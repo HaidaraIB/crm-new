@@ -1,12 +1,13 @@
 
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Owner } from '../types';
+import { OwnersFilterDrawer } from '../components/drawers/OwnersFilterDrawer';
 
-const OwnersTable = ({ owners, onEdit, onDelete }: { owners: Owner[], onEdit: (owner: Owner) => void, onDelete: (id: number) => void }) => {
+const OwnersTable = ({ owners, onEdit, onDelete, isAdmin }: { owners: Owner[], onEdit: (owner: Owner) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto">
@@ -31,12 +32,16 @@ const OwnersTable = ({ owners, onEdit, onDelete }: { owners: Owner[], onEdit: (o
                             <td className="px-6 py-4">{owner.phone}</td>
                             <td className="px-6 py-4">
                                 <div className="flex items-center gap-2">
-                                    <Button variant="ghost" className="p-1 h-auto" onClick={() => onEdit(owner)}>
-                                        <EditIcon className="w-4 h-4" />
-                                    </Button>
-                                    <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(owner.id)}>
-                                        <TrashIcon className="w-4 h-4" />
-                                    </Button>
+                                    {isAdmin && (
+                                        <Button variant="ghost" className="p-1 h-auto" onClick={() => onEdit(owner)}>
+                                            <EditIcon className="w-4 h-4" />
+                                        </Button>
+                                    )}
+                                    {isAdmin && (
+                                        <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(owner.id)}>
+                                            <TrashIcon className="w-4 h-4" />
+                                        </Button>
+                                    )}
                                 </div>
                             </td>
                         </tr>
@@ -53,7 +58,20 @@ const OwnersTable = ({ owners, onEdit, onDelete }: { owners: Owner[], onEdit: (o
 
 
 export const OwnersPage = () => {
-    const { t, currentUser, setIsAddOwnerModalOpen, owners, deleteOwner, setEditingOwner, setIsEditOwnerModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
+    const { 
+        t, 
+        currentUser, 
+        setIsAddOwnerModalOpen, 
+        owners, 
+        ownerFilters,
+        setOwnerFilters,
+        setIsOwnerFilterDrawerOpen,
+        deleteOwner, 
+        setEditingOwner, 
+        setIsEditOwnerModalOpen, 
+        setConfirmDeleteConfig, 
+        setIsConfirmDeleteModalOpen 
+    } = useAppContext();
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -78,6 +96,7 @@ export const OwnersPage = () => {
 
     // Check if user's company specialization is real_estate
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
+    const isAdmin = currentUser?.role === 'Owner';
 
     // If not real estate, show message
     if (!isRealEstate) {
@@ -96,6 +115,25 @@ export const OwnersPage = () => {
         setEditingOwner(owner);
         setIsEditOwnerModalOpen(true);
     };
+
+    const filteredOwners = useMemo(() => {
+        let filtered = owners;
+        if (ownerFilters.city && ownerFilters.city !== 'All') {
+            filtered = filtered.filter(owner => owner.city === ownerFilters.city);
+        }
+        if (ownerFilters.district && ownerFilters.district !== 'All') {
+            filtered = filtered.filter(owner => owner.district === ownerFilters.district);
+        }
+        if (ownerFilters.search) {
+            const searchLower = ownerFilters.search.toLowerCase();
+            filtered = filtered.filter(owner => 
+                owner.name.toLowerCase().includes(searchLower) || 
+                owner.code.toLowerCase().includes(searchLower) ||
+                owner.phone.includes(searchLower)
+            );
+        }
+        return filtered;
+    }, [owners, ownerFilters]);
 
     const handleDelete = (id: number) => {
         const owner = owners.find(o => o.id === id);
@@ -127,16 +165,21 @@ export const OwnersPage = () => {
             title={t('owners')}
             actions={
                 <>
-                    <Input id="search-owners" placeholder={t('search')} className="max-w-xs ps-10" icon={<SearchIcon className="w-4 h-4" />} />
-                    <Button onClick={() => setIsAddOwnerModalOpen(true)}>
-                        <PlusIcon className="w-4 h-4"/> {t('addOwner')}
+                    <Button variant="secondary" onClick={() => setIsOwnerFilterDrawerOpen(true)}>
+                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setIsAddOwnerModalOpen(true)}>
+                            <PlusIcon className="w-4 h-4"/> {t('addOwner')}
+                        </Button>
+                    )}
                 </>
             }
         >
             <Card>
-                <OwnersTable owners={owners} onEdit={handleEdit} onDelete={handleDelete} />
+                <OwnersTable owners={filteredOwners} onEdit={handleEdit} onDelete={handleDelete} isAdmin={isAdmin} />
             </Card>
+            <OwnersFilterDrawer />
         </PageWrapper>
     );
 };

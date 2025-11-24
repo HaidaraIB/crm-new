@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Supplier } from '../types';
+import { SuppliersFilterDrawer } from '../components/drawers/SuppliersFilterDrawer';
 
-const SuppliersTable = ({ suppliers, onUpdate, onDelete }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void }) => {
+const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -33,12 +34,16 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete }: { suppliers: Supplier
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-gray-900 dark:text-gray-100 text-xs sm:text-sm">{supplier.contactPerson}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(supplier)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(supplier.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(supplier)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(supplier.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -56,6 +61,9 @@ export const SuppliersPage = () => {
         t,
         currentUser,
         suppliers,
+        supplierFilters,
+        setSupplierFilters,
+        setIsSupplierFilterDrawerOpen,
         deleteSupplier,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
@@ -73,6 +81,7 @@ export const SuppliersPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
+    const isAdmin = currentUser?.role === 'Owner';
 
     // If not products, show message
     if (!isProducts) {
@@ -107,6 +116,29 @@ export const SuppliersPage = () => {
         setIsEditSupplierModalOpen(true);
     };
 
+    const filteredSuppliers = useMemo(() => {
+        let filtered = suppliers;
+
+        // Specialization filter
+        if (supplierFilters.specialization && supplierFilters.specialization !== 'All') {
+            filtered = filtered.filter(supplier => supplier.specialization === supplierFilters.specialization);
+        }
+
+        // Search filter
+        if (supplierFilters.search) {
+            const searchLower = supplierFilters.search.toLowerCase();
+            filtered = filtered.filter(supplier => 
+                supplier.name.toLowerCase().includes(searchLower) ||
+                supplier.code.toLowerCase().includes(searchLower) ||
+                (supplier.email && supplier.email.toLowerCase().includes(searchLower)) ||
+                (supplier.phone && supplier.phone.toLowerCase().includes(searchLower)) ||
+                (supplier.contactPerson && supplier.contactPerson.toLowerCase().includes(searchLower))
+            );
+        }
+
+        return filtered;
+    }, [suppliers, supplierFilters]);
+
     if (loading) {
         return (
             <PageWrapper title={t('suppliers')}>
@@ -122,16 +154,21 @@ export const SuppliersPage = () => {
             title={t('suppliers')}
             actions={
                 <>
-                    <Input id="search-suppliers" placeholder={t('search')} className="max-w-xs ps-10" icon={<SearchIcon className="w-4 h-4" />} />
-                    <Button onClick={() => setIsAddSupplierModalOpen(true)}>
-                        <PlusIcon className="w-4 h-4"/> {t('addSupplier') || 'Add Supplier'}
+                    <Button variant="secondary" onClick={() => setIsSupplierFilterDrawerOpen(true)}>
+                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setIsAddSupplierModalOpen(true)}>
+                            <PlusIcon className="w-4 h-4"/> {t('addSupplier') || 'Add Supplier'}
+                        </Button>
+                    )}
                 </>
             }
         >
             <Card>
-                <SuppliersTable suppliers={suppliers} onUpdate={handleUpdateSupplier} onDelete={handleDeleteSupplier} />
+                <SuppliersTable suppliers={filteredSuppliers} onUpdate={handleUpdateSupplier} onDelete={handleDeleteSupplier} isAdmin={isAdmin} />
             </Card>
+            <SuppliersFilterDrawer />
         </PageWrapper>
     );
 };

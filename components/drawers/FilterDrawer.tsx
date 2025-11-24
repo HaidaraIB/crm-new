@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { XIcon } from '../icons';
 import { Button } from '../Button';
@@ -25,26 +25,65 @@ const FilterLabel = ({ children, htmlFor }: { children?: React.ReactNode; htmlFo
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const FilterSelect = ({ id, children }: { id: string; children?: React.ReactNode }) => {
+const FilterSelect = ({ id, value, onChange, children }: { id: string; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; children?: React.ReactNode }) => {
     const { language } = useAppContext();
     return (
-        <select id={id} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
+        <select id={id} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
             {children}
         </select>
     );
 };
 
-const FilterInput = ({ id, type = 'text', placeholder }: { id: string; type?: string; placeholder?: string }) => {
+const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: string; type?: string; placeholder?: string; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void }) => {
     const { language } = useAppContext();
     return (
-        <input type={type} id={id} placeholder={placeholder} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" />
+        <input type={type} id={id} placeholder={placeholder} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100" />
     );
 };
 
 
 export const FilterDrawer = () => {
-    const { isFilterDrawerOpen, setIsFilterDrawerOpen, t, currentUser, users, campaigns } = useAppContext();
-    const isRealEstate = currentUser?.company?.specialization === 'real_estate';
+    const { isFilterDrawerOpen, setIsFilterDrawerOpen, t, users, leadFilters, setLeadFilters, channels } = useAppContext();
+    const [localFilters, setLocalFilters] = useState(leadFilters);
+
+    // Update local filters when leadFilters changes
+    useEffect(() => {
+        setLocalFilters(leadFilters);
+    }, [leadFilters]);
+
+    const handleFilterChange = (key: keyof typeof localFilters, value: string) => {
+        setLocalFilters(prev => ({
+            ...prev,
+            [key]: value
+        }));
+    };
+
+    const handleReset = () => {
+        const resetFilters = {
+            status: 'All',
+            type: 'All',
+            priority: 'All',
+            assignedTo: 'All',
+            communicationWay: 'All',
+            budgetMin: '',
+            budgetMax: '',
+            createdAtFrom: '',
+            createdAtTo: '',
+            search: '',
+        };
+        setLocalFilters(resetFilters);
+        setLeadFilters(resetFilters);
+    };
+
+    const handleApply = () => {
+        setLeadFilters(localFilters);
+        setIsFilterDrawerOpen(false);
+    };
+
+    const leadStatuses: Array<'All' | 'Untouched' | 'Touched' | 'Following' | 'Meeting' | 'No Answer' | 'Out Of Service'> = ['All', 'Untouched', 'Touched', 'Following', 'Meeting', 'No Answer', 'Out Of Service'];
+    const leadTypes: Array<'All' | 'Fresh' | 'Cold' | 'Rotated'> = ['All', 'Fresh', 'Cold', 'Rotated'];
+    const priorities: Array<'All' | 'High' | 'Medium' | 'Low'> = ['All', 'High', 'Medium', 'Low'];
+    const communicationWays: Array<'All' | 'WhatsApp' | 'Call'> = ['All', 'WhatsApp', 'Call'];
 
     return (
         <>
@@ -57,100 +96,93 @@ export const FilterDrawer = () => {
                     </Button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-200 dark:divide-gray-700">
-                    <FilterSection title={t('users')}>
-                        <div className="space-y-4">
-                             <div>
-                                <FilterLabel htmlFor="team-leader">{t('teamLeader')}</FilterLabel>
-                                <FilterSelect id="team-leader">
-                                    <option>{t('selectLeader')}</option>
-                                    {users.filter(u => u.role.includes('Manager')).map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
-                                </FilterSelect>
-                            </div>
-                            <div>
-                                <FilterLabel htmlFor="is-assigned">{t('assigned')}</FilterLabel>
-                                <FilterSelect id="is-assigned">
-                                    <option>{t('selectAssignedOrNot')}</option>
-                                    <option value="yes">{t('assigned')}</option>
-                                    <option value="no">{t('unassigned')}</option>
-                                </FilterSelect>
-                            </div>
-                            <div>
-                                <FilterLabel htmlFor="assigned-to">{t('assignedTo')}</FilterLabel>
-                                <FilterSelect id="assigned-to">
-                                    <option>{t('selectUser')}</option>
-                                    {users.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
-                                </FilterSelect>
-                            </div>
-                            <div>
-                                <FilterLabel htmlFor="authority">{t('authority')}</FilterLabel>
-                                <FilterSelect id="authority">
-                                    <option>{t('selectAuthority')}</option>
-                                    <option>{t('decisionMaker')}</option>
-                                    <option>{t('influencer')}</option>
-                                </FilterSelect>
-                            </div>
-                        </div>
-                    </FilterSection>
-                    
                     <FilterSection title={t('leadInfo')}>
                         <div className="space-y-4 pt-2">
-                             {isRealEstate && <div><FilterLabel htmlFor="project">{t('project')}</FilterLabel><FilterSelect id="project"><option>{t('selectProject')}</option></FilterSelect></div>}
-                             <div>
-                                <FilterLabel htmlFor="campaign">{t('campaign')}</FilterLabel>
-                                <FilterSelect id="campaign">
-                                    <option>{t('selectCampaign')}</option>
-                                    {campaigns.map(c => <option key={c.id}>{c.name}</option>)}
+                            <div>
+                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
+                                <FilterSelect id="filter-status" value={localFilters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
+                                    {leadStatuses.map(status => (
+                                        <option key={status} value={status}>
+                                            {status === 'All' ? t('all') : t(status.replace(' ', '').toLowerCase() as any) || status}
+                                        </option>
+                                    ))}
                                 </FilterSelect>
                             </div>
-                             <div><FilterLabel htmlFor="channel">{t('channel')}</FilterLabel><FilterSelect id="channel"><option>{t('selectChannel')}</option><option>{t('facebook')}</option><option>{t('website')}</option></FilterSelect></div>
-                             <div><FilterLabel htmlFor="status">{t('status')}</FilterLabel><FilterSelect id="status"><option>{t('selectStatus')}</option><option>{t('qualified')}</option><option>{t('unqualified')}</option></FilterSelect></div>
-                             <div><FilterLabel htmlFor="cancel-reasons">{t('cancelReasons')}</FilterLabel><FilterSelect id="cancel-reasons"><option>{t('selectCancelReason')}</option><option>{t('budgetTooHigh')}</option><option>{t('notInterested')}</option></FilterSelect></div>
-                             <div><FilterLabel htmlFor="current-stage">{t('currentStage')}</FilterLabel><FilterSelect id="current-stage"><option>{t('selectStage')}</option><option>{t('untouched')}</option><option>{t('touched')}</option></FilterSelect></div>
-                             <div><FilterLabel htmlFor="has-stages">{t('hasStages')}</FilterLabel><FilterSelect id="has-stages"><option>{t('selectStages')}</option></FilterSelect></div>
-                             <div>
-                                <FilterLabel htmlFor="priority">{t('priority')}</FilterLabel>
-                                <FilterSelect id="priority">
-                                    <option>{t('selectPriority')}</option>
-                                    <option>{t('high')}</option><option>{t('medium')}</option><option>{t('low')}</option>
+                            
+                            <div>
+                                <FilterLabel htmlFor="filter-type">{t('type')}</FilterLabel>
+                                <FilterSelect id="filter-type" value={localFilters.type} onChange={(e) => handleFilterChange('type', e.target.value)}>
+                                    {leadTypes.map(type => (
+                                        <option key={type} value={type}>
+                                            {type === 'All' ? t('all') : t(type.toLowerCase() as any) || type}
+                                        </option>
+                                    ))}
                                 </FilterSelect>
                             </div>
-                             <div><FilterLabel htmlFor="excel-filenames">{t('excelFilenames')}</FilterLabel><FilterSelect id="excel-filenames"><option>{t('selectExcel')}</option></FilterSelect></div>
+
+                            <div>
+                                <FilterLabel htmlFor="filter-priority">{t('priority')}</FilterLabel>
+                                <FilterSelect id="filter-priority" value={localFilters.priority} onChange={(e) => handleFilterChange('priority', e.target.value)}>
+                                    {priorities.map(priority => (
+                                        <option key={priority} value={priority}>
+                                            {priority === 'All' ? t('all') : t(priority.toLowerCase() as any) || priority}
+                                        </option>
+                                    ))}
+                                </FilterSelect>
+                            </div>
+
+                            <div>
+                                <FilterLabel htmlFor="filter-communication">{t('communicationWay')}</FilterLabel>
+                                <FilterSelect id="filter-communication" value={localFilters.communicationWay} onChange={(e) => handleFilterChange('communicationWay', e.target.value)}>
+                                    {communicationWays.map(way => (
+                                        <option key={way} value={way}>
+                                            {way === 'All' ? t('all') : way}
+                                        </option>
+                                    ))}
+                                </FilterSelect>
+                            </div>
+
+                            <div>
+                                <FilterLabel htmlFor="filter-assigned">{t('assignedTo')}</FilterLabel>
+                                <FilterSelect id="filter-assigned" value={localFilters.assignedTo} onChange={(e) => handleFilterChange('assignedTo', e.target.value)}>
+                                    <option value="All">{t('all')}</option>
+                                    {users.map(user => (
+                                        <option key={user.id} value={user.id.toString()}>
+                                            {user.name}
+                                        </option>
+                                    ))}
+                                </FilterSelect>
+                            </div>
+
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <FilterLabel htmlFor="budget-start">{t('budgetRangeStart')}</FilterLabel>
-                                    <FilterInput id="budget-start" type="number" placeholder={t('eg500000')} />
+                                    <FilterLabel htmlFor="filter-budget-min">{t('budgetRangeStart')}</FilterLabel>
+                                    <FilterInput id="filter-budget-min" type="number" placeholder={t('eg500000')} value={localFilters.budgetMin} onChange={(e) => handleFilterChange('budgetMin', e.target.value)} />
                                 </div>
                                 <div>
-                                    <FilterLabel htmlFor="budget-end">{t('budgetRangeEnd')}</FilterLabel>
-                                    <FilterInput id="budget-end" type="number" placeholder={t('eg1000000')} />
+                                    <FilterLabel htmlFor="filter-budget-max">{t('budgetRangeEnd')}</FilterLabel>
+                                    <FilterInput id="filter-budget-max" type="number" placeholder={t('eg1000000')} value={localFilters.budgetMax} onChange={(e) => handleFilterChange('budgetMax', e.target.value)} />
                                 </div>
                             </div>
-                        </div>
-                    </FilterSection>
-
-                     <FilterSection title={t('delay')}>
-                        <div className="pt-2">
-                            <FilterLabel htmlFor="delayed-reminder">{t('delayedReminderLeads')}</FilterLabel>
-                            <FilterSelect id="delayed-reminder">
-                                <option>{t('selectDelayedOrNot')}</option>
-                                <option value="yes">{t('delayed')}</option>
-                                <option value="no">{t('notDelayed')}</option>
-                            </FilterSelect>
                         </div>
                     </FilterSection>
 
                     <FilterSection title={t('dates')}>
                         <div className="space-y-4 pt-2">
-                            <div><FilterLabel htmlFor="date-added">{t('dateAddedRange')}</FilterLabel><FilterInput id="date-added" type="date" /></div>
-                            <div><FilterLabel htmlFor="date-assigned">{t('dateAssignedRange')}</FilterLabel><FilterInput id="date-assigned" type="date" /></div>
-                            <div><FilterLabel htmlFor="last-action">{t('lastActionRange')}</FilterLabel><FilterInput id="last-action" type="date" /></div>
-                            <div><FilterLabel htmlFor="reminder-date">{t('reminderDateRange')}</FilterLabel><FilterInput id="reminder-date" type="date" /></div>
+                            <div>
+                                <FilterLabel htmlFor="filter-date-from">{t('leadCreatedAtRange') || t('dateAddedRange')} ({t('from')})</FilterLabel>
+                                <FilterInput id="filter-date-from" type="date" value={localFilters.createdAtFrom} onChange={(e) => handleFilterChange('createdAtFrom', e.target.value)} />
+                            </div>
+                            <div>
+                                <FilterLabel htmlFor="filter-date-to">{t('leadCreatedAtRange') || t('dateAddedRange')} ({t('to')})</FilterLabel>
+                                <FilterInput id="filter-date-to" type="date" value={localFilters.createdAtTo} onChange={(e) => handleFilterChange('createdAtTo', e.target.value)} />
+                            </div>
                         </div>
                     </FilterSection>
                 </div>
                 <div className="p-4 border-t dark:border-gray-800 flex gap-2">
-                    <Button variant="secondary" className="w-full">{t('reset')}</Button>
-                    <Button className="w-full" onClick={() => setIsFilterDrawerOpen(false)}>{t('applyFilters')}</Button>
+                    <Button variant="secondary" className="w-full" onClick={handleReset}>{t('reset')}</Button>
+                    <Button className="w-full" onClick={handleApply}>{t('applyFilters')}</Button>
                 </div>
             </aside>
             {isFilterDrawerOpen && (

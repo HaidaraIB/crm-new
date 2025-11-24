@@ -4,21 +4,24 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon } from '../components/index';
 import { User } from '../types';
 
-// Helper function to translate role
+// Helper function to translate role - only Owner and Employee are valid
 const getRoleTranslation = (role: string, t: (key: string) => string): string => {
+    // Normalize role: convert any old roles to Employee, keep Owner as is
+    const normalizedRole = role === 'Owner' ? 'Owner' : 'Employee';
     const roleMap: Record<string, string> = {
         'Owner': 'owner',
-        'Sales Assistant': 'salesAssistant',
-        'Sales Manager': 'salesManager',
-        'Sales Agent': 'salesAgent',
+        'Employee': 'employee',
     };
     
-    const translationKey = roleMap[role];
-    return translationKey ? t(translationKey) : role;
+    const translationKey = roleMap[normalizedRole];
+    return translationKey ? t(translationKey) : normalizedRole;
 };
 
 const UserCard = ({ user }: { user: User }) => {
-    const { t, setSelectedUser, setIsViewUserModalOpen, setIsEditUserModalOpen, setIsDeleteUserModalOpen } = useAppContext();
+    const { t, setSelectedUser, setIsViewUserModalOpen, setIsEditUserModalOpen, setIsDeleteUserModalOpen, currentUser } = useAppContext();
+    
+    // Check if current user is admin (Owner role)
+    const isAdmin = currentUser?.role === 'Owner';
     
     const handleEdit = () => {
         setSelectedUser(user);
@@ -35,9 +38,7 @@ const UserCard = ({ user }: { user: User }) => {
         setIsViewUserModalOpen(true);
     };
 
-    const handleCall = (e: React.MouseEvent) => {
-        e.preventDefault();
-        e.stopPropagation();
+    const handleCall = () => {
         if (user.phone) {
             const phoneNumber = user.phone.replace(/\D/g, '');
             if (phoneNumber) {
@@ -52,17 +53,19 @@ const UserCard = ({ user }: { user: User }) => {
 
     return (
         <Card className="relative text-center">
-            <div className="absolute top-2 end-2">
-                <Dropdown trigger={
-                    <Button variant="ghost" className="p-1 h-auto">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
-                    </Button>
-                }>
-                    <DropdownItem onClick={handleView}>{t('viewUser')}</DropdownItem>
-                    <DropdownItem onClick={handleEdit}>{t('editUser')}</DropdownItem>
-                    <DropdownItem onClick={handleDelete}>{t('deleteUser')}</DropdownItem>
-                </Dropdown>
-            </div>
+            {isAdmin && (
+                <div className="absolute top-2 end-2">
+                    <Dropdown trigger={
+                        <Button variant="ghost" className="p-1 h-auto">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
+                        </Button>
+                    }>
+                        <DropdownItem onClick={handleView}>{t('viewUser')}</DropdownItem>
+                        <DropdownItem onClick={handleEdit}>{t('editUser')}</DropdownItem>
+                        <DropdownItem onClick={handleDelete}>{t('deleteUser')}</DropdownItem>
+                    </Dropdown>
+                </div>
+            )}
             <div className="flex flex-col items-center pt-4">
                 <img src={user.avatar} alt={user.name} className="w-20 h-20 rounded-full mb-3" />
                 <h3 className="font-bold text-lg">{user.name}</h3>

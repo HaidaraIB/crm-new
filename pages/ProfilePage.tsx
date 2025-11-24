@@ -1,7 +1,7 @@
 
 
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, Loader } from '../components/index';
 
@@ -10,80 +10,55 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
-const FileInput = ({ id, label, onChange }: { id: string; label?: string; onChange: (e: React.ChangeEvent<HTMLInputElement>) => void }) => {
-    const inputRef = useRef<HTMLInputElement>(null);
-    const { t } = useAppContext();
-
-    return (
-        <div>
-            {label && <Label htmlFor={id}>{label}</Label>}
-            <div className="flex items-center gap-2">
-                <input
-                    ref={inputRef}
-                    id={id}
-                    type="file"
-                    accept="image/*"
-                    onChange={onChange}
-                    className="hidden"
-                />
-                <Button variant="secondary" onClick={() => inputRef.current?.click()}>
-                    {t('upload')}
-                </Button>
-            </div>
-        </div>
-    );
-};
-
 export const ProfilePage = () => {
     const {
         t,
         currentUser,
         setCurrentUser,
-        siteLogo,
-        setSiteLogo,
-        setIsChangePasswordModalOpen
+        setIsChangePasswordModalOpen,
+        language
     } = useAppContext();
     const [loading, setLoading] = useState(true);
+    
+    // Split name into first and last name
+    const nameParts = currentUser?.name?.split(' ') || [];
+    const initialFirstName = nameParts[0] || '';
+    const initialLastName = nameParts.slice(1).join(' ') || '';
+    
+    const [firstName, setFirstName] = useState(initialFirstName);
+    const [lastName, setLastName] = useState(initialLastName);
+    const [email, setEmail] = useState(currentUser?.email || '');
+    const [phone, setPhone] = useState(currentUser?.phone || '');
 
     useEffect(() => {
         const timer = setTimeout(() => setLoading(false), 1000);
         return () => clearTimeout(timer);
     }, []);
 
-    const logoInputRef = useRef<HTMLInputElement>(null);
+    // Update form when currentUser changes
+    useEffect(() => {
+        if (currentUser) {
+            const nameParts = currentUser.name?.split(' ') || [];
+            setFirstName(nameParts[0] || '');
+            setLastName(nameParts.slice(1).join(' ') || '');
+            setEmail(currentUser.email || '');
+            setPhone(currentUser.phone || '');
+        }
+    }, [currentUser]);
 
     if (!currentUser) return null;
 
-    const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                if (event.target?.result) {
-                    setCurrentUser({ ...currentUser, avatar: event.target.result as string });
-                }
-            };
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    };
-
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0]) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                const logoDataUrl = event.target?.result as string;
-                setSiteLogo(logoDataUrl);
-                localStorage.setItem('siteLogo', logoDataUrl);
-            };
-            reader.readAsDataURL(e.target.files[0]);
-        }
-    };
-
-    const handleDeleteLogo = () => {
-        setSiteLogo(null);
-        localStorage.removeItem('siteLogo');
-        if (logoInputRef.current) {
-            logoInputRef.current.value = "";
-        }
+    const handleSave = () => {
+        // TODO: Add API call to update user profile
+        // For now, just update local state
+        const fullName = `${firstName} ${lastName}`.trim();
+        setCurrentUser({
+            ...currentUser,
+            name: fullName,
+            email: email,
+            phone: phone
+        });
+        // TODO: Show success message
     };
     
     if (loading) {
@@ -96,61 +71,60 @@ export const ProfilePage = () => {
         );
     }
 
+    const isRTL = language === 'ar';
+
     return (
         <PageWrapper title={t('profile')}>
             <div className="max-w-4xl mx-auto space-y-6">
                 <Card>
                     <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('profileSettings')}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                        <div className="flex flex-col items-center md:items-start gap-4">
-                            <img src={currentUser.avatar} alt="Profile" className="w-24 h-24 rounded-full" />
-                            <FileInput id="avatar-upload" label={t('profilePicture')} onChange={handleAvatarChange} />
-                        </div>
-                        <div className="space-y-4">
+                    <div className={`space-y-4 ${isRTL ? 'text-right' : 'text-left'}`}>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
-                                <Label htmlFor="profile-name">{t('name')}</Label>
-                                <Input id="profile-name" defaultValue={currentUser.name} />
-                            </div>
-                            <div>
-                                <Label htmlFor="profile-email">{t('email')}</Label>
-                                <Input id="profile-email" type="email" defaultValue={currentUser.email} />
-                            </div>
-                        </div>
-                    </div>
-                </Card>
-
-                <Card>
-                    <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('siteCustomization')}</h2>
-                    <div className="space-y-6">
-                        <div className="space-y-2 pt-4 border-t dark:border-gray-700">
-                            <Label htmlFor="logo-upload">{t('siteLogo')}</Label>
-                            <div className="flex items-center gap-2 p-2 rounded-md border dark:border-gray-700 min-h-[56px]">
-                                {siteLogo ? (
-                                    <img src={siteLogo} alt="Current Logo" className="h-10 w-auto object-contain" />
-                                ) : (
-                                    <img src="/logo.png" alt="Default Logo" className="h-10 w-auto object-contain" />
-                                )}
-                            {/* FIX: Corrected typo in closing div tag. */}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                                <input
-                                    ref={logoInputRef}
-                                    id="logo-upload"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleLogoChange}
-                                    className="hidden"
+                                <Label htmlFor="profile-first-name">{t('firstName') || 'First Name'}</Label>
+                                <Input 
+                                    id="profile-first-name" 
+                                    value={firstName}
+                                    onChange={(e) => setFirstName(e.target.value)}
                                 />
-                                <Button variant="secondary" onClick={() => logoInputRef.current?.click()}>
-                                    {t('upload')}
-                                </Button>
-                                {siteLogo && (
-                                    <Button variant="danger" onClick={handleDeleteLogo}>
-                                        {t('delete')}
-                                    </Button>
-                                )}
                             </div>
+                            <div>
+                                <Label htmlFor="profile-last-name">{t('lastName') || 'Last Name'}</Label>
+                                <Input 
+                                    id="profile-last-name" 
+                                    value={lastName}
+                                    onChange={(e) => setLastName(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <Label htmlFor="profile-email">{t('email')}</Label>
+                            <Input 
+                                id="profile-email" 
+                                type="email" 
+                                value={email}
+                                onChange={(e) => setEmail(e.target.value)}
+                                disabled={true}
+                                className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {t('emailVerificationNote') || 'Email verification required to change (coming soon)'}
+                            </p>
+                        </div>
+                        <div>
+                            <Label htmlFor="profile-phone">{t('phone')}</Label>
+                            <Input 
+                                id="profile-phone" 
+                                type="tel" 
+                                value={phone}
+                                onChange={(e) => setPhone(e.target.value)}
+                                disabled={true}
+                                className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                            />
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                {t('phoneVerificationNote') || 'Phone verification required to change (coming soon)'}
+                            </p>
+                        </div>
                     </div>
                 </Card>
 
@@ -161,8 +135,8 @@ export const ProfilePage = () => {
                     </Button>
                 </Card>
                 
-                 <div className="flex justify-end">
-                    <Button>{t('saveProfile')}</Button>
+                <div className="flex justify-end">
+                    <Button onClick={handleSave}>{t('saveProfile')}</Button>
                 </div>
             </div>
         </PageWrapper>

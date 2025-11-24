@@ -38,14 +38,13 @@ const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: 
     );
 };
 
-export const DealsFilterDrawer = () => {
-    const { isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen, t, currentUser, projects, units, dealFilters, setDealFilters, deals } = useAppContext();
-    const [localFilters, setLocalFilters] = useState(dealFilters);
-    const isRealEstate = currentUser?.company?.specialization === 'real_estate';
+export const ServicesFilterDrawer = () => {
+    const { isServiceFilterDrawerOpen, setIsServiceFilterDrawerOpen, t, serviceFilters, setServiceFilters, services, serviceProviders } = useAppContext();
+    const [localFilters, setLocalFilters] = useState(serviceFilters);
 
     useEffect(() => {
-        setLocalFilters(dealFilters);
-    }, [dealFilters]);
+        setLocalFilters(serviceFilters);
+    }, [serviceFilters]);
 
     const handleFilterChange = (key: keyof typeof localFilters, value: string) => {
         setLocalFilters(prev => ({ ...prev, [key]: value }));
@@ -53,93 +52,75 @@ export const DealsFilterDrawer = () => {
 
     const handleReset = () => {
         const resetFilters = {
-            status: 'All',
-            paymentMethod: 'All',
-            unit: 'All',
-            project: 'All',
-            valueMin: '',
-            valueMax: '',
+            category: 'All',
+            provider: 'All',
+            isActive: 'All',
+            priceMin: '',
+            priceMax: '',
             search: '',
         };
         setLocalFilters(resetFilters);
-        setDealFilters(resetFilters);
+        setServiceFilters(resetFilters);
     };
 
     const handleApply = () => {
-        setDealFilters(localFilters);
-        setIsDealsFilterDrawerOpen(false);
+        setServiceFilters(localFilters);
+        setIsServiceFilterDrawerOpen(false);
     };
 
-    // Get unique values from deals for filters
-    const uniqueStatuses = Array.from(new Set(deals.map(d => d.status).filter(Boolean)));
-    const uniquePaymentMethods = Array.from(new Set(deals.map(d => d.paymentMethod).filter(Boolean)));
-    const uniqueUnits = Array.from(new Set(deals.map(d => d.unit).filter(Boolean)));
+    const uniqueCategories = Array.from(new Set(services.map(s => s.category).filter(Boolean)));
+    const uniqueProviders = Array.from(new Set(services.map(s => s.provider).filter(Boolean)));
 
     return (
         <>
             <aside className={`fixed inset-y-0 end-0 z-50 flex h-full w-full max-w-xs flex-col bg-card dark:bg-dark-card border-s dark:border-gray-800 transform transition-transform duration-300 ease-in-out 
-                                ${isDealsFilterDrawerOpen ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'}`}>
+                                ${isServiceFilterDrawerOpen ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'}`}>
                 <div className="flex items-center justify-between p-4 border-b dark:border-gray-800 h-16">
-                    <h2 className="text-lg font-semibold">{t('filterDeals')}</h2>
-                    <Button variant="ghost" className="p-1" onClick={() => setIsDealsFilterDrawerOpen(false)}>
+                    <h2 className="text-lg font-semibold">{t('filterServices')}</h2>
+                    <Button variant="ghost" className="p-1" onClick={() => setIsServiceFilterDrawerOpen(false)}>
                         <XIcon className="h-6 w-6" />
                     </Button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-200 dark:divide-gray-700">
-                    <FilterSection title={t('dealInfo')}>
+                    <FilterSection title={t('serviceInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
-                                <FilterSelect id="filter-status" value={localFilters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
+                                <FilterLabel htmlFor="filter-category">{t('category')}</FilterLabel>
+                                <FilterSelect id="filter-category" value={localFilters.category} onChange={(e) => handleFilterChange('category', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    {uniqueStatuses.map(status => (
-                                        <option key={status} value={status}>{status}</option>
+                                    {uniqueCategories.map(category => (
+                                        <option key={category} value={category}>{category}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-payment">{t('paymentMethod')}</FilterLabel>
-                                <FilterSelect id="filter-payment" value={localFilters.paymentMethod} onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}>
+                                <FilterLabel htmlFor="filter-provider">{t('provider')}</FilterLabel>
+                                <FilterSelect id="filter-provider" value={localFilters.provider} onChange={(e) => handleFilterChange('provider', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    {uniquePaymentMethods.map(method => (
-                                        <option key={method} value={method}>{method}</option>
+                                    {uniqueProviders.map(provider => (
+                                        <option key={provider} value={provider}>{provider}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
 
-                            {isRealEstate && (
-                                <>
-                                    <div>
-                                        <FilterLabel htmlFor="filter-project">{t('project')}</FilterLabel>
-                                        <FilterSelect id="filter-project" value={localFilters.project} onChange={(e) => handleFilterChange('project', e.target.value)}>
-                                            <option value="All">{t('all')}</option>
-                                            {projects.map(project => (
-                                                <option key={project.id} value={project.name}>{project.name}</option>
-                                            ))}
-                                        </FilterSelect>
-                                    </div>
-
-                                    <div>
-                                        <FilterLabel htmlFor="filter-unit">{t('unit')}</FilterLabel>
-                                        <FilterSelect id="filter-unit" value={localFilters.unit} onChange={(e) => handleFilterChange('unit', e.target.value)}>
-                                            <option value="All">{t('all')}</option>
-                                            {uniqueUnits.map(unit => (
-                                                <option key={unit} value={unit}>{unit}</option>
-                                            ))}
-                                        </FilterSelect>
-                                    </div>
-                                </>
-                            )}
+                            <div>
+                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
+                                <FilterSelect id="filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
+                                    <option value="All">{t('all')}</option>
+                                    <option value="true">{t('active')}</option>
+                                    <option value="false">{t('inactive')}</option>
+                                </FilterSelect>
+                            </div>
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <FilterLabel htmlFor="filter-value-min">{t('valueRangeStart') || t('budgetRangeStart')}</FilterLabel>
-                                    <FilterInput id="filter-value-min" type="number" placeholder={t('eg500000')} value={localFilters.valueMin} onChange={(e) => handleFilterChange('valueMin', e.target.value)} />
+                                    <FilterLabel htmlFor="filter-price-min">{t('priceRangeStart')}</FilterLabel>
+                                    <FilterInput id="filter-price-min" type="number" placeholder={t('eg500000')} value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} />
                                 </div>
                                 <div>
-                                    <FilterLabel htmlFor="filter-value-max">{t('valueRangeEnd') || t('budgetRangeEnd')}</FilterLabel>
-                                    <FilterInput id="filter-value-max" type="number" placeholder={t('eg1000000')} value={localFilters.valueMax} onChange={(e) => handleFilterChange('valueMax', e.target.value)} />
+                                    <FilterLabel htmlFor="filter-price-max">{t('priceRangeEnd')}</FilterLabel>
+                                    <FilterInput id="filter-price-max" type="number" placeholder={t('eg1000000')} value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} />
                                 </div>
                             </div>
                         </div>
@@ -147,7 +128,7 @@ export const DealsFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByClientNameOrId')}</FilterLabel>
+                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
                             <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
@@ -157,13 +138,14 @@ export const DealsFilterDrawer = () => {
                     <Button className="w-full" onClick={handleApply}>{t('applyFilters')}</Button>
                 </div>
             </aside>
-            {isDealsFilterDrawerOpen && (
+            {isServiceFilterDrawerOpen && (
                 <div
                     className="fixed inset-0 bg-black/60 z-40"
                     aria-hidden="true"
-                    onClick={() => setIsDealsFilterDrawerOpen(false)}
+                    onClick={() => setIsServiceFilterDrawerOpen(false)}
                 ></div>
             )}
         </>
     );
 };
+

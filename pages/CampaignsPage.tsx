@@ -2,8 +2,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterIcon } from '../components/index';
 import { Campaign } from '../types';
+import { CampaignsFilterDrawer } from '../components/drawers/CampaignsFilterDrawer';
 
 const CampaignsTable = ({ campaigns, onDelete }: { campaigns: Campaign[], onDelete: (id: number) => void }) => {
     const { t } = useAppContext();
@@ -71,8 +72,19 @@ export const CampaignsPage = () => {
     //   };
     //   loadCampaigns();
     // }, []);
-    const { t, setIsAddCampaignModalOpen, campaigns, deleteCampaign, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
-    const [searchTerm, setSearchTerm] = useState('');
+    const { 
+        t, 
+        setIsAddCampaignModalOpen, 
+        campaigns, 
+        campaignFilters,
+        setCampaignFilters,
+        setIsCampaignsFilterDrawerOpen,
+        deleteCampaign, 
+        setConfirmDeleteConfig, 
+        setIsConfirmDeleteModalOpen, 
+        currentUser 
+    } = useAppContext();
+    const isAdmin = currentUser?.role === 'Owner';
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -81,11 +93,57 @@ export const CampaignsPage = () => {
     }, []);
 
     const filteredCampaigns = useMemo(() => {
-        return campaigns.filter(campaign => 
-            campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            campaign.code.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-    }, [searchTerm, campaigns]);
+        let filtered = campaigns;
+
+        // Status filter
+        if (campaignFilters.isActive && campaignFilters.isActive !== 'All') {
+            filtered = filtered.filter(campaign => campaign.isActive === (campaignFilters.isActive === 'true'));
+        }
+
+        // Budget range filter
+        if (campaignFilters.budgetMin) {
+            const minBudget = parseFloat(campaignFilters.budgetMin);
+            if (!isNaN(minBudget)) {
+                filtered = filtered.filter(campaign => campaign.budget >= minBudget);
+            }
+        }
+        if (campaignFilters.budgetMax) {
+            const maxBudget = parseFloat(campaignFilters.budgetMax);
+            if (!isNaN(maxBudget)) {
+                filtered = filtered.filter(campaign => campaign.budget <= maxBudget);
+            }
+        }
+
+        // Created date range filter
+        if (campaignFilters.createdAtFrom) {
+            const fromDate = new Date(campaignFilters.createdAtFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            filtered = filtered.filter(campaign => {
+                const campaignDate = new Date(campaign.createdAt);
+                campaignDate.setHours(0, 0, 0, 0);
+                return campaignDate >= fromDate;
+            });
+        }
+        if (campaignFilters.createdAtTo) {
+            const toDate = new Date(campaignFilters.createdAtTo);
+            toDate.setHours(23, 59, 59, 999);
+            filtered = filtered.filter(campaign => {
+                const campaignDate = new Date(campaign.createdAt);
+                return campaignDate <= toDate;
+            });
+        }
+
+        // Search filter
+        if (campaignFilters.search) {
+            const searchLower = campaignFilters.search.toLowerCase();
+            filtered = filtered.filter(campaign => 
+                campaign.name.toLowerCase().includes(searchLower) ||
+                campaign.code.toLowerCase().includes(searchLower)
+            );
+        }
+
+        return filtered;
+    }, [campaigns, campaignFilters]);
     
     const handleDelete = (id: number) => {
         const campaign = campaigns.find(c => c.id === id);
@@ -118,17 +176,14 @@ export const CampaignsPage = () => {
             title={t('campaigns')}
             actions={
                 <>
-                    <Input 
-                        id="search-campaigns" 
-                        placeholder={t('searchEllipsis')} 
-                        className="max-w-xs ps-10" 
-                        icon={<SearchIcon className="w-4 h-4" />} 
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                    <Button onClick={() => setIsAddCampaignModalOpen(true)}>
-                        <PlusIcon className="w-4 h-4"/> {t('addCampaign')}
+                    <Button variant="secondary" onClick={() => setIsCampaignsFilterDrawerOpen(true)}>
+                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setIsAddCampaignModalOpen(true)}>
+                            <PlusIcon className="w-4 h-4"/> {t('addCampaign')}
+                        </Button>
+                    )}
                 </>
             }
         >
@@ -138,6 +193,7 @@ export const CampaignsPage = () => {
                     onDelete={handleDelete}
                 />
             </Card>
+            <CampaignsFilterDrawer />
         </PageWrapper>
     );
 };

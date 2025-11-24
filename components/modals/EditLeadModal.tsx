@@ -102,7 +102,7 @@ export const EditLeadModal = () => {
                         <Input id="budget" type="number" placeholder={t('enterBudget')} value={formState.budget} onChange={handleChange} />
                     </div>
                     <div>
-                        <Label htmlFor="phone">{t('phoneNumber1')}</Label>
+                        <Label htmlFor="phone">{t('phoneNumber')}</Label>
                         <Input id="phone" placeholder={t('enterPhoneNumber')} value={formState.phone} onChange={handleChange} />
                     </div>
                      <div>

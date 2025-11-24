@@ -17,14 +17,14 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 );
 
 export const AddUserModal = () => {
-    const { isAddUserModalOpen, setIsAddUserModalOpen, addUser, t } = useAppContext();
+    const { isAddUserModalOpen, setIsAddUserModalOpen, addUser, t, currentUser } = useAppContext();
     const [formData, setFormData] = useState({
         name: '',
         username: '',
         email: '',
         password: '',
         phone: '',
-        role: 'Sales Agent',
+        role: 'Employee',
     });
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -64,7 +64,7 @@ export const AddUserModal = () => {
             email: '',
             password: '',
             phone: '',
-            role: 'Sales Agent',
+            role: 'Employee',
         });
         setErrors({});
         setIsAddUserModalOpen(false);
@@ -90,7 +90,7 @@ export const AddUserModal = () => {
                 email: '',
                 password: '',
                 phone: '',
-                role: 'Sales Agent',
+                role: 'Employee',
             });
             setErrors({});
         }} title={t('createUser')}>
@@ -159,9 +159,7 @@ export const AddUserModal = () => {
                         value={formData.role}
                         onChange={(e) => handleChange('role', e.target.value)}
                     >
-                        <option value="Sales Agent">{t('salesAgent')}</option>
-                        <option value="Sales Assistant">{t('salesAssistant')}</option>
-                        <option value="Sales Manager">{t('salesManager')}</option>
+                        <option value="Employee">{t('employee')}</option>
                     </Select>
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>
@@ -174,7 +172,7 @@ export const AddUserModal = () => {
                             email: '',
                             password: '',
                             phone: '',
-                            role: 'Sales Agent',
+                            role: 'Employee',
                         });
                         setErrors({});
                     }}>{t('cancel')}</Button>

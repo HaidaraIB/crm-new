@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { ProductCategory } from '../types';
+import { ProductCategoriesFilterDrawer } from '../components/drawers/ProductCategoriesFilterDrawer';
 
-const CategoriesTable = ({ categories, onUpdate, onDelete }: { categories: ProductCategory[], onUpdate: (category: ProductCategory) => void, onDelete: (id: number) => void }) => {
+const CategoriesTable = ({ categories, onUpdate, onDelete, isAdmin }: { categories: ProductCategory[], onUpdate: (category: ProductCategory) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -27,12 +28,16 @@ const CategoriesTable = ({ categories, onUpdate, onDelete }: { categories: Produ
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-gray-900 dark:text-gray-100 text-xs sm:text-sm max-w-xs truncate">{category.description}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(category)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(category.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(category)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(category.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -50,6 +55,9 @@ export const ProductCategoriesPage = () => {
         t,
         currentUser,
         productCategories,
+        productCategoryFilters,
+        setProductCategoryFilters,
+        setIsProductCategoriesFilterDrawerOpen,
         deleteProductCategory,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
@@ -67,6 +75,7 @@ export const ProductCategoriesPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
+    const isAdmin = currentUser?.role === 'Owner';
 
     // If not products, show message
     if (!isProducts) {
@@ -101,6 +110,22 @@ export const ProductCategoriesPage = () => {
         setIsEditProductCategoryModalOpen(true);
     };
 
+    const filteredCategories = useMemo(() => {
+        let filtered = productCategories;
+
+        // Search filter
+        if (productCategoryFilters.search) {
+            const searchLower = productCategoryFilters.search.toLowerCase();
+            filtered = filtered.filter(category => 
+                category.name.toLowerCase().includes(searchLower) ||
+                category.code.toLowerCase().includes(searchLower) ||
+                (category.description && category.description.toLowerCase().includes(searchLower))
+            );
+        }
+
+        return filtered;
+    }, [productCategories, productCategoryFilters]);
+
     if (loading) {
         return (
             <PageWrapper title={t('productCategories')}>
@@ -116,16 +141,21 @@ export const ProductCategoriesPage = () => {
             title={t('productCategories')}
             actions={
                 <>
-                    <Input id="search-categories" placeholder={t('search')} className="max-w-xs ps-10" icon={<SearchIcon className="w-4 h-4" />} />
-                    <Button onClick={() => setIsAddProductCategoryModalOpen(true)}>
-                        <PlusIcon className="w-4 h-4"/> {t('addProductCategory') || 'Add Product Category'}
+                    <Button variant="secondary" onClick={() => setIsProductCategoriesFilterDrawerOpen(true)}>
+                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setIsAddProductCategoryModalOpen(true)}>
+                            <PlusIcon className="w-4 h-4"/> {t('addProductCategory') || 'Add Product Category'}
+                        </Button>
+                    )}
                 </>
             }
         >
             <Card>
-                <CategoriesTable categories={productCategories} onUpdate={handleUpdateCategory} onDelete={handleDeleteCategory} />
+                <CategoriesTable categories={filteredCategories} onUpdate={handleUpdateCategory} onDelete={handleDeleteCategory} isAdmin={isAdmin} />
             </Card>
+            <ProductCategoriesFilterDrawer />
         </PageWrapper>
     );
 };

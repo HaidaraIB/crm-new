@@ -101,7 +101,41 @@
         .text-inverse {
             color: rgb(var(--text-inverse));
         }
-        /* Custom Scrollbar for Sidebar */
+        /* Global Scrollbar Styling - Webkit (Chrome, Safari, Edge) */
+        *::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        
+        *::-webkit-scrollbar-track {
+            background-color: #f3f4f6; /* gray-100 */
+            border-radius: 5px;
+        }
+        
+        .dark *::-webkit-scrollbar-track {
+            background-color: #1f2937; /* gray-800 */
+        }
+        
+        *::-webkit-scrollbar-thumb {
+            background-color: hsl(var(--color-primary-500));
+            border-radius: 5px;
+            border: 2px solid transparent;
+            background-clip: padding-box;
+        }
+        
+        *::-webkit-scrollbar-thumb:hover {
+            background-color: hsl(var(--color-primary-600));
+        }
+        
+        .dark *::-webkit-scrollbar-thumb {
+            background-color: hsl(var(--color-primary-400));
+        }
+        
+        .dark *::-webkit-scrollbar-thumb:hover {
+            background-color: hsl(var(--color-primary-500));
+        }
+        
+        /* Custom Scrollbar for Sidebar (thinner) */
         .custom-scrollbar::-webkit-scrollbar {
             width: 8px;
         }
@@ -112,17 +146,36 @@
             background-color: #111827; /* gray-900 */
         }
         .custom-scrollbar::-webkit-scrollbar-thumb {
-            background-color: hsl(var(--primary));
+            background-color: hsl(var(--color-primary-500));
             border-radius: 4px;
         }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: hsl(var(--color-primary-600));
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
+            background-color: hsl(var(--color-primary-400));
+        }
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+            background-color: hsl(var(--color-primary-500));
+        }
 
-        /* Firefox scrollbar styling */
+        /* Firefox scrollbar styling - Global */
+        * {
+            scrollbar-width: thin;
+            scrollbar-color: hsl(var(--color-primary-500)) #f3f4f6;
+        }
+        
+        .dark * {
+            scrollbar-color: hsl(var(--color-primary-400)) #1f2937;
+        }
+        
+        /* Firefox scrollbar styling - Custom scrollbar class */
         .custom-scrollbar {
-          scrollbar-width: thin;
-          scrollbar-color: hsl(var(--primary)) #f3f4f6;
+            scrollbar-width: thin;
+            scrollbar-color: hsl(var(--color-primary-500)) #f3f4f6;
         }
         .dark .custom-scrollbar {
-            scrollbar-color: hsl(var(--primary)) #111827;
+            scrollbar-color: hsl(var(--color-primary-400)) #111827;
         }
 
         /* Prevent chart background from changing on hover */

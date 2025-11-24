@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status } from '../types';
+import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters } from '../types';
 import { translations } from '../constants';
 import { formatStageName, getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
@@ -93,14 +93,34 @@ export interface AppContextType {
   setIsAssignLeadModalOpen: (isOpen: boolean) => void;
   isFilterDrawerOpen: boolean;
   setIsFilterDrawerOpen: (isOpen: boolean) => void;
+  isActivitiesFilterDrawerOpen: boolean;
+  setIsActivitiesFilterDrawerOpen: (isOpen: boolean) => void;
+  isDeveloperFilterDrawerOpen: boolean;
+  setIsDeveloperFilterDrawerOpen: (isOpen: boolean) => void;
+  isProjectFilterDrawerOpen: boolean;
+  setIsProjectFilterDrawerOpen: (isOpen: boolean) => void;
+  isOwnerFilterDrawerOpen: boolean;
+  setIsOwnerFilterDrawerOpen: (isOpen: boolean) => void;
+  isProductFilterDrawerOpen: boolean;
+  setIsProductFilterDrawerOpen: (isOpen: boolean) => void;
+  isProductCategoryFilterDrawerOpen: boolean;
+  setIsProductCategoryFilterDrawerOpen: (isOpen: boolean) => void;
+  isSupplierFilterDrawerOpen: boolean;
+  setIsSupplierFilterDrawerOpen: (isOpen: boolean) => void;
+  isServiceFilterDrawerOpen: boolean;
+  setIsServiceFilterDrawerOpen: (isOpen: boolean) => void;
+  isServicePackageFilterDrawerOpen: boolean;
+  setIsServicePackageFilterDrawerOpen: (isOpen: boolean) => void;
+  isServiceProviderFilterDrawerOpen: boolean;
+  setIsServiceProviderFilterDrawerOpen: (isOpen: boolean) => void;
+  isCampaignsFilterDrawerOpen: boolean;
+  setIsCampaignsFilterDrawerOpen: (isOpen: boolean) => void;
   checkedLeadIds: Set<number>;
   setCheckedLeadIds: React.Dispatch<React.SetStateAction<Set<number>>>;
   primaryColor: string;
   setPrimaryColor: (color: string) => void;
   activeSubPageColor: string;
   setActiveSubPageColor: (color: string) => void;
-  siteLogo: string | null;
-  setSiteLogo: (logo: string | null) => void;
 
   // Inventory states
   isUnitsFilterDrawerOpen: boolean;
@@ -229,17 +249,25 @@ export interface AppContextType {
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'history' | 'lastFeedback' | 'notes' | 'lastStage' | 'reminder'>) => void;
   updateLead: (leadId: number, leadData: Partial<Lead>) => void;
   assignLeads: (leadIds: number[], userId: number) => void;
+  leadFilters: LeadFilters;
+  setLeadFilters: React.Dispatch<React.SetStateAction<LeadFilters>>;
   deals: Deal[];
   setDeals: React.Dispatch<React.SetStateAction<Deal[]>>; // TODO: استخدم هذا لتحديث deals من API
   addDeal: (deal: Omit<Deal, 'id'>) => void;
   deleteDeal: (dealId: number) => void;
+  dealFilters: DealFilters;
+  setDealFilters: React.Dispatch<React.SetStateAction<DealFilters>>;
   campaigns: Campaign[];
   setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>;
   addCampaign: (campaign: Omit<Campaign, 'id' | 'code' | 'createdAt'>) => void;
   deleteCampaign: (campaignId: number) => void;
+  campaignFilters: CampaignFilters;
+  setCampaignFilters: React.Dispatch<React.SetStateAction<CampaignFilters>>;
   activities: Activity[];
   setActivities: React.Dispatch<React.SetStateAction<Activity[]>>;
   addActivity: (activity: Omit<Activity, 'id'>) => void;
+  activityFilters: ActivityFilters;
+  setActivityFilters: React.Dispatch<React.SetStateAction<ActivityFilters>>;
   todos: Todo[];
   setTodos: React.Dispatch<React.SetStateAction<Todo[]>>;
   completedTodos: Todo[];
@@ -251,53 +279,73 @@ export interface AppContextType {
   addDeveloper: (developer: Omit<Developer, 'id' | 'code'>) => void;
   updateDeveloper: (developer: Developer) => void;
   deleteDeveloper: (developerId: number) => void;
+  developerFilters: DeveloperFilters;
+  setDeveloperFilters: React.Dispatch<React.SetStateAction<DeveloperFilters>>;
   projects: Project[];
   setProjects: React.Dispatch<React.SetStateAction<Project[]>>; // TODO: استخدم هذا لتحديث projects من API
   addProject: (project: Omit<Project, 'id' | 'code'>) => void;
   updateProject: (project: Project) => void;
   deleteProject: (projectId: number) => void;
+  projectFilters: ProjectFilters;
+  setProjectFilters: React.Dispatch<React.SetStateAction<ProjectFilters>>;
   units: Unit[];
   setUnits: React.Dispatch<React.SetStateAction<Unit[]>>; // TODO: استخدم هذا لتحديث units من API
   addUnit: (unit: Omit<Unit, 'id' | 'code' | 'isSold'>) => void;
   updateUnit: (unit: Unit) => void;
   deleteUnit: (unitId: number) => void;
+  unitFilters: UnitFilters;
+  setUnitFilters: React.Dispatch<React.SetStateAction<UnitFilters>>;
   owners: Owner[];
   setOwners: React.Dispatch<React.SetStateAction<Owner[]>>; // TODO: استخدم هذا لتحديث owners من API
   addOwner: (owner: Omit<Owner, 'id' | 'code'>) => void;
   updateOwner: (owner: Owner) => void;
   deleteOwner: (ownerId: number) => void;
+  ownerFilters: OwnerFilters;
+  setOwnerFilters: React.Dispatch<React.SetStateAction<OwnerFilters>>;
   // Services data
   services: Service[];
   setServices: React.Dispatch<React.SetStateAction<Service[]>>; // TODO: استخدم هذا لتحديث services من API
   addService: (service: Omit<Service, 'id' | 'code'>) => void;
   updateService: (service: Service) => void;
   deleteService: (serviceId: number) => void;
+  serviceFilters: ServiceFilters;
+  setServiceFilters: React.Dispatch<React.SetStateAction<ServiceFilters>>;
   servicePackages: ServicePackage[];
   setServicePackages: React.Dispatch<React.SetStateAction<ServicePackage[]>>; // TODO: استخدم هذا لتحديث servicePackages من API
   addServicePackage: (servicePackage: Omit<ServicePackage, 'id' | 'code'>) => void;
   updateServicePackage: (servicePackage: ServicePackage) => void;
   deleteServicePackage: (packageId: number) => void;
+  servicePackageFilters: ServicePackageFilters;
+  setServicePackageFilters: React.Dispatch<React.SetStateAction<ServicePackageFilters>>;
   serviceProviders: ServiceProvider[];
   setServiceProviders: React.Dispatch<React.SetStateAction<ServiceProvider[]>>; // TODO: استخدم هذا لتحديث serviceProviders من API
   addServiceProvider: (provider: Omit<ServiceProvider, 'id' | 'code'>) => void;
   updateServiceProvider: (provider: ServiceProvider) => void;
   deleteServiceProvider: (providerId: number) => void;
+  serviceProviderFilters: ServiceProviderFilters;
+  setServiceProviderFilters: React.Dispatch<React.SetStateAction<ServiceProviderFilters>>;
   // Products data
   products: Product[];
   setProducts: React.Dispatch<React.SetStateAction<Product[]>>; // TODO: استخدم هذا لتحديث products من API
   addProduct: (product: Omit<Product, 'id' | 'code'>) => void;
   updateProduct: (product: Product) => void;
   deleteProduct: (productId: number) => void;
+  productFilters: ProductFilters;
+  setProductFilters: React.Dispatch<React.SetStateAction<ProductFilters>>;
   productCategories: ProductCategory[];
   setProductCategories: React.Dispatch<React.SetStateAction<ProductCategory[]>>; // TODO: استخدم هذا لتحديث productCategories من API
   addProductCategory: (category: Omit<ProductCategory, 'id' | 'code'>) => void;
   updateProductCategory: (category: ProductCategory) => void;
   deleteProductCategory: (categoryId: number) => void;
+  productCategoryFilters: ProductCategoryFilters;
+  setProductCategoryFilters: React.Dispatch<React.SetStateAction<ProductCategoryFilters>>;
   suppliers: Supplier[];
   setSuppliers: React.Dispatch<React.SetStateAction<Supplier[]>>; // TODO: استخدم هذا لتحديث suppliers من API
   addSupplier: (supplier: Omit<Supplier, 'id' | 'code'>) => void;
   updateSupplier: (supplier: Supplier) => void;
   deleteSupplier: (supplierId: number) => void;
+  supplierFilters: SupplierFilters;
+  setSupplierFilters: React.Dispatch<React.SetStateAction<SupplierFilters>>;
   // Client Tasks (Actions) data
   clientTasks: ClientTask[];
   setClientTasks: React.Dispatch<React.SetStateAction<ClientTask[]>>;
@@ -328,6 +376,20 @@ export const useAppContext = () => {
   const context = useContext(AppContext);
   if (!context) throw new Error('useAppContext must be used within an AppProvider');
   return context;
+};
+
+// Helper function to normalize user roles - only Owner and Employee are valid
+const normalizeRole = (role: string | undefined): 'Owner' | 'Employee' => {
+  if (!role || typeof role !== 'string') return 'Employee';
+  const roleLower = role.toLowerCase();
+  if (roleLower === 'admin' || role === 'Owner') return 'Owner';
+  // Convert any old roles (Sales Agent, Sales Manager, etc.) to Employee
+  if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {
+    return 'Employee';
+  }
+  if (roleLower === 'employee' || role === 'Employee') return 'Employee';
+  // Default to Employee for any unknown role
+  return 'Employee';
 };
 
 // FIX: Made children optional to fix missing children prop error.
@@ -361,14 +423,119 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [dataLoaded, setDataLoaded] = useState(false); // لتتبع ما إذا تم تحميل البيانات بالفعل
   const [currentPage, setCurrentPage] = useState<Page>('Dashboard');
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [leadFilters, setLeadFilters] = useState<LeadFilters>({
+    status: 'All',
+    type: 'All',
+    priority: 'All',
+    assignedTo: 'All',
+    communicationWay: 'All',
+    budgetMin: '',
+    budgetMax: '',
+    createdAtFrom: '',
+    createdAtTo: '',
+    search: '',
+  });
+  const [activityFilters, setActivityFilters] = useState<ActivityFilters>({
+    user: 'All',
+    stage: 'All',
+    leadType: 'All',
+    timePeriod: 'All',
+    dateFrom: '',
+    dateTo: '',
+    search: '',
+  });
+  const [developerFilters, setDeveloperFilters] = useState<DeveloperFilters>({
+    search: '',
+  });
+  const [projectFilters, setProjectFilters] = useState<ProjectFilters>({
+    developer: 'All',
+    type: 'All',
+    city: 'All',
+    paymentMethod: 'All',
+    search: '',
+  });
+  const [unitFilters, setUnitFilters] = useState<UnitFilters>({
+    project: 'All',
+    type: 'All',
+    finishing: 'All',
+    city: 'All',
+    district: 'All',
+    zone: 'All',
+    isSold: 'All',
+    bedrooms: 'All',
+    bathrooms: 'All',
+    priceMin: '',
+    priceMax: '',
+    search: '',
+  });
+  const [ownerFilters, setOwnerFilters] = useState<OwnerFilters>({
+    city: 'All',
+    district: 'All',
+    search: '',
+  });
+  const [productFilters, setProductFilters] = useState<ProductFilters>({
+    category: 'All',
+    supplier: 'All',
+    isActive: 'All',
+    stockMin: '',
+    stockMax: '',
+    priceMin: '',
+    priceMax: '',
+    search: '',
+  });
+  const [productCategoryFilters, setProductCategoryFilters] = useState<ProductCategoryFilters>({
+    search: '',
+  });
+  const [supplierFilters, setSupplierFilters] = useState<SupplierFilters>({
+    specialization: 'All',
+    search: '',
+  });
+  const [serviceFilters, setServiceFilters] = useState<ServiceFilters>({
+    category: 'All',
+    provider: 'All',
+    isActive: 'All',
+    priceMin: '',
+    priceMax: '',
+    search: '',
+  });
+  const [servicePackageFilters, setServicePackageFilters] = useState<ServicePackageFilters>({
+    isActive: 'All',
+    priceMin: '',
+    priceMax: '',
+    search: '',
+  });
+  const [serviceProviderFilters, setServiceProviderFilters] = useState<ServiceProviderFilters>({
+    specialization: 'All',
+    search: '',
+  });
+  const [dealFilters, setDealFilters] = useState<DealFilters>({
+    status: 'All',
+    paymentMethod: 'All',
+    unit: 'All',
+    project: 'All',
+    valueMin: '',
+    valueMax: '',
+    search: '',
+  });
+  const [campaignFilters, setCampaignFilters] = useState<CampaignFilters>({
+    isActive: 'All',
+    budgetMin: '',
+    budgetMax: '',
+    createdAtFrom: '',
+    createdAtTo: '',
+    search: '',
+  });
   const [selectedLeadForDeal, setSelectedLeadForDeal] = useState<number | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
-    // محاولة تحميل المستخدم من localStorage
+    // محاولة تحميل المستخدم من localStorage مع تنظيف الأدوار القديمة
     const stored = localStorage.getItem('currentUser');
     if (stored) {
       try {
-        return JSON.parse(stored);
+        const parsed = JSON.parse(stored);
+        // تنظيف الدور القديم
+        parsed.role = normalizeRole(parsed.role);
+        return parsed;
       } catch {
         return null;
       }
@@ -377,21 +544,20 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   });
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   // Always use fixed purple color - never load from localStorage
-  const [primaryColor] = useState(() => {
+  const [primaryColor, setPrimaryColorState] = useState(() => {
     // Remove any old color from localStorage to ensure consistency
     if (typeof window !== 'undefined') {
       localStorage.removeItem('primaryColor');
     }
     return '#9333ea'; // Purple (fixed, not customizable)
   });
-  const [activeSubPageColor] = useState(() => {
+  const [activeSubPageColor, setActiveSubPageColorState] = useState(() => {
     // Remove any old color from localStorage to ensure consistency
     if (typeof window !== 'undefined') {
       localStorage.removeItem('activeSubPageColor');
     }
     return '#9333ea'; // Purple (same as primary color, fixed, not customizable)
   });
-  const [siteLogo, setSiteLogo] = useState<string | null>(null);
   
   // Data states - TODO: سيتم تحميل البيانات من API بدلاً من البيانات الثابتة
   const [users, setUsers] = useState<User[]>([]);
@@ -427,6 +593,17 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isAddTodoModalOpen, setIsAddTodoModalOpen] = useState(false);
   const [isAssignLeadModalOpen, setIsAssignLeadModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen] = useState(false);
+  const [isDeveloperFilterDrawerOpen, setIsDeveloperFilterDrawerOpen] = useState(false);
+  const [isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen] = useState(false);
+  const [isOwnerFilterDrawerOpen, setIsOwnerFilterDrawerOpen] = useState(false);
+  const [isProductFilterDrawerOpen, setIsProductFilterDrawerOpen] = useState(false);
+  const [isProductCategoryFilterDrawerOpen, setIsProductCategoryFilterDrawerOpen] = useState(false);
+  const [isSupplierFilterDrawerOpen, setIsSupplierFilterDrawerOpen] = useState(false);
+  const [isServiceFilterDrawerOpen, setIsServiceFilterDrawerOpen] = useState(false);
+  const [isServicePackageFilterDrawerOpen, setIsServicePackageFilterDrawerOpen] = useState(false);
+  const [isServiceProviderFilterDrawerOpen, setIsServiceProviderFilterDrawerOpen] = useState(false);
+  const [isCampaignsFilterDrawerOpen, setIsCampaignsFilterDrawerOpen] = useState(false);
   const [checkedLeadIds, setCheckedLeadIds] = useState<Set<number>>(new Set());
 
   // Inventory state
@@ -506,14 +683,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (storedTheme) setThemeState(storedTheme);
     const storedLang = localStorage.getItem('language') as Language;
     if (storedLang) setLanguage(storedLang);
-    const storedColor = localStorage.getItem('primaryColor');
-    if (storedColor) setPrimaryColor(storedColor);
+    // Primary color is fixed to purple - no longer loads from localStorage
+    // Removed: const storedColor = localStorage.getItem('primaryColor');
     // activeSubPageColor is now fixed to purple - no longer loads from localStorage
     if (typeof window !== 'undefined') {
       localStorage.removeItem('activeSubPageColor');
+      localStorage.removeItem('siteLogo');
     }
-    const storedLogo = localStorage.getItem('siteLogo');
-    if (storedLogo) setSiteLogo(storedLogo);
 
     // تحميل البيانات من API عند تسجيل الدخول (مرة واحدة فقط)
     if (isLoggedIn && localStorage.getItem('accessToken') && !dataLoaded) {
@@ -522,13 +698,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       // تحميل بيانات المستخدم الحالي
       getCurrentUserAPI()
         .then((userData) => {
-          // تحويل بيانات المستخدم من API إلى تنسيق Frontend
+          // تحويل بيانات المستخدم من API إلى تنسيق Frontend - تنظيف الأدوار القديمة
           const frontendUser: User = {
             id: userData.id,
             name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
             username: userData.username,
             email: userData.email,
-            role: userData.role === 'admin' ? 'Owner' : userData.role === 'employee' ? 'Sales Agent' : userData.role,
+            role: normalizeRole(userData.role === 'admin' ? 'Owner' : userData.role),
             phone: '',
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
             company: userData.company ? {
@@ -862,14 +1038,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             };
           });
 
-          // تحويل بيانات Users
+          // تحويل بيانات Users - تنظيف الأدوار القديمة
           const frontendUsers: User[] = usersResponse.results.map((u: any) => ({
             id: u.id,
             name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username,
             username: u.username,
             email: u.email,
             phone: u.phone || '',
-            role: u.role === 'admin' ? 'Owner' : u.role === 'employee' ? 'Sales Agent' : u.role,
+            role: normalizeRole(u.role === 'admin' ? 'Owner' : u.role),
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}&background=random`,
             company: u.company ? {
               id: u.company,
@@ -878,10 +1054,16 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             } : undefined,
           }));
 
+          // تنظيف الأدوار القديمة في جميع المستخدمين قبل التحديث
+          const cleanedUsers = frontendUsers.map(user => ({
+            ...user,
+            role: normalizeRole(user.role)
+          }));
+          
           // تحديث state
           setDeals(frontendDeals);
           setLeads(frontendLeads);
-          setUsers(frontendUsers);
+          setUsers(cleanedUsers);
 
           // الآن تحميل Tasks
           return getTasksAPI().then((tasksResponse) => {
@@ -978,7 +1160,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const setCurrentUser = (user: User | null) => {
     setCurrentUserState(user);
     if (user) {
-      localStorage.setItem('currentUser', JSON.stringify({ id: user.id, name: user.name, role: user.role }));
+      // تنظيف الدور قبل الحفظ في localStorage
+      const cleanedRole = normalizeRole(user.role);
+      localStorage.setItem('currentUser', JSON.stringify({ id: user.id, name: user.name, role: cleanedRole }));
     } else {
       localStorage.removeItem('currentUser');
     }
@@ -1064,18 +1248,29 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // --- CRUD Functions ---
   const addUser = async (userData: Omit<User, 'id' | 'avatar'>) => {
     try {
+      // التحقق من وجود company للمستخدم الحالي
+      if (!currentUser?.company?.id) {
+        throw new Error('User must be associated with a company');
+      }
+
       // تحويل بيانات المستخدم من Frontend إلى تنسيق API
       const [firstName, ...lastNameParts] = (userData.name || '').split(' ');
       const lastName = lastNameParts.join(' ') || '';
       
+      // التحقق من وجود كلمة المرور
+      if (!userData.password || !userData.password.trim()) {
+        throw new Error('Password is required');
+      }
+
       const apiUserData = {
         username: userData.username || '',
         email: userData.email || '',
-        password: userData.password || '',
+        password: userData.password,
         first_name: firstName,
         last_name: lastName,
-        role: userData.role === 'Owner' ? 'admin' : userData.role === 'Sales Agent' ? 'employee' : 'employee',
-        company: userData.company?.id,
+        phone: userData.phone || '',
+        role: userData.role === 'Owner' ? 'admin' : userData.role === 'Employee' ? 'employee' : 'employee', // Employee يترجم إلى employee
+        company: currentUser.company.id, // استخدام company المالك الحالي
       };
 
       const newUserResponse = await createUserAPI(apiUserData);
@@ -1086,13 +1281,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         name: `${newUserResponse.first_name || ''} ${newUserResponse.last_name || ''}`.trim() || newUserResponse.username,
         username: newUserResponse.username,
         email: newUserResponse.email,
-        role: newUserResponse.role === 'admin' ? 'Owner' : newUserResponse.role === 'employee' ? 'Sales Agent' : newUserResponse.role,
-        phone: '',
+        role: normalizeRole(newUserResponse.role === 'admin' ? 'Owner' : newUserResponse.role), // فقط Owner أو Employee
+        phone: newUserResponse.phone || userData.phone || '',
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(newUserResponse.username)}&background=random`,
-        company: newUserResponse.company ? {
-          id: newUserResponse.company,
-          name: 'Unknown Company',
-          specialization: 'real_estate' as const,
+        company: currentUser.company ? {
+          id: currentUser.company.id,
+          name: currentUser.company.name,
+          specialization: currentUser.company.specialization,
         } : undefined,
       };
       
@@ -1105,6 +1300,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   
   const updateUser = async (userId: number, userData: Partial<User>) => {
     try {
+      // التحقق من أن المستخدم الحالي هو Admin
+      if (currentUser?.role !== 'Owner') {
+        throw new Error('Only admins can update users');
+      }
+      
       if (!currentUser?.company?.id) {
         throw new Error('User must be associated with a company');
       }
@@ -1125,7 +1325,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         first_name: firstName || existingUser.name?.split(' ')[0] || '',
         last_name: lastName || existingUser.name?.split(' ').slice(1).join(' ') || '',
         phone: userData.phone !== undefined ? userData.phone : existingUser.phone || '',
-        role: userData.role ? (userData.role === 'Owner' ? 'admin' : userData.role === 'Sales Agent' ? 'employee' : userData.role === 'Sales Manager' ? 'employee' : userData.role) : existingUser.role === 'Owner' ? 'admin' : existingUser.role === 'Sales Agent' ? 'employee' : existingUser.role === 'Sales Manager' ? 'employee' : existingUser.role,
+        role: userData.role ? (userData.role === 'Owner' ? 'admin' : 'employee') : existingUser.role === 'Owner' ? 'admin' : 'employee', // فقط Owner أو Employee
         company: currentUser.company.id,
       };
 
@@ -1143,7 +1343,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         username: updatedUserResponse.username,
         email: updatedUserResponse.email,
         phone: updatedUserResponse.phone || '',
-        role: updatedUserResponse.role === 'admin' ? 'Owner' : updatedUserResponse.role === 'employee' ? 'Sales Agent' : updatedUserResponse.role,
+        role: normalizeRole(updatedUserResponse.role === 'admin' ? 'Owner' : updatedUserResponse.role), // فقط Owner أو Employee
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(updatedUserResponse.username)}&background=random`,
         company: updatedUserResponse.company ? {
           id: updatedUserResponse.company,
@@ -1166,6 +1366,16 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   
   const deleteUser = async (userId: number) => {
     try {
+      // التحقق من أن المستخدم الحالي هو Admin
+      if (currentUser?.role !== 'Owner') {
+        throw new Error('Only admins can delete users');
+      }
+      
+      // منع المستخدم من حذف نفسه
+      if (currentUser.id === userId) {
+        throw new Error('You cannot delete yourself');
+      }
+      
       await deleteUserAPI(userId);
       setUsers(prev => prev.filter(u => u.id !== userId));
     } catch (error) {
@@ -1259,6 +1469,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       };
       
       // تحويل بيانات Lead من Frontend إلى تنسيق API
+      // تحديد assigned_to بشكل صريح
+      let assignedToValue: number | null = null;
+      if (leadData.assignedTo !== undefined) {
+        assignedToValue = (leadData.assignedTo && leadData.assignedTo > 0) ? Number(leadData.assignedTo) : null;
+      } else if (lead.assignedTo > 0) {
+        assignedToValue = Number(lead.assignedTo);
+      }
+
       const apiLeadData: any = {
         name: leadData.name || lead.name,
         phone_number: leadData.phone || lead.phone || '',
@@ -1268,8 +1486,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         status: leadData.status ? statusMapToAPI[leadData.status] : (lead.status ? statusMapToAPI[lead.status] : 'untouched'),
         budget: leadData.budget !== undefined ? leadData.budget : lead.budget || null,
         company: currentUser.company.id,
-        assigned_to: leadData.assignedTo !== undefined ? (leadData.assignedTo > 0 ? leadData.assignedTo : null) : (lead.assignedTo > 0 ? lead.assignedTo : null),
+        assigned_to: assignedToValue,
       };
+
+      console.log('Updating lead:', leadId, 'with data:', apiLeadData);
+      console.log('assigned_to value:', assignedToValue, 'type:', typeof assignedToValue);
 
       const updatedLeadResponse = await updateLeadAPI(leadId, apiLeadData);
       
@@ -1363,8 +1584,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         status: newDealResponse.stage === 'won' ? 'Won' : newDealResponse.stage === 'lost' ? 'Lost' : newDealResponse.stage === 'on_hold' ? 'On Hold' : newDealResponse.stage === 'in_progress' ? 'In Progress' : 'Cancelled',
         value: dealData.value || 0,
         leadId: newDealResponse.client,
-        unit: dealData.unit,
-        project: dealData.project,
+        ...(dealData.unit && { unit: dealData.unit }),
+        ...(dealData.project && { project: dealData.project }),
       };
       
       setDeals(prev => [newDeal, ...prev]);
@@ -3094,10 +3315,20 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isAddTodoModalOpen, setIsAddTodoModalOpen,
     isAssignLeadModalOpen, setIsAssignLeadModalOpen,
     isFilterDrawerOpen, setIsFilterDrawerOpen,
+    isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen,
+    isDeveloperFilterDrawerOpen, setIsDeveloperFilterDrawerOpen,
+    isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen,
+    isOwnerFilterDrawerOpen, setIsOwnerFilterDrawerOpen,
+    isProductFilterDrawerOpen, setIsProductFilterDrawerOpen,
+    isProductCategoryFilterDrawerOpen, setIsProductCategoryFilterDrawerOpen,
+    isSupplierFilterDrawerOpen, setIsSupplierFilterDrawerOpen,
+    isServiceFilterDrawerOpen, setIsServiceFilterDrawerOpen,
+    isServicePackageFilterDrawerOpen, setIsServicePackageFilterDrawerOpen,
+    isServiceProviderFilterDrawerOpen, setIsServiceProviderFilterDrawerOpen,
+    isCampaignsFilterDrawerOpen, setIsCampaignsFilterDrawerOpen,
     checkedLeadIds, setCheckedLeadIds,
     primaryColor, setPrimaryColor: setAppColor,
     activeSubPageColor, setActiveSubPageColor: setAppSubPageColor,
-    siteLogo, setSiteLogo,
     isUnitsFilterDrawerOpen, setIsUnitsFilterDrawerOpen,
     isAddDeveloperModalOpen, setIsAddDeveloperModalOpen,
     isAddProjectModalOpen, setIsAddProjectModalOpen,
@@ -3148,22 +3379,36 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     // Data and functions
     users, setUsers, addUser, updateUser, deleteUser,
     leads, setLeads, addLead, updateLead, assignLeads,
+    leadFilters, setLeadFilters,
     deals, setDeals, addDeal, deleteDeal,
+    dealFilters, setDealFilters,
     campaigns, setCampaigns, addCampaign, deleteCampaign,
+    campaignFilters, setCampaignFilters,
     activities, setActivities, addActivity,
+    activityFilters, setActivityFilters,
     todos, setTodos, completedTodos, setCompletedTodos, addTodo, completeTodo,
     developers, setDevelopers, addDeveloper, updateDeveloper, deleteDeveloper,
+    developerFilters, setDeveloperFilters,
     projects, setProjects, addProject, updateProject, deleteProject,
+    projectFilters, setProjectFilters,
     units, setUnits, addUnit, updateUnit, deleteUnit,
+    unitFilters, setUnitFilters,
     owners, setOwners, addOwner, updateOwner, deleteOwner,
+    ownerFilters, setOwnerFilters,
     // Services
     services, setServices, addService, updateService, deleteService,
+    serviceFilters, setServiceFilters,
     servicePackages, setServicePackages, addServicePackage, updateServicePackage, deleteServicePackage,
+    servicePackageFilters, setServicePackageFilters,
     serviceProviders, setServiceProviders, addServiceProvider, updateServiceProvider, deleteServiceProvider,
+    serviceProviderFilters, setServiceProviderFilters,
     // Products
     products, setProducts, addProduct, updateProduct, deleteProduct,
+    productFilters, setProductFilters,
     productCategories, setProductCategories, addProductCategory, updateProductCategory, deleteProductCategory,
+    productCategoryFilters, setProductCategoryFilters,
     suppliers, setSuppliers, addSupplier, updateSupplier, deleteSupplier,
+    supplierFilters, setSupplierFilters,
     // Client Tasks (Actions)
     clientTasks, setClientTasks, addClientTask, updateClientTask, deleteClientTask,
     // Settings

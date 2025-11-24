@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { ServiceProvider } from '../types';
+import { ServiceProvidersFilterDrawer } from '../components/drawers/ServiceProvidersFilterDrawer';
 
-const ProvidersTable = ({ providers, onUpdate, onDelete }: { providers: ServiceProvider[], onUpdate: (provider: ServiceProvider) => void, onDelete: (id: number) => void }) => {
+const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers: ServiceProvider[], onUpdate: (provider: ServiceProvider) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -33,12 +34,16 @@ const ProvidersTable = ({ providers, onUpdate, onDelete }: { providers: ServiceP
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-gray-900 dark:text-gray-100 text-xs sm:text-sm">{provider.rating ? `⭐ ${provider.rating}` : '-'}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(provider)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(provider.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(provider)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(provider.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -56,6 +61,9 @@ export const ServiceProvidersPage = () => {
         t,
         currentUser,
         serviceProviders,
+        serviceProviderFilters,
+        setServiceProviderFilters,
+        setIsServiceProviderFilterDrawerOpen,
         deleteServiceProvider,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
@@ -73,6 +81,7 @@ export const ServiceProvidersPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
+    const isAdmin = currentUser?.role === 'Owner';
 
     // If not services, show message
     if (!isServices) {
@@ -107,6 +116,28 @@ export const ServiceProvidersPage = () => {
         setIsEditServiceProviderModalOpen(true);
     };
 
+    const filteredProviders = useMemo(() => {
+        let filtered = serviceProviders;
+
+        // Specialization filter
+        if (serviceProviderFilters.specialization && serviceProviderFilters.specialization !== 'All') {
+            filtered = filtered.filter(provider => provider.specialization === serviceProviderFilters.specialization);
+        }
+
+        // Search filter
+        if (serviceProviderFilters.search) {
+            const searchLower = serviceProviderFilters.search.toLowerCase();
+            filtered = filtered.filter(provider => 
+                provider.name.toLowerCase().includes(searchLower) ||
+                provider.code.toLowerCase().includes(searchLower) ||
+                (provider.email && provider.email.toLowerCase().includes(searchLower)) ||
+                (provider.phone && provider.phone.toLowerCase().includes(searchLower))
+            );
+        }
+
+        return filtered;
+    }, [serviceProviders, serviceProviderFilters]);
+
     if (loading) {
         return (
             <PageWrapper title={t('serviceProviders')}>
@@ -122,16 +153,21 @@ export const ServiceProvidersPage = () => {
             title={t('serviceProviders')}
             actions={
                 <>
-                    <Input id="search-providers" placeholder={t('search')} className="max-w-xs ps-10" icon={<SearchIcon className="w-4 h-4" />} />
-                    <Button onClick={() => setIsAddServiceProviderModalOpen(true)}>
-                        <PlusIcon className="w-4 h-4"/> {t('addServiceProvider') || 'Add Service Provider'}
+                    <Button variant="secondary" onClick={() => setIsServiceProviderFilterDrawerOpen(true)}>
+                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setIsAddServiceProviderModalOpen(true)}>
+                            <PlusIcon className="w-4 h-4"/> {t('addServiceProvider') || 'Add Service Provider'}
+                        </Button>
+                    )}
                 </>
             }
         >
             <Card>
-                <ProvidersTable providers={serviceProviders} onUpdate={handleUpdateProvider} onDelete={handleDeleteProvider} />
+                <ProvidersTable providers={filteredProviders} onUpdate={handleUpdateProvider} onDelete={handleDeleteProvider} isAdmin={isAdmin} />
             </Card>
+            <ServiceProvidersFilterDrawer />
         </PageWrapper>
     );
 };

@@ -24,7 +24,7 @@ export const EditUserModal = () => {
         phone: '',
         email: '',
         password: '',
-        role: 'Sales Agent' as string,
+        role: 'Employee' as string,
     });
     const [loading, setLoading] = useState(false);
 
@@ -36,7 +36,7 @@ export const EditUserModal = () => {
                 phone: selectedUser.phone || '',
                 email: selectedUser.email || '',
                 password: '',
-                role: selectedUser.role || 'Sales Agent',
+                role: selectedUser.role === 'Owner' ? 'Owner' : 'Employee', // فقط Owner أو Employee
             });
         }
     }, [selectedUser, isEditUserModalOpen]);
@@ -53,7 +53,7 @@ export const EditUserModal = () => {
             phone: '',
             email: '',
             password: '',
-            role: 'Sales Agent',
+            role: 'Employee',
         });
     };
 
@@ -68,7 +68,7 @@ export const EditUserModal = () => {
                 phone: formState.phone,
                 email: formState.email,
                 password: formState.password || undefined,
-                role: formState.role,
+                role: selectedUser.role === 'Owner' ? 'Owner' : formState.role, // لا يمكن تغيير دور Owner
             });
             handleClose();
         } catch (error: any) {
@@ -100,14 +100,14 @@ export const EditUserModal = () => {
                     <Label htmlFor="edit-user-password">{t('newUserPassword')}</Label>
                     <Input id="edit-user-password" type="password" value={formState.password} onChange={handleChange} placeholder={t('leaveBlankPassword')} />
                 </div>
-                <div>
-                    <Label htmlFor="edit-user-role">{t('role')}</Label>
-                    <Select id="edit-user-role" value={formState.role} onChange={handleChange}>
-                        <option value="Owner">{t('owner')}</option>
-                        <option value="Sales Manager">{t('salesManager')}</option>
-                        <option value="Sales Agent">{t('salesAgent')}</option>
-                    </Select>
-                </div>
+                {selectedUser.role !== 'Owner' && (
+                    <div>
+                        <Label htmlFor="edit-user-role">{t('role')}</Label>
+                        <Select id="edit-user-role" value={formState.role} onChange={handleChange}>
+                            <option value="Employee">{t('employee')}</option>
+                        </Select>
+                    </div>
+                )}
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
                     <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('saveChanges')}</Button>

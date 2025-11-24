@@ -2,12 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon } from '../components/index';
 import { Developer, Project, Unit } from '../types';
+import { DevelopersFilterDrawer } from '../components/drawers/DevelopersFilterDrawer';
+import { ProjectsFilterDrawer } from '../components/drawers/ProjectsFilterDrawer';
+import { UnitsFilterDrawer } from '../components/drawers/UnitsFilterDrawer';
 
 type Tab = 'units' | 'projects' | 'developers';
 
-const DevelopersTable = ({ developers, onUpdate, onDelete }: { developers: Developer[], onUpdate: (dev: Developer) => void, onDelete: (id: number) => void }) => {
+const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { developers: Developer[], onUpdate: (dev: Developer) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -22,22 +25,30 @@ const DevelopersTable = ({ developers, onUpdate, onDelete }: { developers: Devel
                             </tr>
                         </thead>
                         <tbody>
-                            {developers.map(dev => (
+                            {developers.length > 0 ? developers.map(dev => (
                                 <tr key={dev.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{dev.code}</td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{dev.name}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(dev)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(dev.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(dev)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(dev.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={3} className="text-center py-10 text-xs sm:text-sm">{t('noDevelopersFound') || 'No developers found'}</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -46,7 +57,7 @@ const DevelopersTable = ({ developers, onUpdate, onDelete }: { developers: Devel
     );
 };
 
-const ProjectsTable = ({ projects, onUpdate, onDelete }: { projects: Project[], onUpdate: (proj: Project) => void, onDelete: (id: number) => void }) => {
+const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Project[], onUpdate: (proj: Project) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -65,7 +76,7 @@ const ProjectsTable = ({ projects, onUpdate, onDelete }: { projects: Project[], 
                             </tr>
                         </thead>
                         <tbody>
-                            {projects.map(proj => (
+                            {projects.length > 0 ? projects.map(proj => (
                                 <tr key={proj.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{proj.code}</td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{proj.name}</td>
@@ -75,16 +86,24 @@ const ProjectsTable = ({ projects, onUpdate, onDelete }: { projects: Project[], 
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{proj.paymentMethod}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(proj)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(proj.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(proj)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(proj.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={7} className="text-center py-10 text-xs sm:text-sm">{t('noProjectsFound') || 'No projects found'}</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>
@@ -93,7 +112,7 @@ const ProjectsTable = ({ projects, onUpdate, onDelete }: { projects: Project[], 
     );
 }
 
-const UnitsTable = ({ units, onUpdate, onDelete }: { units: Unit[], onUpdate: (unit: Unit) => void, onDelete: (id: number) => void }) => {
+const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: Unit[], onUpdate: (unit: Unit) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -136,12 +155,16 @@ const UnitsTable = ({ units, onUpdate, onDelete }: { units: Unit[], onUpdate: (u
                                     </td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(unit)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(unit.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(unit)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(unit.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -162,13 +185,21 @@ export const PropertiesPage = () => {
     const { 
         t,
         currentUser,
-        setIsUnitsFilterDrawerOpen, 
+        setIsUnitsFilterDrawerOpen,
+        setIsDeveloperFilterDrawerOpen,
+        setIsProjectFilterDrawerOpen,
         setIsAddDeveloperModalOpen,
         setIsAddProjectModalOpen,
         setIsAddUnitModalOpen,
         units,
         projects,
         developers,
+        developerFilters,
+        setDeveloperFilters,
+        projectFilters,
+        setProjectFilters,
+        unitFilters,
+        setUnitFilters,
         deleteDeveloper,
         setEditingDeveloper,
         setIsEditDeveloperModalOpen,
@@ -227,16 +258,56 @@ export const PropertiesPage = () => {
         );
     }
     
+    const isAdmin = currentUser?.role === 'Owner';
+    
+    const handleFilterClick = () => {
+        switch (activeTab) {
+            case 'units':
+                setIsUnitsFilterDrawerOpen(true);
+                break;
+            case 'projects':
+                setIsProjectFilterDrawerOpen(true);
+                break;
+            case 'developers':
+                setIsDeveloperFilterDrawerOpen(true);
+                break;
+        }
+    };
+
+    const getAddButtonLabel = () => {
+        switch (activeTab) {
+            case 'units': return t('addUnit');
+            case 'projects': return t('addProject');
+            case 'developers': return t('addDeveloper');
+            default: return t('createNew');
+        }
+    };
+
+    const handleAddClick = () => {
+        switch (activeTab) {
+            case 'units':
+                setIsAddUnitModalOpen(true);
+                break;
+            case 'projects':
+                setIsAddProjectModalOpen(true);
+                break;
+            case 'developers':
+                setIsAddDeveloperModalOpen(true);
+                break;
+        }
+    };
+    
     const pageActions = (
-        <Dropdown trigger={
-            <Button>
-                <PlusIcon className="w-4 h-4"/> {t('createNew')}
+        <>
+            <Button variant="secondary" onClick={handleFilterClick}>
+                <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
             </Button>
-        }>
-            <DropdownItem onClick={() => setIsAddDeveloperModalOpen(true)}>{t('addDeveloper')}</DropdownItem>
-            <DropdownItem onClick={() => setIsAddProjectModalOpen(true)}>{t('addProject')}</DropdownItem>
-            <DropdownItem onClick={() => setIsAddUnitModalOpen(true)}>{t('addUnit')}</DropdownItem>
-        </Dropdown>
+            {isAdmin && (
+                <Button onClick={handleAddClick}>
+                    <PlusIcon className="w-4 h-4"/> {getAddButtonLabel()}
+                </Button>
+            )}
+        </>
     );
 
     const handleDeleteDeveloper = (id: number) => {
@@ -292,27 +363,114 @@ export const PropertiesPage = () => {
         }
     };
 
-    // استخدام useMemo لضمان إعادة التصيير عند تغيير units
-    const memoizedUnits = useMemo(() => units, [units]);
+    // Filter data based on filters
+    const filteredDevelopers = useMemo(() => {
+        let filtered = developers;
+        if (developerFilters.search) {
+            const searchLower = developerFilters.search.toLowerCase();
+            filtered = filtered.filter(dev => 
+                dev.name.toLowerCase().includes(searchLower) || 
+                dev.code.toLowerCase().includes(searchLower)
+            );
+        }
+        return filtered;
+    }, [developers, developerFilters]);
+
+    const filteredProjects = useMemo(() => {
+        let filtered = projects;
+        if (projectFilters.developer && projectFilters.developer !== 'All') {
+            filtered = filtered.filter(proj => proj.developer === projectFilters.developer);
+        }
+        if (projectFilters.type && projectFilters.type !== 'All') {
+            filtered = filtered.filter(proj => proj.type === projectFilters.type);
+        }
+        if (projectFilters.city && projectFilters.city !== 'All') {
+            filtered = filtered.filter(proj => proj.city === projectFilters.city);
+        }
+        if (projectFilters.paymentMethod && projectFilters.paymentMethod !== 'All') {
+            filtered = filtered.filter(proj => proj.paymentMethod === projectFilters.paymentMethod);
+        }
+        if (projectFilters.search) {
+            const searchLower = projectFilters.search.toLowerCase();
+            filtered = filtered.filter(proj => 
+                proj.name.toLowerCase().includes(searchLower) || 
+                proj.code.toLowerCase().includes(searchLower)
+            );
+        }
+        return filtered;
+    }, [projects, projectFilters]);
+
+    const filteredUnits = useMemo(() => {
+        let filtered = units;
+        if (unitFilters.project && unitFilters.project !== 'All') {
+            filtered = filtered.filter(unit => unit.project === unitFilters.project);
+        }
+        if (unitFilters.type && unitFilters.type !== 'All') {
+            filtered = filtered.filter(unit => unit.type === unitFilters.type);
+        }
+        if (unitFilters.finishing && unitFilters.finishing !== 'All') {
+            filtered = filtered.filter(unit => unit.finishing === unitFilters.finishing);
+        }
+        if (unitFilters.city && unitFilters.city !== 'All') {
+            filtered = filtered.filter(unit => unit.city === unitFilters.city);
+        }
+        if (unitFilters.district && unitFilters.district !== 'All') {
+            filtered = filtered.filter(unit => unit.district === unitFilters.district);
+        }
+        if (unitFilters.zone && unitFilters.zone !== 'All') {
+            filtered = filtered.filter(unit => unit.zone === unitFilters.zone);
+        }
+        if (unitFilters.isSold && unitFilters.isSold !== 'All') {
+            filtered = filtered.filter(unit => unit.isSold === (unitFilters.isSold === 'true'));
+        }
+        if (unitFilters.bedrooms && unitFilters.bedrooms !== 'All') {
+            filtered = filtered.filter(unit => unit.bedrooms === parseInt(unitFilters.bedrooms));
+        }
+        if (unitFilters.bathrooms && unitFilters.bathrooms !== 'All') {
+            filtered = filtered.filter(unit => unit.bathrooms === parseInt(unitFilters.bathrooms));
+        }
+        if (unitFilters.priceMin) {
+            const minPrice = parseFloat(unitFilters.priceMin);
+            if (!isNaN(minPrice)) {
+                filtered = filtered.filter(unit => unit.price >= minPrice);
+            }
+        }
+        if (unitFilters.priceMax) {
+            const maxPrice = parseFloat(unitFilters.priceMax);
+            if (!isNaN(maxPrice)) {
+                filtered = filtered.filter(unit => unit.price <= maxPrice);
+            }
+        }
+        if (unitFilters.search) {
+            const searchLower = unitFilters.search.toLowerCase();
+            filtered = filtered.filter(unit => 
+                unit.code.toLowerCase().includes(searchLower) || 
+                unit.project.toLowerCase().includes(searchLower)
+            );
+        }
+        return filtered;
+    }, [units, unitFilters]);
 
     const renderContent = () => {
         switch (activeTab) {
             case 'units':
                 return (
                     <Card>
-                        <div className="flex flex-col sm:flex-row justify-between items-stretch sm:items-center gap-3 mb-4">
-                             <Input id="search-units" placeholder={t('searchUnits')} className="w-full sm:w-auto max-w-xs ps-10" icon={<SearchIcon className="w-4 h-4" />} />
-                             <Button variant="secondary" onClick={() => setIsUnitsFilterDrawerOpen(true)} className="w-full sm:w-auto">
-                                <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
-                             </Button>
-                        </div>
-                        <UnitsTable units={memoizedUnits} onUpdate={handleUpdateUnit} onDelete={handleDeleteUnit} />
+                        <UnitsTable units={filteredUnits} onUpdate={handleUpdateUnit} onDelete={handleDeleteUnit} isAdmin={isAdmin} />
                     </Card>
                 );
             case 'projects':
-                return <Card><ProjectsTable projects={projects} onUpdate={handleUpdateProject} onDelete={handleDeleteProject} /></Card>;
+                return (
+                    <Card>
+                        <ProjectsTable projects={filteredProjects} onUpdate={handleUpdateProject} onDelete={handleDeleteProject} isAdmin={isAdmin} />
+                    </Card>
+                );
             case 'developers':
-                return <Card><DevelopersTable developers={developers} onUpdate={handleUpdateDeveloper} onDelete={handleDeleteDeveloper} /></Card>;
+                return (
+                    <Card>
+                        <DevelopersTable developers={filteredDevelopers} onUpdate={handleUpdateDeveloper} onDelete={handleDeleteDeveloper} isAdmin={isAdmin} />
+                    </Card>
+                );
             default:
                 return null;
         }
@@ -338,6 +496,9 @@ export const PropertiesPage = () => {
                 </nav>
             </div>
             {renderContent()}
+            <DevelopersFilterDrawer />
+            <ProjectsFilterDrawer />
+            <UnitsFilterDrawer />
         </PageWrapper>
     );
 };

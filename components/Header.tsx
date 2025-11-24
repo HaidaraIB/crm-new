@@ -4,7 +4,7 @@ import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './Button';
 import { Input } from './Input';
-import { MoonIcon, SunIcon, SearchIcon, MenuIcon, ChevronDownIcon } from './icons';
+import { MoonIcon, SunIcon, MenuIcon, ChevronDownIcon } from './icons';
 import { Dropdown, DropdownItem } from './Dropdown';
 
 export const Header = () => {
@@ -18,9 +18,6 @@ export const Header = () => {
                 <Button variant="ghost" className="lg:hidden p-1 -ml-2 rtl:-ml-0 rtl:-mr-2 flex-shrink-0" onClick={() => setIsSidebarOpen(true)}>
                     <MenuIcon className="h-6 w-6" />
                 </Button>
-                <div className="relative flex-1 max-w-xs sm:max-w-md">
-                    <Input id="search" placeholder={t('search')} className="w-full" icon={<SearchIcon className="w-4 h-4" />} />
-                </div>
             </div>
             <div className="flex items-center space-x-4 flex-shrink-0">
                 <button

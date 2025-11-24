@@ -38,14 +38,13 @@ const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: 
     );
 };
 
-export const DealsFilterDrawer = () => {
-    const { isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen, t, currentUser, projects, units, dealFilters, setDealFilters, deals } = useAppContext();
-    const [localFilters, setLocalFilters] = useState(dealFilters);
-    const isRealEstate = currentUser?.company?.specialization === 'real_estate';
+export const ProjectsFilterDrawer = () => {
+    const { isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen, t, projectFilters, setProjectFilters, developers, projects } = useAppContext();
+    const [localFilters, setLocalFilters] = useState(projectFilters);
 
     useEffect(() => {
-        setLocalFilters(dealFilters);
-    }, [dealFilters]);
+        setLocalFilters(projectFilters);
+    }, [projectFilters]);
 
     const handleFilterChange = (key: keyof typeof localFilters, value: string) => {
         setLocalFilters(prev => ({ ...prev, [key]: value }));
@@ -53,47 +52,65 @@ export const DealsFilterDrawer = () => {
 
     const handleReset = () => {
         const resetFilters = {
-            status: 'All',
+            developer: 'All',
+            type: 'All',
+            city: 'All',
             paymentMethod: 'All',
-            unit: 'All',
-            project: 'All',
-            valueMin: '',
-            valueMax: '',
             search: '',
         };
         setLocalFilters(resetFilters);
-        setDealFilters(resetFilters);
+        setProjectFilters(resetFilters);
     };
 
     const handleApply = () => {
-        setDealFilters(localFilters);
-        setIsDealsFilterDrawerOpen(false);
+        setProjectFilters(localFilters);
+        setIsProjectFilterDrawerOpen(false);
     };
 
-    // Get unique values from deals for filters
-    const uniqueStatuses = Array.from(new Set(deals.map(d => d.status).filter(Boolean)));
-    const uniquePaymentMethods = Array.from(new Set(deals.map(d => d.paymentMethod).filter(Boolean)));
-    const uniqueUnits = Array.from(new Set(deals.map(d => d.unit).filter(Boolean)));
+    // Get unique values from projects for filters
+    const uniqueTypes = Array.from(new Set(projects.map(p => p.type).filter(Boolean)));
+    const uniqueCities = Array.from(new Set(projects.map(p => p.city).filter(Boolean)));
+    const uniquePaymentMethods = Array.from(new Set(projects.map(p => p.paymentMethod).filter(Boolean)));
 
     return (
         <>
             <aside className={`fixed inset-y-0 end-0 z-50 flex h-full w-full max-w-xs flex-col bg-card dark:bg-dark-card border-s dark:border-gray-800 transform transition-transform duration-300 ease-in-out 
-                                ${isDealsFilterDrawerOpen ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'}`}>
+                                ${isProjectFilterDrawerOpen ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'}`}>
                 <div className="flex items-center justify-between p-4 border-b dark:border-gray-800 h-16">
-                    <h2 className="text-lg font-semibold">{t('filterDeals')}</h2>
-                    <Button variant="ghost" className="p-1" onClick={() => setIsDealsFilterDrawerOpen(false)}>
+                    <h2 className="text-lg font-semibold">{t('filterProjects')}</h2>
+                    <Button variant="ghost" className="p-1" onClick={() => setIsProjectFilterDrawerOpen(false)}>
                         <XIcon className="h-6 w-6" />
                     </Button>
                 </div>
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-200 dark:divide-gray-700">
-                    <FilterSection title={t('dealInfo')}>
+                    <FilterSection title={t('projectInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
-                                <FilterSelect id="filter-status" value={localFilters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
+                                <FilterLabel htmlFor="filter-developer">{t('developer')}</FilterLabel>
+                                <FilterSelect id="filter-developer" value={localFilters.developer} onChange={(e) => handleFilterChange('developer', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    {uniqueStatuses.map(status => (
-                                        <option key={status} value={status}>{status}</option>
+                                    {developers.map(dev => (
+                                        <option key={dev.id} value={dev.name}>{dev.name}</option>
+                                    ))}
+                                </FilterSelect>
+                            </div>
+
+                            <div>
+                                <FilterLabel htmlFor="filter-type">{t('type')}</FilterLabel>
+                                <FilterSelect id="filter-type" value={localFilters.type} onChange={(e) => handleFilterChange('type', e.target.value)}>
+                                    <option value="All">{t('all')}</option>
+                                    {uniqueTypes.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </FilterSelect>
+                            </div>
+
+                            <div>
+                                <FilterLabel htmlFor="filter-city">{t('city')}</FilterLabel>
+                                <FilterSelect id="filter-city" value={localFilters.city} onChange={(e) => handleFilterChange('city', e.target.value)}>
+                                    <option value="All">{t('all')}</option>
+                                    {uniqueCities.map(city => (
+                                        <option key={city} value={city}>{city}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
@@ -107,47 +124,12 @@ export const DealsFilterDrawer = () => {
                                     ))}
                                 </FilterSelect>
                             </div>
-
-                            {isRealEstate && (
-                                <>
-                                    <div>
-                                        <FilterLabel htmlFor="filter-project">{t('project')}</FilterLabel>
-                                        <FilterSelect id="filter-project" value={localFilters.project} onChange={(e) => handleFilterChange('project', e.target.value)}>
-                                            <option value="All">{t('all')}</option>
-                                            {projects.map(project => (
-                                                <option key={project.id} value={project.name}>{project.name}</option>
-                                            ))}
-                                        </FilterSelect>
-                                    </div>
-
-                                    <div>
-                                        <FilterLabel htmlFor="filter-unit">{t('unit')}</FilterLabel>
-                                        <FilterSelect id="filter-unit" value={localFilters.unit} onChange={(e) => handleFilterChange('unit', e.target.value)}>
-                                            <option value="All">{t('all')}</option>
-                                            {uniqueUnits.map(unit => (
-                                                <option key={unit} value={unit}>{unit}</option>
-                                            ))}
-                                        </FilterSelect>
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <FilterLabel htmlFor="filter-value-min">{t('valueRangeStart') || t('budgetRangeStart')}</FilterLabel>
-                                    <FilterInput id="filter-value-min" type="number" placeholder={t('eg500000')} value={localFilters.valueMin} onChange={(e) => handleFilterChange('valueMin', e.target.value)} />
-                                </div>
-                                <div>
-                                    <FilterLabel htmlFor="filter-value-max">{t('valueRangeEnd') || t('budgetRangeEnd')}</FilterLabel>
-                                    <FilterInput id="filter-value-max" type="number" placeholder={t('eg1000000')} value={localFilters.valueMax} onChange={(e) => handleFilterChange('valueMax', e.target.value)} />
-                                </div>
-                            </div>
                         </div>
                     </FilterSection>
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByClientNameOrId')}</FilterLabel>
+                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
                             <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
@@ -157,13 +139,14 @@ export const DealsFilterDrawer = () => {
                     <Button className="w-full" onClick={handleApply}>{t('applyFilters')}</Button>
                 </div>
             </aside>
-            {isDealsFilterDrawerOpen && (
+            {isProjectFilterDrawerOpen && (
                 <div
                     className="fixed inset-0 bg-black/60 z-40"
                     aria-hidden="true"
-                    onClick={() => setIsDealsFilterDrawerOpen(false)}
+                    onClick={() => setIsProjectFilterDrawerOpen(false)}
                 ></div>
             )}
         </>
     );
 };
+

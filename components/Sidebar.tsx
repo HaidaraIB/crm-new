@@ -51,7 +51,7 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
 
 
 export const Sidebar = () => {
-    const { currentPage, setCurrentPage, setIsLoggedIn, isSidebarOpen, setIsSidebarOpen, t, siteLogo, currentUser, language } = useAppContext();
+    const { currentPage, setCurrentPage, setIsLoggedIn, isSidebarOpen, setIsSidebarOpen, t, currentUser, language } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
@@ -103,16 +103,9 @@ export const Sidebar = () => {
             <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                     <img 
-                        src={siteLogo || '/logo.png'} 
+                        src="/logo.png" 
                         alt="LOOP CRM Logo" 
                         className="h-10 w-auto object-contain" 
-                        onError={(e) => {
-                            // Fallback if logo fails to load
-                            const target = e.target as HTMLImageElement;
-                            if (target.src !== '/logo.png') {
-                                target.src = '/logo.png';
-                            }
-                        }}
                     />
                 </div>
                 <button
@@ -124,7 +117,21 @@ export const Sidebar = () => {
                 </button>
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
-                {SIDEBAR_ITEMS.map((item) => {
+                {SIDEBAR_ITEMS.filter((item) => {
+                    // Hide Users item for non-admin users
+                    if (item.name === 'Users' && currentUser?.role !== 'Owner') {
+                        return false;
+                    }
+                    // Hide Reports item for non-admin users
+                    if (item.name === 'Reports' && currentUser?.role !== 'Owner') {
+                        return false;
+                    }
+                    // Hide Integrations item for non-admin users
+                    if (item.name === 'Integrations' && currentUser?.role !== 'Owner') {
+                        return false;
+                    }
+                    return true;
+                }).map((item) => {
                     const isOpen = openSubMenus[item.name] ?? false;
                     const itemNameKey = toCamelCase(item.name) as keyof typeof translations.en;
                     // Override subItems for Inventory based on company specialization

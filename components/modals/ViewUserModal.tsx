@@ -4,17 +4,17 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 
-// Helper function to translate role
+// Helper function to translate role - only Owner and Employee are valid
 const getRoleTranslation = (role: string, t: (key: string) => string): string => {
+    // Normalize role: convert any old roles to Employee, keep Owner as is
+    const normalizedRole = role === 'Owner' ? 'Owner' : 'Employee';
     const roleMap: Record<string, string> = {
         'Owner': 'owner',
-        'Sales Assistant': 'salesAssistant',
-        'Sales Manager': 'salesManager',
-        'Sales Agent': 'salesAgent',
+        'Employee': 'employee',
     };
     
-    const translationKey = roleMap[role];
-    return translationKey ? t(translationKey) : role;
+    const translationKey = roleMap[normalizedRole];
+    return translationKey ? t(translationKey) : normalizedRole;
 };
 
 export const ViewUserModal = () => {

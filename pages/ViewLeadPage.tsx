@@ -2,11 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, UserMinusIcon, UserPlusIcon, DealIcon, EditIcon, PlusIcon, Loader } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader } from '../components/index';
 import { formatDateToLocal } from '../utils/dateUtils';
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, updateLead, users, currentUser, clientTasks, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, users, clientTasks, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal } = useAppContext();
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -62,40 +62,6 @@ export const ViewLeadPage = () => {
             title={selectedLead.name} 
             actions={
                 <div className="flex flex-wrap gap-2">
-                    {selectedLead.assignedTo > 0 ? (
-                        <Button 
-                            variant="secondary" 
-                            className="!text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20"
-                            onClick={async () => {
-                                try {
-                                    await updateLead(selectedLead.id, { assignedTo: 0 });
-                                } catch (error) {
-                                    console.error('Error unassigning lead:', error);
-                                    alert('Failed to unassign lead. Please try again.');
-                                }
-                            }}
-                        >
-                            <UserMinusIcon className="w-4 h-4"/> {t('unassign')}
-                        </Button>
-                    ) : (
-                        <Button 
-                            variant="secondary"
-                            onClick={async () => {
-                                if (!currentUser?.id) {
-                                    alert('No user selected');
-                                    return;
-                                }
-                                try {
-                                    await updateLead(selectedLead.id, { assignedTo: currentUser.id });
-                                } catch (error) {
-                                    console.error('Error assigning lead:', error);
-                                    alert('Failed to assign lead. Please try again.');
-                                }
-                            }}
-                        >
-                            <UserPlusIcon className="w-4 h-4"/> {t('assignToMe') || 'Assign to Me'}
-                        </Button>
-                    )}
                     <Button 
                         variant="secondary"
                         onClick={() => {

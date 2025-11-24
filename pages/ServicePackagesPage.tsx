@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { ServicePackage } from '../types';
+import { ServicePackagesFilterDrawer } from '../components/drawers/ServicePackagesFilterDrawer';
 
-const PackagesTable = ({ packages, onUpdate, onDelete }: { packages: ServicePackage[], onUpdate: (pkg: ServicePackage) => void, onDelete: (id: number) => void }) => {
+const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: ServicePackage[], onUpdate: (pkg: ServicePackage) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -37,12 +38,16 @@ const PackagesTable = ({ packages, onUpdate, onDelete }: { packages: ServicePack
                                     </td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(pkg)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(pkg.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(pkg)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(pkg.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -60,6 +65,9 @@ export const ServicePackagesPage = () => {
         t,
         currentUser,
         servicePackages,
+        servicePackageFilters,
+        setServicePackageFilters,
+        setIsServicePackagesFilterDrawerOpen,
         deleteServicePackage,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
@@ -77,6 +85,7 @@ export const ServicePackagesPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
+    const isAdmin = currentUser?.role === 'Owner';
 
     // If not services, show message
     if (!isServices) {
@@ -111,6 +120,41 @@ export const ServicePackagesPage = () => {
         setIsEditServicePackageModalOpen(true);
     };
 
+    const filteredPackages = useMemo(() => {
+        let filtered = servicePackages;
+
+        // Status filter
+        if (servicePackageFilters.status && servicePackageFilters.status !== 'All') {
+            filtered = filtered.filter(pkg => pkg.isActive === (servicePackageFilters.status === 'Active'));
+        }
+
+        // Price range filter
+        if (servicePackageFilters.priceMin) {
+            const minPrice = parseFloat(servicePackageFilters.priceMin);
+            if (!isNaN(minPrice)) {
+                filtered = filtered.filter(pkg => pkg.price >= minPrice);
+            }
+        }
+        if (servicePackageFilters.priceMax) {
+            const maxPrice = parseFloat(servicePackageFilters.priceMax);
+            if (!isNaN(maxPrice)) {
+                filtered = filtered.filter(pkg => pkg.price <= maxPrice);
+            }
+        }
+
+        // Search filter
+        if (servicePackageFilters.search) {
+            const searchLower = servicePackageFilters.search.toLowerCase();
+            filtered = filtered.filter(pkg => 
+                pkg.name.toLowerCase().includes(searchLower) ||
+                pkg.code.toLowerCase().includes(searchLower) ||
+                (pkg.description && pkg.description.toLowerCase().includes(searchLower))
+            );
+        }
+
+        return filtered;
+    }, [servicePackages, servicePackageFilters]);
+
     if (loading) {
         return (
             <PageWrapper title={t('servicePackages')}>
@@ -126,16 +170,21 @@ export const ServicePackagesPage = () => {
             title={t('servicePackages')}
             actions={
                 <>
-                    <Input id="search-packages" placeholder={t('search')} className="max-w-xs ps-10" icon={<SearchIcon className="w-4 h-4" />} />
-                    <Button onClick={() => setIsAddServicePackageModalOpen(true)}>
-                        <PlusIcon className="w-4 h-4"/> {t('addServicePackage') || 'Add Service Package'}
+                    <Button variant="secondary" onClick={() => setIsServicePackagesFilterDrawerOpen(true)}>
+                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setIsAddServicePackageModalOpen(true)}>
+                            <PlusIcon className="w-4 h-4"/> {t('addServicePackage') || 'Add Service Package'}
+                        </Button>
+                    )}
                 </>
             }
         >
             <Card>
-                <PackagesTable packages={servicePackages} onUpdate={handleUpdatePackage} onDelete={handleDeletePackage} />
+                <PackagesTable packages={filteredPackages} onUpdate={handleUpdatePackage} onDelete={handleDeletePackage} isAdmin={isAdmin} />
             </Card>
+            <ServicePackagesFilterDrawer />
         </PageWrapper>
     );
 };

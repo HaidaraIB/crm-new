@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, SearchIcon, Input, Loader } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader } from '../components/index';
 import { Lead } from '../types';
 
 const leadStatusFilters: Lead['status'][] = ['All', 'Untouched', 'Touched', 'Following', 'Meeting', 'No Answer', 'Out Of Service'];
@@ -22,6 +22,8 @@ export const LeadsPage = () => {
         leads: allLeads,
         currentUser,
         users,
+        leadFilters,
+        setLeadFilters,
     } = useAppContext();
     const [activeStatusFilter, setActiveStatusFilter] = useState<Lead['status']>('All');
     const [loading, setLoading] = useState(true);
@@ -83,8 +85,71 @@ export const LeadsPage = () => {
             leads = leads.filter(l => l.status === activeStatusFilter);
         }
 
+        // 3. Apply filters from FilterDrawer
+        if (leadFilters.status && leadFilters.status !== 'All') {
+            leads = leads.filter(l => l.status === leadFilters.status);
+        }
+
+        if (leadFilters.type && leadFilters.type !== 'All') {
+            leads = leads.filter(l => l.type === leadFilters.type);
+        }
+
+        if (leadFilters.priority && leadFilters.priority !== 'All') {
+            leads = leads.filter(l => l.priority === leadFilters.priority);
+        }
+
+        if (leadFilters.assignedTo && leadFilters.assignedTo !== 'All') {
+            leads = leads.filter(l => l.assignedTo === parseInt(leadFilters.assignedTo));
+        }
+
+        if (leadFilters.communicationWay && leadFilters.communicationWay !== 'All') {
+            leads = leads.filter(l => l.communicationWay === leadFilters.communicationWay);
+        }
+
+        if (leadFilters.budgetMin) {
+            const minBudget = parseFloat(leadFilters.budgetMin);
+            if (!isNaN(minBudget)) {
+                leads = leads.filter(l => l.budget >= minBudget);
+            }
+        }
+
+        if (leadFilters.budgetMax) {
+            const maxBudget = parseFloat(leadFilters.budgetMax);
+            if (!isNaN(maxBudget)) {
+                leads = leads.filter(l => l.budget <= maxBudget);
+            }
+        }
+
+        if (leadFilters.createdAtFrom) {
+            leads = leads.filter(l => {
+                if (!l.createdAt) return false;
+                const leadDate = new Date(l.createdAt);
+                const filterDate = new Date(leadFilters.createdAtFrom);
+                return leadDate >= filterDate;
+            });
+        }
+
+        if (leadFilters.createdAtTo) {
+            leads = leads.filter(l => {
+                if (!l.createdAt) return false;
+                const leadDate = new Date(l.createdAt);
+                const filterDate = new Date(leadFilters.createdAtTo);
+                // Set to end of day for inclusive comparison
+                filterDate.setHours(23, 59, 59, 999);
+                return leadDate <= filterDate;
+            });
+        }
+
+        if (leadFilters.search) {
+            const searchLower = leadFilters.search.toLowerCase();
+            leads = leads.filter(l => 
+                l.name.toLowerCase().includes(searchLower) || 
+                l.phone.includes(searchLower)
+            );
+        }
+
         return leads;
-    }, [currentPage, activeStatusFilter, allLeads]);
+    }, [currentPage, activeStatusFilter, allLeads, leadFilters, currentUser]);
 
     const handleCheckChange = (leadId: number, isChecked: boolean) => {
         setCheckedLeadIds(prev => {
@@ -118,15 +183,19 @@ export const LeadsPage = () => {
         );
     }
 
+    // Check if current user is admin (Owner role)
+    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin';
+
     return (
         <PageWrapper 
             title={pageTitle}
             actions={
                 <>
-                    <Input id="search-leads" placeholder={t('search')} className="w-full sm:w-auto" icon={<SearchIcon className="w-4 h-4" />} />
                     <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
                     <Button onClick={() => setIsAddLeadModalOpen(true)} className="w-full sm:w-auto"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
-                    <Button variant="secondary" onClick={() => setIsAssignLeadModalOpen(true)} disabled={checkedLeadIds.size === 0} className="w-full sm:w-auto">{t('assignLead')}</Button>
+                    {isAdmin && (
+                        <Button variant="secondary" onClick={() => setIsAssignLeadModalOpen(true)} disabled={checkedLeadIds.size === 0} className="w-full sm:w-auto">{t('assignLead')}</Button>
+                    )}
                 </>
             }
         >

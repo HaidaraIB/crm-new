@@ -55,7 +55,7 @@ export const LoginPage = () => {
                 name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
                 username: userData.username,
                 email: userData.email,
-                role: userData.role === 'admin' ? 'Owner' : userData.role === 'employee' ? 'Sales Agent' : userData.role,
+                role: userData.role === 'admin' ? 'Owner' : 'Employee',
                 phone: '', // API لا يحتوي على phone حالياً
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
                 company: userData.company ? {

@@ -8,6 +8,7 @@ import { getStageDisplayLabel } from '../utils/taskStageMapper';
 
 export const DashboardPage = () => {
     const { t, leads, activities, deals, todos, users, currentUser, language } = useAppContext();
+    const isAdmin = currentUser?.role === 'Owner';
     const [loading, setLoading] = useState(false);
 
     // Calculate statistics
@@ -178,24 +179,27 @@ export const DashboardPage = () => {
         return data;
     }, [leads, language]);
     
-    // Top users (users with most activities)
+    // Top users (users with most activities) - only from the same company
     const topUsers = useMemo(() => {
+        if (!currentUser?.company?.id) return [];
+        
         const userActivityCounts: { [userId: number]: number } = {};
         activities.forEach(activity => {
             const user = users.find(u => u.name === activity.user);
-            if (user) {
+            if (user && user.company?.id === currentUser.company.id) {
                 userActivityCounts[user.id] = (userActivityCounts[user.id] || 0) + 1;
             }
         });
         
         return users
+            .filter(user => user.company?.id === currentUser.company.id)
             .map(user => ({
                 ...user,
                 activityCount: userActivityCounts[user.id] || 0,
             }))
             .sort((a, b) => b.activityCount - a.activityCount)
             .slice(0, 3);
-    }, [users, activities]);
+    }, [users, activities, currentUser]);
     
     // Latest feedbacks (latest activities)
     const latestFeedbacks = useMemo(() => {
@@ -432,7 +436,9 @@ export const DashboardPage = () => {
                                         <p className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">
                                             {user.name}
                                         </p>
-                                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">{user.role}</p>
+                                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">
+                                            {user.role === 'Owner' ? t('owner') : t('employee')}
+                                        </p>
                                         <div className="flex items-center gap-1.5 mt-1.5">
                                             <div className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-yellow-400' : 'bg-gray-400'}`}></div>
                                             <p className={`text-xs font-semibold ${index === 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-gray-600 dark:text-gray-400'}`}>

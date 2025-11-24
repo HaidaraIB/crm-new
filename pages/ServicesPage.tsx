@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Service } from '../types';
+import { ServicesFilterDrawer } from '../components/drawers/ServicesFilterDrawer';
 
-const ServicesTable = ({ services, onUpdate, onDelete }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void }) => {
+const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -37,12 +38,16 @@ const ServicesTable = ({ services, onUpdate, onDelete }: { services: Service[], 
                                     </td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(service)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(service.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(service)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(service.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -60,6 +65,9 @@ export const ServicesPage = () => {
         t,
         currentUser,
         services,
+        serviceFilters,
+        setServiceFilters,
+        setIsServiceFilterDrawerOpen,
         deleteService,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
@@ -91,6 +99,7 @@ export const ServicesPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
+    const isAdmin = currentUser?.role === 'Owner';
 
     // If not services, show message
     if (!isServices) {
@@ -120,6 +129,39 @@ export const ServicesPage = () => {
         }
     };
 
+    const filteredServices = useMemo(() => {
+        let filtered = services;
+        if (serviceFilters.category && serviceFilters.category !== 'All') {
+            filtered = filtered.filter(service => service.category === serviceFilters.category);
+        }
+        if (serviceFilters.provider && serviceFilters.provider !== 'All') {
+            filtered = filtered.filter(service => service.provider === serviceFilters.provider);
+        }
+        if (serviceFilters.isActive && serviceFilters.isActive !== 'All') {
+            filtered = filtered.filter(service => service.isActive === (serviceFilters.isActive === 'true'));
+        }
+        if (serviceFilters.priceMin) {
+            const minPrice = parseFloat(serviceFilters.priceMin);
+            if (!isNaN(minPrice)) {
+                filtered = filtered.filter(service => service.price >= minPrice);
+            }
+        }
+        if (serviceFilters.priceMax) {
+            const maxPrice = parseFloat(serviceFilters.priceMax);
+            if (!isNaN(maxPrice)) {
+                filtered = filtered.filter(service => service.price <= maxPrice);
+            }
+        }
+        if (serviceFilters.search) {
+            const searchLower = serviceFilters.search.toLowerCase();
+            filtered = filtered.filter(service => 
+                service.name.toLowerCase().includes(searchLower) || 
+                service.code.toLowerCase().includes(searchLower)
+            );
+        }
+        return filtered;
+    }, [services, serviceFilters]);
+
     const handleUpdateService = (service: Service) => {
         setEditingService(service);
         setIsEditServiceModalOpen(true);
@@ -140,16 +182,21 @@ export const ServicesPage = () => {
             title={t('services')}
             actions={
                 <>
-                    <Input id="search-services" placeholder={t('search')} className="max-w-xs ps-10" icon={<SearchIcon className="w-4 h-4" />} />
-                    <Button onClick={() => setIsAddServiceModalOpen(true)}>
-                        <PlusIcon className="w-4 h-4"/> {t('addService') || 'Add Service'}
+                    <Button variant="secondary" onClick={() => setIsServiceFilterDrawerOpen(true)}>
+                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
+                    {isAdmin && (
+                        <Button onClick={() => setIsAddServiceModalOpen(true)}>
+                            <PlusIcon className="w-4 h-4"/> {t('addService') || 'Add Service'}
+                        </Button>
+                    )}
                 </>
             }
         >
             <Card>
-                <ServicesTable services={services} onUpdate={handleUpdateService} onDelete={handleDeleteService} />
+                <ServicesTable services={filteredServices} onUpdate={handleUpdateService} onDelete={handleDeleteService} isAdmin={isAdmin} />
             </Card>
+            <ServicesFilterDrawer />
         </PageWrapper>
     );
 };

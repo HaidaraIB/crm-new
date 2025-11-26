@@ -1,14 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { PageWrapper, Card, Input, Loader, Button } from '../components/index';
+import { PageWrapper, Card, Loader, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
-
-// FIX: Made children optional to fix missing children prop error.
-const FilterSelect = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode; value: string; onChange: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string }) => (
-    <select id={id} value={value} onChange={onChange} className={`px-3 py-2 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary transition-colors ${className}`}>
-        {children}
-    </select>
-);
+import { FilterIcon } from '../components/icons';
 
 const reportColumns = [
     { header: 'Name', accessor: 'name' },
@@ -25,10 +19,8 @@ const reportColumns = [
 ];
 
 export const EmployeesReportPage = () => {
-    const { t, leads, activities, deals, users } = useAppContext();
-    const [leadType, setLeadType] = useState('all');
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
+    const { t, leads, activities, deals, users, employeesReportFilters, setIsEmployeesReportFilterDrawerOpen } = useAppContext();
+    const { leadType, startDate, endDate } = employeesReportFilters;
     const [loading, setLoading] = useState(false);
 
     // Calculate employee statistics
@@ -114,27 +106,12 @@ export const EmployeesReportPage = () => {
             title={t('employeesReport')}
             actions={
                 <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                    <Input 
-                        type="date" 
-                        id="start-date" 
-                        className="w-full sm:w-auto" 
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                    />
-                    <Input 
-                        type="date" 
-                        id="end-date" 
-                        className="w-full sm:w-auto"
-                        value={endDate}
-                        onChange={(e) => setEndDate(e.target.value)}
-                    />
-                    <FilterSelect id="lead-type-filter" value={leadType} onChange={(e) => setLeadType(e.target.value)} className="w-full sm:w-auto">
-                        <option value="all">{t('allLeadsType')}</option>
-                        <option value="fresh">{t('freshLeads')}</option>
-                        <option value="cold">{t('coldLeads')}</option>
-                    </FilterSelect>
+                    <Button variant="secondary" onClick={() => setIsEmployeesReportFilterDrawerOpen(true)} className="w-full sm:w-auto">
+                        <FilterIcon className="h-4 w-4 inline-block mr-2" />
+                        {t('filter') || 'Filter'}
+                    </Button>
                     <Button variant="secondary" onClick={handleExport} className="w-full sm:w-auto">
-                        Export
+                        {t('export') || 'Export'}
                     </Button>
                 </div>
             }

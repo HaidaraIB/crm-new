@@ -80,7 +80,7 @@ export const LoginPage = () => {
     return (
         <div className={`min-h-screen flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
             {/* Theme and Language Toggle Buttons */}
-            <div className="absolute top-4 end-4 z-10 flex gap-2">
+            <div className={`absolute top-4 end-4 z-10 flex ${language === 'ar' ? 'gap-4' : 'gap-2'}`}>
                 <button
                     onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
                     className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"

@@ -10,7 +10,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddSupplierModal = () => {
-    const { isAddSupplierModalOpen, setIsAddSupplierModalOpen, t, addSupplier } = useAppContext();
+    const { isAddSupplierModalOpen, setIsAddSupplierModalOpen, t, addSupplier, language } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -55,7 +55,7 @@ export const AddSupplierModal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.name) {
-            alert('Please fill in required fields');
+            alert(t('fillRequiredFields') || 'Please fill in required fields');
             return;
         }
 
@@ -72,7 +72,7 @@ export const AddSupplierModal = () => {
             handleClose();
         } catch (error: any) {
             console.error('Error creating supplier:', error);
-            const errorMessage = error?.message || 'Failed to create supplier. Please try again.';
+            const errorMessage = error?.message || t('failedToCreateSupplier') || 'Failed to create supplier. Please try again.';
             alert(errorMessage);
         } finally {
             setLoading(false);
@@ -103,6 +103,7 @@ export const AddSupplierModal = () => {
                         rows={2} 
                         value={formState.address}
                         onChange={handleChange}
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" 
                         placeholder={t('enterAddress') || 'Enter address'}
                     />

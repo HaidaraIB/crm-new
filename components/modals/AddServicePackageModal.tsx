@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { NumberInput } from '../NumberInput';
+import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -10,7 +12,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddServicePackageModal = () => {
-    const { isAddServicePackageModalOpen, setIsAddServicePackageModalOpen, t, addServicePackage, services } = useAppContext();
+    const { isAddServicePackageModalOpen, setIsAddServicePackageModalOpen, t, addServicePackage, services, language } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -65,7 +67,7 @@ export const AddServicePackageModal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.name || !formState.price) {
-            alert('Please fill in required fields');
+            alert(t('pleaseFillRequiredFields') || 'Please fill in required fields');
             return;
         }
 
@@ -88,7 +90,7 @@ export const AddServicePackageModal = () => {
             handleClose();
         } catch (error: any) {
             console.error('Error creating service package:', error);
-            const errorMessage = error?.message || 'Failed to create service package. Please try again.';
+            const errorMessage = error?.message || t('failedToCreateServicePackage') || 'Failed to create service package. Please try again.';
             alert(errorMessage);
         } finally {
             setLoading(false);
@@ -109,6 +111,7 @@ export const AddServicePackageModal = () => {
                         rows={3} 
                         value={formState.description}
                         onChange={handleChange}
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500" 
                         placeholder={t('enterPackageDescription') || 'Enter package description'}
                     />
@@ -116,7 +119,7 @@ export const AddServicePackageModal = () => {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="price">{t('price')} *</Label>
-                        <Input id="price" type="number" placeholder={t('enterPrice') || 'Enter price'} value={formState.price} onChange={handleChange} required />
+                        <NumberInput id="price" placeholder={t('enterPrice') || 'Enter price'} value={formState.price} onChange={handleChange} min={0} step={0.01} required />
                     </div>
                     <div>
                         <Label htmlFor="duration">{t('duration')}</Label>
@@ -146,16 +149,12 @@ export const AddServicePackageModal = () => {
                         )}
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <input 
-                        type="checkbox" 
-                        id="isActive" 
-                        checked={formState.isActive}
-                        onChange={(e) => setFormState(prev => ({ ...prev, isActive: e.target.checked }))}
-                        className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary"
-                    />
-                    <Label htmlFor="isActive">{t('active')}</Label>
-                </div>
+                <Checkbox
+                    id="isActive"
+                    checked={formState.isActive}
+                    onChange={(e) => setFormState(prev => ({ ...prev, isActive: e.target.checked }))}
+                    label={t('active')}
+                />
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
                     <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('submit')}</Button>

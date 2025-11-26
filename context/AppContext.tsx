@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters } from '../types';
+import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
 import { formatStageName, getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
@@ -115,6 +115,12 @@ export interface AppContextType {
   setIsServiceProviderFilterDrawerOpen: (isOpen: boolean) => void;
   isCampaignsFilterDrawerOpen: boolean;
   setIsCampaignsFilterDrawerOpen: (isOpen: boolean) => void;
+  isTeamsReportFilterDrawerOpen: boolean;
+  setIsTeamsReportFilterDrawerOpen: (isOpen: boolean) => void;
+  isEmployeesReportFilterDrawerOpen: boolean;
+  setIsEmployeesReportFilterDrawerOpen: (isOpen: boolean) => void;
+  isMarketingReportFilterDrawerOpen: boolean;
+  setIsMarketingReportFilterDrawerOpen: (isOpen: boolean) => void;
   checkedLeadIds: Set<number>;
   setCheckedLeadIds: React.Dispatch<React.SetStateAction<Set<number>>>;
   primaryColor: string;
@@ -346,6 +352,13 @@ export interface AppContextType {
   deleteSupplier: (supplierId: number) => void;
   supplierFilters: SupplierFilters;
   setSupplierFilters: React.Dispatch<React.SetStateAction<SupplierFilters>>;
+  // Reports filters
+  teamsReportFilters: TeamsReportFilters;
+  setTeamsReportFilters: React.Dispatch<React.SetStateAction<TeamsReportFilters>>;
+  employeesReportFilters: EmployeesReportFilters;
+  setEmployeesReportFilters: React.Dispatch<React.SetStateAction<EmployeesReportFilters>>;
+  marketingReportFilters: MarketingReportFilters;
+  setMarketingReportFilters: React.Dispatch<React.SetStateAction<MarketingReportFilters>>;
   // Client Tasks (Actions) data
   clientTasks: ClientTask[];
   setClientTasks: React.Dispatch<React.SetStateAction<ClientTask[]>>;
@@ -525,6 +538,22 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     createdAtTo: '',
     search: '',
   });
+  const [teamsReportFilters, setTeamsReportFilters] = useState<TeamsReportFilters>({
+    selectedTeam: 'all',
+    leadType: 'all',
+    startDate: '',
+    endDate: '',
+  });
+  const [employeesReportFilters, setEmployeesReportFilters] = useState<EmployeesReportFilters>({
+    leadType: 'all',
+    startDate: '',
+    endDate: '',
+  });
+  const [marketingReportFilters, setMarketingReportFilters] = useState<MarketingReportFilters>({
+    selectedCampaign: 'all',
+    startDate: '',
+    endDate: '',
+  });
   const [selectedLeadForDeal, setSelectedLeadForDeal] = useState<number | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
@@ -604,6 +633,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isServicePackageFilterDrawerOpen, setIsServicePackageFilterDrawerOpen] = useState(false);
   const [isServiceProviderFilterDrawerOpen, setIsServiceProviderFilterDrawerOpen] = useState(false);
   const [isCampaignsFilterDrawerOpen, setIsCampaignsFilterDrawerOpen] = useState(false);
+  const [isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen] = useState(false);
+  const [isEmployeesReportFilterDrawerOpen, setIsEmployeesReportFilterDrawerOpen] = useState(false);
+  const [isMarketingReportFilterDrawerOpen, setIsMarketingReportFilterDrawerOpen] = useState(false);
   const [checkedLeadIds, setCheckedLeadIds] = useState<Set<number>>(new Set());
 
   // Inventory state
@@ -705,13 +737,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             username: userData.username,
             email: userData.email,
             role: normalizeRole(userData.role === 'admin' ? 'Owner' : userData.role),
-            phone: '',
+            phone: userData.phone || '',
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
             company: userData.company ? {
               id: userData.company,
               name: userData.company_name || 'Unknown Company',
               specialization: (userData.company_specialization || 'real_estate') as 'real_estate' | 'services' | 'products',
             } : undefined,
+            emailVerified: userData.email_verified || userData.is_email_verified || false,
           };
           setCurrentUserState(frontendUser);
           localStorage.setItem('currentUser', JSON.stringify(frontendUser));
@@ -3326,6 +3359,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isServicePackageFilterDrawerOpen, setIsServicePackageFilterDrawerOpen,
     isServiceProviderFilterDrawerOpen, setIsServiceProviderFilterDrawerOpen,
     isCampaignsFilterDrawerOpen, setIsCampaignsFilterDrawerOpen,
+    isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen,
+    isEmployeesReportFilterDrawerOpen, setIsEmployeesReportFilterDrawerOpen,
+    isMarketingReportFilterDrawerOpen, setIsMarketingReportFilterDrawerOpen,
     checkedLeadIds, setCheckedLeadIds,
     primaryColor, setPrimaryColor: setAppColor,
     activeSubPageColor, setActiveSubPageColor: setAppSubPageColor,
@@ -3409,6 +3445,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     productCategoryFilters, setProductCategoryFilters,
     suppliers, setSuppliers, addSupplier, updateSupplier, deleteSupplier,
     supplierFilters, setSupplierFilters,
+    // Reports filters
+    teamsReportFilters, setTeamsReportFilters,
+    employeesReportFilters, setEmployeesReportFilters,
+    marketingReportFilters, setMarketingReportFilters,
     // Client Tasks (Actions)
     clientTasks, setClientTasks, addClientTask, updateClientTask, deleteClientTask,
     // Settings

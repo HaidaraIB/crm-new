@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { NumberInput } from '../NumberInput';
 import { formatDateToLocal } from '../../utils/dateUtils';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -64,7 +65,7 @@ export const AddCampaignModal = () => {
                 </div>
                  <div>
                     <Label htmlFor="budget">{t('budget')}</Label>
-                    <Input id="budget" type="number" placeholder={t('enterCampaignBudget')} value={formState.budget} onChange={handleChange} />
+                    <NumberInput id="budget" name="budget" value={formState.budget} onChange={handleChange} placeholder={t('enterCampaignBudget')} min={0} step={1} />
                 </div>
                 <div className="flex items-center gap-2">
                     <input id="isActive" type="checkbox" className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary" checked={formState.isActive} onChange={handleChange} />

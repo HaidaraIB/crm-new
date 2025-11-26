@@ -145,7 +145,13 @@ export const registerCompanyAPI = async (data: {
 
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || errorData.error || 'Registration failed');
+    const error: any = new Error(
+      errorData.detail || errorData.message || errorData.error || 'Registration failed'
+    );
+    if (errorData && typeof errorData === 'object') {
+      error.fields = errorData;
+    }
+    throw error;
   }
 
   const responseData = await response.json();
@@ -159,6 +165,81 @@ export const registerCompanyAPI = async (data: {
   }
   
   return responseData;
+};
+
+/**
+ * الحصول على جميع الخطط المتاحة علنياً للاشتراك
+ * GET /api/public/plans/
+ */
+export const getPublicPlansAPI = async () => {
+  return apiRequest<any[]>('/public/plans/', {
+    method: 'GET',
+  });
+};
+
+/**
+ * التحقق من توفر البيانات أثناء التسجيل (بريد، اسم مستخدم، رقم هاتف، دومين)
+ * POST /api/auth/check-availability/
+ */
+export const checkRegistrationAvailabilityAPI = async (payload: {
+  company_domain?: string;
+  email?: string;
+  username?: string;
+  phone?: string;
+}) => {
+  const response = await fetch(`${BASE_URL}/auth/check-availability/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Availability check failed'
+    );
+    if (data?.errors) {
+      error.fields = data.errors;
+    }
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * التحقق من البريد الإلكتروني عبر الرمز / الرابط
+ * POST /api/auth/verify-email/
+ */
+export const verifyEmailAPI = async (payload: {
+  email: string;
+  code?: string;
+  token?: string;
+}) => {
+  const response = await fetch(`${BASE_URL}/auth/verify-email/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Email verification failed'
+    );
+    if (data?.error) {
+      error.fields = data;
+    }
+    throw error;
+  }
+
+  return data;
 };
 
 /**

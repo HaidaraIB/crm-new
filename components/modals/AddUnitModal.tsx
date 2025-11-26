@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { NumberInput } from '../NumberInput';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -111,15 +112,15 @@ export const AddUnitModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="price">{t('price')}</Label>
-                        <Input id="price" type="number" placeholder="e.g. 1,000,000" value={formState.price} onChange={handleChange} />
+                        <NumberInput id="price" name="price" value={formState.price} onChange={handleChange} placeholder="e.g. 1,000,000" min={0} step={1} />
                     </div>
                     <div>
                         <Label htmlFor="bedrooms">{t('bedrooms')}</Label>
-                        <Input id="bedrooms" type="number" min="0" value={formState.bedrooms} onChange={handleChange} />
+                        <NumberInput id="bedrooms" name="bedrooms" value={formState.bedrooms} onChange={handleChange} min={0} step={1} />
                     </div>
                      <div>
                         <Label htmlFor="bathrooms">{t('bathrooms')}</Label>
-                        <Input id="bathrooms" type="number" min="0" value={formState.bathrooms} onChange={handleChange} />
+                        <NumberInput id="bathrooms" name="bathrooms" value={formState.bathrooms} onChange={handleChange} min={0} step={1} />
                     </div>
                      <div>
                         <Label htmlFor="type">{t('type')}</Label>

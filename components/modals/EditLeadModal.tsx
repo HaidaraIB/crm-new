@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { NumberInput } from '../NumberInput';
 import { Lead } from '../../types';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -99,7 +100,7 @@ export const EditLeadModal = () => {
                     </div>
                      <div>
                         <Label htmlFor="budget">{t('budget')}</Label>
-                        <Input id="budget" type="number" placeholder={t('enterBudget')} value={formState.budget} onChange={handleChange} />
+                        <NumberInput id="budget" name="budget" value={formState.budget} onChange={handleChange} placeholder={t('enterBudget')} min={0} step={1} />
                     </div>
                     <div>
                         <Label htmlFor="phone">{t('phoneNumber')}</Label>

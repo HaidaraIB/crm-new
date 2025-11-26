@@ -30,6 +30,7 @@ export interface User {
   username?: string;
   password?: string;
   company?: Company;
+  emailVerified?: boolean;
 }
 
 export interface TimelineEntry {
@@ -240,6 +241,25 @@ export interface CampaignFilters {
   createdAtFrom: string; // Date from
   createdAtTo: string; // Date to
   search: string; // Search by name or code
+}
+
+export interface TeamsReportFilters {
+  selectedTeam: string; // 'all' or user ID
+  leadType: string; // 'all', 'fresh', 'cold'
+  startDate: string;
+  endDate: string;
+}
+
+export interface EmployeesReportFilters {
+  leadType: string; // 'all', 'fresh', 'cold'
+  startDate: string;
+  endDate: string;
+}
+
+export interface MarketingReportFilters {
+  selectedCampaign: string; // 'all' or campaign ID
+  startDate: string;
+  endDate: string;
 }
 
 export interface Developer {

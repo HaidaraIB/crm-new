@@ -3,6 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { NumberInput } from '../NumberInput';
+import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
 import { Service } from '../../types';
 
@@ -10,14 +12,17 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
-const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; }) => (
-    <select id={id} value={value} onChange={onChange} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; }) => {
+    const { language } = useAppContext();
+    return (
+        <select id={id} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
+            {children}
+        </select>
+    );
+};
 
 export const EditServiceModal = () => {
-    const { isEditServiceModalOpen, setIsEditServiceModalOpen, t, updateService, editingService, setEditingService, serviceProviders } = useAppContext();
+    const { isEditServiceModalOpen, setIsEditServiceModalOpen, t, updateService, editingService, setEditingService, serviceProviders, language } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -60,7 +65,7 @@ export const EditServiceModal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingService || !formState.name || !formState.price) {
-            alert('Please fill in required fields');
+            alert(t('pleaseFillRequiredFields') || 'Please fill in required fields');
             return;
         }
 
@@ -79,7 +84,7 @@ export const EditServiceModal = () => {
             handleClose();
         } catch (error: any) {
             console.error('Error updating service:', error);
-            const errorMessage = error?.message || 'Failed to update service. Please try again.';
+            const errorMessage = error?.message || t('failedToUpdateService') || 'Failed to update service. Please try again.';
             alert(errorMessage);
         } finally {
             setLoading(false);
@@ -97,30 +102,34 @@ export const EditServiceModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="description">{t('description')}</Label>
-                    <textarea 
-                        id="description" 
-                        rows={3} 
+                    <textarea
+                        id="description"
+                        rows={3}
                         value={formState.description}
                         onChange={handleChange}
-                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500" 
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
                         placeholder={t('enterServiceDescription') || 'Enter service description'}
                     />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="price">{t('price')} *</Label>
-                        <Input id="price" type="number" placeholder={t('enterPrice') || 'Enter price'} value={formState.price} onChange={handleChange} required />
+                        <NumberInput id="price" placeholder={t('enterPrice') || 'Enter price'} value={formState.price} onChange={handleChange} min={0} step={0.1} required />
                     </div>
                     <div>
                         <Label htmlFor="duration">{t('duration')}</Label>
                         <Input id="duration" placeholder={t('enterDuration') || 'e.g., 1 hour'} value={formState.duration} onChange={handleChange} />
                     </div>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                     <div>
                         <Label htmlFor="category">{t('category')}</Label>
                         <Input id="category" placeholder={t('enterCategory') || 'Enter category'} value={formState.category} onChange={handleChange} />
                     </div>
+
+                </div>
+                <div>
                     <div>
                         <Label htmlFor="provider">{t('provider')}</Label>
                         <Select id="provider" value={formState.provider} onChange={handleChange}>
@@ -131,16 +140,12 @@ export const EditServiceModal = () => {
                         </Select>
                     </div>
                 </div>
-                <div className="flex items-center gap-2">
-                    <input 
-                        type="checkbox" 
-                        id="isActive" 
-                        checked={formState.isActive}
-                        onChange={handleChange}
-                        className="w-4 h-4 text-primary bg-gray-100 border-gray-300 rounded focus:ring-primary"
-                    />
-                    <Label htmlFor="isActive">{t('active')}</Label>
-                </div>
+                <Checkbox
+                    id="isActive"
+                    checked={formState.isActive}
+                    onChange={handleChange}
+                    label={t('active')}
+                />
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
                     <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('saveChanges')}</Button>

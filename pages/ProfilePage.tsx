@@ -107,9 +107,18 @@ export const ProfilePage = () => {
                                 disabled={true}
                                 className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
                             />
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {t('emailVerificationNote') || 'Email verification required to change (coming soon)'}
-                            </p>
+                            {currentUser.emailVerified ? (
+                                <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                                    </svg>
+                                    {t('emailVerified') || 'Email verified'}
+                                </p>
+                            ) : (
+                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                    {t('emailNotVerified') || 'Email not verified. Please check your inbox for verification email.'}
+                                </p>
+                            )}
                         </div>
                         <div>
                             <Label htmlFor="profile-phone">{t('phone')}</Label>
@@ -121,9 +130,6 @@ export const ProfilePage = () => {
                                 disabled={true}
                                 className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
                             />
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                {t('phoneVerificationNote') || 'Phone verification required to change (coming soon)'}
-                            </p>
                         </div>
                     </div>
                 </Card>

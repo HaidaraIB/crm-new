@@ -19,7 +19,7 @@ export const Header = () => {
                     <MenuIcon className="h-6 w-6" />
                 </Button>
             </div>
-            <div className="flex items-center space-x-4 flex-shrink-0">
+            <div className={`flex items-center ${language === 'ar' ? 'gap-4' : 'space-x-4'} flex-shrink-0`}>
                 <button
                     onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
                     className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"

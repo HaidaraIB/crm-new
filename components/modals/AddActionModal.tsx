@@ -10,7 +10,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddActionModal = () => {
-    const { isAddActionModalOpen, setIsAddActionModalOpen, selectedLead, t, addClientTask } = useAppContext();
+    const { isAddActionModalOpen, setIsAddActionModalOpen, selectedLead, t, addClientTask, language } = useAppContext();
     const [stage, setStage] = useState(selectedLead?.lastStage || 'untouched');
     const [notes, setNotes] = useState('');
     const [reminder, setReminder] = useState('');
@@ -72,6 +72,7 @@ export const AddActionModal = () => {
                         rows={4} 
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100" 
                         placeholder={t('writeActionDetails')}
                     />

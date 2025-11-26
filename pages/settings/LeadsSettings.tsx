@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, Input, ToggleSwitch } from '../../components/index';
+import { Card, Button, Input, ToggleSwitch, NumberInput } from '../../components/index';
 import { useAppContext } from '../../context/AppContext';
 
 export const LeadsSettings = () => {
@@ -41,11 +41,13 @@ export const LeadsSettings = () => {
 
                     <div className="max-w-sm">
                          <label htmlFor="delay-time" className="block text-sm font-medium text-secondary mb-1">{t('reminderDelayTime')}</label>
-                         <Input 
+                         <NumberInput 
                             id="delay-time" 
-                            type="number" 
+                            name="delay-time"
                             value={delayTime}
                             onChange={(e) => setDelayTime(e.target.value)}
+                            min={0}
+                            step={1}
                         />
                          <p className="text-xs text-tertiary mt-1">{t('reminderDelayTimeDesc')}</p>
                     </div>

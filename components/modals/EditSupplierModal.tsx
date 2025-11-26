@@ -11,7 +11,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const EditSupplierModal = () => {
-    const { isEditSupplierModalOpen, setIsEditSupplierModalOpen, t, updateSupplier, editingSupplier, setEditingSupplier } = useAppContext();
+    const { isEditSupplierModalOpen, setIsEditSupplierModalOpen, t, updateSupplier, editingSupplier, setEditingSupplier, language } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -48,7 +48,7 @@ export const EditSupplierModal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingSupplier || !formState.name) {
-            alert('Please fill in required fields');
+            alert(t('fillRequiredFields') || 'Please fill in required fields');
             return;
         }
 
@@ -66,7 +66,7 @@ export const EditSupplierModal = () => {
             handleClose();
         } catch (error: any) {
             console.error('Error updating supplier:', error);
-            const errorMessage = error?.message || 'Failed to update supplier. Please try again.';
+            const errorMessage = error?.message || t('failedToUpdateSupplier') || 'Failed to update supplier. Please try again.';
             alert(errorMessage);
         } finally {
             setLoading(false);
@@ -99,6 +99,7 @@ export const EditSupplierModal = () => {
                         rows={2} 
                         value={formState.address}
                         onChange={handleChange}
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" 
                         placeholder={t('enterAddress') || 'Enter address'}
                     />

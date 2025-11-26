@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { XIcon } from '../icons';
 import { Button } from '../Button';
+import { NumberInput } from '../NumberInput';
 
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <details className="group" open>
@@ -135,11 +136,11 @@ export const DealsFilterDrawer = () => {
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
                                     <FilterLabel htmlFor="filter-value-min">{t('valueRangeStart') || t('budgetRangeStart')}</FilterLabel>
-                                    <FilterInput id="filter-value-min" type="number" placeholder={t('eg500000')} value={localFilters.valueMin} onChange={(e) => handleFilterChange('valueMin', e.target.value)} />
+                                    <NumberInput id="filter-value-min" name="filter-value-min" value={localFilters.valueMin} onChange={(e) => handleFilterChange('valueMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
                                 </div>
                                 <div>
                                     <FilterLabel htmlFor="filter-value-max">{t('valueRangeEnd') || t('budgetRangeEnd')}</FilterLabel>
-                                    <FilterInput id="filter-value-max" type="number" placeholder={t('eg1000000')} value={localFilters.valueMax} onChange={(e) => handleFilterChange('valueMax', e.target.value)} />
+                                    <NumberInput id="filter-value-max" name="filter-value-max" value={localFilters.valueMax} onChange={(e) => handleFilterChange('valueMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
                                 </div>
                             </div>
                         </div>

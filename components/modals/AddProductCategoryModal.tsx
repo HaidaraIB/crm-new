@@ -9,14 +9,17 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
-const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; }) => (
-    <select id={id} value={value} onChange={onChange} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; }) => {
+    const { language } = useAppContext();
+    return (
+        <select id={id} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
+            {children}
+        </select>
+    );
+};
 
 export const AddProductCategoryModal = () => {
-    const { isAddProductCategoryModalOpen, setIsAddProductCategoryModalOpen, t, addProductCategory, productCategories } = useAppContext();
+    const { isAddProductCategoryModalOpen, setIsAddProductCategoryModalOpen, t, addProductCategory, productCategories, language } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -52,7 +55,7 @@ export const AddProductCategoryModal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.name) {
-            alert('Please fill in required fields');
+            alert(t('fillRequiredFields') || 'Please fill in required fields');
             return;
         }
 
@@ -66,7 +69,7 @@ export const AddProductCategoryModal = () => {
             handleClose();
         } catch (error: any) {
             console.error('Error creating product category:', error);
-            const errorMessage = error?.message || 'Failed to create product category. Please try again.';
+            const errorMessage = error?.message || t('failedToCreateProductCategory') || 'Failed to create product category. Please try again.';
             alert(errorMessage);
         } finally {
             setLoading(false);
@@ -87,6 +90,7 @@ export const AddProductCategoryModal = () => {
                         rows={3} 
                         value={formState.description}
                         onChange={handleChange}
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" 
                         placeholder={t('enterCategoryDescription') || 'Enter category description'}
                     />

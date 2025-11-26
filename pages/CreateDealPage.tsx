@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, PlusIcon, Loader } from '../components/index';
+import { PageWrapper, Card, Input, Button, PlusIcon, Loader, NumberInput } from '../components/index';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -193,11 +193,11 @@ export const CreateDealPage = () => {
                          {/* Row 4 */}
                         <div>
                             <Label htmlFor="value">{t('value')}</Label>
-                            <Input id="value" type="number" placeholder={t('eg1000000')} value={formState.value} onChange={handleChange}/>
+                            <NumberInput id="value" name="value" value={formState.value} onChange={handleChange} placeholder={t('eg1000000')} min={0} step={1} />
                         </div>
                         <div>
                             <Label htmlFor="discountPercentage">{t('discountPercentage')}</Label>
-                            <Input id="discountPercentage" type="number" placeholder={t('eg10')} value={formState.discountPercentage} onChange={handleChange} />
+                            <NumberInput id="discountPercentage" name="discountPercentage" value={formState.discountPercentage} onChange={handleChange} placeholder={t('eg10')} min={0} max={100} step={0.01} />
                         </div>
                         <div>
                             <Label htmlFor="discountAmount">{t('discountAmount')}</Label>
@@ -210,7 +210,7 @@ export const CreateDealPage = () => {
                         </div>
                         <div>
                             <Label htmlFor="salesCommissionPercentage">{t('salesCommissionPercentage')}</Label>
-                            <Input id="salesCommissionPercentage" type="number" placeholder={t('eg25')} value={formState.salesCommissionPercentage} onChange={handleChange}/>
+                            <NumberInput id="salesCommissionPercentage" name="salesCommissionPercentage" value={formState.salesCommissionPercentage} onChange={handleChange} placeholder={t('eg25')} min={0} max={100} step={0.01} />
                         </div>
                         <div>
                             <Label htmlFor="salesCommissionAmount">{t('salesCommissionAmount')}</Label>

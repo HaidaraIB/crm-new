@@ -4,6 +4,7 @@ export * from './DashboardPage';
 export * from './LeadsPage';
 export * from './LoginPage';
 export * from './RegisterPage';
+export * from './VerifyEmailPage';
 export * from './ViewLeadPage';
 export * from './ActivitiesPage';
 export * from './PropertiesPage';

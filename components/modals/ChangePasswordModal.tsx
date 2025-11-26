@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { EyeIcon, EyeOffIcon } from '../icons';
 import { changePasswordAPI } from '../../services/api';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -21,6 +22,22 @@ export const ChangePasswordModal = () => {
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+    const [showNewPassword, setShowNewPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+    
+    // Link new password and confirm password visibility - when one changes, update both
+    const handleNewPasswordVisibilityToggle = () => {
+        const newValue = !showNewPassword;
+        setShowNewPassword(newValue);
+        setShowConfirmPassword(newValue);
+    };
+    
+    const handleConfirmPasswordVisibilityToggle = () => {
+        const newValue = !showConfirmPassword;
+        setShowNewPassword(newValue);
+        setShowConfirmPassword(newValue);
+    };
     
     // Refs to prevent auto-fill
     const currentPasswordRef = useRef<HTMLInputElement>(null);
@@ -164,20 +181,29 @@ export const ChangePasswordModal = () => {
 
                 <div>
                     <Label htmlFor="current-password">{t('currentPassword')}</Label>
-                    <Input
-                        ref={currentPasswordRef}
-                        id="current-password"
-                        type="password"
-                        placeholder={t('enterCurrentPassword')}
-                        value={formData.currentPassword}
-                        onChange={(e) => handleChange('currentPassword', e.target.value)}
-                        autoComplete="current-password"
-                        data-lpignore="true"
-                        data-form-type="other"
-                        readOnly
-                        onFocus={(e) => e.target.removeAttribute('readonly')}
-                        className={errors.currentPassword ? 'border-red-500' : ''}
-                    />
+                    <div className="relative">
+                        <Input
+                            ref={currentPasswordRef}
+                            id="current-password"
+                            type={showCurrentPassword ? 'text' : 'password'}
+                            placeholder={t('enterCurrentPassword')}
+                            value={formData.currentPassword}
+                            onChange={(e) => handleChange('currentPassword', e.target.value)}
+                            autoComplete="current-password"
+                            data-lpignore="true"
+                            data-form-type="other"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
+                            className={`pr-10 ${errors.currentPassword ? 'border-red-500' : ''}`}
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                            onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                        >
+                            {showCurrentPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                    </div>
                     {errors.currentPassword && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.currentPassword}</p>
                     )}
@@ -185,20 +211,29 @@ export const ChangePasswordModal = () => {
 
                 <div>
                     <Label htmlFor="new-password">{t('newPassword')}</Label>
-                    <Input
-                        ref={newPasswordRef}
-                        id="new-password"
-                        type="password"
-                        placeholder={t('enterNewPassword')}
-                        value={formData.newPassword}
-                        onChange={(e) => handleChange('newPassword', e.target.value)}
-                        autoComplete="new-password"
-                        data-lpignore="true"
-                        data-form-type="other"
-                        readOnly
-                        onFocus={(e) => e.target.removeAttribute('readonly')}
-                        className={errors.newPassword ? 'border-red-500' : ''}
-                    />
+                    <div className="relative">
+                        <Input
+                            ref={newPasswordRef}
+                            id="new-password"
+                            type={showNewPassword ? 'text' : 'password'}
+                            placeholder={t('enterNewPassword')}
+                            value={formData.newPassword}
+                            onChange={(e) => handleChange('newPassword', e.target.value)}
+                            autoComplete="new-password"
+                            data-lpignore="true"
+                            data-form-type="other"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
+                            className={`pr-10 ${errors.newPassword ? 'border-red-500' : ''}`}
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                            onClick={handleNewPasswordVisibilityToggle}
+                        >
+                            {showNewPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                    </div>
                     {errors.newPassword && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.newPassword}</p>
                     )}
@@ -206,20 +241,29 @@ export const ChangePasswordModal = () => {
 
                 <div>
                     <Label htmlFor="confirm-new-password">{t('confirmNewPassword')}</Label>
-                    <Input
-                        ref={confirmPasswordRef}
-                        id="confirm-new-password"
-                        type="password"
-                        placeholder={t('enterConfirmNewPassword')}
-                        value={formData.confirmPassword}
-                        onChange={(e) => handleChange('confirmPassword', e.target.value)}
-                        autoComplete="new-password"
-                        data-lpignore="true"
-                        data-form-type="other"
-                        readOnly
-                        onFocus={(e) => e.target.removeAttribute('readonly')}
-                        className={errors.confirmPassword ? 'border-red-500' : ''}
-                    />
+                    <div className="relative">
+                        <Input
+                            ref={confirmPasswordRef}
+                            id="confirm-new-password"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            placeholder={t('enterConfirmNewPassword')}
+                            value={formData.confirmPassword}
+                            onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                            autoComplete="new-password"
+                            data-lpignore="true"
+                            data-form-type="other"
+                            readOnly
+                            onFocus={(e) => e.target.removeAttribute('readonly')}
+                            className={`pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                            onClick={handleConfirmPasswordVisibilityToggle}
+                        >
+                            {showConfirmPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                    </div>
                     {errors.confirmPassword && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>
                     )}

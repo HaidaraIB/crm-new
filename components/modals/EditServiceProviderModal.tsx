@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { NumberInput } from '../NumberInput';
 import { Button } from '../Button';
 import { ServiceProvider } from '../../types';
 
@@ -46,7 +47,7 @@ export const EditServiceProviderModal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingServiceProvider || !formState.name) {
-            alert('Please fill in required fields');
+            alert(t('pleaseFillRequiredFields') || 'Please fill in required fields');
             return;
         }
 
@@ -63,7 +64,7 @@ export const EditServiceProviderModal = () => {
             handleClose();
         } catch (error: any) {
             console.error('Error updating service provider:', error);
-            const errorMessage = error?.message || 'Failed to update service provider. Please try again.';
+            const errorMessage = error?.message || t('failedToUpdateServiceProvider') || 'Failed to update service provider. Please try again.';
             alert(errorMessage);
         } finally {
             setLoading(false);
@@ -96,7 +97,7 @@ export const EditServiceProviderModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="rating">{t('rating')}</Label>
-                        <Input id="rating" type="number" min="0" max="5" step="0.1" placeholder={t('enterRating') || 'Enter rating (0-5)'} value={formState.rating} onChange={handleChange} />
+                        <NumberInput id="rating" min={0} max={5} step={0.1} placeholder={t('enterRating') || 'Enter rating (0-5)'} value={formState.rating} onChange={handleChange} />
                     </div>
                 </div>
                 <div className="flex justify-end gap-2">

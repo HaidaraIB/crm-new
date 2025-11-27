@@ -7,6 +7,9 @@
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'https://haidaraib.pythonanywhere.com/api';
 
+// متغير لتتبع عملية refresh token الجارية لتجنب استدعاءات متعددة
+let refreshTokenPromise: Promise<void> | null = null;
+
 /**
  * Helper function to make API requests
  * يستخدم JWT Bearer token للـ authentication
@@ -30,7 +33,19 @@ async function apiRequest<T>(
   // إذا كان الخطأ 401 و retryOn401 = true، حاول refresh token
   if (response.status === 401 && retryOn401) {
     try {
-      await refreshTokenAPI();
+      // إذا كانت هناك عملية refresh جارية، انتظرها بدلاً من بدء عملية جديدة
+      if (refreshTokenPromise) {
+        await refreshTokenPromise;
+      } else {
+        // بدء عملية refresh جديدة
+        refreshTokenPromise = refreshTokenAPI().then(() => {
+          refreshTokenPromise = null; // إعادة تعيين بعد النجاح
+        }).catch((error) => {
+          refreshTokenPromise = null; // إعادة تعيين بعد الفشل
+          throw error;
+        });
+        await refreshTokenPromise;
+      }
       // أعد المحاولة مرة أخرى بدون retry
       return apiRequest<T>(endpoint, options, false);
     } catch (refreshError) {
@@ -243,6 +258,72 @@ export const verifyEmailAPI = async (payload: {
 };
 
 /**
+ * طلب إعادة تعيين كلمة المرور
+ * POST /api/auth/forgot-password/
+ * Body: { email: string }
+ * Response: { message: string, sent: bool }
+ */
+export const forgotPasswordAPI = async (email: string) => {
+  const response = await fetch(`${BASE_URL}/auth/forgot-password/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Failed to send password reset email'
+    );
+    if (data?.error) {
+      error.fields = data;
+    }
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * إعادة تعيين كلمة المرور
+ * POST /api/auth/reset-password/
+ * Body: { email: string, code?: string, token?: string, new_password: string, confirm_password: string }
+ * Response: { message: string }
+ */
+export const resetPasswordAPI = async (payload: {
+  email: string;
+  code?: string;
+  token?: string;
+  new_password: string;
+  confirm_password: string;
+}) => {
+  const response = await fetch(`${BASE_URL}/auth/reset-password/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Password reset failed'
+    );
+    if (data?.error) {
+      error.fields = data;
+    }
+    throw error;
+  }
+
+  return data;
+};
+
+/**
  * تحديث access token باستخدام refresh token
  * POST /api/auth/refresh/
  * Body: { refresh: string }
@@ -390,6 +471,16 @@ export const updateLeadAPI = async (leadId: number, leadData: any) => {
   return apiRequest<any>(`/clients/${leadId}/`, {
     method: 'PUT',
     body: JSON.stringify(leadData),
+  });
+};
+
+/**
+ * حذف Client (Lead)
+ * DELETE /api/clients/:id/
+ */
+export const deleteLeadAPI = async (leadId: number) => {
+  return apiRequest<void>(`/clients/${leadId}/`, {
+    method: 'DELETE',
   });
 };
 

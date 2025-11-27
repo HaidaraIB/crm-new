@@ -11,11 +11,15 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; }) => (
-    <select id={id} value={value} onChange={onChange} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; }) => {
+    const borderClass = className?.includes('border-red') ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600';
+    const baseClassName = className?.replace(/border-\S+/g, '').trim() || '';
+    return (
+        <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
+            {children}
+        </select>
+    );
+};
 
 export const AddProjectModal = () => {
     const { isAddProjectModalOpen, setIsAddProjectModalOpen, t, addProject, developers } = useAppContext();
@@ -26,6 +30,36 @@ export const AddProjectModal = () => {
         city: '',
         paymentMethod: 'Cash',
     });
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.name.trim()) {
+            newErrors.name = t('projectNameRequired') || 'Project name is required';
+        }
+
+        if (!formState.developer) {
+            newErrors.developer = t('developerRequired') || 'Developer is required';
+        }
+
+        if (developers.length === 0) {
+            newErrors.developer = t('noDevelopersAvailable') || 'No developers available. Please add a developer first.';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
 
     // تحديث developer عند فتح الـ modal أو عند تحميل developers
     useEffect(() => {
@@ -43,24 +77,13 @@ export const AddProjectModal = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearError(id);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // التحقق من أن الحقول المطلوبة مملوءة
-        if (!formState.name.trim()) {
-            alert(t('projectName') + ' is required');
-            return;
-        }
-        
-        if (!formState.developer) {
-            alert(t('developer') + ' is required');
-            return;
-        }
-        
-        if (developers.length === 0) {
-            alert('No developers available. Please add a developer first.');
+        if (!validateForm()) {
             return;
         }
         
@@ -89,15 +112,32 @@ export const AddProjectModal = () => {
         <Modal isOpen={isAddProjectModalOpen} onClose={handleClose} title={t('addNewProject')}>
             <form onSubmit={handleSubmit} className="space-y-4">
                  <div>
-                    <Label htmlFor="name">{t('projectName')}</Label>
-                    <Input id="name" placeholder={t('enterProjectName')} value={formState.name} onChange={handleChange} />
+                    <Label htmlFor="name">{t('projectName')} <span className="text-red-500">*</span></Label>
+                    <Input 
+                        id="name" 
+                        placeholder={t('enterProjectName')} 
+                        value={formState.name} 
+                        onChange={handleChange}
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+                    )}
                 </div>
                 <div>
-                    <Label htmlFor="developer">{t('developer')}</Label>
-                    <Select id="developer" value={formState.developer} onChange={handleChange}>
+                    <Label htmlFor="developer">{t('developer')} <span className="text-red-500">*</span></Label>
+                    <Select 
+                        id="developer" 
+                        value={formState.developer} 
+                        onChange={handleChange}
+                        className={errors.developer ? 'border-red-500 dark:border-red-500' : ''}
+                    >
                         <option value="">{t('selectDeveloper') || 'Select Developer'}</option>
                         {developers.map(dev => <option key={dev.id} value={dev.name}>{dev.name}</option>)}
                     </Select>
+                    {errors.developer && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.developer}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="type">{t('type')}</Label>

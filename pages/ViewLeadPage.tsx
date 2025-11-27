@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon } from '../components/index';
 import { formatDateToLocal } from '../utils/dateUtils';
 
 export const ViewLeadPage = () => {
@@ -59,7 +59,18 @@ export const ViewLeadPage = () => {
 
     return (
         <PageWrapper 
-            title={selectedLead.name} 
+            title={
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setCurrentPage('Leads')}
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                        title={t('back') || 'Back'}
+                    >
+                        <ArrowLeftIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    </button>
+                    <span>{selectedLead.name}</span>
+                </div>
+            }
             actions={
                 <div className="flex flex-wrap gap-2">
                     <Button 
@@ -78,7 +89,7 @@ export const ViewLeadPage = () => {
                         onClick={() => {
                             if (selectedLead) {
                                 setEditingLead(selectedLead);
-                                setIsEditLeadModalOpen(true);
+                                setCurrentPage('EditLead');
                             }
                         }}
                     >
@@ -93,8 +104,50 @@ export const ViewLeadPage = () => {
                     <h3 className="font-semibold text-lg mb-4 border-b pb-3 dark:border-gray-700">{t('contactInformation') || 'Contact Information'}</h3>
                     <div className="space-y-4">
                         <div>
-                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('phone')}</label>
-                            <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">{selectedLead.phone || '-'}</p>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('phoneNumbers') || 'Phone Numbers'}</label>
+                            <div className="mt-2 space-y-2">
+                                {selectedLead.phoneNumbers && selectedLead.phoneNumbers.length > 0 ? (
+                                    selectedLead.phoneNumbers.map((pn) => (
+                                        <div key={pn.id} className="flex items-center gap-2">
+                                            <div className="flex-1">
+                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                                    {pn.phone_number}
+                                                    {pn.is_primary && (
+                                                        <span className="ml-2 text-xs text-primary">({t('primary') || 'Primary'})</span>
+                                                    )}
+                                                </p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{pn.phone_type}</p>
+                                            </div>
+                                            <a 
+                                                href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                                                title={t('openWhatsApp') || 'Open WhatsApp'}
+                                            >
+                                                <WhatsappIcon className="w-4 h-4"/>
+                                                <span className="text-xs font-medium">{t('whatsapp') || 'WhatsApp'}</span>
+                                            </a>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                        {selectedLead.phone || '-'}
+                                        {selectedLead.phone && (
+                                            <a 
+                                                href={`https://wa.me/${selectedLead.phone.replace(/[^0-9]/g, '')}`} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer" 
+                                                className="ml-2 inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+                                                title={t('openWhatsApp') || 'Open WhatsApp'}
+                                            >
+                                                <WhatsappIcon className="w-4 h-4"/>
+                                                <span className="text-xs font-medium">{t('whatsapp') || 'WhatsApp'}</span>
+                                            </a>
+                                        )}
+                                    </p>
+                                )}
+                            </div>
                         </div>
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('communicationWay')}</label>

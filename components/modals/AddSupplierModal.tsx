@@ -20,6 +20,32 @@ export const AddSupplierModal = () => {
         specialization: '',
     });
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.name.trim()) {
+            newErrors.name = t('nameRequired') || 'Name is required';
+        }
+
+        if (formState.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
+            newErrors.email = t('invalidEmail') || 'Invalid email format';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
 
     useEffect(() => {
         if (isAddSupplierModalOpen) {
@@ -38,6 +64,7 @@ export const AddSupplierModal = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearError(id);
     };
 
     const handleClose = () => {
@@ -54,8 +81,8 @@ export const AddSupplierModal = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formState.name) {
-            alert(t('fillRequiredFields') || 'Please fill in required fields');
+        
+        if (!validateForm()) {
             return;
         }
 
@@ -83,8 +110,17 @@ export const AddSupplierModal = () => {
         <Modal isOpen={isAddSupplierModalOpen} onClose={handleClose} title={t('addSupplier') || 'Add Supplier'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <Label htmlFor="name">{t('name')} *</Label>
-                    <Input id="name" placeholder={t('enterSupplierName') || 'Enter supplier name'} value={formState.name} onChange={handleChange} required />
+                    <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
+                    <Input 
+                        id="name" 
+                        placeholder={t('enterSupplierName') || 'Enter supplier name'} 
+                        value={formState.name} 
+                        onChange={handleChange}
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+                    )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -93,7 +129,17 @@ export const AddSupplierModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="email">{t('email')}</Label>
-                        <Input id="email" type="email" placeholder={t('enterEmail') || 'Enter email'} value={formState.email} onChange={handleChange} />
+                        <Input 
+                            id="email" 
+                            type="email" 
+                            placeholder={t('enterEmail') || 'Enter email'} 
+                            value={formState.email} 
+                            onChange={handleChange}
+                            className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.email && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                        )}
                     </div>
                 </div>
                 <div>

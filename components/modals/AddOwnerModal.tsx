@@ -25,14 +25,42 @@ export const AddOwnerModal = () => {
         city: 'Riyadh',
         district: '',
     });
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.name.trim()) {
+            newErrors.name = t('nameRequired') || 'Name is required';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearError(id);
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!validateForm()) {
+            return;
+        }
+        
         addOwner(formState);
         setIsAddOwnerModalOpen(false);
         // Reset form
@@ -43,8 +71,17 @@ export const AddOwnerModal = () => {
         <Modal isOpen={isAddOwnerModalOpen} onClose={() => setIsAddOwnerModalOpen(false)} title={t('addNewOwner')}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <Label htmlFor="name">{t('ownerName')}</Label>
-                    <Input id="name" placeholder={t('enterOwnerFullName')} value={formState.name} onChange={handleChange} />
+                    <Label htmlFor="name">{t('ownerName')} <span className="text-red-500">*</span></Label>
+                    <Input 
+                        id="name" 
+                        placeholder={t('enterOwnerFullName')} 
+                        value={formState.name} 
+                        onChange={handleChange}
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="phone">{t('ownerPhone')}</Label>

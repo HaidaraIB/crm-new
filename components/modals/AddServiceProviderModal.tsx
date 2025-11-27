@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
+import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -20,6 +21,36 @@ export const AddServiceProviderModal = () => {
         rating: '',
     });
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.name.trim()) {
+            newErrors.name = t('nameRequired') || 'Name is required';
+        }
+
+        if (formState.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
+            newErrors.email = t('invalidEmail') || 'Invalid email format';
+        }
+
+        if (formState.rating && (Number(formState.rating) < 0 || Number(formState.rating) > 5)) {
+            newErrors.rating = t('ratingRange') || 'Rating must be between 0 and 5';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
 
     useEffect(() => {
         if (isAddServiceProviderModalOpen) {
@@ -37,6 +68,7 @@ export const AddServiceProviderModal = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearError(id);
     };
 
     const handleClose = () => {
@@ -52,8 +84,8 @@ export const AddServiceProviderModal = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formState.name) {
-            alert(t('pleaseFillRequiredFields') || 'Please fill in required fields');
+        
+        if (!validateForm()) {
             return;
         }
 
@@ -80,17 +112,47 @@ export const AddServiceProviderModal = () => {
         <Modal isOpen={isAddServiceProviderModalOpen} onClose={handleClose} title={t('addServiceProvider') || 'Add Service Provider'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <Label htmlFor="name">{t('name')} *</Label>
-                    <Input id="name" placeholder={t('enterProviderName') || 'Enter provider name'} value={formState.name} onChange={handleChange} required />
+                    <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
+                    <Input 
+                        id="name" 
+                        placeholder={t('enterProviderName') || 'Enter provider name'} 
+                        value={formState.name} 
+                        onChange={handleChange}
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+                    )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
                     <div>
                         <Label htmlFor="phone">{t('phone')}</Label>
-                        <Input id="phone" placeholder={t('enterPhoneNumber') || 'Enter phone number'} value={formState.phone} onChange={handleChange} />
+                        <PhoneInput 
+                            id="phone" 
+                            placeholder={t('enterPhoneNumber') || 'Enter phone number'} 
+                            value={formState.phone} 
+                            onChange={(value) => {
+                                setFormState(prev => ({ ...prev, phone: value }));
+                                clearError('phone');
+                            }}
+                            defaultCountry="SA"
+                        />
                     </div>
+                </div>
+                <div>
                     <div>
                         <Label htmlFor="email">{t('email')}</Label>
-                        <Input id="email" type="email" placeholder={t('enterEmail') || 'Enter email'} value={formState.email} onChange={handleChange} />
+                        <Input 
+                            id="email" 
+                            type="email" 
+                            placeholder={t('enterEmail') || 'Enter email'} 
+                            value={formState.email} 
+                            onChange={handleChange}
+                            className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.email && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                        )}
                     </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -100,7 +162,19 @@ export const AddServiceProviderModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="rating">{t('rating')}</Label>
-                        <NumberInput id="rating" min={0} max={5} step={0.1} placeholder={t('enterRating') || 'Enter rating (0-5)'} value={formState.rating} onChange={handleChange} />
+                        <NumberInput 
+                            id="rating" 
+                            min={0} 
+                            max={5} 
+                            step={0.1} 
+                            placeholder={t('enterRating') || 'Enter rating (0-5)'} 
+                            value={formState.rating} 
+                            onChange={handleChange}
+                            className={errors.rating ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.rating && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.rating}</p>
+                        )}
                     </div>
                 </div>
                 <div className="flex justify-end gap-2">

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, PlusIcon, Loader, NumberInput } from '../components/index';
+import { PageWrapper, Card, Input, Button, PlusIcon, Loader, NumberInput, ArrowLeftIcon } from '../components/index';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -9,16 +9,21 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode, value?: string | number; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string }) => (
-    <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${className}`}>
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode, value?: string | number; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string }) => {
+    const borderClass = className?.includes('border-red') ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600';
+    const baseClassName = className?.replace(/border-\S+/g, '').trim() || '';
+    return (
+        <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
+            {children}
+        </select>
+    );
+};
 
 
 export const CreateDealPage = () => {
     const { t, setCurrentPage, setIsAddLeadModalOpen, addDeal, projects, units, leads, currentUser, selectedLeadForDeal, setSelectedLeadForDeal, users } = useAppContext();
     const [loading, setLoading] = useState(true);
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
     
     // Use selectedLeadForDeal if available, otherwise use first lead
@@ -62,6 +67,39 @@ export const CreateDealPage = () => {
         }
     }, [selectedLeadForDeal]);
 
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.leadId || formState.leadId === 0) {
+            newErrors.leadId = t('leadRequired') || 'Lead is required';
+        }
+
+        if (!formState.value || parseFloat(formState.value) <= 0) {
+            newErrors.value = t('valueRequired') || 'Deal value is required and must be greater than 0';
+        }
+
+        if (isRealEstate && !formState.project) {
+            newErrors.project = t('projectRequired') || 'Project is required';
+        }
+
+        if (isRealEstate && !formState.unit) {
+            newErrors.unit = t('unitRequired') || 'Unit is required';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => {
@@ -75,10 +113,16 @@ export const CreateDealPage = () => {
 
             return newState;
         });
+        clearError(id);
     };
     
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        
+        if (!validateForm()) {
+            return;
+        }
+        
         const clientName = leads.find(l => l.id === formState.leadId)?.name || t('unknownClient');
         addDeal({
             clientName,
@@ -117,7 +161,20 @@ export const CreateDealPage = () => {
     }
 
     return (
-        <PageWrapper title={t('createNewDeal')}>
+        <PageWrapper 
+            title={
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={() => setCurrentPage('Deals')}
+                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                        title={t('back') || 'Back'}
+                    >
+                        <ArrowLeftIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                    </button>
+                    <span>{t('createNewDeal')}</span>
+                </div>
+            }
+        >
             <form onSubmit={handleSubmit}>
                 <Card>
                     <h3 className="text-lg font-semibold mb-6 border-b pb-3 dark:border-gray-700">{t('dealInformation')}</h3>
@@ -125,26 +182,50 @@ export const CreateDealPage = () => {
                         {/* Row 1 */}
                         {isRealEstate && projects.length > 0 && (
                             <div>
-                                <Label htmlFor="project">{t('project')}</Label>
-                                <Select id="project" value={formState.project} onChange={handleChange}>
+                                <Label htmlFor="project">{t('project')} <span className="text-red-500">*</span></Label>
+                                <Select 
+                                    id="project" 
+                                    value={formState.project} 
+                                    onChange={handleChange}
+                                    className={errors.project ? 'border-red-500 dark:border-red-500' : ''}
+                                >
                                     <option disabled value="">{t('selectProject')}</option>
                                     {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                                 </Select>
+                                {errors.project && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.project}</p>
+                                )}
                             </div>
                         )}
                         {isRealEstate && units.length > 0 && (
                             <div>
-                                <Label htmlFor="unit">{t('unit')}</Label>
-                                <Select id="unit" value={formState.unit} onChange={handleChange}>
+                                <Label htmlFor="unit">{t('unit')} <span className="text-red-500">*</span></Label>
+                                <Select 
+                                    id="unit" 
+                                    value={formState.unit} 
+                                    onChange={handleChange}
+                                    className={errors.unit ? 'border-red-500 dark:border-red-500' : ''}
+                                >
                                     <option disabled value="">{t('selectUnit')}</option>
                                     {units.map(u => <option key={u.id} value={u.code}>{u.code}</option>)}
                                 </Select>
+                                {errors.unit && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.unit}</p>
+                                )}
                             </div>
                         )}
                         <div>
-                            <Label htmlFor="leadId">{t('lead')}</Label>
+                            <Label htmlFor="leadId">{t('lead')} <span className="text-red-500">*</span></Label>
                             <div className="flex gap-2">
-                                <Select id="leadId" className="flex-grow" value={formState.leadId} onChange={(e) => setFormState(p => ({...p, leadId: Number(e.target.value)}))}>
+                                <Select 
+                                    id="leadId" 
+                                    className={`flex-grow ${errors.leadId ? 'border-red-500 dark:border-red-500' : ''}`} 
+                                    value={formState.leadId} 
+                                    onChange={(e) => {
+                                        setFormState(p => ({...p, leadId: Number(e.target.value)}));
+                                        clearError('leadId');
+                                    }}
+                                >
                                     <option disabled value={0}>{t('selectLead')}</option>
                                     {leads.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </Select>
@@ -152,6 +233,9 @@ export const CreateDealPage = () => {
                                     <PlusIcon className="w-4 h-4"/>
                                 </Button>
                             </div>
+                            {errors.leadId && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.leadId}</p>
+                            )}
                         </div>
                         {/* Row 2 */}
                         <div>
@@ -192,8 +276,20 @@ export const CreateDealPage = () => {
                         </div>
                          {/* Row 4 */}
                         <div>
-                            <Label htmlFor="value">{t('value')}</Label>
-                            <NumberInput id="value" name="value" value={formState.value} onChange={handleChange} placeholder={t('eg1000000')} min={0} step={1} />
+                            <Label htmlFor="value">{t('value')} <span className="text-red-500">*</span></Label>
+                            <NumberInput 
+                                id="value" 
+                                name="value" 
+                                value={formState.value} 
+                                onChange={handleChange} 
+                                placeholder={t('eg1000000')} 
+                                min={0} 
+                                step={1}
+                                className={errors.value ? 'border-red-500 dark:border-red-500' : ''}
+                            />
+                            {errors.value && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.value}</p>
+                            )}
                         </div>
                         <div>
                             <Label htmlFor="discountPercentage">{t('discountPercentage')}</Label>

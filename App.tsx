@@ -3,7 +3,7 @@
 import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal } from './components/index';
-import { ActivitiesPage, CampaignsPage, CreateDealPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, VerifyEmailPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage } from './pages';
+import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage } from './pages';
 
 const CurrentPageContent = () => {
     const { currentPage } = useAppContext();
@@ -19,6 +19,10 @@ const CurrentPageContent = () => {
             return <LeadsPage key={currentPage} />;
         case 'ViewLead':
             return <ViewLeadPage />;
+        case 'CreateLead':
+            return <CreateLeadPage />;
+        case 'EditLead':
+            return <EditLeadPage />;
         case 'Activities':
             return <ActivitiesPage />;
         case 'Inventory':
@@ -85,15 +89,26 @@ const TheApp = () => {
     const pathname = window.location.pathname;
     const urlParams = new URLSearchParams(window.location.search);
     const hasVerificationParams = urlParams.has('token') && urlParams.has('email');
+    const hasResetParams = urlParams.has('token') && (urlParams.has('email') || pathname === '/reset-password');
     
     // Prioritize verify-email route: show VerifyEmailPage if pathname matches OR if URL has verification parameters
     // This ensures verification works regardless of currentPage state
-    if (pathname === '/verify-email' || hasVerificationParams || currentPage === 'VerifyEmail') {
+    if (pathname === '/verify-email' || (hasVerificationParams && pathname !== '/reset-password') || currentPage === 'VerifyEmail') {
         return <VerifyEmailPage />;
     }
     
     // Handle routing for login and register pages
     if (!isLoggedIn) {
+        // Show forgot password page if on /forgot-password route
+        if (pathname === '/forgot-password' || currentPage === 'ForgotPassword') {
+            return <ForgotPasswordPage />;
+        }
+        
+        // Show reset password page if on /reset-password route or has reset params
+        if (pathname === '/reset-password' || hasResetParams || currentPage === 'ResetPassword') {
+            return <ResetPasswordPage />;
+        }
+        
         // Show register page if on /register route
         if (pathname === '/register' || currentPage === 'Register') {
             return <RegisterPage />;

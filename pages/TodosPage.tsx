@@ -18,7 +18,7 @@ const getStageIcon = (stage: TaskStage) => {
 };
 
 export const TodosPage = () => {
-    const { t, todos, completedTodos, completeTodo, setIsAddTodoModalOpen, language } = useAppContext();
+    const { t, todos, completedTodos, completeTodo, setIsAddTodoModalOpen, language, stages } = useAppContext();
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
     const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
@@ -52,6 +52,18 @@ export const TodosPage = () => {
     };
 
     const currentTodos = activeTab === 'active' ? todos : completedTodos;
+    
+    // Get unique stages from todos for filters
+    const availableStages = useMemo(() => {
+        const stageSet = new Set<string>();
+        currentTodos.forEach(todo => {
+            if (todo.stage) {
+                stageSet.add(todo.stage);
+            }
+        });
+        // Get stage objects from settings that match the todos' stages
+        return stages.filter(s => stageSet.has(s.name));
+    }, [currentTodos, stages]);
     
     const filteredTodos = useMemo(() => {
         return currentTodos.filter(todo => {
@@ -152,10 +164,18 @@ export const TodosPage = () => {
                     {activeTab === 'active' && (
                         <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <Button variant={activeFilter === 'all' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('all')}><ListIcon className="w-4 h-4" /> {t('all')}</Button>
-                            <Button variant={activeFilter === 'meeting' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('meeting')}><UsersIcon className="w-4 h-4" /> {getStageDisplayLabel('meeting', t)}</Button>
-                            <Button variant={activeFilter === 'following' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('following')}><PhoneIcon className="w-4 h-4" /> {getStageDisplayLabel('following', t)}</Button>
-                            <Button variant={activeFilter === 'hold' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('hold')}><ClockIcon className="w-4 h-4" /> {getStageDisplayLabel('hold', t)}</Button>
-                            <Button variant={activeFilter === 'whatsapp_pending' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('whatsapp_pending')}><PhoneIcon className="w-4 h-4" /> {getStageDisplayLabel('whatsapp_pending', t)}</Button>
+                            {availableStages.map(stage => {
+                                const Icon = getStageIcon(stage.name as TaskStage);
+                                return (
+                                    <Button 
+                                        key={stage.id} 
+                                        variant={activeFilter === stage.name ? 'primary' : 'ghost'} 
+                                        onClick={() => setActiveFilter(stage.name as FilterType)}
+                                    >
+                                        <Icon className="w-4 h-4" /> {stage.name}
+                                    </Button>
+                                );
+                            })}
                         </div>
                     )}
 
@@ -163,15 +183,18 @@ export const TodosPage = () => {
                         {filteredTodos.length > 0 ? (
                             filteredTodos.map(todo => {
                                 const Icon = getStageIcon(todo.stage);
+                                // Find stage from settings to get color
+                                const stageObj = stages.find(s => s.name === todo.stage);
+                                const stageColor = stageObj?.color || '#808080';
                                 return (
                                     // FIX: Wrapped Card in a div with a key to resolve TypeScript error about key prop not being in CardProps.
                                     <div key={todo.id}>
                                         <Card className="flex items-center gap-4 p-4">
-                                            <div className="p-2 bg-primary-100 dark:bg-primary-900 rounded-full">
-                                                <Icon className="w-5 h-5 text-gray-900 dark:text-gray-100" />
+                                            <div className="p-2 rounded-full" style={{ backgroundColor: `${stageColor}20` }}>
+                                                <Icon className="w-5 h-5" style={{ color: stageColor }} />
                                             </div>
                                             <div className="flex-1">
-                                                <p className="font-semibold">{getStageDisplayLabel(todo.stage, t)}</p>
+                                                <p className="font-semibold">{todo.stage}</p>
                                                 <p className="text-sm text-gray-700 dark:text-gray-300">{todo.leadName} - {todo.leadPhone}</p>
                                                 <p className="text-xs text-gray-500">{new Date(todo.dueDate).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}</p>
                                             </div>

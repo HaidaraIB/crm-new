@@ -4,7 +4,7 @@ export type Theme = 'light' | 'dark';
 export type Page = 
   | 'Dashboard' | 'Leads' | 'Activities' | 'Inventory' | 'Deals' 
   | 'Users' | 'Marketing' | 'Todos' | 'Reports' | 'Integrations' 
-  | 'Settings' | 'ViewLead' | 'CreateDeal' | 'Profile'
+  | 'Settings' | 'ViewLead' | 'CreateDeal' | 'CreateLead' | 'EditLead' | 'Profile'
   // Sub-pages
   | 'All Leads' | 'Fresh Leads' | 'Cold Leads' | 'My Leads' | 'Rotated Leads'
   | 'Properties' | 'Owners'
@@ -53,10 +53,21 @@ export interface ClientTask {
   createdAt: string;
 }
 
+export interface PhoneNumber {
+  id: number;
+  phone_number: string;
+  phone_type: 'mobile' | 'home' | 'work' | 'other';
+  is_primary: boolean;
+  notes?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface Lead {
   id: number;
   name: string;
-  phone: string;
+  phone: string; // Keep for backward compatibility
+  phoneNumbers?: PhoneNumber[]; // New field for multiple phone numbers
   status: 'Untouched' | 'Touched' | 'Following' | 'Meeting' | 'No Answer' | 'Out Of Service' | 'All';
   type: 'Fresh' | 'Cold' | 'My' | 'Rotated' | 'All';
   assignedTo: number; // User ID

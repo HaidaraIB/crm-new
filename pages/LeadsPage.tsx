@@ -3,9 +3,8 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader } from '../components/index';
+import { TrashIcon } from '../components/icons';
 import { Lead } from '../types';
-
-const leadStatusFilters: Lead['status'][] = ['All', 'Untouched', 'Touched', 'Following', 'Meeting', 'No Answer', 'Out Of Service'];
 
 export const LeadsPage = () => {
     const { 
@@ -24,7 +23,23 @@ export const LeadsPage = () => {
         users,
         leadFilters,
         setLeadFilters,
+        statuses,
+        deleteLead,
+        setConfirmDeleteConfig,
+        setIsConfirmDeleteModalOpen,
     } = useAppContext();
+    
+    // Get status filters from settings (non-hidden statuses) or use defaults
+    const leadStatusFilters: Lead['status'][] = React.useMemo(() => {
+        const defaultFilters: Lead['status'][] = ['All', 'Untouched', 'Touched', 'Following', 'Meeting', 'No Answer', 'Out Of Service'];
+        if (statuses.length > 0) {
+            const statusNames = statuses
+                .filter(s => !s.isHidden)
+                .map(s => s.name as Lead['status']);
+            return ['All', ...statusNames];
+        }
+        return defaultFilters;
+    }, [statuses]);
     const [activeStatusFilter, setActiveStatusFilter] = useState<Lead['status']>('All');
     const [loading, setLoading] = useState(true);
 
@@ -55,9 +70,28 @@ export const LeadsPage = () => {
         setCurrentPage('ViewLead');
     };
 
-    const handleAddAction = (lead: Lead) => {
-        setSelectedLead(lead);
-        setIsAddActionModalOpen(true);
+    const handleDeleteLead = (lead: Lead) => {
+        setConfirmDeleteConfig({
+            title: t('deleteLead') || 'Delete Lead',
+            message: t('confirmDeleteLead') || 'Are you sure you want to delete',
+            itemName: lead.name,
+            onConfirm: async () => {
+                try {
+                    await deleteLead(lead.id);
+                } catch (error: any) {
+                    console.error('Error deleting lead:', error);
+                    throw error; // Let ConfirmDeleteModal handle the error display
+                }
+            },
+        });
+        setIsConfirmDeleteModalOpen(true);
+    };
+
+    // Check if user can delete a lead (admin or assigned employee)
+    const canDeleteLead = (lead: Lead) => {
+        const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin';
+        const isAssignedEmployee = lead.assignedTo === currentUser?.id;
+        return isAdmin || isAssignedEmployee;
     };
 
     // FIX: Convert page title to camelCase to match translation keys and cast to the correct type.
@@ -192,7 +226,7 @@ export const LeadsPage = () => {
             actions={
                 <>
                     <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
-                    <Button onClick={() => setIsAddLeadModalOpen(true)} className="w-full sm:w-auto"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
+                    <Button onClick={() => setCurrentPage('CreateLead')} className="w-full sm:w-auto"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
                     {isAdmin && (
                         <Button variant="secondary" onClick={() => setIsAssignLeadModalOpen(true)} disabled={checkedLeadIds.size === 0} className="w-full sm:w-auto">{t('assignLead')}</Button>
                     )}
@@ -243,11 +277,45 @@ export const LeadsPage = () => {
                                                 <td className="p-2 sm:p-4"><input type="checkbox" checked={checkedLeadIds.has(lead.id)} onChange={(e) => handleCheckChange(lead.id, e.target.checked)} className="rounded" /></td>
                                                 <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.name}</td>
                                                 <td className="px-3 sm:px-6 py-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.phone}</span>
-                                                        <a href={`https://wa.me/${lead.phone}`} target="_blank" rel="noopener noreferrer" className="text-green-500 hover:text-green-600 flex-shrink-0">
-                                                            <WhatsappIcon className="w-4 h-4"/>
-                                                        </a>
+                                                    <div className="flex flex-col gap-2">
+                                                        {lead.phoneNumbers && lead.phoneNumbers.length > 0 ? (
+                                                            lead.phoneNumbers.map((pn) => (
+                                                                <div key={pn.id} className="flex items-center gap-2">
+                                                                    <span className="text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm">
+                                                                        {pn.phone_number}
+                                                                        {pn.is_primary && (
+                                                                            <span className="ml-1 text-xs text-primary">({t('primary') || 'Primary'})</span>
+                                                                        )}
+                                                                    </span>
+                                                                    <a 
+                                                                        href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer" 
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors flex-shrink-0"
+                                                                        title={`${t('openWhatsApp') || 'Open WhatsApp'} - ${pn.phone_type}`}
+                                                                    >
+                                                                        <WhatsappIcon className="w-4 h-4"/>
+                                                                        <span className="text-xs font-medium hidden sm:inline">{t('whatsapp') || 'WhatsApp'}</span>
+                                                                    </a>
+                                                                </div>
+                                                            ))
+                                                        ) : (
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.phone}</span>
+                                                                {lead.phone && (
+                                                                    <a 
+                                                                        href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`} 
+                                                                        target="_blank" 
+                                                                        rel="noopener noreferrer" 
+                                                                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors flex-shrink-0"
+                                                                        title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                                    >
+                                                                        <WhatsappIcon className="w-4 h-4"/>
+                                                                        <span className="text-xs font-medium hidden sm:inline">{t('whatsapp') || 'WhatsApp'}</span>
+                                                                    </a>
+                                                                )}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell">
@@ -276,25 +344,63 @@ export const LeadsPage = () => {
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.communicationWay || '-'}</td>
                                                 <td className="px-3 sm:px-6 py-4 hidden md:table-cell">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
-                                                        lead.status === 'Untouched' ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' :
-                                                        lead.status === 'Touched' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                                        lead.status === 'Following' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                                        lead.status === 'Meeting' ? 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200' :
-                                                        lead.status === 'No Answer' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
-                                                        lead.status === 'Out Of Service' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
-                                                        'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                                                    }`}>
-                                                        {lead.status}
-                                                    </span>
+                                                    {(() => {
+                                                        // Find status from settings by name
+                                                        const statusConfig = statuses.find(s => s.name === lead.status);
+                                                        const statusColor = statusConfig?.color || '#808080';
+                                                        
+                                                        // Convert hex to RGB for background opacity
+                                                        const hexToRgb = (hex: string) => {
+                                                            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                                                            return result ? {
+                                                                r: parseInt(result[1], 16),
+                                                                g: parseInt(result[2], 16),
+                                                                b: parseInt(result[3], 16)
+                                                            } : null;
+                                                        };
+                                                        
+                                                        const rgb = hexToRgb(statusColor);
+                                                        const bgColor = rgb 
+                                                            ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
+                                                            : 'bg-gray-100 dark:bg-gray-700';
+                                                        const textColor = rgb
+                                                            ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
+                                                            : 'text-gray-800 dark:text-gray-200';
+                                                        
+                                                        return (
+                                                            <span 
+                                                                className={`px-2 py-1 rounded-full text-xs font-medium ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
+                                                                style={rgb ? {
+                                                                    backgroundColor: bgColor,
+                                                                    color: textColor,
+                                                                } : {}}
+                                                            >
+                                                                {lead.status}
+                                                            </span>
+                                                        );
+                                                    })()}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-gray-900 dark:text-gray-100 max-w-xs truncate">{lead.lastFeedback || '-'}</td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-gray-900 dark:text-gray-100 max-w-xs truncate">{lead.notes || '-'}</td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap">{lead.createdAt || '-'}</td>
                                                 <td className="px-3 sm:px-6 py-4">
-                                                    <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-                                                        <Button variant="ghost" className="p-1 h-auto text-xs sm:text-sm" onClick={() => handleViewLead(lead)}>{t('view')}</Button>
-                                                        <Button variant="secondary" className="p-1 h-auto text-xs sm:text-sm" onClick={() => handleAddAction(lead)}>{t('add_action')}</Button>
+                                                    <div className="flex items-center gap-1 sm:gap-2">
+                                                        <button 
+                                                            className="p-1 h-auto text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors" 
+                                                            onClick={() => handleViewLead(lead)}
+                                                            title={t('view') || 'View'}
+                                                        >
+                                                            <EyeIcon className="w-4 h-4" />
+                                                        </button>
+                                                        {canDeleteLead(lead) && (
+                                                            <button 
+                                                                className="p-1 h-auto text-xs sm:text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" 
+                                                                onClick={() => handleDeleteLead(lead)}
+                                                                title={t('delete') || 'Delete'}
+                                                            >
+                                                                <TrashIcon className="w-4 h-4" />
+                                                            </button>
+                                                        )}
                                                     </div>
                                                 </td>
                                             </tr>

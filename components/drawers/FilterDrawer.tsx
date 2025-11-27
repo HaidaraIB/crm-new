@@ -44,7 +44,7 @@ const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: 
 
 
 export const FilterDrawer = () => {
-    const { isFilterDrawerOpen, setIsFilterDrawerOpen, t, users, leadFilters, setLeadFilters, channels } = useAppContext();
+    const { isFilterDrawerOpen, setIsFilterDrawerOpen, t, users, leadFilters, setLeadFilters, channels, statuses } = useAppContext();
     const [localFilters, setLocalFilters] = useState(leadFilters);
 
     // Update local filters when leadFilters changes
@@ -81,10 +81,29 @@ export const FilterDrawer = () => {
         setIsFilterDrawerOpen(false);
     };
 
-    const leadStatuses: Array<'All' | 'Untouched' | 'Touched' | 'Following' | 'Meeting' | 'No Answer' | 'Out Of Service'> = ['All', 'Untouched', 'Touched', 'Following', 'Meeting', 'No Answer', 'Out Of Service'];
+    // Get statuses from settings
+    const leadStatuses = React.useMemo(() => {
+        if (statuses.length > 0) {
+            const statusNames = statuses
+                .filter(s => !s.isHidden)
+                .map(s => s.name as any);
+            return ['All', ...statusNames];
+        }
+        return ['All'];
+    }, [statuses]);
+    
     const leadTypes: Array<'All' | 'Fresh' | 'Cold' | 'Rotated'> = ['All', 'Fresh', 'Cold', 'Rotated'];
     const priorities: Array<'All' | 'High' | 'Medium' | 'Low'> = ['All', 'High', 'Medium', 'Low'];
-    const communicationWays: Array<'All' | 'WhatsApp' | 'Call'> = ['All', 'WhatsApp', 'Call'];
+    
+    // Get communication ways from channels or use defaults
+    const communicationWays = React.useMemo(() => {
+        const defaultWays: Array<'All' | 'WhatsApp' | 'Call'> = ['All', 'WhatsApp', 'Call'];
+        if (channels.length > 0) {
+            const channelNames = channels.map(c => c.name as any);
+            return ['All', ...channelNames];
+        }
+        return defaultWays;
+    }, [channels]);
 
     return (
         <>

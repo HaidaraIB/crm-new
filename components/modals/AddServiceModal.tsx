@@ -32,6 +32,32 @@ export const AddServiceModal = () => {
         isActive: true,
     });
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.name.trim()) {
+            newErrors.name = t('nameRequired') || 'Name is required';
+        }
+
+        if (!formState.price || Number(formState.price) <= 0) {
+            newErrors.price = t('priceRequired') || 'Price is required and must be greater than 0';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
 
     useEffect(() => {
         if (isAddServiceModalOpen) {
@@ -55,6 +81,7 @@ export const AddServiceModal = () => {
         } else {
             setFormState(prev => ({ ...prev, [id]: value }));
         }
+        clearError(id);
     };
 
     const handleClose = () => {
@@ -72,8 +99,8 @@ export const AddServiceModal = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formState.name || !formState.price) {
-            alert(t('pleaseFillRequiredFields') || 'Please fill in required fields');
+        
+        if (!validateForm()) {
             return;
         }
 
@@ -102,8 +129,17 @@ export const AddServiceModal = () => {
         <Modal isOpen={isAddServiceModalOpen} onClose={handleClose} title={t('addService') || 'Add Service'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <Label htmlFor="name">{t('name')} *</Label>
-                    <Input id="name" placeholder={t('enterServiceName') || 'Enter service name'} value={formState.name} onChange={handleChange} required />
+                    <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
+                    <Input 
+                        id="name" 
+                        placeholder={t('enterServiceName') || 'Enter service name'} 
+                        value={formState.name} 
+                        onChange={handleChange}
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.name && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="description">{t('description')}</Label>
@@ -119,8 +155,19 @@ export const AddServiceModal = () => {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <Label htmlFor="price">{t('price')} *</Label>
-                        <NumberInput id="price" placeholder={t('enterPrice') || 'Enter price'} value={formState.price} onChange={handleChange} min={0} step={0.1} required />
+                        <Label htmlFor="price">{t('price')} <span className="text-red-500">*</span></Label>
+                        <NumberInput 
+                            id="price" 
+                            placeholder={t('enterPrice') || 'Enter price'} 
+                            value={formState.price} 
+                            onChange={handleChange} 
+                            min={0} 
+                            step={0.1}
+                            className={errors.price ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.price && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="duration">{t('duration')}</Label>

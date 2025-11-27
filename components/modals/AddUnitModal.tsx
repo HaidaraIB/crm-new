@@ -12,11 +12,15 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; }) => (
-    <select id={id} value={value} onChange={onChange} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary">
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; }) => {
+    const borderClass = className?.includes('border-red') ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600';
+    const baseClassName = className?.replace(/border-\S+/g, '').trim() || '';
+    return (
+        <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
+            {children}
+        </select>
+    );
+};
 
 export const AddUnitModal = () => {
     const { isAddUnitModalOpen, setIsAddUnitModalOpen, t, addUnit, projects } = useAppContext();
@@ -31,6 +35,36 @@ export const AddUnitModal = () => {
         district: '',
         zone: '',
     });
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.project) {
+            newErrors.project = t('projectRequired') || 'Project is required';
+        }
+
+        if (!formState.price || Number(formState.price) <= 0) {
+            newErrors.price = t('priceRequired') || 'Price is required and must be greater than 0';
+        }
+
+        if (projects.length === 0) {
+            newErrors.project = t('noProjectsAvailable') || 'No projects available. Please add a project first.';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
 
     // تحديث project عند فتح الـ modal أو عند تحميل projects
     useEffect(() => {
@@ -48,24 +82,13 @@ export const AddUnitModal = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearError(id);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        // التحقق من أن الحقول المطلوبة مملوءة
-        if (!formState.project) {
-            alert(t('project') + ' is required');
-            return;
-        }
-        
-        if (!formState.price || Number(formState.price) <= 0) {
-            alert(t('price') + ' is required and must be greater than 0');
-            return;
-        }
-        
-        if (projects.length === 0) {
-            alert('No projects available. Please add a project first.');
+        if (!validateForm()) {
             return;
         }
         
@@ -104,15 +127,35 @@ export const AddUnitModal = () => {
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                        <Label htmlFor="project">{t('project')}</Label>
-                        <Select id="project" value={formState.project} onChange={handleChange}>
+                        <Label htmlFor="project">{t('project')} <span className="text-red-500">*</span></Label>
+                        <Select 
+                            id="project" 
+                            value={formState.project} 
+                            onChange={handleChange}
+                            className={errors.project ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="">{t('selectProject') || 'Select Project'}</option>
                             {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
                         </Select>
+                        {errors.project && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.project}</p>
+                        )}
                     </div>
                     <div>
-                        <Label htmlFor="price">{t('price')}</Label>
-                        <NumberInput id="price" name="price" value={formState.price} onChange={handleChange} placeholder="e.g. 1,000,000" min={0} step={1} />
+                        <Label htmlFor="price">{t('price')} <span className="text-red-500">*</span></Label>
+                        <NumberInput 
+                            id="price" 
+                            name="price" 
+                            value={formState.price} 
+                            onChange={handleChange} 
+                            placeholder="e.g. 1,000,000" 
+                            min={0} 
+                            step={1}
+                            className={errors.price ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.price && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="bedrooms">{t('bedrooms')}</Label>

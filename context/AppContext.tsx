@@ -7,7 +7,7 @@ import { formatStageName, getStageDisplayLabel, getStageCategory } from '../util
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { 
-  getCurrentUserAPI, getUsersAPI, getLeadsAPI, getDealsAPI, createUserAPI, updateUserAPI, deleteUserAPI, createLeadAPI, updateLeadAPI, createDealAPI, deleteDealAPI,
+  getCurrentUserAPI, getUsersAPI, getLeadsAPI, getDealsAPI, createUserAPI, updateUserAPI, deleteUserAPI, createLeadAPI, updateLeadAPI, deleteLeadAPI, createDealAPI, deleteDealAPI,
   getDevelopersAPI, createDeveloperAPI, updateDeveloperAPI, deleteDeveloperAPI,
   getProjectsAPI, createProjectAPI, updateProjectAPI, deleteProjectAPI,
   getUnitsAPI, createUnitAPI, updateUnitAPI, deleteUnitAPI,
@@ -254,6 +254,7 @@ export interface AppContextType {
   setLeads: React.Dispatch<React.SetStateAction<Lead[]>>; // TODO: استخدم هذا لتحديث leads من API
   addLead: (lead: Omit<Lead, 'id' | 'createdAt' | 'history' | 'lastFeedback' | 'notes' | 'lastStage' | 'reminder'>) => void;
   updateLead: (leadId: number, leadData: Partial<Lead>) => void;
+  deleteLead: (leadId: number) => Promise<void>;
   assignLeads: (leadIds: number[], userId: number) => void;
   leadFilters: LeadFilters;
   setLeadFilters: React.Dispatch<React.SetStateAction<LeadFilters>>;
@@ -727,7 +728,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (isLoggedIn && localStorage.getItem('accessToken') && !dataLoaded) {
       setDataLoaded(true); // ضع علامة أننا بدأنا التحميل
       
-      // تحميل بيانات المستخدم الحالي
+      // تحميل بيانات المستخدم الحالي أولاً (مطلوب لمعرفة specialization)
       getCurrentUserAPI()
         .then((userData) => {
           // تحويل بيانات المستخدم من API إلى تنسيق Frontend - تنظيف الأدوار القديمة
@@ -748,252 +749,254 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           };
           setCurrentUserState(frontendUser);
           localStorage.setItem('currentUser', JSON.stringify(frontendUser));
-        })
-        .catch(() => {
-          // إذا فشل تحميل المستخدم، أعد إلى صفحة تسجيل الدخول
-          setIsLoggedInState(false);
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('currentUser');
-        });
 
-      // تحميل البيانات من API
-      // TODO: أضف loading states و error handling
-      // تحميل Users, Leads, Deals معاً في Promise.all (يتم استخدامها لاحقاً في Tasks)
+          const specialization = frontendUser.company?.specialization;
 
-      // تحميل Real Estate data (فقط لشركات العقارات)
-      if (currentUser?.company?.specialization === 'real_estate') {
-        getDevelopersAPI()
-          .then((response) => {
-            const frontendDevelopers: Developer[] = response.results.map((d: any) => ({
-              id: d.id,
-              code: d.code,
-              name: d.name,
-            }));
-            setDevelopers(frontendDevelopers);
-          })
-          .catch((error) => console.error('Error loading developers:', error));
+          // تحميل البيانات الأساسية بشكل متوازي (مطلوبة دائماً)
+          const essentialDataPromises = [
+            getDealsAPI(),
+            getLeadsAPI(),
+            getUsersAPI(),
+            getClientTasksAPI(),
+            getCampaignsAPI(),
+            getChannelsAPI(),
+            getStagesAPI(),
+            getStatusesAPI(),
+          ];
 
-        getProjectsAPI()
-          .then((response) => {
-            const frontendProjects: Project[] = response.results.map((p: any) => ({
-              id: p.id,
-              code: p.code,
-              name: p.name,
-              developer: p.developer_name || '',
-              type: p.type || '',
-              city: p.city || '',
-              paymentMethod: p.payment_method || '',
-            }));
-            setProjects(frontendProjects);
-          })
-          .catch((error) => console.error('Error loading projects:', error));
+          // إضافة بيانات حسب specialization
+          if (specialization === 'real_estate') {
+            essentialDataPromises.push(
+              getDevelopersAPI(),
+              getProjectsAPI(),
+              getUnitsAPI(),
+              getOwnersAPI()
+            );
+          } else if (specialization === 'services') {
+            essentialDataPromises.push(
+              getServicesAPI(),
+              getServicePackagesAPI(),
+              getServiceProvidersAPI()
+            );
+          } else if (specialization === 'products') {
+            essentialDataPromises.push(
+              getProductsAPI(),
+              getProductCategoriesAPI(),
+              getSuppliersAPI()
+            );
+          }
 
-        getUnitsAPI()
-          .then((response) => {
-            const frontendUnits: Unit[] = response.results.map((u: any) => ({
-              id: u.id,
-              code: u.code,
-              project: u.project_name || '',
-              bedrooms: u.bedrooms || 0,
-              price: u.price ? parseFloat(u.price.toString()) : 0,
-              bathrooms: u.bathrooms || 0,
-              type: u.type || '',
-              finishing: u.finishing || '',
-              city: u.city || '',
-              district: u.district || '',
-              zone: u.zone || '',
-              isSold: u.is_sold || false,
-            }));
-            setUnits(frontendUnits);
-          })
-          .catch((error) => console.error('Error loading units:', error));
+          // تحميل جميع البيانات الأساسية بشكل متوازي
+          Promise.all(essentialDataPromises)
+            .then((responses) => {
+              // معالجة البيانات الأساسية
+              const [dealsResponse, leadsResponse, usersResponse, clientTasksResponse, campaignsResponse, channelsResponse, stagesResponse, statusesResponse, ...specializationResponses] = responses;
 
-        getOwnersAPI()
-          .then((response) => {
-            const frontendOwners: Owner[] = response.results.map((o: any) => ({
-              id: o.id,
-              code: o.code,
-              name: o.name,
-              phone: o.phone || '',
-              city: o.city || '',
-              district: o.district || '',
-            }));
-            setOwners(frontendOwners);
-          })
-          .catch((error) => console.error('Error loading owners:', error));
-      }
+              // معالجة Campaigns
+              const campaignsData = Array.isArray(campaignsResponse) ? campaignsResponse : campaignsResponse.results || [];
+              const frontendCampaigns: Campaign[] = campaignsData.map((c: any) => ({
+                id: c.id,
+                code: c.code,
+                name: c.name,
+                budget: c.budget ? parseFloat(c.budget.toString()) : 0,
+                createdAt: c.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
+                isActive: c.is_active !== false,
+              }));
+              setCampaigns(frontendCampaigns);
 
-      // تحميل Services data (فقط لشركات الخدمات)
-      if (currentUser?.company?.specialization === 'services') {
-        getServicesAPI()
-          .then((response) => {
-            const frontendServices: Service[] = response.results.map((s: any) => ({
-              id: s.id,
-              code: s.code,
-              name: s.name,
-              description: s.description || '',
-              price: s.price ? parseFloat(s.price.toString()) : 0,
-              duration: s.duration || '',
-              category: s.category || '',
-              provider: s.provider_name || undefined,
-              isActive: s.is_active !== false,
-            }));
-            setServices(frontendServices);
-          })
-          .catch((error) => console.error('Error loading services:', error));
+              // معالجة Channels
+              const channelsResults = Array.isArray(channelsResponse) ? channelsResponse : ((channelsResponse as any)?.results || []);
+              const frontendChannels: Channel[] = channelsResults.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                type: c.type,
+                priority: c.priority.charAt(0).toUpperCase() + c.priority.slice(1) as 'High' | 'Medium' | 'Low',
+              }));
+              setChannels(frontendChannels);
 
-        getServicePackagesAPI()
-          .then((response) => {
-            const frontendPackages: ServicePackage[] = response.results.map((p: any) => ({
-              id: p.id,
-              code: p.code,
-              name: p.name,
-              description: p.description || '',
-              price: p.price ? parseFloat(p.price.toString()) : 0,
-              duration: p.duration || '',
-              services: p.services || [],
-              isActive: p.is_active !== false,
-            }));
-            setServicePackages(frontendPackages);
-          })
-          .catch((error) => console.error('Error loading service packages:', error));
+              // معالجة Stages
+              const stagesResults = Array.isArray(stagesResponse) ? stagesResponse : ((stagesResponse as any)?.results || []);
+              const frontendStages: Stage[] = stagesResults.map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                description: s.description || '',
+                color: s.color || '#808080',
+                required: s.required || false,
+                autoAdvance: s.auto_advance || false,
+              }));
+              setStages(frontendStages);
 
-        getServiceProvidersAPI()
-          .then((response) => {
-            const frontendProviders: ServiceProvider[] = response.results.map((p: any) => ({
-              id: p.id,
-              code: p.code,
-              name: p.name,
-              phone: p.phone || '',
-              email: p.email || '',
-              specialization: p.specialization || '',
-              rating: p.rating ? parseFloat(p.rating.toString()) : undefined,
-            }));
-            setServiceProviders(frontendProviders);
-          })
-          .catch((error) => console.error('Error loading service providers:', error));
-      }
+              // معالجة Statuses
+              const statusesResults = Array.isArray(statusesResponse) ? statusesResponse : ((statusesResponse as any)?.results || []);
+              const frontendStatuses: Status[] = statusesResults.map((s: any) => ({
+                id: s.id,
+                name: s.name,
+                description: s.description || '',
+                category: s.category.replace('_', ' ').split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') as 'Active' | 'Inactive' | 'Follow Up' | 'Closed',
+                color: s.color || '#808080',
+                isDefault: s.is_default || false,
+                isHidden: s.is_hidden || false,
+              }));
+              setStatuses(frontendStatuses);
 
-      // تحميل Products data (فقط لشركات المنتجات)
-      if (currentUser?.company?.specialization === 'products') {
-        getProductsAPI()
-          .then((response) => {
-            const frontendProducts: Product[] = response.results.map((p: any) => ({
-              id: p.id,
-              code: p.code,
-              name: p.name,
-              description: p.description || '',
-              price: p.price ? parseFloat(p.price.toString()) : 0,
-              cost: p.cost ? parseFloat(p.cost.toString()) : 0,
-              stock: p.stock || 0,
-              category: p.category_name || '',
-              supplier: p.supplier_name || undefined,
-              sku: p.sku || undefined,
-              image: undefined, // Image removed
-              isActive: p.is_active !== false,
-            }));
-            setProducts(frontendProducts);
-          })
-          .catch((error) => console.error('Error loading products:', error));
+              // معالجة بيانات Real Estate
+              if (specialization === 'real_estate' && specializationResponses.length >= 4) {
+                const [developersResponse, projectsResponse, unitsResponse, ownersResponse] = specializationResponses;
+                
+                // التأكد من أن responses هي objects مع results
+                const developersData = Array.isArray(developersResponse) ? developersResponse : developersResponse.results || [];
+                const projectsData = Array.isArray(projectsResponse) ? projectsResponse : projectsResponse.results || [];
+                const unitsData = Array.isArray(unitsResponse) ? unitsResponse : unitsResponse.results || [];
+                const ownersData = Array.isArray(ownersResponse) ? ownersResponse : ownersResponse.results || [];
 
-        getProductCategoriesAPI()
-          .then((response) => {
-            const frontendCategories: ProductCategory[] = response.results.map((c: any) => ({
-              id: c.id,
-              code: c.code,
-              name: c.name,
-              description: c.description || '',
-              parentCategory: c.parent_category || undefined,
-            }));
-            setProductCategories(frontendCategories);
-          })
-          .catch((error) => console.error('Error loading product categories:', error));
+                const frontendDevelopers: Developer[] = developersData.map((d: any) => ({
+                  id: d.id,
+                  code: d.code,
+                  name: d.name,
+                }));
+                setDevelopers(frontendDevelopers);
 
-        getSuppliersAPI()
-          .then((response) => {
-            const frontendSuppliers: Supplier[] = response.results.map((s: any) => ({
-              id: s.id,
-              code: s.code,
-              name: s.name,
-              logo: '', // Logo removed
-              phone: s.phone || '',
-              email: s.email || '',
-              address: s.address || '',
-              contactPerson: s.contact_person || '',
-              specialization: s.specialization || '',
-            }));
-            setSuppliers(frontendSuppliers);
-          })
-          .catch((error) => console.error('Error loading suppliers:', error));
-      }
+                const frontendProjects: Project[] = projectsData.map((p: any) => ({
+                  id: p.id,
+                  code: p.code,
+                  name: p.name,
+                  developer: p.developer_name || '',
+                  type: p.type || '',
+                  city: p.city || '',
+                  paymentMethod: p.payment_method || '',
+                }));
+                setProjects(frontendProjects);
 
-      // تحميل Campaigns
-      getCampaignsAPI()
-        .then((response) => {
-          const frontendCampaigns: Campaign[] = response.results.map((c: any) => ({
-            id: c.id,
-            code: c.code,
-            name: c.name,
-            budget: c.budget ? parseFloat(c.budget.toString()) : 0,
-            createdAt: c.created_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-            isActive: c.is_active !== false,
-          }));
-          setCampaigns(frontendCampaigns);
-        })
-        .catch((error) => console.error('Error loading campaigns:', error));
+                const frontendUnits: Unit[] = unitsData.map((u: any) => ({
+                  id: u.id,
+                  code: u.code,
+                  project: u.project_name || '',
+                  bedrooms: u.bedrooms || 0,
+                  price: u.price ? parseFloat(u.price.toString()) : 0,
+                  bathrooms: u.bathrooms || 0,
+                  type: u.type || '',
+                  finishing: u.finishing || '',
+                  city: u.city || '',
+                  district: u.district || '',
+                  zone: u.zone || '',
+                  isSold: u.is_sold || false,
+                }));
+                setUnits(frontendUnits);
 
-      // تحميل Settings data
-      getChannelsAPI()
-        .then((response: any) => {
-          const results = Array.isArray(response) ? response : ((response as any)?.results || []);
-          const frontendChannels: Channel[] = results.map((c: any) => ({
-            id: c.id,
-            name: c.name,
-            type: c.type,
-            priority: c.priority.charAt(0).toUpperCase() + c.priority.slice(1) as 'High' | 'Medium' | 'Low',
-          }));
-          setChannels(frontendChannels);
-        })
-        .catch((error) => console.error('Error loading channels:', error));
+                const frontendOwners: Owner[] = ownersData.map((o: any) => ({
+                  id: o.id,
+                  code: o.code,
+                  name: o.name,
+                  phone: o.phone || '',
+                  city: o.city || '',
+                  district: o.district || '',
+                }));
+                setOwners(frontendOwners);
+              }
 
-      getStagesAPI()
-        .then((response: any) => {
-          const results = Array.isArray(response) ? response : ((response as any)?.results || []);
-          const frontendStages: Stage[] = results.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            description: s.description || '',
-            color: s.color || '#808080',
-            required: s.required || false,
-            autoAdvance: s.auto_advance || false,
-          }));
-          setStages(frontendStages);
-        })
-        .catch((error) => console.error('Error loading stages:', error));
+              // معالجة بيانات Services
+              if (specialization === 'services' && specializationResponses.length >= 3) {
+                const [servicesResponse, servicePackagesResponse, serviceProvidersResponse] = specializationResponses;
+                
+                // التأكد من أن responses هي objects مع results
+                const servicesData = Array.isArray(servicesResponse) ? servicesResponse : servicesResponse.results || [];
+                const servicePackagesData = Array.isArray(servicePackagesResponse) ? servicePackagesResponse : servicePackagesResponse.results || [];
+                const serviceProvidersData = Array.isArray(serviceProvidersResponse) ? serviceProvidersResponse : serviceProvidersResponse.results || [];
 
-      getStatusesAPI()
-        .then((response: any) => {
-          const results = Array.isArray(response) ? response : ((response as any)?.results || []);
-          const frontendStatuses: Status[] = results.map((s: any) => ({
-            id: s.id,
-            name: s.name,
-            description: s.description || '',
-            category: s.category.replace('_', ' ').split(' ').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ') as 'Active' | 'Inactive' | 'Follow Up' | 'Closed',
-            color: s.color || '#808080',
-            isDefault: s.is_default || false,
-            isHidden: s.is_hidden || false,
-          }));
-          setStatuses(frontendStatuses);
-        })
-        .catch((error) => console.error('Error loading statuses:', error));
+                const frontendServices: Service[] = servicesData.map((s: any) => ({
+                  id: s.id,
+                  code: s.code,
+                  name: s.name,
+                  description: s.description || '',
+                  price: s.price ? parseFloat(s.price.toString()) : 0,
+                  duration: s.duration || '',
+                  category: s.category || '',
+                  provider: s.provider_name || undefined,
+                  isActive: s.is_active !== false,
+                }));
+                setServices(frontendServices);
 
-      // تحميل Tasks وتحويلها إلى Activities و Todos
-      // يجب تحميلها بعد تحميل deals و leads و users
-      Promise.all([getDealsAPI(), getLeadsAPI(), getUsersAPI(), getClientTasksAPI()])
-        .then(([dealsResponse, leadsResponse, usersResponse, clientTasksResponse]) => {
+                const frontendPackages: ServicePackage[] = servicePackagesData.map((p: any) => ({
+                  id: p.id,
+                  code: p.code,
+                  name: p.name,
+                  description: p.description || '',
+                  price: p.price ? parseFloat(p.price.toString()) : 0,
+                  duration: p.duration || '',
+                  services: p.services || [],
+                  isActive: p.is_active !== false,
+                }));
+                setServicePackages(frontendPackages);
+
+                const frontendProviders: ServiceProvider[] = serviceProvidersData.map((p: any) => ({
+                  id: p.id,
+                  code: p.code,
+                  name: p.name,
+                  phone: p.phone || '',
+                  email: p.email || '',
+                  specialization: p.specialization || '',
+                  rating: p.rating ? parseFloat(p.rating.toString()) : undefined,
+                }));
+                setServiceProviders(frontendProviders);
+              }
+
+              // معالجة بيانات Products
+              if (specialization === 'products' && specializationResponses.length >= 3) {
+                const [productsResponse, productCategoriesResponse, suppliersResponse] = specializationResponses;
+                
+                // التأكد من أن responses هي objects مع results
+                const productsData = Array.isArray(productsResponse) ? productsResponse : productsResponse.results || [];
+                const productCategoriesData = Array.isArray(productCategoriesResponse) ? productCategoriesResponse : productCategoriesResponse.results || [];
+                const suppliersData = Array.isArray(suppliersResponse) ? suppliersResponse : suppliersResponse.results || [];
+
+                const frontendProducts: Product[] = productsData.map((p: any) => ({
+                  id: p.id,
+                  code: p.code,
+                  name: p.name,
+                  description: p.description || '',
+                  price: p.price ? parseFloat(p.price.toString()) : 0,
+                  cost: p.cost ? parseFloat(p.cost.toString()) : 0,
+                  stock: p.stock || 0,
+                  category: p.category_name || '',
+                  supplier: p.supplier_name || undefined,
+                  sku: p.sku || undefined,
+                  image: undefined,
+                  isActive: p.is_active !== false,
+                }));
+                setProducts(frontendProducts);
+
+                const frontendCategories: ProductCategory[] = productCategoriesData.map((c: any) => ({
+                  id: c.id,
+                  code: c.code,
+                  name: c.name,
+                  description: c.description || '',
+                  parentCategory: c.parent_category || undefined,
+                }));
+                setProductCategories(frontendCategories);
+
+                const frontendSuppliers: Supplier[] = suppliersData.map((s: any) => ({
+                  id: s.id,
+                  code: s.code,
+                  name: s.name,
+                  logo: '',
+                  phone: s.phone || '',
+                  email: s.email || '',
+                  address: s.address || '',
+                  contactPerson: s.contact_person || '',
+                  specialization: s.specialization || '',
+                }));
+                setSuppliers(frontendSuppliers);
+              }
+
+              // معالجة Deals, Leads, Users, ClientTasks
+              // تحميل Tasks وتحويلها إلى Activities و Todos
+              // يجب تحميلها بعد تحميل deals و leads و users
+              return Promise.all([dealsResponse, leadsResponse, usersResponse, clientTasksResponse]);
+            })
+            .then(([dealsResponse, leadsResponse, usersResponse, clientTasksResponse]) => {
           // تحويل بيانات Deals
-          const frontendDeals: Deal[] = dealsResponse.results.map((d: any) => ({
+          const dealsData = Array.isArray(dealsResponse) ? dealsResponse : dealsResponse.results || [];
+          const frontendDeals: Deal[] = dealsData.map((d: any) => ({
             id: d.id,
             clientName: d.client_name || '',
             paymentMethod: d.payment_method || 'Cash',
@@ -1005,29 +1008,32 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           }));
 
           // تحويل ClientTasks
-          const frontendClientTasks: ClientTask[] = clientTasksResponse.results.map((ct: any) => ({
-            id: ct.id,
-            clientId: ct.client,
-            stage: ct.stage,
-            notes: ct.notes || '',
-            reminderDate: ct.reminder_date || null,
-            createdBy: ct.created_by || 0,
-            createdAt: ct.created_at || new Date().toISOString(),
-          }));
+          const clientTasksData = Array.isArray(clientTasksResponse) ? clientTasksResponse : clientTasksResponse.results || [];
+          const frontendClientTasks: ClientTask[] = clientTasksData.map((ct: any) => {
+            // استخدام stage_name من API (إذا كان موجود) أو stage object
+            const stageName = ct.stage_name || (ct.stage?.name) || ct.stage || '';
+            return {
+              id: ct.id,
+              clientId: ct.client,
+              stage: stageName,
+              notes: ct.notes || '',
+              reminderDate: ct.reminder_date || null,
+              createdBy: ct.created_by || 0,
+              createdAt: ct.created_at || new Date().toISOString(),
+            };
+          });
           setClientTasks(frontendClientTasks);
 
           // تحويل بيانات Leads
-          const frontendLeads: Lead[] = leadsResponse.results.map((c: any) => {
-            // تحويل status من API إلى Frontend format
-            const statusMap: { [key: string]: Lead['status'] } = {
-              'untouched': 'Untouched',
-              'touched': 'Touched',
-              'following': 'Following',
-              'meeting': 'Meeting',
-              'no_answer': 'No Answer',
-              'out_of_service': 'Out Of Service',
-            };
-            const status = statusMap[c.status?.toLowerCase()] || 'Untouched';
+          const leadsData = Array.isArray(leadsResponse) ? leadsResponse : leadsResponse.results || [];
+          const frontendLeads: Lead[] = leadsData.map((c: any) => {
+            // استخدام status_name من API (إذا كان موجود) أو status object
+            const statusName = c.status_name || (c.status?.name) || c.status || 'Untouched';
+            const status = statusName as Lead['status'];
+            
+            // استخدام communication_way_name من API (إذا كان موجود) أو communication_way object
+            const communicationWayName = c.communication_way_name || (c.communication_way?.name) || c.communication_way || 'Call';
+            const communicationWay = communicationWayName === 'WhatsApp' ? 'WhatsApp' : 'Call';
             
             // البحث عن آخر ClientTask لهذا Lead
             const clientTasksForLead = frontendClientTasks.filter(ct => ct.clientId === c.id);
@@ -1041,28 +1047,41 @@ export const AppProvider = ({ children }: AppProviderProps) => {
               )[0];
               lastFeedback = lastTask.notes || '';
               notes = lastTask.notes || '';
-              // تحويل stage من ClientTask إلى format مناسب
-              const stageMap: { [key: string]: Lead['status'] } = {
-                'untouched': 'Untouched',
-                'touched': 'Touched',
-                'following': 'Following',
-                'meeting': 'Meeting',
-                'no_answer': 'No Answer',
-                'out_of_service': 'Out Of Service',
-              };
-              lastStage = stageMap[lastTask.stage?.toLowerCase()] || status;
+              // استخدام stage_name من ClientTask
+              const taskStageName = lastTask.stage || '';
+              // البحث عن stage في stages من الإعدادات (سيتم تحميلها لاحقاً)
+              // نستخدم stage مباشرة من ClientTask
+              lastStage = taskStageName as Lead['status'] || status;
             }
+            
+            // تحويل phone numbers
+            const phoneNumbers = c.phone_numbers && Array.isArray(c.phone_numbers) 
+              ? c.phone_numbers.map((pn: any) => ({
+                  id: pn.id,
+                  phone_number: pn.phone_number || '',
+                  phone_type: pn.phone_type || 'mobile',
+                  is_primary: pn.is_primary || false,
+                  notes: pn.notes || '',
+                  created_at: pn.created_at,
+                  updated_at: pn.updated_at,
+                }))
+              : [];
+            
+            // تحديد رقم الهاتف الأساسي (primary) أو الأول
+            const primaryPhone = phoneNumbers.find((pn: any) => pn.is_primary) || phoneNumbers[0] || null;
+            const phone = primaryPhone?.phone_number || c.phone_number || '';
             
             return {
               id: c.id,
               name: c.name,
-              phone: c.phone_number || '',
+              phone: phone, // Keep for backward compatibility
+              phoneNumbers: phoneNumbers.length > 0 ? phoneNumbers : undefined,
               type: c.type === 'fresh' ? 'Fresh' : 'Cold',
               priority: c.priority === 'high' ? 'High' : c.priority === 'medium' ? 'Medium' : 'Low',
               status: status,
               assignedTo: typeof c.assigned_to === 'number' ? c.assigned_to : 0,
               createdAt: formatDateToLocal(c.created_at),
-              communicationWay: c.communication_way === 'whatsapp' ? 'WhatsApp' : 'Call',
+              communicationWay: communicationWay,
               budget: c.budget ? parseFloat(c.budget.toString()) : 0,
               // Computed fields from ClientTasks
               lastFeedback: lastFeedback,
@@ -1072,7 +1091,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           });
 
           // تحويل بيانات Users - تنظيف الأدوار القديمة
-          const frontendUsers: User[] = usersResponse.results.map((u: any) => ({
+          const usersData = Array.isArray(usersResponse) ? usersResponse : usersResponse.results || [];
+          const frontendUsers: User[] = usersData.map((u: any) => ({
             id: u.id,
             name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username,
             username: u.username,
@@ -1103,8 +1123,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             // تحويل Tasks إلى Activities - من API فقط، بدون أي mock data
             // جميع Activities تأتي من Tasks في قاعدة البيانات
             const frontendActivities: Activity[] = tasksResponse.results.map((t: any) => {
-              // استخدام stage مباشرة من API (نفس الاسم والقيم)
-              const stage = t.stage as TaskStage;
+              // استخدام stage_name من API (إذا كان موجود) أو stage object
+              const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+              const stage = stageName as TaskStage;
 
               // البحث عن اسم المستخدم من deal
               const employeeUsername = t.deal_employee_username;
@@ -1126,8 +1147,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             const frontendTodos: Todo[] = tasksResponse.results
               .filter((t: any) => t.reminder_date)
               .map((t: any) => {
-                // استخدام stage مباشرة من API (نفس الاسم والقيم)
-                const stage = t.stage as TaskStage;
+                // استخدام stage_name من API (إذا كان موجود) أو stage object
+                const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+                const stage = stageName as TaskStage;
 
                 const deal = frontendDeals.find(d => d.id === t.deal);
                 const lead = frontendLeads.find(l => l.id === deal?.leadId);
@@ -1148,8 +1170,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             const frontendCompletedTodos: Todo[] = tasksResponse.results
               .filter((t: any) => !t.reminder_date)
               .map((t: any) => {
-                // استخدام stage مباشرة من API (نفس الاسم والقيم)
-                const stage = t.stage as TaskStage;
+                // استخدام stage_name من API (إذا كان موجود) أو stage object
+                const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+                const stage = stageName as TaskStage;
 
                 const deal = frontendDeals.find(d => d.id === t.deal);
                 const lead = frontendLeads.find(l => l.id === deal?.leadId);
@@ -1165,8 +1188,23 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             // تحديث TODOs Completed من API فقط
             setCompletedTodos(frontendCompletedTodos);
           });
+            })
+            .catch((error) => {
+              console.error('Error loading essential data:', error);
+              // إذا فشل تحميل البيانات الأساسية، أعد إلى صفحة تسجيل الدخول
+              setIsLoggedInState(false);
+              localStorage.removeItem('accessToken');
+              localStorage.removeItem('refreshToken');
+              localStorage.removeItem('currentUser');
+            });
         })
-        .catch((error) => console.error('Error loading tasks/activities:', error));
+        .catch(() => {
+          // إذا فشل تحميل المستخدم، أعد إلى صفحة تسجيل الدخول
+          setIsLoggedInState(false);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('currentUser');
+        });
     }
 
     const handleResize = () => {
@@ -1423,55 +1461,80 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         throw new Error('User must be associated with a company');
       }
 
-      // تحويل status من Frontend إلى API format
-      const statusMapToAPI: { [key: string]: string } = {
-        'Untouched': 'untouched',
-        'Touched': 'touched',
-        'Following': 'following',
-        'Meeting': 'meeting',
-        'No Answer': 'no_answer',
-        'Out Of Service': 'out_of_service',
-      };
+      // البحث عن Channel من الإعدادات بناءً على الاسم
+      const channel = channels.find(c => c.name === leadData.communicationWay);
+      const channelId = channel?.id || null;
       
+      // البحث عن Status من الإعدادات بناءً على الاسم
+      const statusObj = statuses.find(s => s.name === leadData.status);
+      const statusId = statusObj?.id || null;
+      
+      // تحويل phone numbers من Frontend إلى تنسيق API
+      const phoneNumbers = leadData.phoneNumbers && leadData.phoneNumbers.length > 0
+        ? leadData.phoneNumbers.map(pn => ({
+            phone_number: pn.phone_number,
+            phone_type: pn.phone_type || 'mobile',
+            is_primary: pn.is_primary || false,
+            notes: pn.notes || '',
+          }))
+        : leadData.phone
+        ? [{
+            phone_number: leadData.phone,
+            phone_type: 'mobile',
+            is_primary: true,
+            notes: '',
+          }]
+        : [];
+
       // تحويل بيانات Lead من Frontend إلى تنسيق API (Client)
-      const apiLeadData = {
+      const apiLeadData: any = {
         name: leadData.name,
-        phone_number: leadData.phone || '',
+        phone_number: leadData.phone || '', // Keep for backward compatibility
         priority: leadData.priority?.toLowerCase() || 'medium',
         type: leadData.type?.toLowerCase() || 'fresh',
-        communication_way: leadData.communicationWay?.toLowerCase() || 'call',
-        status: statusMapToAPI[leadData.status || 'Untouched'] || 'untouched',
+        communication_way: channelId,
+        status: statusId,
         budget: leadData.budget || null,
         company: currentUser.company.id,
         assigned_to: leadData.assignedTo && leadData.assignedTo > 0 ? leadData.assignedTo : null,
+        phone_numbers: phoneNumbers,
       };
 
       const newLeadResponse = await createLeadAPI(apiLeadData);
       
       // تحويل بيانات Lead الجديد من API إلى تنسيق Frontend
-              // تحويل status من API إلى Frontend format
-              const statusMap: { [key: string]: Lead['status'] } = {
-                'untouched': 'Untouched',
-                'touched': 'Touched',
-                'following': 'Following',
-                'meeting': 'Meeting',
-                'no_answer': 'No Answer',
-                'out_of_service': 'Out Of Service',
-              };
-              const status = statusMap[newLeadResponse.status?.toLowerCase()] || 'Untouched';
-              
-              const newLead: Lead = {
-                id: newLeadResponse.id,
-                name: newLeadResponse.name,
-                phone: newLeadResponse.phone_number || '',
-                type: newLeadResponse.type === 'fresh' ? 'Fresh' : 'Cold',
-                priority: newLeadResponse.priority === 'high' ? 'High' : newLeadResponse.priority === 'medium' ? 'Medium' : 'Low',
-                status: status,
-                assignedTo: typeof newLeadResponse.assigned_to === 'number' ? newLeadResponse.assigned_to : 0,
-                createdAt: formatDateToLocal(newLeadResponse.created_at),
-                communicationWay: newLeadResponse.communication_way === 'whatsapp' ? 'WhatsApp' : 'Call',
-                budget: newLeadResponse.budget ? parseFloat(newLeadResponse.budget.toString()) : 0,
-              };
+      const statusName = newLeadResponse.status_name || (newLeadResponse.status?.name) || newLeadResponse.status || 'Untouched';
+      const communicationWayName = newLeadResponse.communication_way_name || (newLeadResponse.communication_way?.name) || newLeadResponse.communication_way || 'Call';
+      
+      // تحويل phone numbers من API
+      const phoneNumbersFromAPI = newLeadResponse.phone_numbers && Array.isArray(newLeadResponse.phone_numbers)
+        ? newLeadResponse.phone_numbers.map((pn: any) => ({
+            id: pn.id,
+            phone_number: pn.phone_number || '',
+            phone_type: pn.phone_type || 'mobile',
+            is_primary: pn.is_primary || false,
+            notes: pn.notes || '',
+            created_at: pn.created_at,
+            updated_at: pn.updated_at,
+          }))
+        : undefined;
+      
+      const primaryPhone = phoneNumbersFromAPI?.find(pn => pn.is_primary) || phoneNumbersFromAPI?.[0];
+      const phone = primaryPhone?.phone_number || newLeadResponse.phone_number || '';
+      
+      const newLead: Lead = {
+        id: newLeadResponse.id,
+        name: newLeadResponse.name,
+        phone: phone,
+        phoneNumbers: phoneNumbersFromAPI,
+        type: newLeadResponse.type === 'fresh' ? 'Fresh' : 'Cold',
+        priority: newLeadResponse.priority === 'high' ? 'High' : newLeadResponse.priority === 'medium' ? 'Medium' : 'Low',
+        status: statusName as Lead['status'],
+        assignedTo: typeof newLeadResponse.assigned_to === 'number' ? newLeadResponse.assigned_to : 0,
+        createdAt: formatDateToLocal(newLeadResponse.created_at),
+        communicationWay: communicationWayName === 'WhatsApp' ? 'WhatsApp' : 'Call',
+        budget: newLeadResponse.budget ? parseFloat(newLeadResponse.budget.toString()) : 0,
+      };
       
       setLeads(prev => [newLead, ...prev]);
     } catch (error) {
@@ -1491,15 +1554,15 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         throw new Error('Lead not found');
       }
 
-      // تحويل status من Frontend إلى API format
-      const statusMapToAPI: { [key: string]: string } = {
-        'Untouched': 'untouched',
-        'Touched': 'touched',
-        'Following': 'following',
-        'Meeting': 'meeting',
-        'No Answer': 'no_answer',
-        'Out Of Service': 'out_of_service',
-      };
+      // البحث عن Channel من الإعدادات بناءً على الاسم
+      const communicationWayName = leadData.communicationWay || lead.communicationWay;
+      const channel = channels.find(c => c.name === communicationWayName);
+      const channelId = channel?.id || null;
+      
+      // البحث عن Status من الإعدادات بناءً على الاسم
+      const statusName = leadData.status || lead.status;
+      const statusObj = statuses.find(s => s.name === statusName);
+      const statusId = statusObj?.id || null;
       
       // تحويل بيانات Lead من Frontend إلى تنسيق API
       // تحديد assigned_to بشكل صريح
@@ -1510,45 +1573,77 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         assignedToValue = Number(lead.assignedTo);
       }
 
+      // تحويل phone numbers من Frontend إلى تنسيق API
+      const phoneNumbers = leadData.phoneNumbers && leadData.phoneNumbers.length > 0
+        ? leadData.phoneNumbers.map(pn => ({
+            phone_number: pn.phone_number,
+            phone_type: pn.phone_type || 'mobile',
+            is_primary: pn.is_primary || false,
+            notes: pn.notes || '',
+          }))
+        : leadData.phone
+        ? [{
+            phone_number: leadData.phone,
+            phone_type: 'mobile',
+            is_primary: true,
+            notes: '',
+          }]
+        : undefined; // undefined means don't update phone numbers
+
       const apiLeadData: any = {
         name: leadData.name || lead.name,
-        phone_number: leadData.phone || lead.phone || '',
+        phone_number: leadData.phone || lead.phone || '', // Keep for backward compatibility
         priority: leadData.priority?.toLowerCase() || lead.priority?.toLowerCase() || 'medium',
         type: leadData.type?.toLowerCase() || lead.type?.toLowerCase() || 'fresh',
-        communication_way: leadData.communicationWay?.toLowerCase() || lead.communicationWay?.toLowerCase() || 'call',
-        status: leadData.status ? statusMapToAPI[leadData.status] : (lead.status ? statusMapToAPI[lead.status] : 'untouched'),
+        communication_way: channelId,
+        status: statusId,
         budget: leadData.budget !== undefined ? leadData.budget : lead.budget || null,
         company: currentUser.company.id,
         assigned_to: assignedToValue,
       };
+      
+      // إضافة phone_numbers فقط إذا تم توفيرها
+      if (phoneNumbers !== undefined) {
+        apiLeadData.phone_numbers = phoneNumbers;
+      }
 
       console.log('Updating lead:', leadId, 'with data:', apiLeadData);
       console.log('assigned_to value:', assignedToValue, 'type:', typeof assignedToValue);
 
       const updatedLeadResponse = await updateLeadAPI(leadId, apiLeadData);
       
-      // تحويل status من API إلى Frontend format
-      const statusMap: { [key: string]: Lead['status'] } = {
-        'untouched': 'Untouched',
-        'touched': 'Touched',
-        'following': 'Following',
-        'meeting': 'Meeting',
-        'no_answer': 'No Answer',
-        'out_of_service': 'Out Of Service',
-      };
-      const status = statusMap[updatedLeadResponse.status?.toLowerCase()] || lead.status;
+      // استخدام status_name و communication_way_name من API
+      const statusNameFromAPI = updatedLeadResponse.status_name || (updatedLeadResponse.status?.name) || updatedLeadResponse.status || lead.status;
+      const communicationWayNameFromAPI = updatedLeadResponse.communication_way_name || (updatedLeadResponse.communication_way?.name) || updatedLeadResponse.communication_way || lead.communicationWay;
+      
+      // تحويل phone numbers من API
+      const phoneNumbersFromAPI = updatedLeadResponse.phone_numbers && Array.isArray(updatedLeadResponse.phone_numbers)
+        ? updatedLeadResponse.phone_numbers.map((pn: any) => ({
+            id: pn.id,
+            phone_number: pn.phone_number || '',
+            phone_type: pn.phone_type || 'mobile',
+            is_primary: pn.is_primary || false,
+            notes: pn.notes || '',
+            created_at: pn.created_at,
+            updated_at: pn.updated_at,
+          }))
+        : lead.phoneNumbers; // Keep existing if not updated
+      
+      const primaryPhone = phoneNumbersFromAPI?.find(pn => pn.is_primary) || phoneNumbersFromAPI?.[0];
+      const phone = primaryPhone?.phone_number || updatedLeadResponse.phone_number || lead.phone || '';
       
       // تحويل بيانات Lead المحدث من API إلى تنسيق Frontend
       const updatedLead: Lead = {
         id: updatedLeadResponse.id,
         name: updatedLeadResponse.name,
-        phone: updatedLeadResponse.phone_number || '',
+        phone: phone,
+        phoneNumbers: phoneNumbersFromAPI,
         type: updatedLeadResponse.type === 'fresh' ? 'Fresh' : 'Cold',
         priority: updatedLeadResponse.priority === 'high' ? 'High' : updatedLeadResponse.priority === 'medium' ? 'Medium' : 'Low',
-        status: status,
+        status: statusNameFromAPI as Lead['status'],
         assignedTo: typeof updatedLeadResponse.assigned_to === 'number' ? updatedLeadResponse.assigned_to : 0,
         createdAt: lead.createdAt, // الحفاظ على createdAt
-        communicationWay: updatedLeadResponse.communication_way === 'whatsapp' ? 'WhatsApp' : 'Call',
+        communicationWay: communicationWayNameFromAPI === 'WhatsApp' ? 'WhatsApp' : 'Call',
         budget: updatedLeadResponse.budget ? parseFloat(updatedLeadResponse.budget.toString()) : 0,
         // الحفاظ على computed fields من lead
         lastFeedback: lead.lastFeedback,
@@ -1571,6 +1666,46 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       });
     } catch (error) {
       console.error('Error updating lead:', error);
+      throw error;
+    }
+  };
+
+  const deleteLead = async (leadId: number) => {
+    try {
+      // التحقق من أن المستخدم الحالي هو Admin أو الموظف المعين للـ Lead
+      const lead = leads.find(l => l.id === leadId);
+      if (!lead) {
+        throw new Error('Lead not found');
+      }
+
+      const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin';
+      const isAssignedEmployee = lead.assignedTo === currentUser?.id;
+
+      if (!isAdmin && !isAssignedEmployee) {
+        throw new Error('You do not have permission to delete this lead');
+      }
+
+      await deleteLeadAPI(leadId);
+      
+      // تحديث state بشكل صريح
+      setLeads(prev => prev.filter(l => l.id !== leadId));
+      
+      // إذا كان Lead المحذوف هو selectedLead، امسحه
+      setSelectedLead(prev => {
+        if (prev && prev.id === leadId) {
+          return null;
+        }
+        return prev;
+      });
+      
+      // إزالة Lead من checkedLeadIds إذا كان محدد
+      setCheckedLeadIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(leadId);
+        return newSet;
+      });
+    } catch (error) {
+      console.error('Error deleting lead:', error);
       throw error;
     }
   };
@@ -1708,24 +1843,36 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         throw new Error('Deal not found for this lead');
       }
 
-      // استخدام stage مباشرة من activityData (نفس الاسم والقيم)
-      const stage = activityData.stage;
+      // البحث عن Stage من الإعدادات بناءً على الاسم
+      const stageName = activityData.stage;
+      const stageObj = stages.find(s => 
+        s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
+        s.name === stageName
+      );
+      const stageId = stageObj?.id || null;
+      
+      if (!stageId) {
+        throw new Error('Stage not found in settings');
+      }
 
       const apiTaskData = {
         deal: deal.id,
-        stage: stage,
+        stage: stageId,
         notes: activityData.notes || '',
         reminder_date: null,
       };
 
       const newTaskResponse = await createTaskAPI(apiTaskData);
       
+      // استخدام stage_name من API
+      const stageNameFromAPI = newTaskResponse.stage_name || (newTaskResponse.stage?.name) || activityData.stage;
+      
       // إضافة Activity جديد
       const newActivity: Activity = {
         id: newTaskResponse.id,
         user: activityData.user,
         lead: activityData.lead,
-        stage: stage,
+        stage: stageNameFromAPI as TaskStage,
         date: newTaskResponse.created_at?.split('T')[0] || activityData.date,
         notes: newTaskResponse.notes || activityData.notes,
       };
@@ -1750,13 +1897,22 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         throw new Error('Deal not found');
       }
 
-      // استخدام stage مباشرة من todoData (نفس الاسم والقيم)
-      const stage = todoData.stage;
+      // البحث عن Stage من الإعدادات بناءً على الاسم
+      const stageName = todoData.stage;
+      const stageObj = stages.find(s => 
+        s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
+        s.name === stageName
+      );
+      const stageId = stageObj?.id || null;
+      
+      if (!stageId) {
+        throw new Error('Stage not found in settings');
+      }
 
       // Create Task with reminder_date
       const apiTaskData = {
         deal: todoData.dealId,
-        stage: stage,
+        stage: stageId,
         notes: todoData.notes || '',
         reminder_date: todoData.reminderDate || null,
       };
@@ -1767,11 +1923,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       const dealObj = deals.find(d => d.id === todoData.dealId);
       const lead = leads.find(l => l.id === dealObj?.leadId);
       
+      // استخدام stage_name من API
+      const stageNameFromAPI = newTaskResponse.stage_name || (newTaskResponse.stage?.name) || todoData.stage;
+      
       const newActivity: Activity = {
         id: newTaskResponse.id,
         user: currentUser?.name || 'Unknown',
         lead: lead?.name || dealObj?.clientName || '',
-        stage: stage,
+        stage: stageNameFromAPI as TaskStage,
         date: formatDateToLocal(newTaskResponse.created_at),
         notes: newTaskResponse.notes || todoData.notes || '',
       };
@@ -1785,7 +1944,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       const activeTodos = tasksResponse.results
         .filter((t: any) => t.reminder_date)
         .map((t: any) => {
-          const stage = t.stage as TaskStage;
+          // استخدام stage_name من API
+          const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+          const stage = stageName as TaskStage;
 
           const dealObj = deals.find(d => d.id === t.deal);
           const lead = leads.find(l => l.id === dealObj?.leadId);
@@ -1803,7 +1964,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       const completedTodos = tasksResponse.results
         .filter((t: any) => !t.reminder_date)
         .map((t: any) => {
-          const stage = t.stage as TaskStage;
+          // استخدام stage_name من API
+          const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+          const stage = stageName as TaskStage;
 
           const dealObj = deals.find(d => d.id === t.deal);
           const lead = leads.find(l => l.id === dealObj?.leadId);
@@ -1839,10 +2002,22 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       // Find the todo before removing it
       const todoToComplete = todos.find(t => t.id === todoId);
       
+      // البحث عن Stage ID من الإعدادات
+      const stageName = task.stage_name || task.stage || '';
+      const stageObj = stages.find(s => 
+        s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
+        s.name === stageName
+      );
+      const stageId = stageObj?.id || null;
+      
+      if (!stageId) {
+        throw new Error('Stage not found in settings');
+      }
+      
       // Update Task to remove reminder_date (mark as completed)
       await updateTaskAPI(todoId, {
         deal: task.deal,
-        stage: task.stage,
+        stage: stageId,
         notes: task.notes || '',
         reminder_date: null, // Remove reminder_date to complete the todo
       });
@@ -1854,7 +2029,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       const activeTodos = updatedTasksResponse.results
         .filter((t: any) => t.reminder_date)
         .map((t: any) => {
-          const stage = t.stage as TaskStage;
+          // استخدام stage_name من API
+          const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+          const stage = stageName as TaskStage;
 
           const dealObj = deals.find(d => d.id === t.deal);
           const lead = leads.find(l => l.id === dealObj?.leadId);
@@ -1872,7 +2049,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       const completedTodos = updatedTasksResponse.results
         .filter((t: any) => !t.reminder_date)
         .map((t: any) => {
-          const stage = t.stage as TaskStage;
+          // استخدام stage_name من API
+          const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+          const stage = stageName as TaskStage;
 
           const dealObj = deals.find(d => d.id === t.deal);
           const lead = leads.find(l => l.id === dealObj?.leadId);
@@ -3012,19 +3191,34 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         throw new Error('User must be associated with a company');
       }
 
+      // البحث عن Stage من الإعدادات بناءً على الاسم
+      const stageName = clientTaskData.stage;
+      const stageObj = stages.find(s => 
+        s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
+        s.name === stageName
+      );
+      const stageId = stageObj?.id || null;
+      
+      if (!stageId) {
+        throw new Error('Stage not found in settings');
+      }
+
       const apiClientTaskData = {
         client: clientTaskData.clientId,
-        stage: clientTaskData.stage,
+        stage: stageId,
         notes: clientTaskData.notes || '',
         reminder_date: clientTaskData.reminderDate || null,
       };
 
       const newClientTaskResponse = await createClientTaskAPI(apiClientTaskData);
       
+      // استخدام stage_name من API
+      const stageNameFromAPI = newClientTaskResponse.stage_name || (newClientTaskResponse.stage?.name) || clientTaskData.stage;
+      
       const newClientTask: ClientTask = {
         id: newClientTaskResponse.id,
         clientId: newClientTaskResponse.client,
-        stage: newClientTaskResponse.stage,
+        stage: stageNameFromAPI,
         notes: newClientTaskResponse.notes || '',
         reminderDate: newClientTaskResponse.reminder_date || null,
         createdBy: newClientTaskResponse.created_by || currentUser.id,
@@ -3033,22 +3227,29 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       
       setClientTasks(prev => [newClientTask, ...prev]);
 
-      // تحديث Lead's history إذا كان selectedLead
-      if (selectedLead && selectedLead.id === clientTaskData.clientId) {
-        const user = users.find(u => u.id === currentUser.id);
-        const newHistoryEntry: TimelineEntry = {
-          id: newClientTask.id,
-          user: user?.name || 'Unknown',
-          avatar: user?.avatar || '',
-          action: `Updated stage to ${clientTaskData.stage}`,
-          details: clientTaskData.notes || '',
-          date: formatDateToLocal(newClientTask.createdAt),
-        };
-        setSelectedLead({
-          ...selectedLead,
-          history: [newHistoryEntry, ...selectedLead.history],
-          lastStage: clientTaskData.stage,
-        });
+      // تحديث Lead's history إذا كان selectedLead (مع معالجة الأخطاء)
+      try {
+        if (selectedLead && selectedLead.id === clientTaskData.clientId) {
+          const user = users.find(u => u.id === currentUser.id);
+          const newHistoryEntry: TimelineEntry = {
+            id: newClientTask.id,
+            user: user?.name || 'Unknown',
+            avatar: user?.avatar || '',
+            action: `Updated stage to ${stageNameFromAPI}`,
+            details: clientTaskData.notes || '',
+            date: formatDateToLocal(newClientTask.createdAt),
+          };
+          // تحديث selectedLead بشكل آمن
+          const currentHistory = selectedLead.history || [];
+          setSelectedLead({
+            ...selectedLead,
+            history: [newHistoryEntry, ...currentHistory],
+            lastStage: stageNameFromAPI as Lead['status'],
+          });
+        }
+      } catch (historyError) {
+        // تجاهل أخطاء تحديث history - الـ task تم إنشاؤه بنجاح
+        console.warn('Error updating lead history (non-critical):', historyError);
       }
     } catch (error) {
       console.error('Error creating client task:', error);
@@ -3059,16 +3260,34 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const updateClientTask = async (clientTaskId: number, clientTaskData: Partial<ClientTask>) => {
     try {
       const apiClientTaskData: any = {};
-      if (clientTaskData.stage !== undefined) apiClientTaskData.stage = clientTaskData.stage;
+      
+      // إذا تم تحديث stage، البحث عن ID من الإعدادات
+      if (clientTaskData.stage !== undefined) {
+        const stageName = clientTaskData.stage;
+        const stageObj = stages.find(s => 
+          s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
+          s.name === stageName
+        );
+        const stageId = stageObj?.id || null;
+        if (stageId) {
+          apiClientTaskData.stage = stageId;
+        } else {
+          throw new Error('Stage not found in settings');
+        }
+      }
+      
       if (clientTaskData.notes !== undefined) apiClientTaskData.notes = clientTaskData.notes;
       if (clientTaskData.reminderDate !== undefined) apiClientTaskData.reminder_date = clientTaskData.reminderDate;
 
       const updatedResponse = await updateClientTaskAPI(clientTaskId, apiClientTaskData);
       
+      // استخدام stage_name من API
+      const stageNameFromAPI = updatedResponse.stage_name || (updatedResponse.stage?.name) || clientTaskData.stage || '';
+      
       const updated: ClientTask = {
         id: updatedResponse.id,
         clientId: updatedResponse.client,
-        stage: updatedResponse.stage,
+        stage: stageNameFromAPI,
         notes: updatedResponse.notes || '',
         reminderDate: updatedResponse.reminder_date || null,
         createdBy: updatedResponse.created_by || 0,
@@ -3414,7 +3633,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isChangePasswordModalOpen, setIsChangePasswordModalOpen,
     // Data and functions
     users, setUsers, addUser, updateUser, deleteUser,
-    leads, setLeads, addLead, updateLead, assignLeads,
+    leads, setLeads, addLead, updateLead, deleteLead, assignLeads,
     leadFilters, setLeadFilters,
     deals, setDeals, addDeal, deleteDeal,
     dealFilters, setDealFilters,

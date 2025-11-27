@@ -127,7 +127,7 @@ export const LoginPage = () => {
                             <label htmlFor="username" className="sr-only">{t('username')}</label>
                             <Input 
                                 id="username" 
-                                placeholder={t('username') || 'Username or Email'}
+                                placeholder={t('usernameOrEmail') || 'Username or Email'}
                                 value={username}
                                 onChange={(e) => {
                                     setUsername(e.target.value);
@@ -170,8 +170,18 @@ export const LoginPage = () => {
                                 {t('signIn')}
                             </Button>
                         </div>
-                        <div className="text-center">
-                            <p                                 className="text-sm text-secondary">
+                        <div className="text-center space-y-2">
+                            <p className="text-sm text-secondary">
+                                <button
+                                    onClick={() => {
+                                        window.location.href = '/forgot-password';
+                                    }}
+                                    className="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                                >
+                                    {t('forgotPassword') || 'Forgot Password?'}
+                                </button>
+                            </p>
+                            <p className="text-sm text-secondary">
                                 {t('dontHaveAccount') || "Don't have an account?"}{' '}
                                 <button
                                     onClick={() => {

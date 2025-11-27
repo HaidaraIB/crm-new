@@ -15,6 +15,7 @@ export const ActivitiesPage = () => {
         activityFilters,
         setActivityFilters,
         setIsActivitiesFilterDrawerOpen,
+        stages,
     } = useAppContext();
     const [loading, setLoading] = useState(false);
 
@@ -153,7 +154,49 @@ export const ActivitiesPage = () => {
                                     <tr key={activity.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                         <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">{activity.user}</td>
                                         <td className="px-6 py-4">{activity.lead}</td>
-                                        <td className="px-6 py-4">{getStageDisplayLabel(activity.stage)}</td>
+                                        <td className="px-6 py-4">
+                                            {(() => {
+                                                // Find stage from settings by name (normalize to match)
+                                                const stageName = typeof activity.stage === 'string' 
+                                                    ? activity.stage.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
+                                                    : activity.stage;
+                                                const stageConfig = stages.find(s => 
+                                                    s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
+                                                    s.name === stageName
+                                                );
+                                                const stageColor = stageConfig?.color || '#808080';
+                                                
+                                                // Convert hex to RGB for background opacity
+                                                const hexToRgb = (hex: string) => {
+                                                    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                                                    return result ? {
+                                                        r: parseInt(result[1], 16),
+                                                        g: parseInt(result[2], 16),
+                                                        b: parseInt(result[3], 16)
+                                                    } : null;
+                                                };
+                                                
+                                                const rgb = hexToRgb(stageColor);
+                                                const bgColor = rgb 
+                                                    ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
+                                                    : 'bg-gray-100 dark:bg-gray-700';
+                                                const textColor = rgb
+                                                    ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
+                                                    : 'text-gray-800 dark:text-gray-200';
+                                                
+                                                return (
+                                                    <span 
+                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
+                                                        style={rgb ? {
+                                                            backgroundColor: bgColor,
+                                                            color: textColor,
+                                                        } : {}}
+                                                    >
+                                                        {getStageDisplayLabel(activity.stage)}
+                                                    </span>
+                                                );
+                                            })()}
+                                        </td>
                                         <td className="px-6 py-4">{activity.date}</td>
                                         <td className="px-6 py-4">{activity.notes}</td>
                                     </tr>

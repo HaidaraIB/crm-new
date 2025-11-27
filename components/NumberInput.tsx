@@ -98,8 +98,12 @@ export const NumberInput: React.FC<NumberInputProps> = ({
         }
     };
 
+    // Extract border classes from className if provided
+    const borderClass = className.includes('border-red') ? 'border border-red-500 dark:border-red-500' : 'border border-gray-300 dark:border-gray-700';
+    const baseClassName = className.replace(/border-\S+/g, '').trim();
+    
     return (
-        <div className={`relative flex items-center ${className}`}>
+        <div className={`relative flex items-center ${baseClassName}`}>
             <input
                 id={id}
                 name={name}
@@ -114,7 +118,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
                     w-full px-3 py-2
                     ${isRTL ? 'pl-14' : 'pr-14'}
                     bg-gray-50 dark:bg-gray-800
-                    border border-gray-300 dark:border-gray-700
+                    ${borderClass}
                     rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500
                     text-gray-900 dark:text-gray-100 
                     placeholder:text-gray-400 dark:placeholder:text-gray-500

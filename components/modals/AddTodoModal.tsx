@@ -23,14 +23,49 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 };
 
 export const AddTodoModal = () => {
-    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, addTodo, deals, leads, language } = useAppContext();
+    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, addTodo, deals, leads, language, stages } = useAppContext();
+    
+    // Get default stage from settings (first stage or 'Hold')
+    const getDefaultStage = () => {
+        if (stages.length > 0) {
+            return stages[0].name as TaskStage;
+        }
+        return 'Hold' as TaskStage;
+    };
+    
     const [formState, setFormState] = useState({
         dealId: '',
-        stage: 'hold' as TaskStage,
+        stage: getDefaultStage(),
         notes: '',
         reminderDate: '',
     });
     const [loading, setLoading] = useState(false);
+    const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+    const validateForm = (): boolean => {
+        const newErrors: { [key: string]: string } = {};
+
+        if (!formState.dealId || formState.dealId === '') {
+            newErrors.dealId = t('dealRequired') || 'Deal is required';
+        }
+
+        if (!formState.reminderDate || formState.reminderDate.trim() === '') {
+            newErrors.reminderDate = t('reminderDateRequired') || 'Reminder date is required';
+        }
+
+        setErrors(newErrors);
+        return Object.keys(newErrors).length === 0;
+    };
+
+    const clearError = (field: string) => {
+        if (errors[field]) {
+            setErrors(prev => {
+                const newErrors = { ...prev };
+                delete newErrors[field];
+                return newErrors;
+            });
+        }
+    };
 
     // Initialize form state when modal opens
     useEffect(() => {
@@ -43,16 +78,17 @@ export const AddTodoModal = () => {
             
             setFormState({
                 dealId: deals[0].id.toString(),
-                stage: 'hold',
+                stage: getDefaultStage(),
                 notes: '',
                 reminderDate: reminderDateStr,
             });
         }
-    }, [isAddTodoModalOpen, deals.length]);
+    }, [isAddTodoModalOpen, deals.length, stages]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearError(id);
     };
 
     const handleClose = () => {
@@ -65,7 +101,7 @@ export const AddTodoModal = () => {
         
         setFormState({
             dealId: deals.length > 0 ? deals[0].id.toString() : '',
-            stage: 'hold',
+            stage: getDefaultStage(),
             notes: '',
             reminderDate: reminderDateStr,
         });
@@ -73,8 +109,8 @@ export const AddTodoModal = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formState.dealId || !formState.reminderDate) {
-            alert(t('pleaseFillRequiredFields'));
+        
+        if (!validateForm()) {
             return;
         }
 
@@ -100,35 +136,48 @@ export const AddTodoModal = () => {
         <Modal isOpen={isAddTodoModalOpen} onClose={handleClose} title={t('addTodo')}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
-                    <Label htmlFor="dealId">{t('deal')}</Label>
-                    <Select id="dealId" value={formState.dealId} onChange={handleChange}>
+                    <Label htmlFor="dealId">{t('deal')} <span className="text-red-500">*</span></Label>
+                    <Select 
+                        id="dealId" 
+                        value={formState.dealId} 
+                        onChange={handleChange}
+                        className={errors.dealId ? 'border-red-500 dark:border-red-500' : ''}
+                    >
                         <option value="">{t('selectDeal')}</option>
                         {deals.map(deal => (
                             <option key={deal.id} value={deal.id}>{deal.clientName}</option>
                         ))}
                     </Select>
+                    {errors.dealId && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.dealId}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="stage">{t('stage')}</Label>
                     <Select id="stage" value={formState.stage} onChange={handleChange}>
-                        <option value="hold">{getStageDisplayLabel('hold', t)}</option>
-                        <option value="meeting">{getStageDisplayLabel('meeting', t)}</option>
-                        <option value="done_meeting">{getStageDisplayLabel('done_meeting', t)}</option>
-                        <option value="following">{getStageDisplayLabel('following', t)}</option>
-                        <option value="no_answer">{getStageDisplayLabel('no_answer', t)}</option>
-                        <option value="whatsapp_pending">{getStageDisplayLabel('whatsapp_pending', t)}</option>
-                        <option value="out_of_service">{getStageDisplayLabel('out_of_service', t)}</option>
-                        <option value="cancellation">{getStageDisplayLabel('cancellation', t)}</option>
-                        <option value="not_interested">{getStageDisplayLabel('not_interested', t)}</option>
-                        <option value="follow_after_meeting">{getStageDisplayLabel('follow_after_meeting', t)}</option>
-                        <option value="reschedule_meeting">{getStageDisplayLabel('reschedule_meeting', t)}</option>
-                        <option value="broker">{getStageDisplayLabel('broker', t)}</option>
-                        <option value="resale">{getStageDisplayLabel('resale', t)}</option>
+                        {stages.length > 0 ? (
+                            stages.map(stage => (
+                                <option key={stage.id} value={stage.name}>
+                                    {stage.name}
+                                </option>
+                            ))
+                        ) : (
+                            <option value="">{t('noStagesAvailable') || 'No stages available'}</option>
+                        )}
                     </Select>
                 </div>
                 <div>
-                    <Label htmlFor="reminderDate">{t('reminderDateAndTime')}</Label>
-                    <Input id="reminderDate" type="datetime-local" value={formState.reminderDate} onChange={handleChange} />
+                    <Label htmlFor="reminderDate">{t('reminderDateAndTime')} <span className="text-red-500">*</span></Label>
+                    <Input 
+                        id="reminderDate" 
+                        type="datetime-local" 
+                        value={formState.reminderDate} 
+                        onChange={handleChange}
+                        className={errors.reminderDate ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.reminderDate && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.reminderDate}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="notes">{t('notes')}</Label>

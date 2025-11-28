@@ -500,7 +500,7 @@ export const RegisterPage = () => {
                 },
                 plan_id: selectedPlan,
                 billing_cycle: billingCycle,
-            });
+            }, language);
 
             // Auto login after registration
             const frontendUser = {

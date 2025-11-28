@@ -3,7 +3,7 @@ export type Language = 'en' | 'ar';
 export type Theme = 'light' | 'dark';
 export type Page = 
   | 'Dashboard' | 'Leads' | 'Activities' | 'Inventory' | 'Deals' 
-  | 'Users' | 'Marketing' | 'Todos' | 'Reports' | 'Integrations' 
+  | 'Users' | 'Employees' | 'Marketing' | 'Todos' | 'Reports' | 'Integrations' 
   | 'Settings' | 'ViewLead' | 'CreateDeal' | 'CreateLead' | 'EditLead' | 'Profile'
   // Sub-pages
   | 'All Leads' | 'Fresh Leads' | 'Cold Leads' | 'My Leads' | 'Rotated Leads'

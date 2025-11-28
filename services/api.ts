@@ -63,7 +63,26 @@ async function apiRequest<T>(
     const errorData = await response.json().catch(() => ({}));
     const errorMessage = errorData.detail || errorData.message || errorData.error || JSON.stringify(errorData) || `API Error: ${response.status} ${response.statusText}`;
     console.error('API Error:', response.status, errorData);
-    throw new Error(errorMessage);
+    
+    // Create error object with fields for Django REST Framework validation errors
+    const error: any = new Error(errorMessage);
+    
+    // Django REST Framework returns field errors in the response directly
+    if (errorData && typeof errorData === 'object') {
+      // Check for field-specific errors (e.g., { email: ["error message"], username: ["error message"] })
+      const fieldErrors: Record<string, any> = {};
+      Object.keys(errorData).forEach(key => {
+        if (key !== 'detail' && key !== 'message' && key !== 'error') {
+          fieldErrors[key] = errorData[key];
+        }
+      });
+      
+      if (Object.keys(fieldErrors).length > 0) {
+        error.fields = fieldErrors;
+      }
+    }
+    
+    throw error;
   }
 
   // معالجة DELETE requests - قد لا تعيد response body
@@ -149,11 +168,12 @@ export const registerCompanyAPI = async (data: {
   };
   plan_id?: number | null;
   billing_cycle?: 'monthly' | 'yearly';
-}) => {
+}, language: string = 'en') => {
   const response = await fetch(`${BASE_URL}/auth/register/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept-Language': language,
     },
     body: JSON.stringify(data),
   });
@@ -263,11 +283,12 @@ export const verifyEmailAPI = async (payload: {
  * Body: { email: string }
  * Response: { message: string, sent: bool }
  */
-export const forgotPasswordAPI = async (email: string) => {
+export const forgotPasswordAPI = async (email: string, language: string = 'en') => {
   const response = await fetch(`${BASE_URL}/auth/forgot-password/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Accept-Language': language,
     },
     body: JSON.stringify({ email }),
   });
@@ -318,6 +339,80 @@ export const resetPasswordAPI = async (payload: {
       error.fields = data;
     }
     throw error;
+  }
+
+  return data;
+};
+
+/**
+ * طلب رمز المصادقة الثنائية
+ * POST /api/auth/request-2fa/
+ * Body: { username: string }
+ * Response: { message: string, sent: bool, token: string }
+ */
+export const requestTwoFactorAuthAPI = async (username: string, language: string = 'ar') => {
+  const response = await fetch(`${BASE_URL}/auth/request-2fa/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept-Language': language,
+    },
+    body: JSON.stringify({ username }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.error || data?.message || 'Failed to request 2FA code'
+    );
+    if (data?.errors) {
+      error.fields = data.errors;
+    }
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * التحقق من رمز المصادقة الثنائية والحصول على tokens
+ * POST /api/auth/verify-2fa/
+ * Body: { username: string, password: string, code?: string, token?: string }
+ * Response: { access: string, refresh: string, user: {...} }
+ */
+export const verifyTwoFactorAuthAPI = async (payload: {
+  username: string;
+  password: string;
+  code?: string;
+  token?: string;
+}) => {
+  const response = await fetch(`${BASE_URL}/auth/verify-2fa/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.error || data?.message || 'Invalid 2FA code'
+    );
+    if (data?.errors) {
+      error.fields = data.errors;
+    }
+    throw error;
+  }
+
+  // Save tokens
+  if (data.access) {
+    localStorage.setItem('accessToken', data.access);
+  }
+  if (data.refresh) {
+    localStorage.setItem('refreshToken', data.refresh);
   }
 
   return data;

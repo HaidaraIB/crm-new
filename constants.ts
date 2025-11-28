@@ -14,7 +14,7 @@ export const SIDEBAR_ITEMS: {
   { name: 'Activities', icon: StarIcon },
   { name: 'Inventory', icon: ShoppingBagIcon, subItems: ['Properties', 'Owners'] },
   { name: 'Deals', icon: HandshakeIcon },
-  { name: 'Users', icon: UsersIcon },
+  { name: 'Employees', icon: UsersIcon },
   { name: 'Marketing', icon: MegaphoneIcon, subItems: ['Campaigns'] },
   { name: 'Todos', icon: CheckSquareIcon },
   { name: 'Reports', icon: FileTextIcon, subItems: ['Teams Report', 'Employees Report', 'Marketing Report'] },
@@ -58,7 +58,8 @@ export const translations = {
         properties: "Properties",
         owners: "Owners",
         deals: "Deals",
-        users: "Users",
+        users: "Users", // Keep for backward compatibility
+        employees: "Employees",
         marketing: "Marketing",
         campaigns: "Campaigns",
         // FIX: Added missing translation key.
@@ -294,24 +295,46 @@ export const translations = {
         autoAssignment: "Auto Assignment",
         on: "On",
         off: "Off",
-        viewUser: "View User",
-        createUser: "Create User",
-        editUser: "Edit User",
-        deleteUser: "Delete User",
+        viewUser: "View User", // Keep for backward compatibility
+        createUser: "Create User", // Keep for backward compatibility
+        editUser: "Edit User", // Keep for backward compatibility
+        deleteUser: "Delete User", // Keep for backward compatibility
+        viewEmployee: "View Employee",
+        createEmployee: "Create Employee",
+        editEmployee: "Edit Employee",
+        deleteEmployee: "Delete Employee",
+        noEmployeesFound: "No employees found",
         salesAssistant: "Sales Assistant",
         employee: "Employee",
         owner: "Owner",
         noPhoneNumber: "No phone number available",
         nameRequired: "Name is required",
+        nameMinLength: "Name must be at least 2 characters",
         usernameRequired: "Username is required",
+        usernameMinLength: "Username must be at least 3 characters",
+        usernameInvalidChars: "Username can only contain letters, numbers, and underscores",
         emailRequired: "Email is required",
         passwordRequired: "Password is required",
+        passwordMinLength: "Password must be at least 8 characters",
+        passwordComplexity: "Password must contain at least one letter and one number",
         phoneRequired: "Phone is required",
         enterPhone: "Enter phone number",
         invalidPhone: "Invalid phone number format",
+        invalidPhoneFormat: "Phone number must include country code (e.g., +966...)",
+        invalidPhoneLength: "Phone number length is invalid",
         roleRequired: "Role is required",
         invalidEmail: "Invalid email format",
-        passwordMinLength: "Password must be at least 6 characters",
+        userCreatedSuccessfully: "User created successfully!", // Keep for backward compatibility
+        userUpdatedSuccessfully: "User updated successfully!", // Keep for backward compatibility
+        errorCreatingUser: "Failed to create user. Please try again.", // Keep for backward compatibility
+        errorUpdatingUser: "Failed to update user. Please try again.", // Keep for backward compatibility
+        employeeCreatedSuccessfully: "Employee created successfully!",
+        employeeUpdatedSuccessfully: "Employee updated successfully!",
+        errorCreatingEmployee: "Failed to create employee. Please try again.",
+        errorUpdatingEmployee: "Failed to update employee. Please try again.",
+        emailAlreadyExists: "This email is already registered",
+        usernameAlreadyExists: "This username is already taken",
+        phoneAlreadyExists: "This phone number is already registered",
         // Campaigns
         addCampaign: "Add Campaign",
         isActive: "Is Active",
@@ -596,8 +619,10 @@ export const translations = {
         salesAgent: "Sales Agent",
         saveChanges: "Save Changes",
         // DeleteUserModal
-        confirmDeleteUser1: "Are you sure you want to delete the user",
-        confirmDeleteUser2: "? This action cannot be undone.",
+        confirmDeleteUser1: "Are you sure you want to delete the user", // Keep for backward compatibility
+        confirmDeleteUser2: "? This action cannot be undone.", // Keep for backward compatibility
+        confirmDeleteEmployee1: "Are you sure you want to delete the employee",
+        confirmDeleteEmployee2: "? This action cannot be undone.",
         errorUpdatingUser: "Failed to update user. Please try again.",
         // AddCampaignModal
         addNewCampaign: "Add New Campaign",
@@ -757,6 +782,26 @@ export const translations = {
         pleaseEnterCode: "Please enter the reset code",
         codeMustBe6Digits: "Code must be 6 digits",
         usingCodeToReset: "Using code to reset password",
+        // Two Factor Authentication
+        twoFactorAuth: "Two-Factor Authentication",
+        twoFactorAuthTitle: "Two-Factor Authentication",
+        twoFactorAuthDescription: "To ensure your account security, please enter the two-factor authentication code sent to your email",
+        enter2FACode: "Enter the 6-digit two-factor authentication code",
+        twoFactorCodeLabel: "Two-Factor Authentication Code",
+        twoFactorCodePlaceholder: "000000",
+        verify: "Verify",
+        didntReceiveCode: "Didn't receive the code?",
+        resendCode: "Resend Code",
+        resendCodeCountdown: "Resend Code ({countdown} seconds)",
+        backToLogin: "Back to Login",
+        twoFactorCodeSent: "Two-factor authentication code has been sent to your email",
+        pleaseEnter2FACode: "Please enter the 6-digit two-factor authentication code",
+        twoFactorCodeInvalid: "Invalid two-factor authentication code",
+        twoFactorCodeExpired: "Two-factor authentication code has expired. Please request a new one",
+        twoFactorCodeRequired: "Please enter the two-factor authentication code",
+        twoFactorCodeLengthError: "The code must be 6 digits",
+        twoFactorAuthFailed: "Failed to verify two-factor authentication code",
+        twoFactorAuthRequestFailed: "Failed to request two-factor authentication code",
     },
     ar: {
         hello: "أهلاً بك! 👋",
@@ -791,7 +836,8 @@ export const translations = {
         properties: "العقارات",
         owners: "المالك",
         deals: "الصفقات",
-        users: "المستخدمون",
+        users: "المستخدمون", // Keep for backward compatibility
+        employees: "الموظفون",
         marketing: "التسويق",
         campaigns: "الحملات",
         // FIX: Added missing translation key.
@@ -1030,24 +1076,46 @@ export const translations = {
         autoAssignment: "الإسناد التلقائي",
         on: "مفعل",
         off: "معطل",
-        viewUser: "عرض المستخدم",
-        createUser: "إنشاء مستخدم",
-        editUser: "تعديل المستخدم",
-        deleteUser: "حذف المستخدم",
+        viewUser: "عرض المستخدم", // Keep for backward compatibility
+        createUser: "إنشاء مستخدم", // Keep for backward compatibility
+        editUser: "تعديل المستخدم", // Keep for backward compatibility
+        deleteUser: "حذف المستخدم", // Keep for backward compatibility
+        viewEmployee: "عرض الموظف",
+        createEmployee: "إنشاء موظف",
+        editEmployee: "تعديل الموظف",
+        deleteEmployee: "حذف الموظف",
+        noEmployeesFound: "لا يوجد موظفون",
         salesAssistant: "مساعد مبيعات",
         employee: "موظف",
         owner: "المالك",
         noPhoneNumber: "لا يوجد رقم هاتف متاح",
         nameRequired: "الاسم مطلوب",
+        nameMinLength: "يجب أن يكون الاسم حرفين على الأقل",
         usernameRequired: "اسم المستخدم مطلوب",
+        usernameMinLength: "يجب أن يكون اسم المستخدم 3 أحرف على الأقل",
+        usernameInvalidChars: "يمكن أن يحتوي اسم المستخدم على الأحرف والأرقام والشرطة السفلية فقط",
         emailRequired: "البريد الإلكتروني مطلوب",
         passwordRequired: "كلمة المرور مطلوبة",
+        passwordMinLength: "يجب أن تكون كلمة المرور 8 أحرف على الأقل",
+        passwordComplexity: "يجب أن تحتوي كلمة المرور على حرف واحد ورقم واحد على الأقل",
         phoneRequired: "رقم الهاتف مطلوب",
         enterPhone: "أدخل رقم الهاتف",
         invalidPhone: "صيغة رقم الهاتف غير صحيحة",
+        invalidPhoneFormat: "يجب أن يتضمن رقم الهاتف رمز الدولة (مثل: +966...)",
+        invalidPhoneLength: "طول رقم الهاتف غير صحيح",
         roleRequired: "الدور مطلوب",
         invalidEmail: "صيغة البريد الإلكتروني غير صحيحة",
-        passwordMinLength: "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+        userCreatedSuccessfully: "تم إنشاء المستخدم بنجاح!", // Keep for backward compatibility
+        userUpdatedSuccessfully: "تم تحديث المستخدم بنجاح!", // Keep for backward compatibility
+        errorCreatingUser: "فشل إنشاء المستخدم. يرجى المحاولة مرة أخرى.", // Keep for backward compatibility
+        errorUpdatingUser: "فشل تحديث المستخدم. يرجى المحاولة مرة أخرى.", // Keep for backward compatibility
+        employeeCreatedSuccessfully: "تم إنشاء الموظف بنجاح!",
+        employeeUpdatedSuccessfully: "تم تحديث الموظف بنجاح!",
+        errorCreatingEmployee: "فشل إنشاء الموظف. يرجى المحاولة مرة أخرى.",
+        errorUpdatingEmployee: "فشل تحديث الموظف. يرجى المحاولة مرة أخرى.",
+        emailAlreadyExists: "هذا البريد الإلكتروني مسجل بالفعل",
+        usernameAlreadyExists: "اسم المستخدم هذا مستخدم بالفعل",
+        phoneAlreadyExists: "رقم الهاتف هذا مسجل بالفعل",
         // Campaigns
         addCampaign: "إضافة حملة",
         isActive: "نشطة",
@@ -1291,8 +1359,10 @@ export const translations = {
         salesAgent: "مندوب مبيعات",
         saveChanges: "حفظ التغييرات",
         // DeleteUserModal
-        confirmDeleteUser1: "هل أنت متأكد أنك تريد حذف المستخدم",
-        confirmDeleteUser2: "؟ لا يمكن التراجع عن هذا الإجراء.",
+        confirmDeleteUser1: "هل أنت متأكد أنك تريد حذف المستخدم", // Keep for backward compatibility
+        confirmDeleteUser2: "؟ لا يمكن التراجع عن هذا الإجراء.", // Keep for backward compatibility
+        confirmDeleteEmployee1: "هل أنت متأكد أنك تريد حذف الموظف",
+        confirmDeleteEmployee2: "؟ لا يمكن التراجع عن هذا الإجراء.",
         errorUpdatingUser: "فشل تحديث المستخدم. يرجى المحاولة مرة أخرى.",
         // AddCampaignModal
         addNewCampaign: "إضافة حملة جديدة",
@@ -1453,6 +1523,26 @@ export const translations = {
         pleaseEnterCode: "الرجاء إدخال رمز إعادة التعيين",
         codeMustBe6Digits: "يجب أن يكون الرمز 6 أرقام",
         usingCodeToReset: "استخدام الرمز لإعادة تعيين كلمة المرور",
+        // Two Factor Authentication
+        twoFactorAuth: "المصادقة الثنائية",
+        twoFactorAuthTitle: "المصادقة الثنائية",
+        twoFactorAuthDescription: "لضمان أمان حسابك، يرجى إدخال رمز المصادقة الثنائية الذي تم إرساله إلى بريدك الإلكتروني",
+        enter2FACode: "أدخل رمز المصادقة الثنائية المكون من 6 أرقام",
+        twoFactorCodeLabel: "رمز المصادقة الثنائية",
+        twoFactorCodePlaceholder: "000000",
+        verify: "التحقق",
+        didntReceiveCode: "لم تستلم الرمز؟",
+        resendCode: "إعادة إرسال الرمز",
+        resendCodeCountdown: "إعادة الإرسال ({countdown} ثانية)",
+        backToLogin: "العودة إلى تسجيل الدخول",
+        twoFactorCodeSent: "تم إرسال رمز المصادقة الثنائية إلى بريدك الإلكتروني",
+        pleaseEnter2FACode: "الرجاء إدخال رمز المصادقة الثنائية المكون من 6 أرقام",
+        twoFactorCodeInvalid: "رمز المصادقة الثنائية غير صحيح",
+        twoFactorCodeExpired: "انتهت صلاحية رمز المصادقة الثنائية. يرجى طلب رمز جديد",
+        twoFactorCodeRequired: "الرجاء إدخال رمز المصادقة الثنائية",
+        twoFactorCodeLengthError: "يجب أن يكون الرمز 6 أرقام",
+        twoFactorAuthFailed: "فشل التحقق من رمز المصادقة الثنائية",
+        twoFactorAuthRequestFailed: "فشل طلب رمز المصادقة الثنائية",
         // Filter Drawers
         filterActivities: "تصفية الأنشطة",
         activityInfo: "معلومات النشاط",

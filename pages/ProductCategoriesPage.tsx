@@ -57,7 +57,7 @@ export const ProductCategoriesPage = () => {
         productCategories,
         productCategoryFilters,
         setProductCategoryFilters,
-        setIsProductCategoriesFilterDrawerOpen,
+        setIsProductCategoryFilterDrawerOpen,
         deleteProductCategory,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
@@ -141,7 +141,7 @@ export const ProductCategoriesPage = () => {
             title={t('productCategories')}
             actions={
                 <>
-                    <Button variant="secondary" onClick={() => setIsProductCategoriesFilterDrawerOpen(true)}>
+                    <Button variant="secondary" onClick={() => setIsProductCategoryFilterDrawerOpen(true)}>
                         <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
                     {isAdmin && (

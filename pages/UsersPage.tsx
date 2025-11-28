@@ -22,6 +22,8 @@ const UserCard = ({ user }: { user: User }) => {
     
     // Check if current user is admin (Owner role)
     const isAdmin = currentUser?.role === 'Owner';
+    // Check if the displayed user is admin (Owner role) - don't allow edit/delete for admins
+    const isUserAdmin = user.role === 'Owner';
     
     const handleEdit = () => {
         setSelectedUser(user);
@@ -60,9 +62,13 @@ const UserCard = ({ user }: { user: User }) => {
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/></svg>
                         </Button>
                     }>
-                        <DropdownItem onClick={handleView}>{t('viewUser')}</DropdownItem>
-                        <DropdownItem onClick={handleEdit}>{t('editUser')}</DropdownItem>
-                        <DropdownItem onClick={handleDelete}>{t('deleteUser')}</DropdownItem>
+                        <DropdownItem onClick={handleView}>{t('viewEmployee')}</DropdownItem>
+                        {!isUserAdmin && (
+                            <>
+                                <DropdownItem onClick={handleEdit}>{t('editEmployee')}</DropdownItem>
+                                <DropdownItem onClick={handleDelete}>{t('deleteEmployee')}</DropdownItem>
+                            </>
+                        )}
                     </Dropdown>
                 </div>
             )}
@@ -88,7 +94,10 @@ const UserCard = ({ user }: { user: User }) => {
 export const UsersPage = () => {
     const { t, users, currentUser, setIsAddUserModalOpen } = useAppContext();
     const [loading, setLoading] = useState(true);
-    const userCount = users.length;
+    
+    // Filter out Owner users - only show Employee users
+    const filteredUsers = users.filter(user => user.role !== 'Owner');
+    const userCount = filteredUsers.length;
     
     // Check if current user is admin (Owner role)
     const isAdmin = currentUser?.role === 'Owner';
@@ -115,7 +124,7 @@ export const UsersPage = () => {
 
     if (loading) {
         return (
-            <PageWrapper title={`${t('users')}: ${userCount}`}>
+            <PageWrapper title={`${t('employees')}: ${userCount}`}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
                     <Loader variant="primary" className="h-12"/>
                 </div>
@@ -125,26 +134,63 @@ export const UsersPage = () => {
 
     return (
         <PageWrapper
-            title={`${t('users')}: ${userCount}`}
+            title={`${t('employees')}: ${userCount}`}
             actions={
-                isAdmin && (
+                isAdmin && filteredUsers.length > 0 && (
                     <Button 
                         onClick={() => setIsAddUserModalOpen(true)}
                         className="w-full sm:w-auto"
                     >
-                        <PlusIcon className="w-4 h-4" /> {t('createUser')}
+                        <PlusIcon className="w-4 h-4" /> {t('createEmployee')}
                     </Button>
                 )
             }
         >
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {users.map(user => (
-                    // FIX: Wrapped UserCard in a div with a key to resolve TypeScript error about key prop not being in UserCard's props.
-                    <div key={user.id}>
-                        <UserCard user={user} />
+            {filteredUsers.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 px-4">
+                    <div className="text-center">
+                        <svg 
+                            className="mx-auto h-16 w-16 text-gray-400 dark:text-gray-500 mb-4" 
+                            fill="none" 
+                            viewBox="0 0 24 24" 
+                            stroke="currentColor"
+                        >
+                            <path 
+                                strokeLinecap="round" 
+                                strokeLinejoin="round" 
+                                strokeWidth={1.5} 
+                                d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" 
+                            />
+                        </svg>
+                        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                            {t('noEmployeesFound')}
+                        </h3>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
+                            {isAdmin 
+                                ? (t('noEmployeesFound') + '. ' + (t('createEmployee') || 'Create your first employee to get started.'))
+                                : (t('noEmployeesFound') || 'No employees found.')
+                            }
+                        </p>
+                        {isAdmin && (
+                            <Button 
+                                onClick={() => setIsAddUserModalOpen(true)}
+                                className="mt-4"
+                            >
+                                <PlusIcon className="w-4 h-4" /> {t('createEmployee')}
+                            </Button>
+                        )}
                     </div>
-                ))}
-            </div>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {filteredUsers.map(user => (
+                        // FIX: Wrapped UserCard in a div with a key to resolve TypeScript error about key prop not being in UserCard's props.
+                        <div key={user.id}>
+                            <UserCard user={user} />
+                        </div>
+                    ))}
+                </div>
+            )}
         </PageWrapper>
     );
 };

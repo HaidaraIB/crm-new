@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
-import { loginAPI, getCurrentUserAPI } from '../services/api';
+import { loginAPI, getCurrentUserAPI, requestTwoFactorAuthAPI } from '../services/api';
 
 export const LoginPage = () => {
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -43,33 +43,18 @@ export const LoginPage = () => {
         setIsLoading(true);
         
         try {
-            // تسجيل الدخول والحصول على token
-            const loginResponse = await loginAPI(username, password);
+            // Request 2FA code (this will verify user exists and is active)
+            const twoFAResponse = await requestTwoFactorAuthAPI(username, language);
             
-            // الحصول على بيانات المستخدم الكاملة
-            const userData = await getCurrentUserAPI();
+            // Store username, password, and token in sessionStorage for 2FA page
+            sessionStorage.setItem('2fa_username', username);
+            sessionStorage.setItem('2fa_password', password);
+            sessionStorage.setItem('2fa_token', twoFAResponse.token);
             
-            // تحويل بيانات المستخدم من API إلى تنسيق Frontend
-            const frontendUser = {
-                id: userData.id,
-                name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-                username: userData.username,
-                email: userData.email,
-                role: userData.role === 'admin' ? 'Owner' : 'Employee',
-                phone: '', // API لا يحتوي على phone حالياً
-                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
-                company: userData.company ? {
-                    id: userData.company,
-                    name: loginResponse.user?.company_name || 'Unknown Company',
-                    specialization: 'real_estate' as const, // TODO: إضافة specialization في API
-                } : undefined,
-            };
-            
-            setCurrentUser(frontendUser);
-            setIsLoggedIn(true);
-            // Navigate to dashboard after successful login
-            window.history.replaceState({}, '', '/');
-            setCurrentPage('Dashboard');
+            // Navigate to 2FA page (password will be verified there)
+            window.history.replaceState({}, '', '/2fa');
+            setCurrentPage('TwoFactorAuth');
+            setIsLoading(false);
         } catch (error: any) {
             const errorMessage = error.message || '';
             setError(translateLoginError(errorMessage));

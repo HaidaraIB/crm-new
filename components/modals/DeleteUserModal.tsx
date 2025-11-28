@@ -17,12 +17,12 @@ export const DeleteUserModal = () => {
     if (!selectedUser) return null;
 
     return (
-        <Modal isOpen={isDeleteUserModalOpen} onClose={() => setIsDeleteUserModalOpen(false)} title={t('deleteUser')}>
+        <Modal isOpen={isDeleteUserModalOpen} onClose={() => setIsDeleteUserModalOpen(false)} title={t('deleteEmployee')}>
             <div className="space-y-4">
-                <p>{t('confirmDeleteUser1')} <span className="font-bold">{selectedUser.name}</span>{t('confirmDeleteUser2')}</p>
+                <p>{t('confirmDeleteEmployee1')} <span className="font-bold">{selectedUser.name}</span>{t('confirmDeleteEmployee2')}</p>
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={() => setIsDeleteUserModalOpen(false)}>{t('cancel')}</Button>
-                    <Button variant="danger" onClick={handleDelete}>{t('deleteUser')}</Button>
+                    <Button variant="danger" onClick={handleDelete}>{t('deleteEmployee')}</Button>
                 </div>
             </div>
         </Modal>

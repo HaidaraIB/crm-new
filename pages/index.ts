@@ -7,6 +7,7 @@ export * from './RegisterPage';
 export * from './VerifyEmailPage';
 export * from './ForgotPasswordPage';
 export * from './ResetPasswordPage';
+export * from './TwoFactorAuthPage';
 export * from './ViewLeadPage';
 export * from './ActivitiesPage';
 export * from './PropertiesPage';

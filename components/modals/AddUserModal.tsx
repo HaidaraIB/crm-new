@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 
@@ -28,46 +29,166 @@ export const AddUserModal = () => {
     });
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [isLoading, setIsLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
+
+    const validatePhone = (phone: string): string | null => {
+        if (!phone.trim()) {
+            return t('phoneRequired') || 'Phone is required';
+        }
+        
+        // Phone should start with + (dial code)
+        if (!phone.startsWith('+')) {
+            return t('invalidPhoneFormat') || 'Phone number must include country code (e.g., +966...)';
+        }
+        
+        // Remove + and check if remaining digits are valid (at least 7 digits for phone number)
+        const digitsOnly = phone.replace(/\D/g, '');
+        if (digitsOnly.length < 8) {
+            return t('invalidPhoneLength') || 'Phone number is too short';
+        }
+        
+        if (digitsOnly.length > 15) {
+            return t('invalidPhoneLength') || 'Phone number is too long';
+        }
+        
+        return null;
+    };
 
     const validateForm = () => {
         const newErrors: Record<string, string> = {};
         
-        if (!formData.name.trim()) newErrors.name = t('nameRequired') || 'Name is required';
-        if (!formData.username.trim()) newErrors.username = t('usernameRequired') || 'Username is required';
-        if (!formData.email.trim()) newErrors.email = t('emailRequired') || 'Email is required';
-        else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) newErrors.email = t('invalidEmail') || 'Invalid email format';
-        if (!formData.password.trim()) newErrors.password = t('passwordRequired') || 'Password is required';
-        else if (formData.password.length < 6) newErrors.password = t('passwordMinLength') || 'Password must be at least 6 characters';
-        if (!formData.phone.trim()) newErrors.phone = t('phoneRequired') || 'Phone is required';
-        if (!formData.role) newErrors.role = t('roleRequired') || 'Role is required';
+        // Name validation
+        if (!formData.name.trim()) {
+            newErrors.name = t('nameRequired') || 'Name is required';
+        } else if (formData.name.trim().length < 2) {
+            newErrors.name = t('nameMinLength') || 'Name must be at least 2 characters';
+        }
+        
+        // Username validation
+        if (!formData.username.trim()) {
+            newErrors.username = t('usernameRequired') || 'Username is required';
+        } else if (formData.username.trim().length < 3) {
+            newErrors.username = t('usernameMinLength') || 'Username must be at least 3 characters';
+        } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username.trim())) {
+            newErrors.username = t('usernameInvalidChars') || 'Username can only contain letters, numbers, and underscores';
+        }
+        
+        // Email validation
+        if (!formData.email.trim()) {
+            newErrors.email = t('emailRequired') || 'Email is required';
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+            newErrors.email = t('invalidEmail') || 'Invalid email format';
+        }
+        
+        // Password validation
+        if (!formData.password.trim()) {
+            newErrors.password = t('passwordRequired') || 'Password is required';
+        } else if (formData.password.length < 8) {
+            newErrors.password = t('passwordMinLength') || 'Password must be at least 8 characters';
+        } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(formData.password)) {
+            newErrors.password = t('passwordComplexity') || 'Password must contain at least one letter and one number';
+        }
+        
+        // Phone validation
+        const phoneError = validatePhone(formData.phone);
+        if (phoneError) {
+            newErrors.phone = phoneError;
+        }
+        
+        // Role validation
+        if (!formData.role) {
+            newErrors.role = t('roleRequired') || 'Role is required';
+        }
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
 
-    const handleSubmit = () => {
+    const handleSubmit = async () => {
         if (!validateForm()) return;
 
-        addUser({
-            name: formData.name,
-            username: formData.username,
-            email: formData.email,
-            password: formData.password,
-            phone: formData.phone,
-            role: formData.role,
-        });
-
-        // Reset form
-        setFormData({
-            name: '',
-            username: '',
-            email: '',
-            password: '',
-            phone: '',
-            role: 'Employee',
-        });
+        setIsLoading(true);
+        setSuccessMessage('');
         setErrors({});
-        setIsAddUserModalOpen(false);
+
+        try {
+            await addUser({
+                name: formData.name,
+                username: formData.username,
+                email: formData.email,
+                password: formData.password,
+                phone: formData.phone,
+                role: formData.role,
+            });
+
+            // Success - show message and close after a delay
+            setSuccessMessage(t('employeeCreatedSuccessfully') || 'Employee created successfully!');
+            
+            // Reset form
+            setFormData({
+                name: '',
+                username: '',
+                email: '',
+                password: '',
+                phone: '',
+                role: 'Employee',
+            });
+            setErrors({});
+            
+            // Close modal after showing success message
+            setTimeout(() => {
+                setIsAddUserModalOpen(false);
+                setSuccessMessage('');
+            }, 1500);
+        } catch (error: any) {
+            console.error('Error creating user:', error);
+            
+            // Handle API errors - Django REST Framework returns errors in specific format
+            const errorMessage = error?.message || '';
+            const errorFields = error?.fields || {};
+            const lowerMessage = errorMessage.toLowerCase();
+            
+            // Check for field-specific errors first (from API response)
+            if (errorFields.email) {
+                const emailError = Array.isArray(errorFields.email) ? errorFields.email[0] : errorFields.email;
+                if (typeof emailError === 'string' && (emailError.toLowerCase().includes('already exists') || emailError.toLowerCase().includes('already exist'))) {
+                    setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
+                } else {
+                    setErrors({ email: emailError || t('invalidEmail') || 'Invalid email format' });
+                }
+            } else if (errorFields.username) {
+                const usernameError = Array.isArray(errorFields.username) ? errorFields.username[0] : errorFields.username;
+                if (typeof usernameError === 'string' && (usernameError.toLowerCase().includes('already exists') || usernameError.toLowerCase().includes('already exist'))) {
+                    setErrors({ username: t('usernameAlreadyExists') || 'This username is already taken' });
+                } else {
+                    setErrors({ username: usernameError || t('usernameRequired') || 'Username is required' });
+                }
+            } else if (errorFields.phone) {
+                const phoneError = Array.isArray(errorFields.phone) ? errorFields.phone[0] : errorFields.phone;
+                if (typeof phoneError === 'string' && (phoneError.toLowerCase().includes('already exists') || phoneError.toLowerCase().includes('already exist'))) {
+                    setErrors({ phone: t('phoneAlreadyExists') || 'This phone number is already registered' });
+                } else {
+                    setErrors({ phone: phoneError || t('invalidPhone') || 'Invalid phone number' });
+                }
+            } else if (errorFields.password) {
+                const passwordError = Array.isArray(errorFields.password) ? errorFields.password[0] : errorFields.password;
+                setErrors({ password: passwordError || t('passwordRequired') || 'Password is required' });
+            } else if (lowerMessage.includes('email') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
+                setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
+            } else if (lowerMessage.includes('username') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
+                setErrors({ username: t('usernameAlreadyExists') || 'This username is already taken' });
+            } else if (lowerMessage.includes('phone') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
+                setErrors({ phone: t('phoneAlreadyExists') || 'This phone number is already registered' });
+            } else {
+                // Generic error - show at top
+                setErrors({ 
+                    _general: errorMessage || t('errorCreatingEmployee') || 'Failed to create employee. Please try again.' 
+                });
+            }
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const handleChange = (field: string, value: string) => {
@@ -93,8 +214,18 @@ export const AddUserModal = () => {
                 role: 'Employee',
             });
             setErrors({});
-        }} title={t('createUser')}>
+        }} title={t('createEmployee')}>
             <div className="space-y-4">
+                {successMessage && (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
+                        {successMessage}
+                    </div>
+                )}
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="add-user-name">{t('name')} *</Label>
                     <Input 
@@ -145,10 +276,12 @@ export const AddUserModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="add-user-phone">{t('phone')} *</Label>
-                    <Input 
+                    <PhoneInput 
                         id="add-user-phone" 
                         value={formData.phone}
-                        onChange={(e) => handleChange('phone', e.target.value)}
+                        onChange={(value) => handleChange('phone', value)}
+                        placeholder={t('enterPhoneNumber') || 'Enter phone number'}
+                        error={!!errors.phone}
                     />
                     {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
                 </div>
@@ -164,19 +297,32 @@ export const AddUserModal = () => {
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="secondary" onClick={() => {
-                        setIsAddUserModalOpen(false);
-                        setFormData({
-                            name: '',
-                            username: '',
-                            email: '',
-                            password: '',
-                            phone: '',
-                            role: 'Employee',
-                        });
-                        setErrors({});
-                    }}>{t('cancel')}</Button>
-                    <Button onClick={handleSubmit}>{t('createUser')}</Button>
+                    <Button 
+                        variant="secondary" 
+                        onClick={() => {
+                            setIsAddUserModalOpen(false);
+                            setFormData({
+                                name: '',
+                                username: '',
+                                email: '',
+                                password: '',
+                                phone: '',
+                                role: 'Employee',
+                            });
+                            setErrors({});
+                            setSuccessMessage('');
+                        }}
+                        disabled={isLoading}
+                    >
+                        {t('cancel')}
+                    </Button>
+                    <Button 
+                        onClick={handleSubmit}
+                        loading={isLoading}
+                        disabled={isLoading}
+                    >
+                        {t('createUser')}
+                    </Button>
                 </div>
             </div>
         </Modal>

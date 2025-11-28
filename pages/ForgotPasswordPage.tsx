@@ -32,7 +32,7 @@ export const ForgotPasswordPage = () => {
         setIsLoading(true);
         
         try {
-            await forgotPasswordAPI(email);
+            await forgotPasswordAPI(email, language);
             setSuccess(true);
         } catch (error: any) {
             const errorMessage = error.message || 'Failed to send password reset email';

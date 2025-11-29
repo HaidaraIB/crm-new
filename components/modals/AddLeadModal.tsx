@@ -24,6 +24,8 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 export const AddLeadModal = () => {
     const { isAddLeadModalOpen, setIsAddLeadModalOpen, t, addLead, users, currentUser, statuses, channels } = useAppContext();
+    const [isLoading, setIsLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
     
     // Get default status from settings (first non-hidden status or first status)
     const getDefaultStatus = () => {
@@ -118,7 +120,7 @@ export const AddLeadModal = () => {
         });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.name) {
             return;
@@ -141,30 +143,57 @@ export const AddLeadModal = () => {
             return;
         }
         
-        addLead({
-            name: formState.name,
-            phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '',
-            phoneNumbers: finalPhoneNumbers,
-            budget: Number(formState.budget) || 0,
-            assignedTo: formState.assignedTo ? Number(formState.assignedTo) : 0,
-            type: formState.type,
-            communicationWay: formState.communicationWay,
-            priority: formState.priority,
-            status: formState.status,
-        });
-        setIsAddLeadModalOpen(false);
-        // Reset form
-        const defaultUserId = currentUser?.id || users[0]?.id || '';
-        setFormState({
-            name: '', phone: '', budget: '', assignedTo: defaultUserId.toString(),
-            type: 'Fresh', communicationWay: getDefaultChannel(), priority: 'Medium', status: getDefaultStatus(),
-        });
-        setPhoneNumbers([]);
+        setIsLoading(true);
+        setSuccessMessage('');
+
+        try {
+            await addLead({
+                name: formState.name,
+                phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '',
+                phoneNumbers: finalPhoneNumbers,
+                budget: Number(formState.budget) || 0,
+                assignedTo: formState.assignedTo ? Number(formState.assignedTo) : 0,
+                type: formState.type,
+                communicationWay: formState.communicationWay,
+                priority: formState.priority,
+                status: formState.status,
+            });
+
+            // Success - show message and close after a delay
+            setSuccessMessage(t('leadCreatedSuccessfully') || 'Lead created successfully!');
+            
+            // Reset form
+            const defaultUserId = currentUser?.id || users[0]?.id || '';
+            setFormState({
+                name: '', phone: '', budget: '', assignedTo: defaultUserId.toString(),
+                type: 'Fresh', communicationWay: getDefaultChannel(), priority: 'Medium', status: getDefaultStatus(),
+            });
+            setPhoneNumbers([]);
+            
+            // Close modal after showing success message
+            setTimeout(() => {
+                setIsAddLeadModalOpen(false);
+                setSuccessMessage('');
+            }, 1500);
+        } catch (error: any) {
+            console.error('Error creating lead:', error);
+            alert(error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <Modal isOpen={isAddLeadModalOpen} onClose={() => setIsAddLeadModalOpen(false)} title={t('addNewLead')}>
+        <Modal isOpen={isAddLeadModalOpen} onClose={() => {
+            setIsAddLeadModalOpen(false);
+            setSuccessMessage('');
+        }} title={t('addNewLead')}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {successMessage && (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
+                        {successMessage}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="name">{t('clientName')}</Label>
@@ -304,7 +333,7 @@ export const AddLeadModal = () => {
                     <textarea id="notes" rows={3} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
                 </div> */}
                 <div className="flex justify-end">
-                    <Button type="submit">{t('submit')}</Button>
+                    <Button type="submit" loading={isLoading} disabled={isLoading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

@@ -27,6 +27,8 @@ export const AddOwnerModal = () => {
         district: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isLoading, setIsLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -60,22 +62,54 @@ export const AddOwnerModal = () => {
         clearError('phone');
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
         if (!validateForm()) {
             return;
         }
         
-        addOwner(formState);
-        setIsAddOwnerModalOpen(false);
-        // Reset form
-        setFormState({ name: '', phone: '', city: 'Riyadh', district: '' });
+        setIsLoading(true);
+        setSuccessMessage('');
+        try {
+            await addOwner(formState);
+            
+            // Success - show message and close after a delay
+            setSuccessMessage(t('ownerCreatedSuccessfully') || 'Owner created successfully!');
+            
+            // Reset form
+            setFormState({ name: '', phone: '', city: 'Riyadh', district: '' });
+            setErrors({});
+            
+            // Close modal after showing success message
+            setTimeout(() => {
+                setIsAddOwnerModalOpen(false);
+                setSuccessMessage('');
+            }, 1500);
+        } catch (error: any) {
+            console.error('Error creating owner:', error);
+            setErrors({ _general: error?.message || t('errorCreatingOwner') || 'Failed to create owner. Please try again.' });
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     return (
-        <Modal isOpen={isAddOwnerModalOpen} onClose={() => setIsAddOwnerModalOpen(false)} title={t('addNewOwner')}>
+        <Modal isOpen={isAddOwnerModalOpen} onClose={() => {
+            setIsAddOwnerModalOpen(false);
+            setSuccessMessage('');
+        }} title={t('addNewOwner')}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {successMessage && (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
+                        {successMessage}
+                    </div>
+                )}
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="name">{t('ownerName')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -111,7 +145,7 @@ export const AddOwnerModal = () => {
                     <Input id="district" placeholder={t('enterSpecificDistrict')} value={formState.district} onChange={handleChange} />
                 </div>
                 <div className="flex justify-end">
-                    <Button type="submit">{t('submit')}</Button>
+                    <Button type="submit" loading={isLoading} disabled={isLoading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

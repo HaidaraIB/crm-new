@@ -35,6 +35,7 @@ export const EditLeadModal = () => {
         status: 'Untouched' as Lead['status'],
     });
     const [loading, setLoading] = useState(false);
+    const [successMessage, setSuccessMessage] = useState('');
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
 
     // Initialize form state when editingLead changes
@@ -77,6 +78,7 @@ export const EditLeadModal = () => {
 
     const handleClose = () => {
         setIsEditLeadModalOpen(false);
+        setSuccessMessage('');
     };
 
     const handleAddPhoneNumber = () => {
@@ -141,6 +143,7 @@ export const EditLeadModal = () => {
         }
 
         setLoading(true);
+        setSuccessMessage('');
         try {
             await updateLead(editingLead.id, {
                 name: formState.name,
@@ -153,10 +156,17 @@ export const EditLeadModal = () => {
                 priority: formState.priority,
                 status: formState.status,
             });
-            handleClose();
-        } catch (error) {
+
+            // Success - show message and close after a delay
+            setSuccessMessage(t('leadUpdatedSuccessfully') || 'Lead updated successfully!');
+            
+            // Close modal after showing success message
+            setTimeout(() => {
+                handleClose();
+            }, 1500);
+        } catch (error: any) {
             console.error('Error updating lead:', error);
-            alert('Failed to update lead. Please try again.');
+            alert(error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -167,6 +177,11 @@ export const EditLeadModal = () => {
     return (
         <Modal isOpen={isEditLeadModalOpen} onClose={handleClose} title={t('editClient') || 'Edit Client'}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {successMessage && (
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
+                        {successMessage}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="name">{t('clientName')}</Label>

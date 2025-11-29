@@ -3,7 +3,7 @@
 import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal } from './components/index';
-import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage } from './pages';
+import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage } from './pages';
 
 const CurrentPageContent = () => {
     const { currentPage } = useAppContext();
@@ -118,6 +118,22 @@ const TheApp = () => {
         // Show register page if on /register route
         if (pathname === '/register' || currentPage === 'Register') {
             return <RegisterPage />;
+        }
+        
+        // Handle /payment/return/ route - redirect to success page (backend redirects here from PayTabs)
+        if (pathname === '/payment/return' || pathname.startsWith('/payment/return')) {
+            // Backend already redirected here with subscription_id and status, just show success page
+            return <PaymentSuccessPage />;
+        }
+        
+        // Show payment success page if on /payment/success route (backend redirects here after processing)
+        if (pathname === '/payment/success' || pathname.startsWith('/payment/success') || currentPage === 'PaymentSuccess') {
+            return <PaymentSuccessPage />;
+        }
+        
+        // Show payment page if on /payment route (but not /payment/success or /payment/return)
+        if ((pathname === '/payment' || (pathname.startsWith('/payment/') && !pathname.startsWith('/payment/success') && !pathname.startsWith('/payment/return'))) || currentPage === 'Payment') {
+            return <PaymentPage />;
         }
         
         // Show login page if on /login route or root

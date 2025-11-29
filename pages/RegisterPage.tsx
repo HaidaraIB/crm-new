@@ -222,10 +222,19 @@ export const RegisterPage = () => {
             setTimeout(() => {
                 setShowVerificationModal(false);
                 if (userData) {
-                    setCurrentUser(userData);
-                    setIsLoggedIn(true);
-                    window.history.replaceState({}, '', '/');
-                    setCurrentPage('Dashboard');
+                    // Check if payment is required after email verification
+                    if (userData.requiresPayment && userData.subscriptionId) {
+                        // Save user data temporarily and redirect to payment
+                        localStorage.setItem('pendingUserData', JSON.stringify(userData));
+                        // Redirect to payment page
+                        window.location.href = `/payment?subscription_id=${userData.subscriptionId}`;
+                    } else {
+                        // No payment required - go to dashboard
+                        setCurrentUser(userData);
+                        setIsLoggedIn(true);
+                        window.history.replaceState({}, '', '/');
+                        setCurrentPage('Dashboard');
+                    }
                 } else {
                     window.location.href = '/';
                 }
@@ -243,10 +252,19 @@ export const RegisterPage = () => {
     const handleSkipVerification = () => {
         setShowVerificationModal(false);
         if (pendingUserData) {
-            setCurrentUser(pendingUserData);
-            setIsLoggedIn(true);
-            window.history.replaceState({}, '', '/');
-            setCurrentPage('Dashboard');
+            // Check if payment is required after skipping verification
+            if (pendingUserData.requiresPayment && pendingUserData.subscriptionId) {
+                // Save user data temporarily and redirect to payment
+                localStorage.setItem('pendingUserData', JSON.stringify(pendingUserData));
+                // Redirect to payment page
+                window.location.href = `/payment?subscription_id=${pendingUserData.subscriptionId}`;
+            } else {
+                // No payment required - go to dashboard
+                setCurrentUser(pendingUserData);
+                setIsLoggedIn(true);
+                window.history.replaceState({}, '', '/');
+                setCurrentPage('Dashboard');
+            }
             setPendingUserData(null);
         }
     };
@@ -518,9 +536,25 @@ export const RegisterPage = () => {
                 },
             };
 
+            // Store tokens and user data
+            localStorage.setItem('accessToken', response.access);
+            localStorage.setItem('refreshToken', response.refresh);
+            
+            // Check if payment is required
+            const requiresPayment = response.requires_payment === true;
+            const subscription = response.subscription;
+            
+            // Store payment info in pendingUserData for later use
+            const userDataWithPayment = {
+                ...frontendUser,
+                requiresPayment,
+                subscriptionId: subscription?.id,
+            };
+            
+            // Always show email verification modal first (if verification is available)
             const verificationDetails = response.email_verification;
             if (verificationDetails) {
-                setPendingUserData(frontendUser);
+                setPendingUserData(userDataWithPayment);
                 setVerificationEmail(frontendUser.email);
                 setVerificationExpiresAt(verificationDetails.expires_at || null);
                 setVerificationCode('');
@@ -532,10 +566,18 @@ export const RegisterPage = () => {
                 });
                 setShowVerificationModal(true);
             } else {
-                setCurrentUser(frontendUser);
-                setIsLoggedIn(true);
-                window.history.replaceState({}, '', '/');
-                setCurrentPage('Dashboard');
+                // No verification required - proceed directly
+                if (requiresPayment && subscription) {
+                    // Save user data temporarily and redirect to payment
+                    localStorage.setItem('pendingUserData', JSON.stringify(userDataWithPayment));
+                    // Redirect to payment page
+                    window.location.href = `/payment?subscription_id=${subscription.id}`;
+                } else {
+                    setCurrentUser(frontendUser);
+                    setIsLoggedIn(true);
+                    window.history.replaceState({}, '', '/');
+                    setCurrentPage('Dashboard');
+                }
             }
         } catch (error: any) {
             const backendFieldErrors = mapBackendErrorsToFields(error.fields || {});

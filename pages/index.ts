@@ -4,6 +4,8 @@ export * from './DashboardPage';
 export * from './LeadsPage';
 export * from './LoginPage';
 export * from './RegisterPage';
+export * from './PaymentPage';
+export * from './PaymentSuccessPage';
 export * from './VerifyEmailPage';
 export * from './ForgotPasswordPage';
 export * from './ResetPasswordPage';

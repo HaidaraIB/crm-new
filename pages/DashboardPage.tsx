@@ -10,6 +10,29 @@ export const DashboardPage = () => {
     const { t, leads, activities, deals, todos, users, currentUser, language } = useAppContext();
     const isAdmin = currentUser?.role === 'Owner';
     const [loading, setLoading] = useState(false);
+    const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
+    const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
+
+    // Check for payment success message on mount
+    useEffect(() => {
+        const paymentSuccessData = localStorage.getItem('paymentSuccessMessage');
+        if (paymentSuccessData) {
+            try {
+                const data = JSON.parse(paymentSuccessData);
+                // Only show if message is recent (within last 10 seconds)
+                if (Date.now() - data.timestamp < 10000) {
+                    setPaymentSuccessMessage(data.message);
+                    setShowPaymentSuccess(true);
+                    // Remove from localStorage so it doesn't show again on refresh
+                    localStorage.removeItem('paymentSuccessMessage');
+                } else {
+                    localStorage.removeItem('paymentSuccessMessage');
+                }
+            } catch (e) {
+                localStorage.removeItem('paymentSuccessMessage');
+            }
+        }
+    }, []);
 
     // Calculate statistics
     const stats = useMemo(() => {
@@ -233,6 +256,38 @@ export const DashboardPage = () => {
 
     return (
         <PageWrapper title={t('dashboard')}>
+            {/* Payment Success Notification */}
+            {showPaymentSuccess && (
+                <div className={`mb-6 p-4 rounded-lg border-2 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-500/50 shadow-lg animate-slide-down ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
+                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-bold text-green-800 dark:text-green-300">
+                                    {t('paymentSuccess') || 'Payment Successful!'}
+                                </h3>
+                                <p className="text-sm text-green-700 dark:text-green-400 mt-1">
+                                    {paymentSuccessMessage || (t('paymentSuccessMessage') || 'Your payment has been processed successfully. Your subscription is now active.')}
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setShowPaymentSuccess(false)}
+                            className="flex-shrink-0 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors"
+                            aria-label="Close"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+            )}
+            
             {/* Stats Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
                 {stats.map(stat => (

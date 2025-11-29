@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
@@ -11,6 +11,19 @@ export const LoginPage = () => {
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
+    const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+
+    // Check for pending subscription ID on mount
+    useEffect(() => {
+        const pendingSubId = localStorage.getItem('pendingSubscriptionId');
+        if (pendingSubId) {
+            setSubscriptionId(pendingSubId);
+            // Set a flag error that will trigger the link display
+            setError('SUBSCRIPTION_INACTIVE');
+            // Clear it after showing
+            localStorage.removeItem('pendingSubscriptionId');
+        }
+    }, [t]);
 
     const translateLoginError = (errorMessage: string): string => {
         const lowerMessage = errorMessage.toLowerCase();
@@ -105,7 +118,22 @@ export const LoginPage = () => {
                     <div className="space-y-6">
                         {error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                                {error}
+                                <div>
+                                    {error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
+                                        <>
+                                            {t('noActiveSubscriptionBeforeLink')}
+                                            <a
+                                                href={`/payment?subscription_id=${subscriptionId}`}
+                                                className="underline font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 ml-1"
+                                            >
+                                                {t('completePayment')}
+                                            </a>
+                                            {t('noActiveSubscriptionAfterLink')}
+                                        </>
+                                    ) : (
+                                        error
+                                    )}
+                                </div>
                             </div>
                         )}
                         <div>

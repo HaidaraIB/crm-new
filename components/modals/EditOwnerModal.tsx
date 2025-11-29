@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -74,6 +75,11 @@ export const EditOwnerModal = () => {
         clearError(id);
     };
 
+    const handlePhoneChange = (value: string) => {
+        setFormState(prev => ({ ...prev, phone: value }));
+        clearError('phone');
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingOwner) return;
@@ -109,7 +115,12 @@ export const EditOwnerModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="phone">{t('ownerPhone')}</Label>
-                    <Input id="phone" placeholder={t('enterContactPhoneNumber')} value={formState.phone} onChange={handleChange} />
+                    <PhoneInput 
+                        id="phone" 
+                        placeholder={t('enterContactPhoneNumber')} 
+                        value={formState.phone} 
+                        onChange={handlePhoneChange} 
+                    />
                 </div>
                  <div>
                     <Label htmlFor="city">{t('city')}</Label>

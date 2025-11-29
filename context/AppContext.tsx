@@ -27,6 +27,20 @@ import {
 } from '../services/api';
 
 // --- Helper Functions ---
+/**
+ * Safely extract company ID from company field (handles both object and ID formats)
+ */
+const getCompanyId = (company: any): number | null => {
+  if (!company) return null;
+  if (typeof company === 'object' && company.id !== undefined) {
+    return company.id;
+  }
+  if (typeof company === 'number') {
+    return company;
+  }
+  return null;
+};
+
 const hexToHsl = (hex: string): [number, number, number] | null => {
     if (!hex) return null;
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -731,6 +745,28 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       // تحميل بيانات المستخدم الحالي أولاً (مطلوب لمعرفة specialization)
       getCurrentUserAPI()
         .then((userData) => {
+          // Check if user has an active subscription
+          const hasActiveSubscription = userData.company?.subscription?.is_active === true;
+          const subscriptionId = userData.company?.subscription?.id;
+          
+          if (!hasActiveSubscription) {
+            // Store subscription ID for payment link before clearing tokens
+            if (subscriptionId) {
+              localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
+            }
+            // Clear tokens and logout user
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('isLoggedIn');
+            setIsLoggedIn(false);
+            setCurrentUserState(null);
+            setDataLoaded(true);
+            // Redirect to login page
+            window.location.href = '/';
+            return;
+          }
+          
           // تحويل بيانات المستخدم من API إلى تنسيق Frontend - تنظيف الأدوار القديمة
           const frontendUser: User = {
             id: userData.id,
@@ -741,9 +777,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             phone: userData.phone || '',
             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
             company: userData.company ? {
-              id: userData.company,
-              name: userData.company_name || 'Unknown Company',
-              specialization: (userData.company_specialization || 'real_estate') as 'real_estate' | 'services' | 'products',
+              id: typeof userData.company === 'object' ? userData.company.id : userData.company,
+              name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+              specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
             } : undefined,
             emailVerified: userData.email_verified || userData.is_email_verified || false,
           };
@@ -1341,7 +1377,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         last_name: lastName,
         phone: userData.phone || '',
         role: userData.role === 'Owner' ? 'admin' : userData.role === 'Employee' ? 'employee' : 'employee', // Employee يترجم إلى employee
-        company: currentUser.company.id, // استخدام company المالك الحالي
+        company: getCompanyId(currentUser.company), // استخدام company المالك الحالي
       };
 
       const newUserResponse = await createUserAPI(apiUserData);
@@ -1397,7 +1433,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         last_name: lastName || existingUser.name?.split(' ').slice(1).join(' ') || '',
         phone: userData.phone !== undefined ? userData.phone : existingUser.phone || '',
         role: userData.role ? (userData.role === 'Owner' ? 'admin' : 'employee') : existingUser.role === 'Owner' ? 'admin' : 'employee', // فقط Owner أو Employee
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       // إذا تم توفير password، أضفه
@@ -1417,9 +1453,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         role: normalizeRole(updatedUserResponse.role === 'admin' ? 'Owner' : updatedUserResponse.role), // فقط Owner أو Employee
         avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(updatedUserResponse.username)}&background=random`,
         company: updatedUserResponse.company ? {
-          id: updatedUserResponse.company,
-          name: updatedUserResponse.company_name || 'Unknown Company',
-          specialization: (updatedUserResponse.company_specialization || 'real_estate') as 'real_estate' | 'services' | 'products',
+          id: typeof updatedUserResponse.company === 'object' ? updatedUserResponse.company.id : updatedUserResponse.company,
+          name: updatedUserResponse.company_name || (typeof updatedUserResponse.company === 'object' ? updatedUserResponse.company.name : 'Unknown Company'),
+          specialization: (updatedUserResponse.company_specialization || (typeof updatedUserResponse.company === 'object' ? updatedUserResponse.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
         } : undefined,
       };
       
@@ -1495,7 +1531,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         communication_way: channelId,
         status: statusId,
         budget: leadData.budget || null,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
         assigned_to: leadData.assignedTo && leadData.assignedTo > 0 ? leadData.assignedTo : null,
         phone_numbers: phoneNumbers,
       };
@@ -1598,7 +1634,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         communication_way: channelId,
         status: statusId,
         budget: leadData.budget !== undefined ? leadData.budget : lead.budget || null,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
         assigned_to: assignedToValue,
       };
       
@@ -1734,7 +1770,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       // تحويل بيانات Deal من Frontend إلى تنسيق API
       const apiDealData: any = {
         client: dealData.leadId || null,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
         employee: currentUser.id,
         stage: dealData.status?.toLowerCase() === 'won' ? 'won' : 
                dealData.status?.toLowerCase() === 'lost' ? 'lost' :
@@ -1787,7 +1823,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         name: campaignData.name,
         budget: campaignData.budget || 0,
         is_active: campaignData.isActive !== false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       console.log('Creating campaign with data:', apiCampaignData);
@@ -2081,7 +2117,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
       const apiDeveloperData = {
         name: developerData.name,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newDeveloperResponse = await createDeveloperAPI(apiDeveloperData);
@@ -2110,7 +2146,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
       const apiDeveloperData = {
         name: updatedDeveloper.name,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateDeveloperAPI(updatedDeveloper.id, apiDeveloperData);
@@ -2220,7 +2256,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         type: projectData.type || '',
         city: projectData.city || '',
         payment_method: projectData.paymentMethod || '',
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       console.log('Creating project with data:', apiProjectData);
@@ -2275,7 +2311,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         type: updatedProject.type || '',
         city: updatedProject.city || '',
         payment_method: updatedProject.paymentMethod || '',
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       console.log('Updating project with data:', apiProjectData);
@@ -2418,7 +2454,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         district: unitData.district || '',
         zone: unitData.zone || '',
         is_sold: false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newUnitResponse = await createUnitAPI(apiUnitData);
@@ -2469,7 +2505,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         district: updatedUnit.district || '',
         zone: updatedUnit.zone || '',
         is_sold: updatedUnit.isSold || false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateUnitAPI(updatedUnit.id, apiUnitData);
@@ -2530,7 +2566,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         phone: ownerData.phone || '',
         city: ownerData.city || '',
         district: ownerData.district || '',
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newOwnerResponse = await createOwnerAPI(apiOwnerData);
@@ -2562,7 +2598,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         phone: updatedOwner.phone || '',
         city: updatedOwner.city || '',
         district: updatedOwner.district || '',
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateOwnerAPI(updatedOwner.id, apiOwnerData);
@@ -2619,7 +2655,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         description: serviceData.description || '',
         provider: providerId,
         is_active: serviceData.isActive !== false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newServiceResponse = await createServiceAPI(apiServiceData);
@@ -2663,7 +2699,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         description: updatedService.description || '',
         provider: providerId,
         is_active: updatedService.isActive !== false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateServiceAPI(updatedService.id, apiServiceData);
@@ -2722,7 +2758,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         duration: packageData.duration || '',
         services: serviceIds,
         is_active: packageData.isActive !== false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newPackageResponse = await createServicePackageAPI(apiPackageData);
@@ -2765,7 +2801,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         duration: updatedPackage.duration || '',
         services: serviceIds,
         is_active: updatedPackage.isActive !== false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateServicePackageAPI(updatedPackage.id, apiPackageData);
@@ -2814,7 +2850,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         email: providerData.email || '',
         specialization: providerData.specialization || '',
         rating: providerData.rating || null,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newProviderResponse = await createServiceProviderAPI(apiProviderData);
@@ -2848,7 +2884,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         email: updatedProvider.email || '',
         specialization: updatedProvider.specialization || '',
         rating: updatedProvider.rating || null,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateServiceProviderAPI(updatedProvider.id, apiProviderData);
@@ -2914,7 +2950,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         supplier: supplierId,
         sku: productData.sku || '',
         is_active: productData.isActive !== false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newProductResponse = await createProductAPI(apiProductData);
@@ -2968,7 +3004,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         supplier: supplierId,
         sku: updatedProduct.sku || '',
         is_active: updatedProduct.isActive !== false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateProductAPI(updatedProduct.id, apiProductData);
@@ -3026,7 +3062,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         name: categoryData.name,
         description: categoryData.description || '',
         parent_category: parentCategoryId,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newCategoryResponse = await createProductCategoryAPI(apiCategoryData);
@@ -3062,7 +3098,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         name: updatedCategory.name,
         description: updatedCategory.description || '',
         parent_category: parentCategoryId,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateProductCategoryAPI(updatedCategory.id, apiCategoryData);
@@ -3109,7 +3145,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         address: supplierData.address || '',
         contact_person: supplierData.contactPerson || '',
         specialization: supplierData.specialization || '',
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newSupplierResponse = await createSupplierAPI(apiSupplierData);
@@ -3146,7 +3182,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         address: updatedSupplier.address || '',
         contact_person: updatedSupplier.contactPerson || '',
         specialization: updatedSupplier.specialization || '',
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateSupplierAPI(updatedSupplier.id, apiSupplierData);
@@ -3329,7 +3365,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         name: channelData.name || 'New Channel',
         type: channelData.type || 'Web',
         priority: channelData.priority.toLowerCase(),
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newChannelResponse = await createChannelAPI(apiChannelData);
@@ -3358,7 +3394,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         name: updatedChannel.name,
         type: updatedChannel.type,
         priority: updatedChannel.priority.toLowerCase(),
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateChannelAPI(updatedChannel.id, apiChannelData);
@@ -3399,7 +3435,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         color: stageData.color || '#808080',
         required: stageData.required || false,
         auto_advance: stageData.autoAdvance || false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newStageResponse = await createStageAPI(apiStageData);
@@ -3437,7 +3473,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         color: updatedStage.color || '#808080',
         required: updatedStage.required || false,
         auto_advance: updatedStage.autoAdvance || false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateStageAPI(updatedStage.id, apiStageData);
@@ -3481,7 +3517,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         color: statusData.color || '#808080',
         is_default: statusData.isDefault || false,
         is_hidden: statusData.isHidden || false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const newStatusResponse = await createStatusAPI(apiStatusData);
@@ -3516,7 +3552,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         color: updatedStatus.color || '#808080',
         is_default: updatedStatus.isDefault || false,
         is_hidden: updatedStatus.isHidden || false,
-        company: currentUser.company.id,
+        company: getCompanyId(currentUser.company),
       };
 
       const updatedResponse = await updateStatusAPI(updatedStatus.id, apiStatusData);

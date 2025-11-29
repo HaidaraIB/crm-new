@@ -14,6 +14,7 @@ export const TwoFactorAuthPage = () => {
     const [token, setToken] = useState<string | null>(null);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [subscriptionId, setSubscriptionId] = useState<number | null>(null);
 
     // Get username and password from sessionStorage (set by LoginPage)
     useEffect(() => {
@@ -80,6 +81,31 @@ export const TwoFactorAuthPage = () => {
             // Get full user data
             const userData = await getCurrentUserAPI();
             
+            // Check if user has an active subscription
+            const hasActiveSubscription = userData.company?.subscription?.is_active === true;
+            const subId = userData.company?.subscription?.id;
+            
+            if (!hasActiveSubscription) {
+                // Clear tokens and session storage
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                sessionStorage.removeItem('2fa_username');
+                sessionStorage.removeItem('2fa_password');
+                sessionStorage.removeItem('2fa_token');
+                
+                // Store subscription ID for payment link (set it even if we need to show error)
+                if (subId) {
+                    setSubscriptionId(subId);
+                    // Set a flag error that will trigger the link display
+                    setError('SUBSCRIPTION_INACTIVE');
+                } else {
+                    // No subscription ID available, show plain error
+                    setError(t('noActiveSubscription'));
+                }
+                setIsLoading(false);
+                return;
+            }
+            
             // Convert user data from API to Frontend format
             const frontendUser = {
                 id: userData.id,
@@ -90,9 +116,9 @@ export const TwoFactorAuthPage = () => {
                 phone: '',
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
                 company: userData.company ? {
-                    id: userData.company,
-                    name: response.user?.company_name || 'Unknown Company',
-                    specialization: 'real_estate' as const,
+                    id: typeof userData.company === 'object' ? userData.company.id : userData.company,
+                    name: response.user?.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+                    specialization: (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate') as 'real_estate' | 'services' | 'products',
                 } : undefined,
             };
             
@@ -171,7 +197,22 @@ export const TwoFactorAuthPage = () => {
                     <div className="space-y-6">
                         {error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                                {error}
+                                <div>
+                                    {error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
+                                        <>
+                                            {t('noActiveSubscriptionBeforeLink')}
+                                            <a
+                                                href={`/payment?subscription_id=${subscriptionId}`}
+                                                className="underline font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 ml-1"
+                                            >
+                                                {t('completePayment')}
+                                            </a>
+                                            {t('noActiveSubscriptionAfterLink')}
+                                        </>
+                                    ) : (
+                                        error
+                                    )}
+                                </div>
                             </div>
                         )}
                         {success && (

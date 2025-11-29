@@ -58,6 +58,27 @@ export const VerifyEmailPage = () => {
                 if (isLoggedIn) {
                     try {
                         const userData = await getCurrentUserAPI();
+                        
+                        // Check if user has an active subscription
+                        const hasActiveSubscription = userData.company?.subscription?.is_active === true;
+                        const subscriptionId = userData.company?.subscription?.id;
+                        
+                        if (!hasActiveSubscription) {
+                            // Store subscription ID for payment link before clearing tokens
+                            if (subscriptionId) {
+                                localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
+                            }
+                            // Clear tokens and logout user
+                            localStorage.removeItem('accessToken');
+                            localStorage.removeItem('refreshToken');
+                            localStorage.removeItem('currentUser');
+                            localStorage.removeItem('isLoggedIn');
+                            setCurrentUser(null);
+                            // Redirect to login page
+                            window.location.href = '/';
+                            return;
+                        }
+                        
                         const frontendUser = {
                             id: userData.id,
                             name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
@@ -67,9 +88,9 @@ export const VerifyEmailPage = () => {
                             phone: userData.phone || '',
                             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
                             company: userData.company ? {
-                                id: userData.company,
-                                name: userData.company_name || 'Unknown Company',
-                                specialization: 'real_estate' as const,
+                                id: typeof userData.company === 'object' ? userData.company.id : userData.company,
+                                name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+                                specialization: (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate') as 'real_estate' | 'services' | 'products',
                             } : undefined,
                         };
                         setCurrentUser(frontendUser);

@@ -203,6 +203,128 @@ export const registerCompanyAPI = async (data: {
 };
 
 /**
+ * إنشاء جلسة دفع Paytabs
+ * POST /api/payments/create-paytabs-session/
+ * Body: { subscription_id: number }
+ * Response: { payment_id: number, redirect_url: string, tran_ref: string }
+ */
+export const createPaytabsPaymentSessionAPI = async (subscriptionId: number) => {
+  // Use direct fetch instead of apiRequest to avoid token requirement
+  const token = localStorage.getItem('accessToken');
+  const response = await fetch(`${BASE_URL}/payments/create-paytabs-session/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify({ subscription_id: subscriptionId }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error: any = new Error(
+      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
+    );
+    throw error;
+  }
+
+  return response.json();
+};
+
+
+/**
+ * Handle Paytabs return URL - verify payment after user returns from Paytabs
+ * POST /api/payments/paytabs-return/
+ * Body: { tran_ref?: string, subscription_id?: number }
+ */
+export const paytabsReturnAPI = async (tranRef?: string, subscriptionId?: number) => {
+  const response = await fetch(`${BASE_URL}/payments/paytabs-return/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ 
+      ...(tranRef && { tran_ref: tranRef }),
+      ...(subscriptionId && { subscription_id: subscriptionId })
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Failed to verify payment return'
+    );
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  
+  // Also check if the response indicates failure even with 200 status
+  if (data.status === 'error' || data.status === 'failed' || (data.payment_status && data.payment_status !== 'A')) {
+    const error: any = new Error(
+      data?.message || data?.error || 'Payment verification failed'
+    );
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  
+  return data;
+};
+
+/**
+ * Handle Paytabs callback - verify payment (called by Paytabs server-to-server or frontend)
+ * POST /api/payments/paytabs-callback/
+ * Body: { tran_ref: string }
+ */
+export const paytabsCallbackAPI = async (tranRef: string) => {
+  const response = await fetch(`${BASE_URL}/payments/paytabs-callback/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ 
+      tran_ref: tranRef
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Failed to process payment callback'
+    );
+    throw error;
+  }
+  return data;
+};
+
+/**
+ * Check payment status by subscription_id - for polling
+ * GET /api/payments/subscription/{subscription_id}/status/
+ * Returns payment status and subscription status
+ */
+export const checkPaymentStatusAPI = async (subscriptionId: number) => {
+  const response = await fetch(`${BASE_URL}/payment-status/${subscriptionId}/`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Failed to check payment status'
+    );
+    throw error;
+  }
+  return data;
+};
+
+/**
  * الحصول على جميع الخطط المتاحة علنياً للاشتراك
  * GET /api/public/plans/
  */

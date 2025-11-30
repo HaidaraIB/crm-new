@@ -252,7 +252,7 @@ export const CreateLeadPage = () => {
                                             setFormState(prev => ({ ...prev, phone: value }));
                                             clearError('phone');
                                         }}
-                                        defaultCountry="SA"
+                                        defaultCountry="SY"
                                         error={!!errors.phone}
                                     />
                                     {errors.phone && (
@@ -271,7 +271,7 @@ export const CreateLeadPage = () => {
                                                     placeholder={t('enterPhoneNumber')}
                                                     value={pn.phone_number}
                                                     onChange={(value) => handlePhoneNumberChange(index, 'phone_number', value)}
-                                                    defaultCountry="SA"
+                                                    defaultCountry="SY"
                                                 />
                                             </div>
                                             <div className="col-span-6 md:col-span-2">

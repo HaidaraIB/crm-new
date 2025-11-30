@@ -18,7 +18,7 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 );
 
 export const AddUserModal = () => {
-    const { isAddUserModalOpen, setIsAddUserModalOpen, addUser, t, currentUser } = useAppContext();
+    const { isAddUserModalOpen, setIsAddUserModalOpen, addUser, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formData, setFormData] = useState({
         name: '',
         username: '',
@@ -30,7 +30,6 @@ export const AddUserModal = () => {
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [isLoading, setIsLoading] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
 
     const validatePhone = (phone: string): string | null => {
         if (!phone.trim()) {
@@ -109,7 +108,6 @@ export const AddUserModal = () => {
         if (!validateForm()) return;
 
         setIsLoading(true);
-        setSuccessMessage('');
         setErrors({});
 
         try {
@@ -122,9 +120,6 @@ export const AddUserModal = () => {
                 role: formData.role,
             });
 
-            // Success - show message and close after a delay
-            setSuccessMessage(t('employeeCreatedSuccessfully') || 'Employee created successfully!');
-            
             // Reset form
             setFormData({
                 name: '',
@@ -136,11 +131,10 @@ export const AddUserModal = () => {
             });
             setErrors({});
             
-            // Close modal after showing success message
-            setTimeout(() => {
-                setIsAddUserModalOpen(false);
-                setSuccessMessage('');
-            }, 1500);
+            // Close modal immediately and show success modal
+            setIsAddUserModalOpen(false);
+            setSuccessMessage(t('employeeCreatedSuccessfully') || 'Employee created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating user:', error);
             
@@ -216,11 +210,6 @@ export const AddUserModal = () => {
             setErrors({});
         }} title={t('createEmployee')}>
             <div className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                         {errors._general}

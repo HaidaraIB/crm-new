@@ -13,7 +13,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const ChangePasswordModal = () => {
-    const { isChangePasswordModalOpen, setIsChangePasswordModalOpen, t } = useAppContext();
+    const { isChangePasswordModalOpen, setIsChangePasswordModalOpen, t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formData, setFormData] = useState({
         currentPassword: '',
         newPassword: '',
@@ -21,7 +21,6 @@ export const ChangePasswordModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
     const [showCurrentPassword, setShowCurrentPassword] = useState(false);
     const [showNewPassword, setShowNewPassword] = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -53,7 +52,6 @@ export const ChangePasswordModal = () => {
                 confirmPassword: '',
             });
             setErrors({});
-            setSuccessMessage('');
             // Prevent auto-fill by making fields readonly initially
             setTimeout(() => {
                 if (currentPasswordRef.current) {
@@ -78,9 +76,6 @@ export const ChangePasswordModal = () => {
                 delete newErrors[field];
                 return newErrors;
             });
-        }
-        if (successMessage) {
-            setSuccessMessage('');
         }
     };
 
@@ -118,7 +113,6 @@ export const ChangePasswordModal = () => {
 
         setIsLoading(true);
         setErrors({});
-        setSuccessMessage('');
 
         try {
             await changePasswordAPI(
@@ -127,17 +121,17 @@ export const ChangePasswordModal = () => {
                 formData.confirmPassword
             );
             
-            setSuccessMessage(t('passwordChangedSuccessfully') || 'Password changed successfully!');
+            // Reset form
+            setFormData({
+                currentPassword: '',
+                newPassword: '',
+                confirmPassword: '',
+            });
             
-            // Reset form after success
-            setTimeout(() => {
-                setFormData({
-                    currentPassword: '',
-                    newPassword: '',
-                    confirmPassword: '',
-                });
-                setIsChangePasswordModalOpen(false);
-            }, 1500);
+            // Close modal immediately and show success modal
+            setIsChangePasswordModalOpen(false);
+            setSuccessMessage(t('passwordChangedSuccessfully') || 'Password changed successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             const errorMessage = error.message || t('errorChangingPassword') || 'Error changing password';
             
@@ -170,12 +164,6 @@ export const ChangePasswordModal = () => {
                 {errors.general && (
                     <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-md">
                         {errors.general}
-                    </div>
-                )}
-
-                {successMessage && (
-                    <div className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 rounded-md">
-                        {successMessage}
                     </div>
                 )}
 
@@ -280,8 +268,9 @@ export const ChangePasswordModal = () => {
                     <Button 
                         onClick={handleSubmit}
                         disabled={isLoading}
+                        loading={isLoading}
                     >
-                        {isLoading ? (t('changing') || 'Changing...') : t('saveChanges')}
+                        {t('saveChanges')}
                     </Button>
                 </div>
             </div>

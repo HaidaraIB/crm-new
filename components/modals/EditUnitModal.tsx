@@ -24,7 +24,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const EditUnitModal = () => {
-    const { isEditUnitModalOpen, setIsEditUnitModalOpen, t, updateUnit, editingUnit, setEditingUnit, projects } = useAppContext();
+    const { isEditUnitModalOpen, setIsEditUnitModalOpen, t, updateUnit, editingUnit, setEditingUnit, projects, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         project: '',
         bedrooms: '1',
@@ -38,6 +38,7 @@ export const EditUnitModal = () => {
         isSold: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -105,6 +106,7 @@ export const EditUnitModal = () => {
             return;
         }
         
+        setIsLoading(true);
         try {
             await updateUnit({
                 ...editingUnit,
@@ -113,10 +115,16 @@ export const EditUnitModal = () => {
                 price: Number(formState.price),
                 bathrooms: Number(formState.bathrooms),
             });
+
+            // Close modal immediately and show success modal
             handleClose();
-        } catch (error) {
+            setSuccessMessage(t('unitUpdatedSuccessfully') || 'Unit updated successfully!');
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
             console.error('Error updating unit:', error);
-            // يمكن إضافة toast notification هنا
+            setErrors({ _general: error?.message || t('errorUpdatingUnit') || 'Failed to update unit. Please try again.' });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -125,6 +133,11 @@ export const EditUnitModal = () => {
     return (
         <Modal isOpen={isEditUnitModalOpen} onClose={handleClose} title={`${t('edit')} ${t('unit')}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="project">{t('project')} <span className="text-red-500">*</span></Label>
@@ -205,8 +218,8 @@ export const EditUnitModal = () => {
                     </div>
                 </div>
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={handleClose}>{t('cancel')}</Button>
-                    <Button type="submit">{t('saveChanges')}</Button>
+                    <Button type="button" variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
+                    <Button type="submit" disabled={isLoading} loading={isLoading}>{t('saveChanges')}</Button>
                 </div>
             </form>
         </Modal>

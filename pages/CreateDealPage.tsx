@@ -37,6 +37,7 @@ export const CreateDealPage = () => {
         closedBy: currentUser?.id || 1,
         paymentMethod: 'Cash',
         status: 'Reservation',
+        stage: 'in_progress' as 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled',
         startDate: new Date().toISOString().split('T')[0],
         closedDate: '',
         value: '',
@@ -128,6 +129,7 @@ export const CreateDealPage = () => {
             clientName,
             paymentMethod: formState.paymentMethod,
             status: formState.status,
+            stage: formState.stage,
             value: calculatedValues.totalValue,
             leadId: formState.leadId,
             startedBy: Number(formState.startedBy),
@@ -258,6 +260,22 @@ export const CreateDealPage = () => {
                             </Select>
                         </div>
                         {/* Row 3 */}
+                        <div>
+                            <Label htmlFor="stage">{t('stage')} <span className="text-red-500">*</span></Label>
+                            <Select 
+                                id="stage" 
+                                value={formState.stage} 
+                                onChange={(e) => {
+                                    setFormState(prev => ({ ...prev, stage: e.target.value as 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled' }));
+                                }}
+                            >
+                                <option value="in_progress">{t('inProgress') || 'In Progress'}</option>
+                                <option value="on_hold">{t('onHold') || 'On Hold'}</option>
+                                <option value="won">{t('won') || 'Won'}</option>
+                                <option value="lost">{t('lost') || 'Lost'}</option>
+                                <option value="cancelled">{t('cancelled') || 'Cancelled'}</option>
+                            </Select>
+                        </div>
                         <div>
                             <Label htmlFor="status">{t('status')}</Label>
                             <Select id="status" value={formState.status} onChange={handleChange}>

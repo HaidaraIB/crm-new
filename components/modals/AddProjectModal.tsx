@@ -22,7 +22,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const AddProjectModal = () => {
-    const { isAddProjectModalOpen, setIsAddProjectModalOpen, t, addProject, developers } = useAppContext();
+    const { isAddProjectModalOpen, setIsAddProjectModalOpen, t, addProject, developers, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         developer: '',
@@ -31,6 +31,7 @@ export const AddProjectModal = () => {
         paymentMethod: 'Cash',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -87,12 +88,29 @@ export const AddProjectModal = () => {
             return;
         }
         
+        setIsLoading(true);
         try {
             await addProject(formState);
+
+            // Reset form
+            setFormState({
+                name: '',
+                developer: '',
+                type: 'Residential',
+                city: '',
+                paymentMethod: 'Cash',
+            });
+            setErrors({});
+            
+            // Close modal immediately and show success modal
             handleClose();
+            setSuccessMessage(t('projectCreatedSuccessfully') || 'Project created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error adding project:', error);
-            alert(error?.message || 'Failed to add project. Please try again.');
+            setErrors({ _general: error?.message || t('errorCreatingProject') || 'Failed to add project. Please try again.' });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -111,6 +129,11 @@ export const AddProjectModal = () => {
     return (
         <Modal isOpen={isAddProjectModalOpen} onClose={handleClose} title={t('addNewProject')}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                  <div>
                     <Label htmlFor="name">{t('projectName')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -154,8 +177,9 @@ export const AddProjectModal = () => {
                         <option value="Installments">{t('installment')}</option>
                     </Select>
                 </div>
-                <div className="flex justify-end">
-                    <Button type="submit">{t('submit')}</Button>
+                <div className="flex justify-end gap-2">
+                    <Button type="button" variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
+                    <Button type="submit" disabled={isLoading} loading={isLoading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

@@ -4,7 +4,7 @@ import { Modal } from '../Modal';
 import { Button } from '../Button';
 
 export const AssignLeadModal = () => {
-    const { isAssignLeadModalOpen, setIsAssignLeadModalOpen, checkedLeadIds, t, users, assignLeads } = useAppContext();
+    const { isAssignLeadModalOpen, setIsAssignLeadModalOpen, checkedLeadIds, t, users, assignLeads, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
     const [isAssigning, setIsAssigning] = useState(false);
@@ -21,12 +21,16 @@ export const AssignLeadModal = () => {
         setIsAssigning(true);
         try {
             await assignLeads(Array.from(checkedLeadIds), Number(selectedUserId));
+            
+            // Close modal immediately and show success modal
             setIsAssignLeadModalOpen(false);
             setSelectedUserId('');
             setShowConfirmDialog(false);
-        } catch (error) {
+            setSuccessMessage(t('leadsAssignedSuccessfully') || 'Leads assigned successfully!');
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
             console.error('Error assigning leads:', error);
-            alert(t('assignLeadsError') || 'Failed to assign leads. Please try again.');
+            alert(error?.message || t('assignLeadsError') || 'Failed to assign leads. Please try again.');
         } finally {
             setIsAssigning(false);
         }
@@ -64,7 +68,9 @@ export const AssignLeadModal = () => {
                 </div>
             </Modal>
 
-            <Modal isOpen={showConfirmDialog} onClose={() => setShowConfirmDialog(false)} title={t('confirmAssignLeads') || 'Confirm Assignment'}>
+            <Modal isOpen={showConfirmDialog} onClose={() => {
+                setShowConfirmDialog(false);
+            }} title={t('confirmAssignLeads') || 'Confirm Assignment'}>
                 <div className="space-y-4">
                     <p className="text-gray-700 dark:text-gray-300">
                         {t('confirmAssignLeadsMessage') || 'Are you sure you want to assign'}
@@ -73,11 +79,13 @@ export const AssignLeadModal = () => {
                         <span className="font-bold"> {selectedEmployee?.name || ''}</span>?
                     </p>
                     <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={() => setShowConfirmDialog(false)} disabled={isAssigning}>
+                        <Button variant="secondary" onClick={() => {
+                            setShowConfirmDialog(false);
+                        }} disabled={isAssigning}>
                             {t('cancel')}
                         </Button>
-                        <Button onClick={handleConfirmAssign} disabled={isAssigning}>
-                            {isAssigning ? (t('assigning') || 'Assigning...') : (t('confirmAssign') || 'Confirm')}
+                        <Button onClick={handleConfirmAssign} disabled={isAssigning} loading={isAssigning}>
+                            {t('confirmAssign') || 'Confirm'}
                         </Button>
                     </div>
                 </div>

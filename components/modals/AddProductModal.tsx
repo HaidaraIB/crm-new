@@ -23,7 +23,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const AddProductModal = () => {
-    const { isAddProductModalOpen, setIsAddProductModalOpen, t, addProduct, productCategories, suppliers, language } = useAppContext();
+    const { isAddProductModalOpen, setIsAddProductModalOpen, t, addProduct, productCategories, suppliers, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -37,7 +37,6 @@ export const AddProductModal = () => {
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [successMessage, setSuccessMessage] = useState('');
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -108,7 +107,6 @@ export const AddProductModal = () => {
             sku: '',
             isActive: true,
         });
-        setSuccessMessage('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -119,7 +117,6 @@ export const AddProductModal = () => {
         }
 
         setLoading(true);
-        setSuccessMessage('');
         try {
             await addProduct({
                 name: formState.name,
@@ -133,9 +130,6 @@ export const AddProductModal = () => {
                 isActive: formState.isActive,
             });
 
-            // Success - show message and close after a delay
-            setSuccessMessage(t('productCreatedSuccessfully') || 'Product created successfully!');
-            
             // Reset form
             setFormState({
                 name: '',
@@ -150,10 +144,10 @@ export const AddProductModal = () => {
             });
             setErrors({});
             
-            // Close modal after showing success message
-            setTimeout(() => {
-                handleClose();
-            }, 1500);
+            // Close modal immediately and show success modal
+            handleClose();
+            setSuccessMessage(t('productCreatedSuccessfully') || 'Product created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating product:', error);
             const errorMessage = error?.message || t('failedToCreateProduct') || 'Failed to create product. Please try again.';
@@ -166,11 +160,6 @@ export const AddProductModal = () => {
     return (
         <Modal isOpen={isAddProductModalOpen} onClose={handleClose} title={t('addProduct') || 'Add Product'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                         {errors._general}

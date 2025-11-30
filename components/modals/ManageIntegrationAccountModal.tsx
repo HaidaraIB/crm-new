@@ -40,13 +40,16 @@ export const ManageIntegrationAccountModal = () => {
         t,
         setConnectedAccounts,
         editingAccount,
-        setEditingAccount
+        setEditingAccount,
+        setIsSuccessModalOpen,
+        setSuccessMessage
     } = useAppContext();
 
     const [accountName, setAccountName] = useState('');
     const [accountLink, setAccountLink] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
     const [status, setStatus] = useState<'Connected' | 'Disconnected'>('Connected');
+    const [isLoading, setIsLoading] = useState(false);
 
     const platformName = getPlatformName(currentPage);
     // Map Meta to 'facebook' for dataKey compatibility (API will use company-specific keys)
@@ -82,45 +85,61 @@ export const ManageIntegrationAccountModal = () => {
             status,
         };
 
-        // TODO: استبدل هذا الكود باستدعاء API
-        // مثال:
-        // try {
-        //   if (isEditMode) {
-        //     await updateConnectedAccountAPI(editingAccount.id, payload);
-        //     // ثم حدث state
-        //   } else {
-        //     const newAccount = await createConnectedAccountAPI(payload);
-        //     // ثم أضف للstate
-        //   }
-        //   handleClose();
-        // } catch (error) {
-        //   console.error('Error saving account:', error);
-        //   // TODO: أظهر رسالة خطأ للمستخدم
-        // }
+        setIsLoading(true);
 
-        // الكود الحالي (للاختبار فقط):
-        if (isEditMode) {
-            // Edit existing account
-            setConnectedAccounts((prev: any) => ({
-                ...prev,
-                [platformKey]: prev[platformKey].map((acc: any) => 
-                    acc.id === editingAccount.id 
-                    ? { ...acc, ...payload } 
-                    : acc
-                )
-            }));
-        } else {
-            // Add new account
-            const newAccount = {
-                id: Date.now(),
-                ...payload,
-            };
-            setConnectedAccounts((prev: any) => ({
-                ...prev,
-                [platformKey]: [...(prev[platformKey] || []), newAccount]
-            }));
+        try {
+            // TODO: استبدل هذا الكود باستدعاء API
+            // مثال:
+            // if (isEditMode) {
+            //   await updateConnectedAccountAPI(editingAccount.id, payload);
+            //   // ثم حدث state
+            // } else {
+            //   const newAccount = await createConnectedAccountAPI(payload);
+            //   // ثم أضف للstate
+            // }
+
+            // الكود الحالي (للاختبار فقط):
+            if (isEditMode) {
+                // Edit existing account
+                setConnectedAccounts((prev: any) => ({
+                    ...prev,
+                    [platformKey]: prev[platformKey].map((acc: any) => 
+                        acc.id === editingAccount.id 
+                        ? { ...acc, ...payload } 
+                        : acc
+                    )
+                }));
+            } else {
+                // Add new account
+                const newAccount = {
+                    id: Date.now(),
+                    ...payload,
+                };
+                setConnectedAccounts((prev: any) => ({
+                    ...prev,
+                    [platformKey]: [...(prev[platformKey] || []), newAccount]
+                }));
+            }
+
+            // Reset form
+            setAccountName('');
+            setAccountLink('');
+            setPhoneNumber('');
+            setStatus('Connected');
+            
+            // Close modal immediately and show success modal
+            handleClose();
+            setSuccessMessage(isEditMode 
+                ? (t('accountUpdatedSuccessfully') || 'Account updated successfully!')
+                : (t('accountCreatedSuccessfully') || 'Account created successfully!')
+            );
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
+            console.error('Error saving account:', error);
+            alert(error?.message || t('errorSavingAccount') || 'Failed to save account. Please try again.');
+        } finally {
+            setIsLoading(false);
         }
-        handleClose();
     };
     
     const renderPlatformFields = () => {
@@ -173,8 +192,8 @@ export const ManageIntegrationAccountModal = () => {
                     </Select>
                 </div>
                 <div className="flex justify-end gap-2">
-                    <Button variant="secondary" onClick={handleClose}>{t('cancel')}</Button>
-                    <Button onClick={handleSubmit}>{t('submit')}</Button>
+                    <Button variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
+                    <Button onClick={handleSubmit} disabled={isLoading} loading={isLoading}>{t('submit')}</Button>
                 </div>
             </div>
         </Modal>

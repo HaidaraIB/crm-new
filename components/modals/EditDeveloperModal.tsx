@@ -12,11 +12,12 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const EditDeveloperModal = () => {
-    const { isEditDeveloperModalOpen, setIsEditDeveloperModalOpen, t, updateDeveloper, editingDeveloper, setEditingDeveloper } = useAppContext();
+    const { isEditDeveloperModalOpen, setIsEditDeveloperModalOpen, t, updateDeveloper, editingDeveloper, setEditingDeveloper, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState<Omit<Developer, 'id' | 'code'>>({
         name: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -66,14 +67,22 @@ export const EditDeveloperModal = () => {
             return;
         }
         
+        setIsLoading(true);
         try {
             await updateDeveloper({
                 ...editingDeveloper,
                 ...formState,
             });
+
+            // Close modal immediately and show success modal
             handleClose();
-        } catch (error) {
+            setSuccessMessage(t('developerUpdatedSuccessfully') || 'Developer updated successfully!');
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
             console.error('Error updating developer:', error);
+            setErrors({ _general: error?.message || t('errorUpdatingDeveloper') || 'Failed to update developer. Please try again.' });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -82,6 +91,11 @@ export const EditDeveloperModal = () => {
     return (
         <Modal isOpen={isEditDeveloperModalOpen} onClose={handleClose} title={`${t('edit')} ${t('developer')}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="name">{t('developerName')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -96,8 +110,8 @@ export const EditDeveloperModal = () => {
                     )}
                 </div>
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={handleClose}>{t('cancel')}</Button>
-                    <Button type="submit">{t('saveChanges')}</Button>
+                    <Button type="button" variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
+                    <Button type="submit" disabled={isLoading} loading={isLoading}>{t('saveChanges')}</Button>
                 </div>
             </form>
         </Modal>

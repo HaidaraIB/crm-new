@@ -68,3 +68,6 @@ export * from './modals/AddProductCategoryModal';
 export * from './modals/EditProductCategoryModal';
 export * from './modals/AddSupplierModal';
 export * from './modals/EditSupplierModal';
+export * from './modals/EditDealModal';
+export * from './modals/ViewDealModal';
+export * from './modals/SuccessModal';

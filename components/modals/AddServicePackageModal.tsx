@@ -12,7 +12,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddServicePackageModal = () => {
-    const { isAddServicePackageModalOpen, setIsAddServicePackageModalOpen, t, addServicePackage, services, language } = useAppContext();
+    const { isAddServicePackageModalOpen, setIsAddServicePackageModalOpen, t, addServicePackage, services, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -114,11 +114,26 @@ export const AddServicePackageModal = () => {
                 services: serviceNames as unknown as number[], // addServicePackage expects service names (strings), but converts them to IDs internally
                 isActive: formState.isActive,
             });
+
+            // Reset form
+            setFormState({
+                name: '',
+                description: '',
+                price: '',
+                duration: '',
+                selectedServices: [],
+                isActive: true,
+            });
+            setErrors({});
+            
+            // Close modal immediately and show success modal
             handleClose();
+            setSuccessMessage(t('servicePackageCreatedSuccessfully') || 'Service package created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating service package:', error);
             const errorMessage = error?.message || t('failedToCreateServicePackage') || 'Failed to create service package. Please try again.';
-            alert(errorMessage);
+            setErrors({ _general: errorMessage });
         } finally {
             setLoading(false);
         }
@@ -127,6 +142,11 @@ export const AddServicePackageModal = () => {
     return (
         <Modal isOpen={isAddServicePackageModalOpen} onClose={handleClose} title={t('addServicePackage') || 'Add Service Package'}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -204,7 +224,7 @@ export const AddServicePackageModal = () => {
                 />
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('submit')}</Button>
+                    <Button type="submit" disabled={loading} loading={loading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

@@ -23,7 +23,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const EditOwnerModal = () => {
-    const { isEditOwnerModalOpen, setIsEditOwnerModalOpen, t, updateOwner, editingOwner, setEditingOwner } = useAppContext();
+    const { isEditOwnerModalOpen, setIsEditOwnerModalOpen, t, updateOwner, editingOwner, setEditingOwner, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -32,7 +32,6 @@ export const EditOwnerModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -69,7 +68,6 @@ export const EditOwnerModal = () => {
     const handleClose = () => {
         setIsEditOwnerModalOpen(false);
         setEditingOwner(null);
-        setSuccessMessage('');
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -92,20 +90,16 @@ export const EditOwnerModal = () => {
         }
         
         setIsLoading(true);
-        setSuccessMessage('');
         try {
             await updateOwner({
                 ...editingOwner,
                 ...formState,
             });
 
-            // Success - show message and close after a delay
+            // Close modal immediately and show success modal
+            handleClose();
             setSuccessMessage(t('ownerUpdatedSuccessfully') || 'Owner updated successfully!');
-            
-            // Close modal after showing success message
-            setTimeout(() => {
-                handleClose();
-            }, 1500);
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating owner:', error);
             setErrors({ _general: error?.message || t('errorUpdatingOwner') || 'Failed to update owner. Please try again.' });
@@ -119,11 +113,6 @@ export const EditOwnerModal = () => {
     return (
         <Modal isOpen={isEditOwnerModalOpen} onClose={handleClose} title={`${t('edit')} ${t('ownerName')}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                         {errors._general}

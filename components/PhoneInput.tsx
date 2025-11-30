@@ -102,13 +102,12 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     placeholder,
     className = '',
     error = false,
-    defaultCountry = 'SA',
+    defaultCountry = 'SY',
 }) => {
     const { language } = useAppContext();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const [selectedCountry, setSelectedCountry] = useState<Country>(() => {
-        return countries.find(c => c.code === defaultCountry) || countries[0];
-    });
+    const defaultCountryObj = countries.find(c => c.code === defaultCountry) || countries.find(c => c.code === 'SY') || countries[0];
+    const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountryObj);
     const [phoneNumber, setPhoneNumber] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -121,8 +120,12 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
             } else {
                 setPhoneNumber(value.replace(/\D/g, ''));
             }
+        } else {
+            // Reset to default country when value is empty
+            setSelectedCountry(defaultCountryObj);
+            setPhoneNumber('');
         }
-    }, [value]);
+    }, [value, defaultCountryObj]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {

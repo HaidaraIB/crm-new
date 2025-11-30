@@ -11,11 +11,12 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddDeveloperModal = () => {
-    const { isAddDeveloperModalOpen, setIsAddDeveloperModalOpen, t, addDeveloper } = useAppContext();
+    const { isAddDeveloperModalOpen, setIsAddDeveloperModalOpen, t, addDeveloper, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -50,18 +51,37 @@ export const AddDeveloperModal = () => {
         if (!validateForm()) {
             return;
         }
+        
+        setIsLoading(true);
         try {
             await addDeveloper(formState);
-            setIsAddDeveloperModalOpen(false);
+
+            // Reset form
             setFormState({ name: '' });
-        } catch (error) {
+            setErrors({});
+            
+            // Close modal immediately and show success modal
+            setIsAddDeveloperModalOpen(false);
+            setSuccessMessage(t('developerCreatedSuccessfully') || 'Developer created successfully!');
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
             console.error('Error adding developer:', error);
+            setErrors({ _general: error?.message || t('errorCreatingDeveloper') || 'Failed to add developer. Please try again.' });
+        } finally {
+            setIsLoading(false);
         }
     };
 
     return (
-        <Modal isOpen={isAddDeveloperModalOpen} onClose={() => setIsAddDeveloperModalOpen(false)} title={t('addNewDeveloper')}>
+        <Modal isOpen={isAddDeveloperModalOpen} onClose={() => {
+            setIsAddDeveloperModalOpen(false);
+        }} title={t('addNewDeveloper')}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="name">{t('developerName')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -75,8 +95,12 @@ export const AddDeveloperModal = () => {
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
                 </div>
-                <div className="flex justify-end">
-                    <Button type="submit">{t('submit')}</Button>
+                <div className="flex justify-end gap-2">
+                    <Button type="button" variant="secondary" onClick={() => {
+                        setIsAddDeveloperModalOpen(false);
+                        setSuccessMessage('');
+                    }} disabled={isLoading}>{t('cancel')}</Button>
+                    <Button type="submit" disabled={isLoading} loading={isLoading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

@@ -23,7 +23,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 );
 
 export const EditLeadModal = () => {
-    const { isEditLeadModalOpen, setIsEditLeadModalOpen, t, updateLead, users, editingLead, statuses, channels } = useAppContext();
+    const { isEditLeadModalOpen, setIsEditLeadModalOpen, t, updateLead, users, editingLead, statuses, channels, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -35,7 +35,6 @@ export const EditLeadModal = () => {
         status: 'Untouched' as Lead['status'],
     });
     const [loading, setLoading] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
 
     // Initialize form state when editingLead changes
@@ -78,7 +77,6 @@ export const EditLeadModal = () => {
 
     const handleClose = () => {
         setIsEditLeadModalOpen(false);
-        setSuccessMessage('');
     };
 
     const handleAddPhoneNumber = () => {
@@ -143,7 +141,6 @@ export const EditLeadModal = () => {
         }
 
         setLoading(true);
-        setSuccessMessage('');
         try {
             await updateLead(editingLead.id, {
                 name: formState.name,
@@ -157,13 +154,10 @@ export const EditLeadModal = () => {
                 status: formState.status,
             });
 
-            // Success - show message and close after a delay
+            // Close modal immediately and show success modal
+            handleClose();
             setSuccessMessage(t('leadUpdatedSuccessfully') || 'Lead updated successfully!');
-            
-            // Close modal after showing success message
-            setTimeout(() => {
-                handleClose();
-            }, 1500);
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating lead:', error);
             alert(error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
@@ -177,11 +171,6 @@ export const EditLeadModal = () => {
     return (
         <Modal isOpen={isEditLeadModalOpen} onClose={handleClose} title={t('editClient') || 'Edit Client'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="name">{t('clientName')}</Label>
@@ -205,7 +194,7 @@ export const EditLeadModal = () => {
                                     placeholder={t('enterPhoneNumber')} 
                                     value={formState.phone} 
                                     onChange={(value) => setFormState(prev => ({ ...prev, phone: value }))}
-                                    defaultCountry="SA"
+                                    defaultCountry="SY"
                                 />
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {t('orAddMultiplePhones') || 'Or add multiple phone numbers below'}
@@ -220,7 +209,7 @@ export const EditLeadModal = () => {
                                                 placeholder={t('enterPhoneNumber')}
                                                 value={pn.phone_number}
                                                 onChange={(value) => handlePhoneNumberChange(index, 'phone_number', value)}
-                                                defaultCountry="SA"
+                                                defaultCountry="SY"
                                             />
                                         </div>
                                         <div className="col-span-6 sm:col-span-2">

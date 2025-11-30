@@ -98,14 +98,25 @@ export interface Deal {
   id: number;
   clientName: string;
   paymentMethod: string;
-  status: string;
+  status: string; // For display (Reservation, Contracted, Closed)
+  stage: 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled'; // API stage field
   value: number;
   leadId?: number;
+  client?: number; // API client ID
+  employee?: number; // API employee ID
   startedBy?: number; // user ID
   closedBy?: number; // user ID
   startDate?: string;
+  closedDate?: string;
+  discountPercentage?: number;
+  discountAmount?: number;
+  salesCommissionPercentage?: number;
+  salesCommissionAmount?: number;
+  description?: string;
   unit?: string; // For real estate deals
   project?: string; // For real estate deals
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface DealFilters {

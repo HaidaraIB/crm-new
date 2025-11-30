@@ -19,7 +19,7 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 );
 
 export const EditUserModal = () => {
-    const { isEditUserModalOpen, setIsEditUserModalOpen, selectedUser, t, updateUser } = useAppContext();
+    const { isEditUserModalOpen, setIsEditUserModalOpen, selectedUser, t, updateUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -29,7 +29,6 @@ export const EditUserModal = () => {
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [successMessage, setSuccessMessage] = useState('');
 
     // Initialize form state when modal opens or selectedUser changes
     useEffect(() => {
@@ -141,7 +140,6 @@ export const EditUserModal = () => {
             role: 'Employee',
         });
         setErrors({});
-        setSuccessMessage('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -154,7 +152,6 @@ export const EditUserModal = () => {
         }
 
         setLoading(true);
-        setSuccessMessage('');
         setErrors({});
 
         try {
@@ -166,13 +163,10 @@ export const EditUserModal = () => {
                 role: selectedUser.role === 'Owner' ? 'Owner' : formState.role, // لا يمكن تغيير دور Owner
             });
 
-            // Success - show message and close after a delay
+            // Close modal immediately and show success modal
+            handleClose();
             setSuccessMessage(t('employeeUpdatedSuccessfully') || 'Employee updated successfully!');
-            
-            // Close modal after showing success message
-            setTimeout(() => {
-                handleClose();
-            }, 1500);
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating user:', error);
             
@@ -219,11 +213,6 @@ export const EditUserModal = () => {
     return (
         <Modal isOpen={isEditUserModalOpen} onClose={handleClose} title={`${t('editEmployee')}: ${selectedUser.name}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                         {errors._general}

@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, Input, ToggleSwitch, TrashIcon, PlusIcon, Modal } from '../../components/index';
+import { Card, Button, Input, TrashIcon, PlusIcon, Modal } from '../../components/index';
 import { Channel } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 
@@ -22,7 +22,6 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 
 export const ChannelsSettings = () => {
     const { t, channels, addChannel, updateChannel, deleteChannel, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
-    const [multiChannel, setMultiChannel] = useState(true);
     const [defaultChannel, setDefaultChannel] = useState('');
     const [channelTypes, setChannelTypes] = useState<string[]>(['advertising', 'email', 'Web', 'Social']);
     const [isAddTypeModalOpen, setIsAddTypeModalOpen] = useState(false);
@@ -136,10 +135,6 @@ export const ChannelsSettings = () => {
             <Card>
                 <h2 className="text-xl font-semibold mb-4">{t('channelAutomation')}</h2>
                  <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-medium">{t('multiChannelTracking')}</h3>
-                        <ToggleSwitch enabled={multiChannel} setEnabled={setMultiChannel} />
-                    </div>
                      <div className="max-w-sm">
                         <Label htmlFor="default-channel">{t('defaultChannel')}</Label>
                         <Select id="default-channel" value={defaultChannel} onChange={(e) => setDefaultChannel(e.target.value)}>

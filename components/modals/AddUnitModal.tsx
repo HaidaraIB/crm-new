@@ -23,7 +23,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const AddUnitModal = () => {
-    const { isAddUnitModalOpen, setIsAddUnitModalOpen, t, addUnit, projects } = useAppContext();
+    const { isAddUnitModalOpen, setIsAddUnitModalOpen, t, addUnit, projects, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         project: '',
         bedrooms: '1',
@@ -36,6 +36,7 @@ export const AddUnitModal = () => {
         zone: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -92,6 +93,7 @@ export const AddUnitModal = () => {
             return;
         }
         
+        setIsLoading(true);
         try {
             await addUnit({
                 ...formState,
@@ -99,10 +101,30 @@ export const AddUnitModal = () => {
                 price: Number(formState.price),
                 bathrooms: Number(formState.bathrooms),
             });
+
+            // Reset form
+            setFormState({
+                project: '',
+                bedrooms: '1',
+                price: '',
+                bathrooms: '1',
+                type: 'Apartment',
+                finishing: 'Finished',
+                city: '',
+                district: '',
+                zone: '',
+            });
+            setErrors({});
+            
+            // Close modal immediately and show success modal
             handleClose();
+            setSuccessMessage(t('unitCreatedSuccessfully') || 'Unit created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error adding unit:', error);
-            alert(error?.message || 'Failed to add unit. Please try again.');
+            setErrors({ _general: error?.message || t('errorCreatingUnit') || 'Failed to add unit. Please try again.' });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -125,6 +147,11 @@ export const AddUnitModal = () => {
     return (
         <Modal isOpen={isAddUnitModalOpen} onClose={handleClose} title={t('addNewUnit')}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="project">{t('project')} <span className="text-red-500">*</span></Label>
@@ -192,8 +219,9 @@ export const AddUnitModal = () => {
                         <Input id="zone" placeholder="e.g. Zone 1" value={formState.zone} onChange={handleChange} />
                     </div>
                 </div>
-                <div className="flex justify-end">
-                    <Button type="submit">{t('submit')}</Button>
+                <div className="flex justify-end gap-2">
+                    <Button type="button" variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
+                    <Button type="submit" disabled={isLoading} loading={isLoading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

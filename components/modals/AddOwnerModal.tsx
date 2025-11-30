@@ -19,7 +19,7 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 );
 
 export const AddOwnerModal = () => {
-    const { isAddOwnerModalOpen, setIsAddOwnerModalOpen, t, addOwner } = useAppContext();
+    const { isAddOwnerModalOpen, setIsAddOwnerModalOpen, t, addOwner, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -28,7 +28,6 @@ export const AddOwnerModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [isLoading, setIsLoading] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -70,22 +69,17 @@ export const AddOwnerModal = () => {
         }
         
         setIsLoading(true);
-        setSuccessMessage('');
         try {
             await addOwner(formState);
-            
-            // Success - show message and close after a delay
-            setSuccessMessage(t('ownerCreatedSuccessfully') || 'Owner created successfully!');
             
             // Reset form
             setFormState({ name: '', phone: '', city: 'Riyadh', district: '' });
             setErrors({});
             
-            // Close modal after showing success message
-            setTimeout(() => {
-                setIsAddOwnerModalOpen(false);
-                setSuccessMessage('');
-            }, 1500);
+            // Close modal immediately and show success modal
+            setIsAddOwnerModalOpen(false);
+            setSuccessMessage(t('ownerCreatedSuccessfully') || 'Owner created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating owner:', error);
             setErrors({ _general: error?.message || t('errorCreatingOwner') || 'Failed to create owner. Please try again.' });
@@ -97,14 +91,8 @@ export const AddOwnerModal = () => {
     return (
         <Modal isOpen={isAddOwnerModalOpen} onClose={() => {
             setIsAddOwnerModalOpen(false);
-            setSuccessMessage('');
         }} title={t('addNewOwner')}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                         {errors._general}

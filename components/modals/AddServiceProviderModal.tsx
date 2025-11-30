@@ -12,7 +12,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddServiceProviderModal = () => {
-    const { isAddServiceProviderModalOpen, setIsAddServiceProviderModalOpen, t, addServiceProvider } = useAppContext();
+    const { isAddServiceProviderModalOpen, setIsAddServiceProviderModalOpen, t, addServiceProvider, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -98,11 +98,25 @@ export const AddServiceProviderModal = () => {
                 specialization: formState.specialization || '',
                 rating: formState.rating ? Number(formState.rating) : undefined,
             });
+
+            // Reset form
+            setFormState({
+                name: '',
+                phone: '',
+                email: '',
+                specialization: '',
+                rating: '',
+            });
+            setErrors({});
+            
+            // Close modal immediately and show success modal
             handleClose();
+            setSuccessMessage(t('serviceProviderCreatedSuccessfully') || 'Service provider created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating service provider:', error);
             const errorMessage = error?.message || t('failedToCreateServiceProvider') || 'Failed to create service provider. Please try again.';
-            alert(errorMessage);
+            setErrors({ _general: errorMessage });
         } finally {
             setLoading(false);
         }
@@ -111,6 +125,11 @@ export const AddServiceProviderModal = () => {
     return (
         <Modal isOpen={isAddServiceProviderModalOpen} onClose={handleClose} title={t('addServiceProvider') || 'Add Service Provider'}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -135,7 +154,7 @@ export const AddServiceProviderModal = () => {
                                 setFormState(prev => ({ ...prev, phone: value }));
                                 clearError('phone');
                             }}
-                            defaultCountry="SA"
+                            defaultCountry="SY"
                         />
                     </div>
                 </div>
@@ -179,7 +198,7 @@ export const AddServiceProviderModal = () => {
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('submit')}</Button>
+                    <Button type="submit" disabled={loading} loading={loading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

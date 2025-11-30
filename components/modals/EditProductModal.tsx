@@ -24,7 +24,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const EditProductModal = () => {
-    const { isEditProductModalOpen, setIsEditProductModalOpen, t, updateProduct, editingProduct, setEditingProduct, productCategories, suppliers, language } = useAppContext();
+    const { isEditProductModalOpen, setIsEditProductModalOpen, t, updateProduct, editingProduct, setEditingProduct, productCategories, suppliers, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -38,7 +38,6 @@ export const EditProductModal = () => {
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [successMessage, setSuccessMessage] = useState('');
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -98,7 +97,6 @@ export const EditProductModal = () => {
     const handleClose = () => {
         setIsEditProductModalOpen(false);
         setEditingProduct(null);
-        setSuccessMessage('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -110,7 +108,6 @@ export const EditProductModal = () => {
         }
 
         setLoading(true);
-        setSuccessMessage('');
         try {
             await updateProduct({
                 ...editingProduct,
@@ -125,13 +122,10 @@ export const EditProductModal = () => {
                 isActive: formState.isActive,
             });
 
-            // Success - show message and close after a delay
+            // Close modal immediately and show success modal
+            handleClose();
             setSuccessMessage(t('productUpdatedSuccessfully') || 'Product updated successfully!');
-            
-            // Close modal after showing success message
-            setTimeout(() => {
-                handleClose();
-            }, 1500);
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating product:', error);
             const errorMessage = error?.message || t('failedToUpdateProduct') || 'Failed to update product. Please try again.';
@@ -146,11 +140,6 @@ export const EditProductModal = () => {
     return (
         <Modal isOpen={isEditProductModalOpen} onClose={handleClose} title={t('editProduct') || 'Edit Product'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                         {errors._general}

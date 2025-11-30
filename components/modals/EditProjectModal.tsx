@@ -24,7 +24,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 
 export const EditProjectModal = () => {
-    const { isEditProjectModalOpen, setIsEditProjectModalOpen, t, updateProject, editingProject, setEditingProject, developers } = useAppContext();
+    const { isEditProjectModalOpen, setIsEditProjectModalOpen, t, updateProject, editingProject, setEditingProject, developers, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState<Omit<Project, 'id' | 'code'>>({
         name: '',
         developer: '',
@@ -33,6 +33,7 @@ export const EditProjectModal = () => {
         paymentMethod: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
+    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -90,15 +91,22 @@ export const EditProjectModal = () => {
             return;
         }
         
+        setIsLoading(true);
         try {
             await updateProject({
                 ...editingProject,
                 ...formState,
             });
+
+            // Close modal immediately and show success modal
             handleClose();
-        } catch (error) {
+            setSuccessMessage(t('projectUpdatedSuccessfully') || 'Project updated successfully!');
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
             console.error('Error updating project:', error);
-            // يمكن إضافة toast notification هنا
+            setErrors({ _general: error?.message || t('errorUpdatingProject') || 'Failed to update project. Please try again.' });
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -107,6 +115,11 @@ export const EditProjectModal = () => {
     return (
         <Modal isOpen={isEditProjectModalOpen} onClose={handleClose} title={`${t('edit')} ${t('project')}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                  <div>
                     <Label htmlFor="name">{t('projectName')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -151,8 +164,8 @@ export const EditProjectModal = () => {
                     </Select>
                 </div>
                 <div className="flex justify-end gap-2">
-                    <Button type="button" variant="secondary" onClick={handleClose}>{t('cancel')}</Button>
-                    <Button type="submit">{t('saveChanges')}</Button>
+                    <Button type="button" variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
+                    <Button type="submit" disabled={isLoading} loading={isLoading}>{t('saveChanges')}</Button>
                 </div>
             </form>
         </Modal>

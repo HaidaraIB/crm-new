@@ -4,7 +4,7 @@
 
 import React, { useState } from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, Input, ToggleSwitch, TrashIcon, EyeIcon, EyeOffIcon, PlusIcon } from '../../components/index';
+import { Card, Button, Input, TrashIcon, EyeIcon, EyeOffIcon, PlusIcon } from '../../components/index';
 import { Status } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 
@@ -22,9 +22,6 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 export const StatusesSettings = () => {
     const { t, statuses, addStatus, updateStatus, deleteStatus, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
-    const [customStatuses, setCustomStatuses] = useState(true);
-    const [requireUpdates, setRequireUpdates] = useState(true);
-    const [defaultStatus, setDefaultStatus] = useState('');
     const [editingStatuses, setEditingStatuses] = useState<{ [key: number]: Partial<Status> }>({});
     const [updateTimeouts, setUpdateTimeouts] = useState<{ [key: number]: NodeJS.Timeout }>({});
 
@@ -68,7 +65,7 @@ export const StatusesSettings = () => {
                 name: '',
                 description: '',
                 category: 'Active',
-                color: '#808080',
+                color: '#808080', // Default color, but not shown in UI
                 isDefault: false,
                 isHidden: false,
             });
@@ -105,27 +102,6 @@ export const StatusesSettings = () => {
     return (
         <div className="space-y-6">
             <Card>
-                <h2 className="text-xl font-semibold mb-4">{t('statusConfiguration')}</h2>
-                 <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-medium">{t('enableCustomStatuses')}</h3>
-                        <ToggleSwitch enabled={customStatuses} setEnabled={setCustomStatuses} />
-                    </div>
-                    <div className="flex items-center justify-between">
-                        <h3 className="font-medium">{t('requireStatusUpdates')}</h3>
-                        <ToggleSwitch enabled={requireUpdates} setEnabled={setRequireUpdates} />
-                    </div>
-                     <div className="max-w-sm">
-                        <Label htmlFor="default-status">{t('defaultActiveStatus')}</Label>
-                        <Select id="default-status" value={defaultStatus} onChange={(e) => setDefaultStatus(e.target.value)}>
-                            {statuses.map(s => <option key={s.id}>{s.name}</option>)}
-                        </Select>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{t('defaultActiveStatusDesc')}</p>
-                     </div>
-                 </div>
-            </Card>
-
-            <Card>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">{t('availableStatuses')}</h2>
                     <Button onClick={() => handleAddStatus()}><PlusIcon className="w-4 h-4" /> {t('addStatus')}</Button>
@@ -145,12 +121,6 @@ export const StatusesSettings = () => {
                                 <tr key={status.id} className="border-t dark:border-gray-700">
                                     <td className="p-2 font-medium">
                                         <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                value={editingStatuses[status.id]?.color !== undefined ? editingStatuses[status.id].color : status.color}
-                                                onChange={(e) => handleStatusChange(status.id, 'color', e.target.value, true)}
-                                                className="w-8 h-8 p-0 border-none bg-transparent rounded-md cursor-pointer"
-                                            />
                                             <Input
                                                 value={editingStatuses[status.id]?.name !== undefined ? editingStatuses[status.id].name : status.name}
                                                 onChange={(e) => handleStatusChange(status.id, 'name', e.target.value, false)}

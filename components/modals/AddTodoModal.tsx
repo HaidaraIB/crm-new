@@ -23,7 +23,7 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 };
 
 export const AddTodoModal = () => {
-    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, addTodo, deals, leads, language, stages } = useAppContext();
+    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, addTodo, deals, leads, language, stages, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     
     // Get default stage from settings (first stage or 'Hold')
     const getDefaultStage = () => {
@@ -122,11 +122,29 @@ export const AddTodoModal = () => {
                 notes: formState.notes,
                 reminderDate: formState.reminderDate,
             });
+
+            // Reset form
+            const tomorrow = new Date();
+            tomorrow.setDate(tomorrow.getDate() + 1);
+            tomorrow.setHours(9, 0, 0, 0);
+            const reminderDateStr = tomorrow.toISOString().slice(0, 16);
+            
+            setFormState({
+                dealId: deals.length > 0 ? deals[0].id.toString() : '',
+                stage: getDefaultStage(),
+                notes: '',
+                reminderDate: reminderDateStr,
+            });
+            setErrors({});
+            
+            // Close modal immediately and show success modal
             handleClose();
+            setSuccessMessage(t('todoCreatedSuccessfully') || 'Todo created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating todo:', error);
-            const errorMessage = error?.message || t('failedToCreateTodo');
-            alert(errorMessage);
+            const errorMessage = error?.message || t('failedToCreateTodo') || 'Failed to create todo. Please try again.';
+            setErrors({ _general: errorMessage });
         } finally {
             setLoading(false);
         }
@@ -135,6 +153,11 @@ export const AddTodoModal = () => {
     return (
         <Modal isOpen={isAddTodoModalOpen} onClose={handleClose} title={t('addTodo')}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="dealId">{t('deal')} <span className="text-red-500">*</span></Label>
                     <Select 
@@ -193,7 +216,7 @@ export const AddTodoModal = () => {
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') : t('submit')}</Button>
+                    <Button type="submit" disabled={loading} loading={loading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

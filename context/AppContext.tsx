@@ -7,7 +7,7 @@ import { formatStageName, getStageDisplayLabel, getStageCategory } from '../util
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { 
-  getCurrentUserAPI, getUsersAPI, getLeadsAPI, getDealsAPI, createUserAPI, updateUserAPI, deleteUserAPI, createLeadAPI, updateLeadAPI, deleteLeadAPI, createDealAPI, deleteDealAPI,
+  getCurrentUserAPI, getUsersAPI, getLeadsAPI, getDealsAPI, createUserAPI, updateUserAPI, deleteUserAPI, createLeadAPI, updateLeadAPI, deleteLeadAPI, createDealAPI, updateDealAPI, deleteDealAPI,
   getDevelopersAPI, createDeveloperAPI, updateDeveloperAPI, deleteDeveloperAPI,
   getProjectsAPI, createProjectAPI, updateProjectAPI, deleteProjectAPI,
   getUnitsAPI, createUnitAPI, updateUnitAPI, deleteUnitAPI,
@@ -231,6 +231,14 @@ export interface AppContextType {
   // Deals states
   isDealsFilterDrawerOpen: boolean;
   setIsDealsFilterDrawerOpen: (isOpen: boolean) => void;
+  isEditDealModalOpen: boolean;
+  setIsEditDealModalOpen: (isOpen: boolean) => void;
+  editingDeal: Deal | null;
+  setEditingDeal: React.Dispatch<React.SetStateAction<Deal | null>>;
+  isViewDealModalOpen: boolean;
+  setIsViewDealModalOpen: (isOpen: boolean) => void;
+  viewingDeal: Deal | null;
+  setViewingDeal: React.Dispatch<React.SetStateAction<Deal | null>>;
 
   // Users states
   isAddUserModalOpen: boolean;
@@ -258,6 +266,12 @@ export interface AppContextType {
   isChangePasswordModalOpen: boolean;
   setIsChangePasswordModalOpen: (isOpen: boolean) => void;
 
+  // Success Modal state
+  isSuccessModalOpen: boolean;
+  setIsSuccessModalOpen: (isOpen: boolean) => void;
+  successMessage: string;
+  setSuccessMessage: (message: string) => void;
+
   // Data states
   users: User[];
   setUsers: React.Dispatch<React.SetStateAction<User[]>>; // TODO: استخدم هذا لتحديث users من API
@@ -275,9 +289,14 @@ export interface AppContextType {
   deals: Deal[];
   setDeals: React.Dispatch<React.SetStateAction<Deal[]>>; // TODO: استخدم هذا لتحديث deals من API
   addDeal: (deal: Omit<Deal, 'id'>) => void;
+  updateDeal: (dealId: number, dealData: Partial<Deal>) => Promise<void>;
   deleteDeal: (dealId: number) => void;
   dealFilters: DealFilters;
   setDealFilters: React.Dispatch<React.SetStateAction<DealFilters>>;
+  isEditDealModalOpen: boolean;
+  setIsEditDealModalOpen: (isOpen: boolean) => void;
+  editingDeal: Deal | null;
+  setEditingDeal: React.Dispatch<React.SetStateAction<Deal | null>>;
   campaigns: Campaign[];
   setCampaigns: React.Dispatch<React.SetStateAction<Campaign[]>>;
   addCampaign: (campaign: Omit<Campaign, 'id' | 'code' | 'createdAt'>) => void;
@@ -700,6 +719,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   
   // Deals state
   const [isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen] = useState(false);
+  const [isEditDealModalOpen, setIsEditDealModalOpen] = useState(false);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+  const [isViewDealModalOpen, setIsViewDealModalOpen] = useState(false);
+  const [viewingDeal, setViewingDeal] = useState<Deal | null>(null);
   
   // Users state
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -723,6 +746,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   
   // Change Password Modal state
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+
+  // Success Modal state
+  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
 
   useEffect(() => {
@@ -1036,11 +1063,25 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             id: d.id,
             clientName: d.client_name || '',
             paymentMethod: d.payment_method || 'Cash',
-            status: d.stage === 'won' ? 'Won' : d.stage === 'lost' ? 'Lost' : d.stage === 'on_hold' ? 'On Hold' : d.stage === 'in_progress' ? 'In Progress' : 'Cancelled',
+            status: d.status || (d.stage === 'won' ? 'Won' : d.stage === 'lost' ? 'Lost' : d.stage === 'on_hold' ? 'On Hold' : d.stage === 'in_progress' ? 'In Progress' : 'Cancelled'),
+            stage: d.stage || 'in_progress',
             value: d.value ? parseFloat(d.value.toString()) : 0,
             leadId: d.client,
-            unit: d.unit_name || undefined,
-            project: d.project_name || undefined,
+            client: d.client,
+            employee: d.employee,
+            startedBy: d.started_by || undefined,
+            closedBy: d.closed_by || undefined,
+            startDate: d.start_date || undefined,
+            closedDate: d.closed_date || undefined,
+            discountPercentage: d.discount_percentage ? parseFloat(d.discount_percentage.toString()) : undefined,
+            discountAmount: d.discount_amount ? parseFloat(d.discount_amount.toString()) : undefined,
+            salesCommissionPercentage: d.sales_commission_percentage ? parseFloat(d.sales_commission_percentage.toString()) : undefined,
+            salesCommissionAmount: d.sales_commission_amount ? parseFloat(d.sales_commission_amount.toString()) : undefined,
+            description: d.description || undefined,
+            unit: d.unit_code || (typeof d.unit === 'object' && d.unit?.code) || (typeof d.unit === 'number' ? undefined : d.unit) || undefined,
+            project: d.project_name || (typeof d.project === 'object' && d.project?.name) || (typeof d.project === 'number' ? undefined : d.project) || undefined,
+            createdAt: d.created_at || undefined,
+            updatedAt: d.updated_at || undefined,
           }));
 
           // تحويل ClientTasks
@@ -1771,30 +1812,227 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       const apiDealData: any = {
         client: dealData.leadId || null,
         company: getCompanyId(currentUser.company),
-        employee: currentUser.id,
-        stage: dealData.status?.toLowerCase() === 'won' ? 'won' : 
-               dealData.status?.toLowerCase() === 'lost' ? 'lost' :
-               dealData.status?.toLowerCase() === 'on hold' ? 'on_hold' :
-               dealData.status?.toLowerCase() === 'in progress' ? 'in_progress' : 'cancelled',
+        employee: dealData.startedBy || currentUser.id,
+        stage: dealData.stage || 'in_progress',
+        payment_method: dealData.paymentMethod || 'Cash',
+        status: dealData.status || 'Reservation',
+        value: dealData.value || null,
+        start_date: dealData.startDate || null,
+        closed_date: dealData.closedDate || null,
+        discount_percentage: dealData.discountPercentage || 0,
+        discount_amount: dealData.discountAmount || 0,
+        sales_commission_percentage: dealData.salesCommissionPercentage || 0,
+        sales_commission_amount: dealData.salesCommissionAmount || 0,
+        description: dealData.description || null,
+        started_by: dealData.startedBy || currentUser.id,
+        closed_by: dealData.closedBy || null,
       };
+
+      // Add real estate fields if provided
+      // Convert unit code/name to ID
+      if (dealData.unit) {
+        const unit = units.find(u => u.code === dealData.unit);
+        if (unit) {
+          apiDealData.unit = unit.id;
+        }
+      }
+      // Convert project name to ID
+      if (dealData.project) {
+        const project = projects.find(p => p.name === dealData.project);
+        if (project) {
+          apiDealData.project = project.id;
+        }
+      }
 
       const newDealResponse = await createDealAPI(apiDealData);
       
-      // تحويل بيانات Deal الجديد من API إلى تنسيق Frontend
+      // تحويل بيانات Deal الجديد من API إلى تنسيق Frontend (نفس المنطق المستخدم في التحميل الأولي)
       const newDeal: Deal = {
         id: newDealResponse.id,
-        clientName: newDealResponse.client_name || dealData.clientName,
-        paymentMethod: dealData.paymentMethod || 'Cash',
-        status: newDealResponse.stage === 'won' ? 'Won' : newDealResponse.stage === 'lost' ? 'Lost' : newDealResponse.stage === 'on_hold' ? 'On Hold' : newDealResponse.stage === 'in_progress' ? 'In Progress' : 'Cancelled',
-        value: dealData.value || 0,
+        clientName: newDealResponse.client_name || dealData.clientName || '',
+        paymentMethod: newDealResponse.payment_method || dealData.paymentMethod || 'Cash',
+        status: newDealResponse.status || (newDealResponse.stage === 'won' ? 'Won' : newDealResponse.stage === 'lost' ? 'Lost' : newDealResponse.stage === 'on_hold' ? 'On Hold' : newDealResponse.stage === 'in_progress' ? 'In Progress' : 'Cancelled') || dealData.status || 'Reservation',
+        stage: newDealResponse.stage || dealData.stage || 'in_progress',
+        value: newDealResponse.value ? parseFloat(newDealResponse.value.toString()) : (dealData.value || 0),
         leadId: newDealResponse.client,
-        ...(dealData.unit && { unit: dealData.unit }),
-        ...(dealData.project && { project: dealData.project }),
+        client: newDealResponse.client,
+        employee: newDealResponse.employee,
+        startedBy: newDealResponse.started_by || dealData.startedBy || undefined,
+        closedBy: newDealResponse.closed_by || dealData.closedBy || undefined,
+        startDate: newDealResponse.start_date || dealData.startDate || undefined,
+        closedDate: newDealResponse.closed_date || dealData.closedDate || undefined,
+        discountPercentage: newDealResponse.discount_percentage ? parseFloat(newDealResponse.discount_percentage.toString()) : (dealData.discountPercentage !== undefined ? dealData.discountPercentage : undefined),
+        discountAmount: newDealResponse.discount_amount ? parseFloat(newDealResponse.discount_amount.toString()) : (dealData.discountAmount !== undefined ? dealData.discountAmount : undefined),
+        salesCommissionPercentage: newDealResponse.sales_commission_percentage ? parseFloat(newDealResponse.sales_commission_percentage.toString()) : (dealData.salesCommissionPercentage !== undefined ? dealData.salesCommissionPercentage : undefined),
+        salesCommissionAmount: newDealResponse.sales_commission_amount ? parseFloat(newDealResponse.sales_commission_amount.toString()) : (dealData.salesCommissionAmount !== undefined ? dealData.salesCommissionAmount : undefined),
+        description: newDealResponse.description || dealData.description || undefined,
+        unit: newDealResponse.unit_code || (typeof newDealResponse.unit === 'object' && newDealResponse.unit?.code) || (typeof newDealResponse.unit === 'number' ? undefined : newDealResponse.unit) || dealData.unit || undefined,
+        project: newDealResponse.project_name || (typeof newDealResponse.project === 'object' && newDealResponse.project?.name) || (typeof newDealResponse.project === 'number' ? undefined : newDealResponse.project) || dealData.project || undefined,
+        createdAt: newDealResponse.created_at || undefined,
+        updatedAt: newDealResponse.updated_at || undefined,
       };
       
-      setDeals(prev => [newDeal, ...prev]);
+      // إعادة تحميل Deals من API لضمان الحصول على جميع البيانات بشكل صحيح
+      try {
+        const dealsResponse = await getDealsAPI();
+        const dealsData = Array.isArray(dealsResponse) ? dealsResponse : dealsResponse.results || [];
+        const frontendDeals: Deal[] = dealsData.map((d: any) => ({
+          id: d.id,
+          clientName: d.client_name || '',
+          paymentMethod: d.payment_method || 'Cash',
+          status: d.status || (d.stage === 'won' ? 'Won' : d.stage === 'lost' ? 'Lost' : d.stage === 'on_hold' ? 'On Hold' : d.stage === 'in_progress' ? 'In Progress' : 'Cancelled'),
+          stage: d.stage || 'in_progress',
+          value: d.value ? parseFloat(d.value.toString()) : 0,
+          leadId: d.client,
+          client: d.client,
+          employee: d.employee,
+          startedBy: d.started_by || undefined,
+          closedBy: d.closed_by || undefined,
+          startDate: d.start_date || undefined,
+          closedDate: d.closed_date || undefined,
+          discountPercentage: d.discount_percentage ? parseFloat(d.discount_percentage.toString()) : undefined,
+          discountAmount: d.discount_amount ? parseFloat(d.discount_amount.toString()) : undefined,
+          salesCommissionPercentage: d.sales_commission_percentage ? parseFloat(d.sales_commission_percentage.toString()) : undefined,
+          salesCommissionAmount: d.sales_commission_amount ? parseFloat(d.sales_commission_amount.toString()) : undefined,
+          description: d.description || undefined,
+          unit: d.unit_code || (typeof d.unit === 'object' && d.unit?.code) || (typeof d.unit === 'number' ? undefined : d.unit) || undefined,
+          project: d.project_name || (typeof d.project === 'object' && d.project?.name) || (typeof d.project === 'number' ? undefined : d.project) || undefined,
+          createdAt: d.created_at || undefined,
+          updatedAt: d.updated_at || undefined,
+        }));
+        setDeals(frontendDeals);
+      } catch (reloadError) {
+        // إذا فشل إعادة التحميل، استخدم البيانات من response
+        console.warn('Failed to reload deals, using response data:', reloadError);
+        setDeals(prev => [newDeal, ...prev]);
+      }
     } catch (error) {
       console.error('Error creating deal:', error);
+      throw error;
+    }
+  };
+
+  const updateDeal = async (dealId: number, dealData: Partial<Deal>) => {
+    try {
+      if (!currentUser?.company?.id) {
+        throw new Error('User must be associated with a company');
+      }
+
+      const existingDeal = deals.find(d => d.id === dealId);
+      if (!existingDeal) {
+        throw new Error('Deal not found');
+      }
+
+      // تحويل بيانات Deal من Frontend إلى تنسيق API
+      const apiDealData: any = {
+        client: dealData.leadId || dealData.client || existingDeal.client || null,
+        company: getCompanyId(currentUser.company),
+        employee: dealData.startedBy || dealData.employee || existingDeal.employee || currentUser.id,
+        stage: dealData.stage || existingDeal.stage || 'in_progress',
+        payment_method: dealData.paymentMethod !== undefined ? dealData.paymentMethod : existingDeal.paymentMethod || 'Cash',
+        status: dealData.status !== undefined ? dealData.status : existingDeal.status || 'Reservation',
+        value: dealData.value !== undefined ? dealData.value : existingDeal.value || null,
+        start_date: dealData.startDate !== undefined ? dealData.startDate : existingDeal.startDate || null,
+        closed_date: dealData.closedDate !== undefined ? dealData.closedDate : existingDeal.closedDate || null,
+        discount_percentage: dealData.discountPercentage !== undefined ? dealData.discountPercentage : existingDeal.discountPercentage || 0,
+        discount_amount: dealData.discountAmount !== undefined ? dealData.discountAmount : existingDeal.discountAmount || 0,
+        sales_commission_percentage: dealData.salesCommissionPercentage !== undefined ? dealData.salesCommissionPercentage : existingDeal.salesCommissionPercentage || 0,
+        sales_commission_amount: dealData.salesCommissionAmount !== undefined ? dealData.salesCommissionAmount : existingDeal.salesCommissionAmount || 0,
+        description: dealData.description !== undefined ? dealData.description : existingDeal.description || null,
+        started_by: dealData.startedBy !== undefined ? dealData.startedBy : existingDeal.startedBy || currentUser.id,
+        closed_by: dealData.closedBy !== undefined ? dealData.closedBy : existingDeal.closedBy || null,
+      };
+
+      // Add real estate fields if provided or existing
+      // Convert unit code/name to ID
+      if (dealData.unit !== undefined) {
+        const unit = units.find(u => u.code === dealData.unit);
+        if (unit) {
+          apiDealData.unit = unit.id;
+        }
+      } else if (existingDeal.unit) {
+        const unit = units.find(u => u.code === existingDeal.unit);
+        if (unit) {
+          apiDealData.unit = unit.id;
+        }
+      }
+      // Convert project name to ID
+      if (dealData.project !== undefined) {
+        const project = projects.find(p => p.name === dealData.project);
+        if (project) {
+          apiDealData.project = project.id;
+        }
+      } else if (existingDeal.project) {
+        const project = projects.find(p => p.name === existingDeal.project);
+        if (project) {
+          apiDealData.project = project.id;
+        }
+      }
+
+      const updatedDealResponse = await updateDealAPI(dealId, apiDealData);
+      
+      // تحويل بيانات Deal المحدث من API إلى تنسيق Frontend (نفس المنطق المستخدم في التحميل الأولي)
+      const updatedDeal: Deal = {
+        id: updatedDealResponse.id,
+        clientName: updatedDealResponse.client_name || existingDeal.clientName || '',
+        paymentMethod: updatedDealResponse.payment_method || existingDeal.paymentMethod || 'Cash',
+        status: updatedDealResponse.status || (updatedDealResponse.stage === 'won' ? 'Won' : updatedDealResponse.stage === 'lost' ? 'Lost' : updatedDealResponse.stage === 'on_hold' ? 'On Hold' : updatedDealResponse.stage === 'in_progress' ? 'In Progress' : 'Cancelled') || existingDeal.status || 'Reservation',
+        stage: updatedDealResponse.stage || existingDeal.stage || 'in_progress',
+        value: updatedDealResponse.value ? parseFloat(updatedDealResponse.value.toString()) : (existingDeal.value || 0),
+        leadId: updatedDealResponse.client,
+        client: updatedDealResponse.client,
+        employee: updatedDealResponse.employee,
+        startedBy: updatedDealResponse.started_by || existingDeal.startedBy || undefined,
+        closedBy: updatedDealResponse.closed_by || existingDeal.closedBy || undefined,
+        startDate: updatedDealResponse.start_date || existingDeal.startDate || undefined,
+        closedDate: updatedDealResponse.closed_date || existingDeal.closedDate || undefined,
+        discountPercentage: updatedDealResponse.discount_percentage ? parseFloat(updatedDealResponse.discount_percentage.toString()) : (existingDeal.discountPercentage !== undefined ? existingDeal.discountPercentage : undefined),
+        discountAmount: updatedDealResponse.discount_amount ? parseFloat(updatedDealResponse.discount_amount.toString()) : (existingDeal.discountAmount !== undefined ? existingDeal.discountAmount : undefined),
+        salesCommissionPercentage: updatedDealResponse.sales_commission_percentage ? parseFloat(updatedDealResponse.sales_commission_percentage.toString()) : (existingDeal.salesCommissionPercentage !== undefined ? existingDeal.salesCommissionPercentage : undefined),
+        salesCommissionAmount: updatedDealResponse.sales_commission_amount ? parseFloat(updatedDealResponse.sales_commission_amount.toString()) : (existingDeal.salesCommissionAmount !== undefined ? existingDeal.salesCommissionAmount : undefined),
+        description: updatedDealResponse.description || existingDeal.description || undefined,
+        unit: updatedDealResponse.unit_code || (typeof updatedDealResponse.unit === 'object' && updatedDealResponse.unit?.code) || (typeof updatedDealResponse.unit === 'number' ? undefined : updatedDealResponse.unit) || existingDeal.unit || undefined,
+        project: updatedDealResponse.project_name || (typeof updatedDealResponse.project === 'object' && updatedDealResponse.project?.name) || (typeof updatedDealResponse.project === 'number' ? undefined : updatedDealResponse.project) || existingDeal.project || undefined,
+        createdAt: updatedDealResponse.created_at || existingDeal.createdAt || undefined,
+        updatedAt: updatedDealResponse.updated_at || undefined,
+      };
+      
+      // إعادة تحميل Deals من API لضمان الحصول على جميع البيانات بشكل صحيح
+      try {
+        const dealsResponse = await getDealsAPI();
+        const dealsData = Array.isArray(dealsResponse) ? dealsResponse : dealsResponse.results || [];
+        const frontendDeals: Deal[] = dealsData.map((d: any) => ({
+          id: d.id,
+          clientName: d.client_name || '',
+          paymentMethod: d.payment_method || 'Cash',
+          status: d.status || (d.stage === 'won' ? 'Won' : d.stage === 'lost' ? 'Lost' : d.stage === 'on_hold' ? 'On Hold' : d.stage === 'in_progress' ? 'In Progress' : 'Cancelled'),
+          stage: d.stage || 'in_progress',
+          value: d.value ? parseFloat(d.value.toString()) : 0,
+          leadId: d.client,
+          client: d.client,
+          employee: d.employee,
+          startedBy: d.started_by || undefined,
+          closedBy: d.closed_by || undefined,
+          startDate: d.start_date || undefined,
+          closedDate: d.closed_date || undefined,
+          discountPercentage: d.discount_percentage ? parseFloat(d.discount_percentage.toString()) : undefined,
+          discountAmount: d.discount_amount ? parseFloat(d.discount_amount.toString()) : undefined,
+          salesCommissionPercentage: d.sales_commission_percentage ? parseFloat(d.sales_commission_percentage.toString()) : undefined,
+          salesCommissionAmount: d.sales_commission_amount ? parseFloat(d.sales_commission_amount.toString()) : undefined,
+          description: d.description || undefined,
+          unit: d.unit_code || (typeof d.unit === 'object' && d.unit?.code) || (typeof d.unit === 'number' ? undefined : d.unit) || undefined,
+          project: d.project_name || (typeof d.project === 'object' && d.project?.name) || (typeof d.project === 'number' ? undefined : d.project) || undefined,
+          createdAt: d.created_at || undefined,
+          updatedAt: d.updated_at || undefined,
+        }));
+        setDeals(frontendDeals);
+      } catch (reloadError) {
+        // إذا فشل إعادة التحميل، استخدم البيانات من response
+        console.warn('Failed to reload deals, using response data:', reloadError);
+        setDeals(prev => prev.map(d => d.id === dealId ? updatedDeal : d));
+      }
+    } catch (error) {
+      console.error('Error updating deal:', error);
       throw error;
     }
   };
@@ -3658,6 +3896,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isEditSupplierModalOpen, setIsEditSupplierModalOpen,
     editingSupplier, setEditingSupplier,
     isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen,
+    isEditDealModalOpen, setIsEditDealModalOpen,
+    editingDeal, setEditingDeal,
+    isViewDealModalOpen, setIsViewDealModalOpen,
+    viewingDeal, setViewingDeal,
     isAddUserModalOpen, setIsAddUserModalOpen,
     isViewUserModalOpen, setIsViewUserModalOpen,
     isEditUserModalOpen, setIsEditUserModalOpen,
@@ -3667,11 +3909,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     connectedAccounts, setConnectedAccounts,
     editingAccount, setEditingAccount,
     isChangePasswordModalOpen, setIsChangePasswordModalOpen,
+    isSuccessModalOpen, setIsSuccessModalOpen,
+    successMessage, setSuccessMessage,
     // Data and functions
     users, setUsers, addUser, updateUser, deleteUser,
     leads, setLeads, addLead, updateLead, deleteLead, assignLeads,
     leadFilters, setLeadFilters,
-    deals, setDeals, addDeal, deleteDeal,
+    deals, setDeals, addDeal, updateDeal, deleteDeal,
     dealFilters, setDealFilters,
     campaigns, setCampaigns, addCampaign, deleteCampaign,
     campaignFilters, setCampaignFilters,

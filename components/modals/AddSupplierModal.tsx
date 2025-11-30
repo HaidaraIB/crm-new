@@ -10,7 +10,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddSupplierModal = () => {
-    const { isAddSupplierModalOpen, setIsAddSupplierModalOpen, t, addSupplier, language } = useAppContext();
+    const { isAddSupplierModalOpen, setIsAddSupplierModalOpen, t, addSupplier, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -21,7 +21,6 @@ export const AddSupplierModal = () => {
     });
     const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [successMessage, setSuccessMessage] = useState('');
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -78,7 +77,6 @@ export const AddSupplierModal = () => {
             contactPerson: '',
             specialization: '',
         });
-        setSuccessMessage('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -89,7 +87,6 @@ export const AddSupplierModal = () => {
         }
 
         setLoading(true);
-        setSuccessMessage('');
         try {
             await addSupplier({
                 name: formState.name,
@@ -100,9 +97,6 @@ export const AddSupplierModal = () => {
                 specialization: formState.specialization || '',
             });
 
-            // Success - show message and close after a delay
-            setSuccessMessage(t('supplierCreatedSuccessfully') || 'Supplier created successfully!');
-            
             // Reset form
             setFormState({
                 name: '',
@@ -114,10 +108,10 @@ export const AddSupplierModal = () => {
             });
             setErrors({});
             
-            // Close modal after showing success message
-            setTimeout(() => {
-                handleClose();
-            }, 1500);
+            // Close modal immediately and show success modal
+            handleClose();
+            setSuccessMessage(t('supplierCreatedSuccessfully') || 'Supplier created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating supplier:', error);
             const errorMessage = error?.message || t('failedToCreateSupplier') || 'Failed to create supplier. Please try again.';
@@ -130,11 +124,6 @@ export const AddSupplierModal = () => {
     return (
         <Modal isOpen={isAddSupplierModalOpen} onClose={handleClose} title={t('addSupplier') || 'Add Supplier'}>
             <form onSubmit={handleSubmit} className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
-                    </div>
-                )}
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                         {errors._general}

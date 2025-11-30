@@ -726,6 +726,19 @@ export const createDealAPI = async (dealData: any) => {
 };
 
 /**
+ * تحديث Deal
+ * PUT /api/deals/:id/
+ * Body: { client, company, employee, stage }
+ * Response: Deal object
+ */
+export const updateDealAPI = async (dealId: number, dealData: any) => {
+  return apiRequest<any>(`/deals/${dealId}/`, {
+    method: 'PUT',
+    body: JSON.stringify(dealData),
+  });
+};
+
+/**
  * حذف Deal
  * DELETE /api/deals/:id/
  */

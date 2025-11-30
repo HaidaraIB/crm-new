@@ -10,7 +10,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddActionModal = () => {
-    const { isAddActionModalOpen, setIsAddActionModalOpen, selectedLead, t, addClientTask, language, stages } = useAppContext();
+    const { isAddActionModalOpen, setIsAddActionModalOpen, selectedLead, t, addClientTask, language, stages, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     // Get default stage from selectedLead's lastStage or first stage from settings
     const getDefaultStage = () => {
         if (selectedLead?.lastStage) {
@@ -102,7 +102,17 @@ export const AddActionModal = () => {
                 notes: notes,
                 reminderDate: reminder || null,
             });
+
+            // Reset form
+            setStage(getDefaultStage());
+            setNotes('');
+            setReminder('');
+            setErrors({});
+            
+            // Close modal immediately and show success modal
             handleClose();
+            setSuccessMessage(t('actionCreatedSuccessfully') || 'Action created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error adding action:', error);
             // Only show error if it's not a successful creation
@@ -110,7 +120,7 @@ export const AddActionModal = () => {
             const errorMessage = error?.message || 'Failed to add action. Please try again.';
             // Check if the error is about state update (which happens after successful creation)
             if (!errorMessage.includes('history') && !errorMessage.includes('selectedLead')) {
-                alert(errorMessage);
+                setErrors({ _general: errorMessage });
             }
         } finally {
             setLoading(false);
@@ -120,6 +130,11 @@ export const AddActionModal = () => {
     return (
         <Modal isOpen={isAddActionModalOpen} onClose={handleClose} title={`${t('add_action')} ${t('for')} ${selectedLead.name}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="stage">{t('stage')} <span className="text-red-500">*</span></Label>
                     <select 
@@ -183,7 +198,7 @@ export const AddActionModal = () => {
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('submit')}</Button>
+                    <Button type="submit" disabled={loading} loading={loading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

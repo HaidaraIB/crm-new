@@ -19,7 +19,7 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 };
 
 export const AddProductCategoryModal = () => {
-    const { isAddProductCategoryModalOpen, setIsAddProductCategoryModalOpen, t, addProductCategory, productCategories, language } = useAppContext();
+    const { isAddProductCategoryModalOpen, setIsAddProductCategoryModalOpen, t, addProductCategory, productCategories, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -89,11 +89,23 @@ export const AddProductCategoryModal = () => {
                 description: formState.description,
                 parentCategory: formState.parentCategory || undefined,
             });
+
+            // Reset form
+            setFormState({
+                name: '',
+                description: '',
+                parentCategory: '',
+            });
+            setErrors({});
+            
+            // Close modal immediately and show success modal
             handleClose();
+            setSuccessMessage(t('productCategoryCreatedSuccessfully') || 'Product category created successfully!');
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating product category:', error);
             const errorMessage = error?.message || t('failedToCreateProductCategory') || 'Failed to create product category. Please try again.';
-            alert(errorMessage);
+            setErrors({ _general: errorMessage });
         } finally {
             setLoading(false);
         }
@@ -102,6 +114,11 @@ export const AddProductCategoryModal = () => {
     return (
         <Modal isOpen={isAddProductCategoryModalOpen} onClose={handleClose} title={t('addProductCategory') || 'Add Product Category'}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors._general && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errors._general}
+                    </div>
+                )}
                 <div>
                     <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
                     <Input 
@@ -138,7 +155,7 @@ export const AddProductCategoryModal = () => {
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('submit')}</Button>
+                    <Button type="submit" disabled={loading} loading={loading}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

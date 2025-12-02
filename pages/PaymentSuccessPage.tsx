@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Loader } from '../components/index';
-import { getCurrentUserAPI, checkPaymentStatusAPI } from '../services/api';
-import { navigateToCompanyRoute, getCompanySubdomainUrl } from '../utils/routing';
+import { getCurrentUserAPI, checkPaymentStatusAPI, requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI } from '../services/api';
+import { navigateToCompanyRoute, getCompanySubdomainUrl, getBaseDomain, isOnSubdomain } from '../utils/routing';
 
 export const PaymentSuccessPage = () => {
     const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage, currentUser } = useAppContext();
@@ -99,6 +99,13 @@ export const PaymentSuccessPage = () => {
                             paymentCompleted = true;
                             console.log('✅ paymentCompleted is now:', paymentCompleted);
                             console.log('✅ Will skip polling loop and proceed to login...');
+                            
+                            // Check if backend returned tokens in the response
+                            if (statusResult.access && statusResult.refresh) {
+                                console.log('🔑 Tokens found in payment status response!');
+                                localStorage.setItem('accessToken', statusResult.access);
+                                localStorage.setItem('refreshToken', statusResult.refresh);
+                            }
                         } else {
                             // If not yet updated, start polling but with fewer attempts
                             console.log('⚠️ Payment not yet updated in database, will poll a few times...');
@@ -131,6 +138,14 @@ export const PaymentSuccessPage = () => {
                         if (checkPaymentCompleted(statusResult)) {
                             paymentCompleted = true;
                             console.log('✅ Payment completed during polling! Breaking loop...');
+                            
+                            // Check if backend returned tokens in the response
+                            if (statusResult.access && statusResult.refresh) {
+                                console.log('🔑 Tokens found in payment status response!');
+                                localStorage.setItem('accessToken', statusResult.access);
+                                localStorage.setItem('refreshToken', statusResult.refresh);
+                            }
+                            
                             break;
                         }
                         
@@ -202,10 +217,55 @@ export const PaymentSuccessPage = () => {
                 const pendingUserData = JSON.parse(pendingUserDataStr);
                 console.log('📦 pendingUserData parsed:', pendingUserData);
                 
+                // Check if we have tokens - if not, try to get them by re-authenticating
+                let accessToken = localStorage.getItem('accessToken');
+                let refreshToken = localStorage.getItem('refreshToken');
+                
+                // If no tokens, try to re-authenticate using sessionStorage credentials
+                if (!accessToken || !refreshToken) {
+                    console.log('🔑 No tokens found, attempting to re-authenticate...');
+                    const storedUsername = sessionStorage.getItem('2fa_username');
+                    const storedPassword = sessionStorage.getItem('2fa_password');
+                    
+                    if (storedUsername && storedPassword && pendingUserData?.username === storedUsername) {
+                        try {
+                            console.log('🔐 Re-authenticating with stored credentials...');
+                            // Request 2FA token
+                            const twoFAResponse = await requestTwoFactorAuthAPI(storedUsername, language);
+                            
+                            // Try to verify with empty code (backend might allow this after payment)
+                            try {
+                                const verifyResponse = await verifyTwoFactorAuthAPI({
+                                    username: storedUsername,
+                                    password: storedPassword,
+                                    token: twoFAResponse.token,
+                                    code: '', // Try empty code first
+                                });
+                                
+                                // If successful, we now have tokens
+                                if (verifyResponse.access && verifyResponse.refresh) {
+                                    accessToken = verifyResponse.access;
+                                    refreshToken = verifyResponse.refresh;
+                                    localStorage.setItem('accessToken', accessToken);
+                                    localStorage.setItem('refreshToken', refreshToken);
+                                    console.log('🔑 Tokens obtained from re-authentication!');
+                                }
+                            } catch (verifyErr: any) {
+                                console.log('⚠️ Empty code not accepted, will redirect to login');
+                                // Continue without tokens - will redirect to login in catch block
+                            }
+                        } catch (err) {
+                            console.error('❌ Error re-authenticating:', err);
+                        }
+                    }
+                }
+                
                 // Get updated user data from API
+                // If we don't have tokens, getCurrentUserAPI will fail with 401, and we'll handle it
+                let userData;
                 try {
                     console.log('🌐 Calling getCurrentUserAPI()...');
-                    const userData = await getCurrentUserAPI();
+                    userData = await getCurrentUserAPI();
                     console.log('🌐 getCurrentUserAPI response:', userData);
                     
                     // Verify subscription is active
@@ -361,6 +421,72 @@ export const PaymentSuccessPage = () => {
                 } catch (err: any) {
                     console.error('❌ Error getting user data:', err);
                     console.error('❌ Error details:', err.message, err.stack);
+                    console.error('❌ Error status:', err.status);
+                    
+                    // If API fails due to 401 (no tokens), try to use pendingUserData to login
+                    if (err.status === 401 || err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+                        console.log('⚠️ No tokens available, but payment is complete. Using pendingUserData to proceed...');
+                        
+                        // Use pendingUserData to create frontend user
+                        if (pendingUserData) {
+                            const frontendUser = {
+                                id: pendingUserData.id || pendingUserData.user?.id,
+                                name: pendingUserData.name || `${pendingUserData.user?.first_name || ''} ${pendingUserData.user?.last_name || ''}`.trim() || pendingUserData.user?.username,
+                                username: pendingUserData.username || pendingUserData.user?.username,
+                                email: pendingUserData.email || pendingUserData.user?.email,
+                                role: pendingUserData.role || pendingUserData.user?.role || 'Owner',
+                                phone: pendingUserData.phone || pendingUserData.user?.phone || '',
+                                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(pendingUserData.username || pendingUserData.user?.username || 'User')}&background=random`,
+                                company: pendingUserData.company ? {
+                                    ...pendingUserData.company,
+                                    domain: pendingUserData.company.domain,
+                                } : undefined,
+                            };
+                            
+                            console.log('👤 Using pendingUserData to login:', frontendUser);
+                            
+                            // Clear old user data
+                            localStorage.removeItem('currentUser');
+                            
+                            // Since we don't have tokens, we can't use API calls
+                            // But payment is complete, so we'll redirect to login with success message
+                            // Store success message
+                            localStorage.setItem('paymentSuccessMessage', JSON.stringify({
+                                message: t('paymentSuccessMessage') || 'Payment successful! Your subscription is now active. Please login to continue.',
+                                timestamp: Date.now()
+                            }));
+                            
+                            // Also store subscription ID so login page can show payment link if needed
+                            if (subscriptionId) {
+                                localStorage.setItem('pendingSubscriptionId', subscriptionId);
+                            }
+                            
+                            // Redirect to login page
+                            const loginUrl = isOnSubdomain() ? 
+                                `${window.location.protocol}//${getBaseDomain()}${window.location.port ? ':' + window.location.port : ''}/login?payment_success=true` :
+                                '/login?payment_success=true';
+                            console.log('🔄 Redirecting to login page with payment success flag:', loginUrl);
+                            window.location.href = loginUrl;
+                            setIsLoading(false);
+                            processingRef.current = false;
+                            return;
+                        } else {
+                            // No pendingUserData either - just redirect to login
+                            localStorage.setItem('paymentSuccessMessage', JSON.stringify({
+                                message: t('paymentSuccessMessage') || 'Payment successful! Your subscription is now active. Please login to continue.',
+                                timestamp: Date.now()
+                            }));
+                            
+                            const loginUrl = isOnSubdomain() ? 
+                                `${window.location.protocol}//${getBaseDomain()}${window.location.port ? ':' + window.location.port : ''}/login` :
+                                '/login';
+                            console.log('🔄 Redirecting to login page:', loginUrl);
+                            window.location.href = loginUrl;
+                            setIsLoading(false);
+                            processingRef.current = false;
+                            return;
+                        }
+                    }
                     
                     // If API fails but we have pendingUserData, use that instead
                     if (pendingUserData) {

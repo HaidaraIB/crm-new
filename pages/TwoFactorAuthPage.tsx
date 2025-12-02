@@ -87,6 +87,30 @@ export const TwoFactorAuthPage = () => {
             const subId = userData.company?.subscription?.id;
             
             if (!hasActiveSubscription) {
+                // Convert user data to frontend format before clearing tokens
+                const frontendUser = {
+                    id: userData.id,
+                    name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
+                    username: userData.username,
+                    email: userData.email,
+                    role: userData.role === 'admin' ? 'Owner' : 'Employee',
+                    phone: userData.phone || '',
+                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
+                    company: userData.company ? {
+                        id: typeof userData.company === 'object' ? userData.company.id : userData.company,
+                        name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+                        domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
+                        specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
+                    } : undefined,
+                };
+                
+                // Store user data for payment success page
+                localStorage.setItem('pendingUserData', JSON.stringify({
+                    ...frontendUser,
+                    requiresPayment: true,
+                    subscriptionId: subId,
+                }));
+                
                 // Clear tokens and session storage
                 localStorage.removeItem('accessToken');
                 localStorage.removeItem('refreshToken');

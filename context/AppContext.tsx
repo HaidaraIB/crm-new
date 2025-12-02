@@ -831,16 +831,46 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           if (subscriptionId) {
             localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
           }
+          
           // Clear tokens and logout user
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('currentUser');
           localStorage.removeItem('isLoggedIn');
+          sessionStorage.clear();
           setIsLoggedIn(false);
           setCurrentUserState(null);
           setDataLoaded(true);
-          // Redirect to login page
-          window.location.href = '/';
+          
+          // If on subdomain, redirect to main domain login page
+          const hostname = window.location.hostname;
+          let isOnSubdomain = false;
+          let baseDomain = 'localhost';
+          
+          if (hostname.includes('.')) {
+            const parts = hostname.split('.');
+            // Check if we're on a subdomain
+            if (hostname.includes('.localhost')) {
+              // For localhost subdomains (e.g., memo.com.localhost)
+              isOnSubdomain = parts.length > 2;
+              baseDomain = 'localhost';
+            } else if (parts.length > 2 || (parts.length === 2 && parts[0] !== 'localhost' && parts[0] !== '127')) {
+              // For production subdomains
+              isOnSubdomain = true;
+              baseDomain = parts.slice(-2).join('.');
+            }
+          }
+          
+          if (isOnSubdomain) {
+            const protocol = window.location.protocol;
+            const port = window.location.port ? `:${window.location.port}` : '';
+            const loginUrl = `${protocol}//${baseDomain}${port}/login`;
+            console.log('🔄 No active subscription on subdomain, redirecting to main domain login:', loginUrl);
+            window.location.replace(loginUrl);
+          } else {
+            // Redirect to login page on main domain
+            window.location.replace('/login');
+          }
           return;
         }
       }
@@ -1404,9 +1434,53 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       try {
         const userData = await getCurrentUserAPI();
         const hasActiveSubscription = userData.company?.subscription?.is_active === true;
+        const subscriptionId = userData.company?.subscription?.id;
         
         if (!hasActiveSubscription) {
-          // إذا لم يكن هناك اشتراك نشط، توقف عن polling
+          // Store subscription ID for payment link before clearing tokens
+          if (subscriptionId) {
+            localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
+          }
+          
+          // Clear tokens and logout user
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('isLoggedIn');
+          sessionStorage.clear();
+          setIsLoggedInState(false);
+          setCurrentUserState(null);
+          setDataLoaded(false);
+          
+          // If on subdomain, redirect to main domain login page
+          const hostname = window.location.hostname;
+          let isOnSubdomain = false;
+          let baseDomain = 'localhost';
+          
+          if (hostname.includes('.')) {
+            const parts = hostname.split('.');
+            // Check if we're on a subdomain
+            if (hostname.includes('.localhost')) {
+              // For localhost subdomains (e.g., memo.com.localhost)
+              isOnSubdomain = parts.length > 2;
+              baseDomain = 'localhost';
+            } else if (parts.length > 2 || (parts.length === 2 && parts[0] !== 'localhost' && parts[0] !== '127')) {
+              // For production subdomains
+              isOnSubdomain = true;
+              baseDomain = parts.slice(-2).join('.');
+            }
+          }
+          
+          if (isOnSubdomain) {
+            const protocol = window.location.protocol;
+            const port = window.location.port ? `:${window.location.port}` : '';
+            const loginUrl = `${protocol}//${baseDomain}${port}/login`;
+            console.log('🔄 No active subscription on subdomain (from polling), redirecting to main domain login:', loginUrl);
+            window.location.replace(loginUrl);
+          } else {
+            // Redirect to login page on main domain
+            window.location.replace('/login');
+          }
           return;
         }
       } catch (error) {

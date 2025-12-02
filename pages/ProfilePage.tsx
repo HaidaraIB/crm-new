@@ -19,7 +19,7 @@ export const ProfilePage = () => {
         language
     } = useAppContext();
     const [loading, setLoading] = useState(true);
-    const [subscriptionInfo, setSubscriptionInfo] = useState<{ id: number; isActive: boolean; planName?: string } | null>(null);
+    const [subscriptionInfo, setSubscriptionInfo] = useState<{ id: number; isActive: boolean; plan?: { name?: string; name_ar?: string } } | null>(null);
     
     // Split name into first and last name
     const nameParts = currentUser?.name?.split(' ') || [];
@@ -40,13 +40,54 @@ export const ProfilePage = () => {
     useEffect(() => {
         const loadSubscriptionInfo = async () => {
             try {
-                const { getCurrentUserAPI } = await import('../services/api');
+                const { getCurrentUserAPI, getPublicPlansAPI } = await import('../services/api');
                 const userData = await getCurrentUserAPI();
                 if (userData?.company?.subscription) {
+                    const subscriptionPlan = userData.company.subscription.plan;
+                    let planWithArabic: { name?: string; name_ar?: string } | undefined = undefined;
+                    
+                    // If plan has name_ar, use it directly
+                    if (subscriptionPlan?.name_ar) {
+                        planWithArabic = {
+                            name: subscriptionPlan.name,
+                            name_ar: subscriptionPlan.name_ar,
+                        };
+                    } else if (subscriptionPlan?.id) {
+                        // If plan doesn't have name_ar, try to get it from public plans
+                        try {
+                            const publicPlans = await getPublicPlansAPI();
+                            const publicPlan = Array.isArray(publicPlans) 
+                                ? publicPlans.find((p: any) => p.id === subscriptionPlan.id)
+                                : null;
+                            if (publicPlan) {
+                                planWithArabic = {
+                                    name: publicPlan.name || subscriptionPlan.name,
+                                    name_ar: publicPlan.name_ar || subscriptionPlan.name,
+                                };
+                            } else {
+                                planWithArabic = {
+                                    name: subscriptionPlan.name,
+                                    name_ar: subscriptionPlan.name, // Fallback to English name
+                                };
+                            }
+                        } catch (err) {
+                            console.error('Error fetching public plans:', err);
+                            planWithArabic = {
+                                name: subscriptionPlan.name,
+                                name_ar: subscriptionPlan.name, // Fallback to English name
+                            };
+                        }
+                    } else if (subscriptionPlan?.name) {
+                        planWithArabic = {
+                            name: subscriptionPlan.name,
+                            name_ar: subscriptionPlan.name, // Fallback to English name
+                        };
+                    }
+                    
                     setSubscriptionInfo({
                         id: userData.company.subscription.id,
                         isActive: userData.company.subscription.is_active === true,
-                        planName: userData.company.subscription.plan?.name || undefined,
+                        plan: planWithArabic,
                     });
                 }
             } catch (error) {
@@ -181,10 +222,14 @@ export const ProfilePage = () => {
                                     </span>
                                 </div>
                             </div>
-                            {subscriptionInfo.planName && (
+                            {subscriptionInfo.plan && (
                                 <div>
                                     <Label htmlFor="current-plan">{t('currentPlan')}</Label>
-                                    <p className="mt-1 text-gray-700 dark:text-gray-300">{subscriptionInfo.planName}</p>
+                                    <p className="mt-1 text-gray-700 dark:text-gray-300">
+                                        {language === 'ar' && subscriptionInfo.plan.name_ar && subscriptionInfo.plan.name_ar.trim()
+                                            ? subscriptionInfo.plan.name_ar
+                                            : (subscriptionInfo.plan.name || '')}
+                                    </p>
                                 </div>
                             )}
                         </div>

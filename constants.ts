@@ -298,7 +298,7 @@ export const translations = {
         personnelInformation: "Personnel Information",
         timestamps: "Timestamps",
         updatedAt: "Updated At",
-        currency: "",
+        currency: "SAR",
         additionalDetails: "Additional Details",
         employee: "Employee",
         // Users
@@ -839,6 +839,7 @@ export const translations = {
         loadingPaymentLink: "Loading payment link...",
         errorLoadingPaymentLink: "Error loading payment link",
         subscriptionActiveButCanUpgrade: "Your subscription is active. You can still upgrade or downgrade your plan. Please try again or contact support.",
+        paymentFailed: "Payment failed. Please try again.",
     },
     ar: {
         hello: "أهلاً بك! 👋",
@@ -1278,7 +1279,7 @@ export const translations = {
         personnelInformation: "معلومات الموظفين",
         timestamps: "الطوابع الزمنية",
         updatedAt: "تاريخ التحديث",
-        currency: "",
+        currency: "SAR",
         additionalDetails: "تفاصيل إضافية",
         reminderDateAndTime: "تاريخ ووقت التذكير",
         enterNotes: "أدخل الملاحظات...",
@@ -1654,5 +1655,6 @@ export const translations = {
         loadingPaymentLink: "جارٍ تحميل رابط الدفع...",
         errorLoadingPaymentLink: "خطأ في تحميل رابط الدفع",
         subscriptionActiveButCanUpgrade: "اشتراكك نشط. يمكنك ترقية أو تخفيض خطتك. يرجى المحاولة مرة أخرى أو التواصل مع الدعم.",
+        paymentFailed: "فشل الدفع. يرجى المحاولة مرة أخرى.",
     }
 };

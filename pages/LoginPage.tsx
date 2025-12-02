@@ -6,6 +6,9 @@ import { loginAPI, getCurrentUserAPI, requestTwoFactorAuthAPI } from '../service
 
 export const LoginPage = () => {
     // Check if this is a logout redirect and clear any remaining data
+    // Also check for payment success message
+    const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
+    
     React.useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('logout') === 'true') {
@@ -19,6 +22,38 @@ export const LoginPage = () => {
             
             // Clean URL
             window.history.replaceState({}, '', '/login');
+        }
+        
+        // Check for payment success message
+        if (urlParams.get('payment_success') === 'true') {
+            const storedMessage = localStorage.getItem('paymentSuccessMessage');
+            if (storedMessage) {
+                try {
+                    const messageData = JSON.parse(storedMessage);
+                    setPaymentSuccessMessage(messageData.message);
+                    // Clean URL
+                    window.history.replaceState({}, '', '/login');
+                } catch (e) {
+                    console.error('Error parsing payment success message:', e);
+                }
+            }
+        } else {
+            // Also check localStorage for payment success message (in case URL param was removed)
+            const storedMessage = localStorage.getItem('paymentSuccessMessage');
+            if (storedMessage) {
+                try {
+                    const messageData = JSON.parse(storedMessage);
+                    // Only show if message is recent (within last 5 minutes)
+                    const messageAge = Date.now() - messageData.timestamp;
+                    if (messageAge < 5 * 60 * 1000) {
+                        setPaymentSuccessMessage(messageData.message);
+                    } else {
+                        localStorage.removeItem('paymentSuccessMessage');
+                    }
+                } catch (e) {
+                    console.error('Error parsing payment success message:', e);
+                }
+            }
         }
     }, []);
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -152,6 +187,13 @@ export const LoginPage = () => {
                         <p className="mt-2 text-center text-sm text-secondary">{t('signInToContinue')}</p>
                     </div>
                     <div className="space-y-6">
+                        {paymentSuccessMessage && (
+                            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
+                                <div>
+                                    {paymentSuccessMessage}
+                                </div>
+                            </div>
+                        )}
                         {error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                                 <div>

@@ -3,6 +3,7 @@
 
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { navigateToCompanyRoute } from '../utils/routing';
 // FIX: Import translations to be used for type casting.
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
@@ -61,6 +62,8 @@ export const Sidebar = () => {
     
     const handleNavigation = (page: PageType) => {
         setCurrentPage(page);
+        // Update URL to company route
+        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
         if (window.innerWidth < 1024) { // lg breakpoint
             setIsSidebarOpen(false);
         }
@@ -214,12 +217,14 @@ export const Sidebar = () => {
                             </button>
                             <button
                                 onClick={() => {
-                                    setIsLoggedIn(false);
+                                    // Clear all data first
                                     localStorage.removeItem('accessToken');
                                     localStorage.removeItem('refreshToken');
                                     localStorage.removeItem('isLoggedIn');
                                     localStorage.removeItem('currentUser');
-                                    window.location.href = '/login';
+                                    
+                                    // Then set logged in to false (this will handle redirect)
+                                    setIsLoggedIn(false);
                                 }}
                                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium transition-colors"
                             >

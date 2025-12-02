@@ -41,6 +41,19 @@ const getCompanyId = (company: any): number | null => {
   return null;
 };
 
+/**
+ * Get company route path
+ */
+const getCompanyRoute = (companyDomain?: string, page?: string): string => {
+  if (!companyDomain) {
+    return '/';
+  }
+  if (page && page !== 'Dashboard') {
+    return `/company/${companyDomain}/${page.toLowerCase()}`;
+  }
+  return `/company/${companyDomain}`;
+};
+
 const hexToHsl = (hex: string): [number, number, number] | null => {
     if (!hex) return null;
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -231,10 +244,6 @@ export interface AppContextType {
   // Deals states
   isDealsFilterDrawerOpen: boolean;
   setIsDealsFilterDrawerOpen: (isOpen: boolean) => void;
-  isEditDealModalOpen: boolean;
-  setIsEditDealModalOpen: (isOpen: boolean) => void;
-  editingDeal: Deal | null;
-  setEditingDeal: React.Dispatch<React.SetStateAction<Deal | null>>;
   isViewDealModalOpen: boolean;
   setIsViewDealModalOpen: (isOpen: boolean) => void;
   viewingDeal: Deal | null;
@@ -464,7 +473,36 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     return 'en';
   });
   const [isLoggedIn, setIsLoggedInState] = useState(() => {
+    // Simply load login state - subdomain check will happen after data is loaded
+    // Also check if we're on main domain but user has subdomain - clear login state
+    const hostname = window.location.hostname;
+    const isOnMainDomain = hostname === 'localhost' || hostname === '127.0.0.1' || (!hostname.includes('.localhost') && hostname.split('.').length <= 2);
+    
     const stored = localStorage.getItem('isLoggedIn');
+    const storedUser = localStorage.getItem('currentUser');
+    
+    // If on main domain but user has subdomain, don't load login state
+    if (isOnMainDomain && storedUser) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (parsed.company?.domain) {
+          console.log('🔄 On main domain but user has subdomain, clearing login state');
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('isLoggedIn');
+          return false;
+        }
+      } catch {
+        // Invalid data, clear it
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('isLoggedIn');
+        return false;
+      }
+    }
+    
     return stored === 'true';
   });
   const [dataLoaded, setDataLoaded] = useState(false); // لتتبع ما إذا تم تحميل البيانات بالفعل
@@ -592,10 +630,26 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
     // محاولة تحميل المستخدم من localStorage مع تنظيف الأدوار القديمة
+    // Subdomain check will happen after data is loaded from API
+    // Also check if we're on main domain but user has subdomain - clear data
+    const hostname = window.location.hostname;
+    const isOnMainDomain = hostname === 'localhost' || hostname === '127.0.0.1' || (!hostname.includes('.localhost') && hostname.split('.').length <= 2);
+    
     const stored = localStorage.getItem('currentUser');
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
+        
+        // If we're on main domain but user has a subdomain, clear the data
+        if (isOnMainDomain && parsed.company?.domain) {
+          console.log('🔄 On main domain but user has subdomain, clearing data');
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('isLoggedIn');
+          return null;
+        }
+        
         // تنظيف الدور القديم
         parsed.role = normalizeRole(parsed.role);
         return parsed;
@@ -765,55 +819,60 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       localStorage.removeItem('siteLogo');
     }
 
-    // تحميل البيانات من API عند تسجيل الدخول (مرة واحدة فقط)
-    if (isLoggedIn && localStorage.getItem('accessToken') && !dataLoaded) {
-      setDataLoaded(true); // ضع علامة أننا بدأنا التحميل
-      
-      // تحميل بيانات المستخدم الحالي أولاً (مطلوب لمعرفة specialization)
-      getCurrentUserAPI()
-        .then((userData) => {
-          // Check if user has an active subscription
-          const hasActiveSubscription = userData.company?.subscription?.is_active === true;
-          const subscriptionId = userData.company?.subscription?.id;
-          
-          if (!hasActiveSubscription) {
-            // Store subscription ID for payment link before clearing tokens
-            if (subscriptionId) {
-              localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
-            }
-            // Clear tokens and logout user
-            localStorage.removeItem('accessToken');
-            localStorage.removeItem('refreshToken');
-            localStorage.removeItem('currentUser');
-            localStorage.removeItem('isLoggedIn');
-            setIsLoggedIn(false);
-            setCurrentUserState(null);
-            setDataLoaded(true);
-            // Redirect to login page
-            window.location.href = '/';
-            return;
+    // دالة لتحميل البيانات الأساسية (يمكن استخدامها في polling)
+    const loadEssentialData = async (userData: any, skipUserCheck: boolean = false) => {
+      // Check if user has an active subscription (فقط عند التحميل الأول)
+      if (!skipUserCheck) {
+        const hasActiveSubscription = userData.company?.subscription?.is_active === true;
+        const subscriptionId = userData.company?.subscription?.id;
+        
+        if (!hasActiveSubscription) {
+          // Store subscription ID for payment link before clearing tokens
+          if (subscriptionId) {
+            localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
           }
-          
-          // تحويل بيانات المستخدم من API إلى تنسيق Frontend - تنظيف الأدوار القديمة
-          const frontendUser: User = {
-            id: userData.id,
-            name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-            username: userData.username,
-            email: userData.email,
-            role: normalizeRole(userData.role === 'admin' ? 'Owner' : userData.role),
-            phone: userData.phone || '',
-            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
-            company: userData.company ? {
-              id: typeof userData.company === 'object' ? userData.company.id : userData.company,
-              name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
-              specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
-            } : undefined,
-            emailVerified: userData.email_verified || userData.is_email_verified || false,
-          };
-          setCurrentUserState(frontendUser);
-          localStorage.setItem('currentUser', JSON.stringify(frontendUser));
+          // Clear tokens and logout user
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('isLoggedIn');
+          setIsLoggedIn(false);
+          setCurrentUserState(null);
+          setDataLoaded(true);
+          // Redirect to login page
+          window.location.href = '/';
+          return;
+        }
+      }
+      
+      // تحويل بيانات المستخدم من API إلى تنسيق Frontend - تنظيف الأدوار القديمة
+      const frontendUser: User = {
+        id: userData.id,
+        name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
+        username: userData.username,
+        email: userData.email,
+        role: normalizeRole(userData.role === 'admin' ? 'Owner' : userData.role),
+        phone: userData.phone || '',
+        avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
+        company: userData.company ? {
+          id: typeof userData.company === 'object' ? userData.company.id : userData.company,
+          name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+          domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
+          specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
+        } : undefined,
+        emailVerified: userData.email_verified || userData.is_email_verified || false,
+      };
+      // Clear old user data before setting new user to avoid conflicts
+      const oldUserId = currentUser?.id;
+      if (oldUserId && oldUserId !== frontendUser.id) {
+        console.log('🔄 User changed, clearing old data...');
+        localStorage.removeItem('currentUser');
+      }
+      
+      setCurrentUserState(frontendUser);
+      localStorage.setItem('currentUser', JSON.stringify(frontendUser));
 
-          const specialization = frontendUser.company?.specialization;
+      const specialization = frontendUser.company?.specialization;
 
           // تحميل البيانات الأساسية بشكل متوازي (مطلوبة دائماً)
           const essentialDataPromises = [
@@ -850,7 +909,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           }
 
           // تحميل جميع البيانات الأساسية بشكل متوازي
-          Promise.all(essentialDataPromises)
+          return Promise.all(essentialDataPromises)
             .then((responses) => {
               // معالجة البيانات الأساسية
               const [dealsResponse, leadsResponse, usersResponse, clientTasksResponse, campaignsResponse, channelsResponse, stagesResponse, statusesResponse, ...specializationResponses] = responses;
@@ -1180,6 +1239,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             company: u.company ? {
               id: u.company,
               name: u.company_name || 'Unknown Company',
+              domain: u.company_domain || undefined,
               specialization: (u.company_specialization || 'real_estate') as 'real_estate' | 'services' | 'products',
             } : undefined,
           }));
@@ -1274,9 +1334,42 @@ export const AppProvider = ({ children }: AppProviderProps) => {
               localStorage.removeItem('refreshToken');
               localStorage.removeItem('currentUser');
             });
+    }
+
+    // استدعاء loadEssentialData إذا كان المستخدم مسجل دخول ولم يتم تحميل البيانات بعد
+    if (isLoggedIn && !dataLoaded) {
+      getCurrentUserAPI()
+        .then((userData) => {
+          return loadEssentialData(userData, false);
+        })
+        .then(() => {
+          setDataLoaded(true);
+          
+          // After data is loaded, check if we're on the correct subdomain
+          const loadedUser = currentUser || JSON.parse(localStorage.getItem('currentUser') || 'null');
+          if (loadedUser?.company?.domain) {
+            const hostname = window.location.hostname;
+            let currentSubdomain: string | null = null;
+            
+            // For localhost subdomains (e.g., memo.com.localhost)
+            if (hostname.includes('.localhost')) {
+              currentSubdomain = hostname.split('.localhost')[0];
+            } else if (hostname !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
+              // For production subdomains
+              const parts = hostname.split('.');
+              if (parts.length > 2) {
+                currentSubdomain = parts.slice(0, -2).join('.');
+              }
+            }
+            
+            // If we're on wrong subdomain, redirect (but don't clear data yet - let redirect handle it)
+            if (currentSubdomain && currentSubdomain !== loadedUser.company.domain) {
+              console.log('🔄 Wrong subdomain detected, will redirect after data load');
+              // Don't clear data here - let the redirect in App.tsx handle it
+            }
+          }
         })
         .catch(() => {
-          // إذا فشل تحميل المستخدم، أعد إلى صفحة تسجيل الدخول
           setIsLoggedInState(false);
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
@@ -1293,15 +1386,290 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     return () => window.removeEventListener('resize', handleResize);
   }, [isLoggedIn, dataLoaded, currentUser?.company?.specialization]); // إضافة specialization للتحميل عند تغيير التخصص
 
+  // Polling mechanism - تحديث البيانات الأساسية بشكل دوري
+  useEffect(() => {
+    // فقط إذا كان المستخدم مسجل دخول ولديه اشتراك نشط
+    if (!isLoggedIn || !localStorage.getItem('accessToken') || !dataLoaded) {
+      return;
+    }
+
+    // دالة لتحميل البيانات الأساسية فقط (للـ polling)
+    const pollEssentialData = async () => {
+      // التحقق من أن المستخدم لا يزال مسجل دخول ولديه token
+      if (!localStorage.getItem('accessToken') || !isLoggedIn) {
+        return;
+      }
+
+      // التحقق من الاشتراك النشط قبل polling
+      try {
+        const userData = await getCurrentUserAPI();
+        const hasActiveSubscription = userData.company?.subscription?.is_active === true;
+        
+        if (!hasActiveSubscription) {
+          // إذا لم يكن هناك اشتراك نشط، توقف عن polling
+          return;
+        }
+      } catch (error) {
+        // إذا فشل التحقق من الاشتراك، توقف عن polling
+        console.error('Error checking subscription status:', error);
+        return;
+      }
+
+      try {
+        // تحميل البيانات الأساسية فقط (Leads, Deals, Users, Tasks, ClientTasks)
+        const [dealsResponse, leadsResponse, usersResponse, clientTasksResponse, tasksResponse] = await Promise.all([
+          getDealsAPI(),
+          getLeadsAPI(),
+          getUsersAPI(),
+          getClientTasksAPI(),
+          getTasksAPI(),
+        ]);
+
+        // معالجة Deals
+        const dealsData = Array.isArray(dealsResponse) ? dealsResponse : dealsResponse.results || [];
+        const frontendDeals: Deal[] = dealsData.map((d: any) => ({
+          id: d.id,
+          clientName: d.client_name || '',
+          paymentMethod: d.payment_method || 'Cash',
+          status: d.status || (d.stage === 'won' ? 'Won' : d.stage === 'lost' ? 'Lost' : d.stage === 'on_hold' ? 'On Hold' : d.stage === 'in_progress' ? 'In Progress' : 'Cancelled'),
+          stage: d.stage || 'in_progress',
+          value: d.value ? parseFloat(d.value.toString()) : 0,
+          leadId: d.client,
+          client: d.client,
+          employee: d.employee,
+          startedBy: d.started_by || undefined,
+          closedBy: d.closed_by || undefined,
+          startDate: d.start_date || undefined,
+          closedDate: d.closed_date || undefined,
+          discountPercentage: d.discount_percentage ? parseFloat(d.discount_percentage.toString()) : undefined,
+          discountAmount: d.discount_amount ? parseFloat(d.discount_amount.toString()) : undefined,
+          salesCommissionPercentage: d.sales_commission_percentage ? parseFloat(d.sales_commission_percentage.toString()) : undefined,
+          salesCommissionAmount: d.sales_commission_amount ? parseFloat(d.sales_commission_amount.toString()) : undefined,
+          description: d.description || undefined,
+          unit: d.unit_code || (typeof d.unit === 'object' && d.unit?.code) || (typeof d.unit === 'number' ? undefined : d.unit) || undefined,
+          project: d.project_name || (typeof d.project === 'object' && d.project?.name) || (typeof d.project === 'number' ? undefined : d.project) || undefined,
+          createdAt: d.created_at || undefined,
+          updatedAt: d.updated_at || undefined,
+        }));
+
+        // معالجة ClientTasks
+        const clientTasksData = Array.isArray(clientTasksResponse) ? clientTasksResponse : clientTasksResponse.results || [];
+        const frontendClientTasks: ClientTask[] = clientTasksData.map((ct: any) => {
+          const stageName = ct.stage_name || (ct.stage?.name) || ct.stage || '';
+          return {
+            id: ct.id,
+            clientId: ct.client,
+            stage: stageName,
+            notes: ct.notes || '',
+            reminderDate: ct.reminder_date || null,
+            createdBy: ct.created_by || 0,
+            createdAt: ct.created_at || new Date().toISOString(),
+          };
+        });
+        setClientTasks(frontendClientTasks);
+
+        // معالجة Leads
+        const leadsData = Array.isArray(leadsResponse) ? leadsResponse : leadsResponse.results || [];
+        const frontendLeads: Lead[] = leadsData.map((c: any) => {
+          const statusName = c.status_name || (c.status?.name) || c.status || 'Untouched';
+          const status = statusName as Lead['status'];
+          const communicationWayName = c.communication_way_name || (c.communication_way?.name) || c.communication_way || 'Call';
+          const communicationWay = communicationWayName === 'WhatsApp' ? 'WhatsApp' : 'Call';
+          
+          const clientTasksForLead = frontendClientTasks.filter(ct => ct.clientId === c.id);
+          let lastFeedback = '';
+          let notes = '';
+          let lastStage: Lead['status'] = status;
+          
+          if (clientTasksForLead.length > 0) {
+            const lastTask = clientTasksForLead.sort((a, b) => 
+              parseUTCDate(b.createdAt).getTime() - parseUTCDate(a.createdAt).getTime()
+            )[0];
+            lastFeedback = lastTask.notes || '';
+            notes = lastTask.notes || '';
+            const taskStageName = lastTask.stage || '';
+            lastStage = taskStageName as Lead['status'] || status;
+          }
+          
+          const phoneNumbers = c.phone_numbers && Array.isArray(c.phone_numbers) 
+            ? c.phone_numbers.map((pn: any) => ({
+                id: pn.id,
+                phone_number: pn.phone_number || '',
+                phone_type: pn.phone_type || 'mobile',
+                is_primary: pn.is_primary || false,
+                notes: pn.notes || '',
+                created_at: pn.created_at,
+                updated_at: pn.updated_at,
+              }))
+            : [];
+          
+          const primaryPhone = phoneNumbers.find((pn: any) => pn.is_primary) || phoneNumbers[0] || null;
+          const phone = primaryPhone?.phone_number || c.phone_number || '';
+          
+          return {
+            id: c.id,
+            name: c.name,
+            phone: phone,
+            phoneNumbers: phoneNumbers.length > 0 ? phoneNumbers : undefined,
+            type: c.type === 'fresh' ? 'Fresh' : 'Cold',
+            priority: c.priority === 'high' ? 'High' : c.priority === 'medium' ? 'Medium' : 'Low',
+            status: status,
+            assignedTo: typeof c.assigned_to === 'number' ? c.assigned_to : 0,
+            createdAt: formatDateToLocal(c.created_at),
+            communicationWay: communicationWay,
+            budget: c.budget ? parseFloat(c.budget.toString()) : 0,
+            lastFeedback: lastFeedback,
+            notes: notes,
+            lastStage: lastStage,
+          };
+        });
+
+        // معالجة Users
+        const usersData = Array.isArray(usersResponse) ? usersResponse : usersResponse.results || [];
+        const frontendUsers: User[] = usersData.map((u: any) => ({
+          id: u.id,
+          name: `${u.first_name || ''} ${u.last_name || ''}`.trim() || u.username,
+          username: u.username,
+          email: u.email,
+          phone: u.phone || '',
+          role: normalizeRole(u.role === 'admin' ? 'Owner' : u.role),
+          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(u.username)}&background=random`,
+          company: u.company ? {
+            id: u.company,
+            name: u.company_name || 'Unknown Company',
+            specialization: (u.company_specialization || 'real_estate') as 'real_estate' | 'services' | 'products',
+          } : undefined,
+        }));
+
+        const cleanedUsers = frontendUsers.map(user => ({
+          ...user,
+          role: normalizeRole(user.role)
+        }));
+
+        // معالجة Tasks
+        const tasksData = Array.isArray(tasksResponse) ? tasksResponse : tasksResponse.results || [];
+        const frontendActivities: Activity[] = tasksData.map((t: any) => {
+          const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+          const stage = stageName as TaskStage;
+          const employeeUsername = t.deal_employee_username;
+          const user = employeeUsername ? frontendUsers.find(u => u.username === employeeUsername) : null;
+
+          return {
+            id: t.id,
+            user: user?.name || employeeUsername || 'Unknown',
+            lead: t.deal_client_name || '',
+            stage: stage,
+            date: formatDateToLocal(t.created_at),
+            notes: t.notes || '',
+          };
+        });
+
+        const frontendTodos: Todo[] = tasksData
+          .filter((t: any) => t.reminder_date)
+          .map((t: any) => {
+            const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+            const stage = stageName as TaskStage;
+            const deal = frontendDeals.find(d => d.id === t.deal);
+            const lead = frontendLeads.find(l => l.id === deal?.leadId);
+
+            return {
+              id: t.id,
+              stage: stage,
+              leadName: lead?.name || t.deal_client_name || '',
+              leadPhone: lead?.phone || '',
+              dueDate: formatDateToLocal(t.reminder_date),
+            };
+          });
+
+        const frontendCompletedTodos: Todo[] = tasksData
+          .filter((t: any) => !t.reminder_date)
+          .map((t: any) => {
+            const stageName = t.stage_name || (t.stage?.name) || t.stage || '';
+            const stage = stageName as TaskStage;
+            const deal = frontendDeals.find(d => d.id === t.deal);
+            const lead = frontendLeads.find(l => l.id === deal?.leadId);
+
+            return {
+              id: t.id,
+              stage: stage,
+              leadName: lead?.name || t.deal_client_name || '',
+              leadPhone: lead?.phone || '',
+              dueDate: formatDateToLocal(t.created_at),
+            };
+          });
+
+        // تحديث state
+        setDeals(frontendDeals);
+        setLeads(frontendLeads);
+        setUsers(cleanedUsers);
+        setActivities(frontendActivities);
+        setTodos(frontendTodos);
+        setCompletedTodos(frontendCompletedTodos);
+      } catch (error) {
+        console.error('Error polling data:', error);
+        // لا نقوم بتسجيل الخروج عند فشل polling، فقط نطبع الخطأ
+      }
+    };
+
+    // استدعاء polling كل 30 ثانية (30000 مللي ثانية)
+    const pollInterval = setInterval(() => {
+      pollEssentialData();
+    }, 30000);
+
+    // تنظيف interval عند unmount أو تسجيل الخروج
+    return () => {
+      clearInterval(pollInterval);
+    };
+  }, [isLoggedIn, dataLoaded]); // يعتمد على isLoggedIn و dataLoaded
+
   const setIsLoggedIn = (loggedIn: boolean) => {
     setIsLoggedInState(loggedIn);
-    localStorage.setItem('isLoggedIn', loggedIn.toString());
     if (!loggedIn) {
+      // Clear all user data FIRST before redirecting
+      // Clear multiple times to ensure it's gone
       localStorage.removeItem('currentUser');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('pendingUserData');
+      sessionStorage.clear(); // Clear session storage as well
+      
       setCurrentUserState(null);
       setDataLoaded(false); // إعادة تعيين dataLoaded عند تسجيل الخروج
+      
+      // If on subdomain, redirect to main domain login page with logout parameter
+      const hostname = window.location.hostname;
+      let isOnSubdomain = false;
+      let baseDomain = 'localhost';
+      
+      if (hostname.includes('.')) {
+        const parts = hostname.split('.');
+        // Check if we're on a subdomain
+        if (hostname.includes('.localhost')) {
+          // For localhost subdomains (e.g., memo.com.localhost)
+          isOnSubdomain = parts.length > 2;
+          baseDomain = 'localhost';
+        } else if (parts.length > 2 || (parts.length === 2 && parts[0] !== 'localhost' && parts[0] !== '127')) {
+          // For production subdomains
+          isOnSubdomain = true;
+          baseDomain = parts.slice(-2).join('.');
+        }
+      }
+      
+      if (isOnSubdomain) {
+        const protocol = window.location.protocol;
+        const port = window.location.port ? `:${window.location.port}` : '';
+        // Add logout parameter to ensure clean state
+        const loginUrl = `${protocol}//${baseDomain}${port}/login?logout=true&t=${Date.now()}`;
+        console.log('🔄 Logged out from subdomain, redirecting to main domain login:', loginUrl);
+        // Use window.location.replace to avoid back button issues and ensure clean logout
+        // Add a small delay to ensure localStorage is cleared
+        setTimeout(() => {
+          window.location.replace(loginUrl);
+        }, 100);
+      }
+    } else {
+      localStorage.setItem('isLoggedIn', loggedIn.toString());
     }
   };
 
@@ -1310,7 +1678,22 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (user) {
       // تنظيف الدور قبل الحفظ في localStorage
       const cleanedRole = normalizeRole(user.role);
-      localStorage.setItem('currentUser', JSON.stringify({ id: user.id, name: user.name, role: cleanedRole }));
+      // Save full user data including company info
+      localStorage.setItem('currentUser', JSON.stringify({
+        id: user.id,
+        name: user.name,
+        username: user.username,
+        email: user.email,
+        role: cleanedRole,
+        phone: user.phone,
+        avatar: user.avatar,
+        company: user.company ? {
+          id: user.company.id,
+          name: user.company.name,
+          domain: user.company.domain,
+          specialization: user.company.specialization,
+        } : null,
+      }));
     } else {
       localStorage.removeItem('currentUser');
     }
@@ -1435,6 +1818,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         company: currentUser.company ? {
           id: currentUser.company.id,
           name: currentUser.company.name,
+          domain: currentUser.company.domain,
           specialization: currentUser.company.specialization,
         } : undefined,
       };
@@ -1496,6 +1880,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         company: updatedUserResponse.company ? {
           id: typeof updatedUserResponse.company === 'object' ? updatedUserResponse.company.id : updatedUserResponse.company,
           name: updatedUserResponse.company_name || (typeof updatedUserResponse.company === 'object' ? updatedUserResponse.company.name : 'Unknown Company'),
+          domain: updatedUserResponse.company_domain || (typeof updatedUserResponse.company === 'object' ? updatedUserResponse.company.domain : undefined),
           specialization: (updatedUserResponse.company_specialization || (typeof updatedUserResponse.company === 'object' ? updatedUserResponse.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
         } : undefined,
       };

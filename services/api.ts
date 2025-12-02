@@ -59,6 +59,55 @@ async function apiRequest<T>(
     }
   }
 
+  // إذا كان الخطأ 403 (Forbidden)، قد يكون بسبب عدم وجود اشتراك نشط
+  // لكن لا نتحقق من ذلك في endpoint /users/me/ لأنه يستخدم للتحقق من حالة الاشتراك
+  if (response.status === 403 && !endpoint.includes('/users/me/')) {
+    const errorData = await response.json().catch(() => ({}));
+    const errorMessage = errorData.detail || errorData.message || errorData.error || '';
+    
+    // إذا كان الخطأ متعلق بعدم وجود اشتراك نشط، قم بتسجيل الخروج تلقائياً
+    if (errorMessage.toLowerCase().includes('subscription') || 
+        errorMessage.toLowerCase().includes('اشتراك') ||
+        errorMessage.toLowerCase().includes('active') ||
+        errorMessage.toLowerCase().includes('not active')) {
+      // احفظ subscription ID من localStorage إذا كان موجوداً
+      const currentUserStr = localStorage.getItem('currentUser');
+      if (currentUserStr) {
+        try {
+          const currentUser = JSON.parse(currentUserStr);
+          // محاولة الحصول على subscription ID من بيانات المستخدم المحفوظة
+          // أو من localStorage إذا كان موجوداً
+          const pendingSubscriptionId = localStorage.getItem('pendingSubscriptionId');
+          if (!pendingSubscriptionId) {
+            // محاولة الحصول على subscription ID من API (إذا كان متاحاً)
+            try {
+              const userData = await getCurrentUserAPI().catch(() => null);
+              if (userData?.company?.subscription?.id) {
+                localStorage.setItem('pendingSubscriptionId', userData.company.subscription.id.toString());
+              }
+            } catch (e) {
+              // تجاهل الأخطاء في محاولة الحصول على بيانات المستخدم
+            }
+          }
+        } catch (e) {
+          // تجاهل الأخطاء في parsing
+        }
+      }
+      
+      // قم بتسجيل الخروج
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('currentUser');
+      
+      // رمي خطأ خاص يمكن التعرف عليه
+      const subscriptionError: any = new Error('SUBSCRIPTION_INACTIVE');
+      subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
+      subscriptionError.subscriptionId = localStorage.getItem('pendingSubscriptionId');
+      throw subscriptionError;
+    }
+  }
+
   if (!response.ok) {
     const errorData = await response.json().catch(() => ({}));
     const errorMessage = errorData.detail || errorData.message || errorData.error || JSON.stringify(errorData) || `API Error: ${response.status} ${response.statusText}`;
@@ -205,19 +254,23 @@ export const registerCompanyAPI = async (data: {
 /**
  * إنشاء جلسة دفع Paytabs
  * POST /api/payments/create-paytabs-session/
- * Body: { subscription_id: number }
+ * Body: { subscription_id: number, plan_id?: number }
  * Response: { payment_id: number, redirect_url: string, tran_ref: string }
  */
-export const createPaytabsPaymentSessionAPI = async (subscriptionId: number) => {
+export const createPaytabsPaymentSessionAPI = async (subscriptionId: number, planId?: number) => {
   // Use direct fetch instead of apiRequest to avoid token requirement
   const token = localStorage.getItem('accessToken');
+  const body: any = { subscription_id: subscriptionId };
+  if (planId) {
+    body.plan_id = planId;
+  }
   const response = await fetch(`${BASE_URL}/payments/create-paytabs-session/`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
     },
-    body: JSON.stringify({ subscription_id: subscriptionId }),
+    body: JSON.stringify(body),
   });
 
   if (!response.ok) {
@@ -473,28 +526,90 @@ export const resetPasswordAPI = async (payload: {
  * Response: { message: string, sent: bool, token: string }
  */
 export const requestTwoFactorAuthAPI = async (username: string, language: string = 'ar') => {
-  const response = await fetch(`${BASE_URL}/auth/request-2fa/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept-Language': language,
-    },
-    body: JSON.stringify({ username }),
-  });
+  try {
+    console.log('🔐 Requesting 2FA for username:', username);
+    const url = `${BASE_URL}/auth/request-2fa/`;
+    console.log('📡 API URL:', url);
+    
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept-Language': language,
+      },
+      body: JSON.stringify({ username }),
+      credentials: 'include', // Include credentials for CORS
+    });
+    
+    console.log('📥 Response status:', response.status, response.statusText);
 
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.error || data?.message || 'Failed to request 2FA code'
-    );
-    if (data?.errors) {
-      error.fields = data.errors;
+    // Try to parse response as JSON, but handle non-JSON responses
+    let data: any = {};
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch (e) {
+        console.error('Failed to parse JSON response:', e);
+        data = { error: 'Invalid response from server' };
+      }
+    } else {
+      // If response is not JSON, try to get text
+      const text = await response.text();
+      console.error('Non-JSON response:', text);
+      data = { error: text || 'Invalid response from server' };
     }
-    throw error;
-  }
 
-  return data;
+    if (!response.ok) {
+      // Handle different error formats
+      let errorMessage = data?.detail || data?.error || data?.message || 'Failed to request 2FA code';
+      
+      // Check for field-specific errors (from serializer)
+      if (data?.username) {
+        if (Array.isArray(data.username)) {
+          errorMessage = data.username[0];
+        } else if (typeof data.username === 'string') {
+          errorMessage = data.username;
+        }
+      }
+      
+      // Map common error messages
+      if (errorMessage.toLowerCase().includes('user not found') || 
+          errorMessage.toLowerCase().includes('not found')) {
+        errorMessage = 'Invalid username or password';
+      } else if (errorMessage.toLowerCase().includes('inactive')) {
+        errorMessage = 'Account is inactive';
+      }
+      
+      const error: any = new Error(errorMessage);
+      if (data?.errors) {
+        error.fields = data.errors;
+      }
+      // Add status code for better error handling
+      error.status = response.status;
+      throw error;
+    }
+
+    console.log('✅ 2FA request successful:', data);
+    return data;
+  } catch (error: any) {
+    // If it's already our custom error, re-throw it
+    if (error.message && error.status) {
+      console.error('❌ 2FA request failed with status:', error.status, error.message);
+      throw error;
+    }
+    
+    // Handle network errors or other fetch errors
+    console.error('❌ Request 2FA error:', error);
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      console.error('🌐 Network error detected');
+      throw new Error('Network error. Please check your connection.');
+    }
+    
+    // Re-throw with a user-friendly message
+    console.error('❌ Unknown error:', error);
+    throw new Error(error.message || 'Failed to request 2FA code. Please try again.');
+  }
 };
 
 /**

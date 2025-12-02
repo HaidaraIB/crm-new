@@ -19,6 +19,7 @@ export const ProfilePage = () => {
         language
     } = useAppContext();
     const [loading, setLoading] = useState(true);
+    const [subscriptionInfo, setSubscriptionInfo] = useState<{ id: number; isActive: boolean; planName?: string } | null>(null);
     
     // Split name into first and last name
     const nameParts = currentUser?.name?.split(' ') || [];
@@ -34,6 +35,28 @@ export const ProfilePage = () => {
         const timer = setTimeout(() => setLoading(false), 1000);
         return () => clearTimeout(timer);
     }, []);
+
+    // Load subscription info
+    useEffect(() => {
+        const loadSubscriptionInfo = async () => {
+            try {
+                const { getCurrentUserAPI } = await import('../services/api');
+                const userData = await getCurrentUserAPI();
+                if (userData?.company?.subscription) {
+                    setSubscriptionInfo({
+                        id: userData.company.subscription.id,
+                        isActive: userData.company.subscription.is_active === true,
+                        planName: userData.company.subscription.plan?.name || undefined,
+                    });
+                }
+            } catch (error) {
+                console.error('Error loading subscription info:', error);
+            }
+        };
+        if (currentUser) {
+            loadSubscriptionInfo();
+        }
+    }, [currentUser]);
 
     // Update form when currentUser changes
     useEffect(() => {
@@ -60,6 +83,7 @@ export const ProfilePage = () => {
         });
         // TODO: Show success message
     };
+
     
     if (loading) {
         return (
@@ -140,6 +164,32 @@ export const ProfilePage = () => {
                         {t('changePassword')}
                     </Button>
                 </Card>
+
+                {subscriptionInfo && (
+                    <Card>
+                        <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('subscription')}</h2>
+                        <div className={`space-y-4 ${isRTL ? 'text-right' : 'text-left'}`}>
+                            <div>
+                                <Label htmlFor="subscription-status">{t('subscriptionStatus')}</Label>
+                                <div className="flex items-center gap-2 mt-1">
+                                    <span className={`px-3 py-1 rounded-full text-sm font-medium ${
+                                        subscriptionInfo.isActive 
+                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                    }`}>
+                                        {subscriptionInfo.isActive ? t('active') : t('inactive')}
+                                    </span>
+                                </div>
+                            </div>
+                            {subscriptionInfo.planName && (
+                                <div>
+                                    <Label htmlFor="current-plan">{t('currentPlan')}</Label>
+                                    <p className="mt-1 text-gray-700 dark:text-gray-300">{subscriptionInfo.planName}</p>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                )}
                 
                 <div className="flex justify-end">
                     <Button onClick={handleSave}>{t('saveProfile')}</Button>

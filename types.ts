@@ -17,6 +17,7 @@ export type Page =
 export interface Company {
   id: number;
   name: string;
+  domain?: string;
   specialization: 'real_estate' | 'services' | 'products';
 }
 

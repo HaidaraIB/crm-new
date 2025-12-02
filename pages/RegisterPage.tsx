@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
 import { registerCompanyAPI, getPublicPlansAPI, checkRegistrationAvailabilityAPI, verifyEmailAPI } from '../services/api';
+import { navigateToCompanyRoute, getCompanySubdomainUrl } from '../utils/routing';
 
 type PublicPlan = {
     id: number;
@@ -230,10 +231,28 @@ export const RegisterPage = () => {
                         window.location.href = `/payment?subscription_id=${userData.subscriptionId}`;
                     } else {
                         // No payment required - go to dashboard
+                        // Clear old user data before setting new user
+                        localStorage.removeItem('currentUser');
+                        localStorage.removeItem('accessToken');
+                        localStorage.removeItem('refreshToken');
+                        localStorage.removeItem('isLoggedIn');
+                        
                         setCurrentUser(userData);
                         setIsLoggedIn(true);
-                        window.history.replaceState({}, '', '/');
-                        setCurrentPage('Dashboard');
+                        
+                        // If company has domain, redirect to subdomain immediately
+                        // Otherwise, just navigate to dashboard
+                        if (userData.company?.domain) {
+                            const subdomainUrl = getCompanySubdomainUrl(userData.company.domain, 'Dashboard');
+                            console.log('🔄 Redirecting to company subdomain after registration:', subdomainUrl);
+                            window.location.href = subdomainUrl;
+                        } else {
+                            // Wait a bit before navigating to ensure state is updated
+                            setTimeout(() => {
+                                navigateToCompanyRoute(userData.company?.name, userData.company?.domain, 'Dashboard');
+                                setCurrentPage('Dashboard');
+                            }, 200);
+                        }
                     }
                 } else {
                     window.location.href = '/';
@@ -262,7 +281,7 @@ export const RegisterPage = () => {
                 // No payment required - go to dashboard
                 setCurrentUser(pendingUserData);
                 setIsLoggedIn(true);
-                window.history.replaceState({}, '', '/');
+                navigateToCompanyRoute(pendingUserData.company?.name, pendingUserData.company?.domain, 'Dashboard');
                 setCurrentPage('Dashboard');
             }
             setPendingUserData(null);
@@ -520,6 +539,12 @@ export const RegisterPage = () => {
                 billing_cycle: billingCycle,
             }, language);
 
+            // Clear old user data before registration
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('isLoggedIn');
+            
             // Auto login after registration
             const frontendUser = {
                 id: response.user.id,
@@ -532,6 +557,7 @@ export const RegisterPage = () => {
                 company: {
                     id: response.company.id,
                     name: response.company.name,
+                    domain: response.company.domain || companyDomain, // Include domain from response or form
                     specialization: response.company.specialization as 'real_estate' | 'services' | 'products',
                 },
             };
@@ -573,10 +599,40 @@ export const RegisterPage = () => {
                     // Redirect to payment page
                     window.location.href = `/payment?subscription_id=${subscription.id}`;
                 } else {
+                    // Clear old user data before setting new user
+                    localStorage.removeItem('currentUser');
+                    localStorage.removeItem('accessToken');
+                    localStorage.removeItem('refreshToken');
+                    
                     setCurrentUser(frontendUser);
                     setIsLoggedIn(true);
-                    window.history.replaceState({}, '', '/');
-                    setCurrentPage('Dashboard');
+                    
+                    // If company has domain, redirect to subdomain with auth data in URL
+                    // localStorage is not shared between different subdomains
+                    if (frontendUser.company?.domain) {
+                        const accessToken = localStorage.getItem('accessToken');
+                        const refreshToken = localStorage.getItem('refreshToken');
+                        
+                        // Encode tokens and user data to pass via URL
+                        const authData = {
+                            access: accessToken,
+                            refresh: refreshToken,
+                            user: frontendUser
+                        };
+                        
+                        const encodedData = btoa(JSON.stringify(authData));
+                        const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
+                        const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
+                        
+                        console.log('🔄 Redirecting to company subdomain after registration:', redirectUrl);
+                        window.location.replace(redirectUrl);
+                    } else {
+                        // Wait a bit before navigating to ensure state is updated
+                        setTimeout(() => {
+                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                            setCurrentPage('Dashboard');
+                        }, 100);
+                    }
                 }
             }
         } catch (error: any) {

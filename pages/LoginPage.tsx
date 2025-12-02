@@ -5,6 +5,22 @@ import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../compon
 import { loginAPI, getCurrentUserAPI, requestTwoFactorAuthAPI } from '../services/api';
 
 export const LoginPage = () => {
+    // Check if this is a logout redirect and clear any remaining data
+    React.useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('logout') === 'true') {
+            // Clear all data to ensure clean logout
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('isLoggedIn');
+            localStorage.removeItem('pendingUserData');
+            sessionStorage.clear();
+            
+            // Clean URL
+            window.history.replaceState({}, '', '/login');
+        }
+    }, []);
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -56,8 +72,10 @@ export const LoginPage = () => {
         setIsLoading(true);
         
         try {
+            console.log('🔐 Starting login process for:', username);
             // Request 2FA code (this will verify user exists and is active)
             const twoFAResponse = await requestTwoFactorAuthAPI(username, language);
+            console.log('✅ 2FA request successful, navigating to 2FA page');
             
             // Store username, password, and token in sessionStorage for 2FA page
             sessionStorage.setItem('2fa_username', username);
@@ -69,8 +87,26 @@ export const LoginPage = () => {
             setCurrentPage('TwoFactorAuth');
             setIsLoading(false);
         } catch (error: any) {
+            console.error('❌ Login error:', error);
             const errorMessage = error.message || '';
-            setError(translateLoginError(errorMessage));
+            console.error('❌ Error message:', errorMessage);
+            console.error('❌ Error status:', error.status);
+            console.error('❌ Full error:', error);
+            
+            // Check if it's a subscription inactive error
+            if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
+                const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
+                if (subId) {
+                    setSubscriptionId(subId);
+                    setError('SUBSCRIPTION_INACTIVE');
+                } else {
+                    setError(t('noActiveSubscription'));
+                }
+            } else {
+                const translatedError = translateLoginError(errorMessage);
+                console.error('❌ Translated error:', translatedError);
+                setError(translatedError);
+            }
             setIsLoading(false);
         }
     };
@@ -127,6 +163,13 @@ export const LoginPage = () => {
                                                 className="underline font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 ml-1"
                                             >
                                                 {t('completePayment')}
+                                            </a>
+                                            {t('noActiveSubscriptionMiddleLink')}
+                                            <a
+                                                href={`/change-plan${subscriptionId ? `?subscription_id=${subscriptionId}` : ''}`}
+                                                className="underline font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 ml-1"
+                                            >
+                                                {t('changePlan')}
                                             </a>
                                             {t('noActiveSubscriptionAfterLink')}
                                         </>

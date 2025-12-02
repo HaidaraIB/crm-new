@@ -2,9 +2,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Loader } from '../components/index';
 import { getCurrentUserAPI, checkPaymentStatusAPI } from '../services/api';
+import { navigateToCompanyRoute, getCompanySubdomainUrl } from '../utils/routing';
 
 export const PaymentSuccessPage = () => {
-    const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage } = useAppContext();
+    const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage, currentUser } = useAppContext();
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const processingRef = React.useRef(false);
@@ -241,6 +242,7 @@ export const PaymentSuccessPage = () => {
                             company: retryUserData.company ? {
                                 id: retryUserData.company.id,
                                 name: retryUserData.company.name,
+                                domain: retryUserData.company.domain || pendingUserData.company?.domain,
                                 specialization: retryUserData.company.specialization,
                             } : pendingUserData.company,
                         };
@@ -251,14 +253,40 @@ export const PaymentSuccessPage = () => {
                             timestamp: Date.now()
                         }));
                         
+                        // Clear old user data before setting new user
+                        localStorage.removeItem('currentUser');
+                        
                         setCurrentUser(frontendUser);
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
                         
-                        setTimeout(() => {
-                            window.history.replaceState({}, '', '/');
-                            setCurrentPage('Dashboard');
-                        }, 2000);
+                        // If company has domain, redirect to subdomain with auth data in URL
+                        // localStorage is not shared between different subdomains
+                        if (frontendUser.company?.domain) {
+                            const accessToken = localStorage.getItem('accessToken');
+                            const refreshToken = localStorage.getItem('refreshToken');
+                            
+                            // Encode tokens and user data to pass via URL
+                            const authData = {
+                                access: accessToken,
+                                refresh: refreshToken,
+                                user: frontendUser
+                            };
+                            
+                            const encodedData = btoa(JSON.stringify(authData));
+                            const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
+                            const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
+                            
+                            console.log('🔄 Redirecting to company subdomain after payment:', redirectUrl);
+                            setTimeout(() => {
+                                window.location.replace(redirectUrl);
+                            }, 1000);
+                        } else {
+                            setTimeout(() => {
+                                navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                                setCurrentPage('Dashboard');
+                            }, 2000);
+                        }
                         setIsLoading(false);
                         processingRef.current = false;
                         return;
@@ -276,12 +304,17 @@ export const PaymentSuccessPage = () => {
                         company: userData.company ? {
                             id: userData.company.id,
                             name: userData.company.name,
+                            domain: userData.company.domain || pendingUserData.company?.domain,
                             specialization: userData.company.specialization,
                         } : pendingUserData.company,
                     };
                     
                     console.log('👤 Setting user data and logging in...');
                     console.log('👤 frontendUser:', frontendUser);
+                    
+                    // Clear old user data before setting new user
+                    localStorage.removeItem('currentUser');
+                    
                     setCurrentUser(frontendUser);
                     setIsLoggedIn(true);
                     localStorage.removeItem('pendingUserData');
@@ -293,15 +326,38 @@ export const PaymentSuccessPage = () => {
                         timestamp: Date.now()
                     }));
                     
-                    // Redirect to dashboard after 2 seconds
-                    console.log('🔄 Redirecting to dashboard in 2 seconds...');
-                    setTimeout(() => {
-                        console.log('🔄 Executing redirect to dashboard...');
-                        window.history.replaceState({}, '', '/');
-                        setCurrentPage('Dashboard');
-                        setIsLoading(false);
-                        processingRef.current = false;
-                    }, 2000);
+                    // If company has domain, redirect to subdomain with auth data in URL
+                    // localStorage is not shared between different subdomains
+                    if (frontendUser.company?.domain) {
+                        const accessToken = localStorage.getItem('accessToken');
+                        const refreshToken = localStorage.getItem('refreshToken');
+                        
+                        // Encode tokens and user data to pass via URL
+                        const authData = {
+                            access: accessToken,
+                            refresh: refreshToken,
+                            user: frontendUser
+                        };
+                        
+                        const encodedData = btoa(JSON.stringify(authData));
+                        const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
+                        const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
+                        
+                        console.log('🔄 Redirecting to company subdomain after payment:', redirectUrl);
+                        setTimeout(() => {
+                            window.location.replace(redirectUrl);
+                        }, 1000);
+                    } else {
+                        // Redirect to dashboard after 2 seconds
+                        console.log('🔄 Redirecting to dashboard in 2 seconds...');
+                        setTimeout(() => {
+                            console.log('🔄 Executing redirect to dashboard...');
+                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                            setCurrentPage('Dashboard');
+                            setIsLoading(false);
+                            processingRef.current = false;
+                        }, 2000);
+                    }
                 } catch (err: any) {
                     console.error('❌ Error getting user data:', err);
                     console.error('❌ Error details:', err.message, err.stack);
@@ -317,7 +373,10 @@ export const PaymentSuccessPage = () => {
                             role: pendingUserData.role || pendingUserData.user?.role || 'Owner',
                             phone: pendingUserData.phone || pendingUserData.user?.phone || '',
                             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(pendingUserData.username || pendingUserData.user?.username || 'User')}&background=random`,
-                            company: pendingUserData.company,
+                            company: pendingUserData.company ? {
+                                ...pendingUserData.company,
+                                domain: pendingUserData.company.domain,
+                            } : undefined,
                         };
                         
                         console.log('👤 Using pendingUserData:', frontendUser);
@@ -328,17 +387,44 @@ export const PaymentSuccessPage = () => {
                             timestamp: Date.now()
                         }));
                         
+                        // Clear old user data before setting new user
+                        localStorage.removeItem('currentUser');
+                        
                         setCurrentUser(frontendUser);
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
                         
                         console.log('✅ User logged in using pendingUserData!');
-                        setTimeout(() => {
-                            window.history.replaceState({}, '', '/');
-                            setCurrentPage('Dashboard');
-                            setIsLoading(false);
-                            processingRef.current = false;
-                        }, 2000);
+                        
+                        // If company has domain, redirect to subdomain with auth data in URL
+                        // localStorage is not shared between different subdomains
+                        if (frontendUser.company?.domain) {
+                            const accessToken = localStorage.getItem('accessToken');
+                            const refreshToken = localStorage.getItem('refreshToken');
+                            
+                            // Encode tokens and user data to pass via URL
+                            const authData = {
+                                access: accessToken,
+                                refresh: refreshToken,
+                                user: frontendUser
+                            };
+                            
+                            const encodedData = btoa(JSON.stringify(authData));
+                            const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
+                            const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
+                            
+                            console.log('🔄 Redirecting to company subdomain after payment:', redirectUrl);
+                            setTimeout(() => {
+                                window.location.replace(redirectUrl);
+                            }, 1000);
+                        } else {
+                            setTimeout(() => {
+                                navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                                setCurrentPage('Dashboard');
+                                setIsLoading(false);
+                                processingRef.current = false;
+                            }, 2000);
+                        }
                         return;
                     }
                     

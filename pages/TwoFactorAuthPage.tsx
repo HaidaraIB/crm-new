@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI, getCurrentUserAPI } from '../services/api';
+import { navigateToCompanyRoute, getCompanySubdomainUrl } from '../utils/routing';
 
 export const TwoFactorAuthPage = () => {
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -113,12 +114,13 @@ export const TwoFactorAuthPage = () => {
                 username: userData.username,
                 email: userData.email,
                 role: userData.role === 'admin' ? 'Owner' : 'Employee',
-                phone: '',
+                phone: userData.phone || '',
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
                 company: userData.company ? {
                     id: typeof userData.company === 'object' ? userData.company.id : userData.company,
-                    name: response.user?.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
-                    specialization: (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate') as 'real_estate' | 'services' | 'products',
+                    name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+                    domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
+                    specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
                 } : undefined,
             };
             
@@ -127,13 +129,57 @@ export const TwoFactorAuthPage = () => {
             sessionStorage.removeItem('2fa_password');
             sessionStorage.removeItem('2fa_token');
             
+            // Clear old user data before setting new user
+            localStorage.removeItem('currentUser');
+            
+            // Save tokens and user data to localStorage first
+            localStorage.setItem('currentUser', JSON.stringify(frontendUser));
+            localStorage.setItem('isLoggedIn', 'true');
+            
             setCurrentUser(frontendUser);
             setIsLoggedIn(true);
-            window.history.replaceState({}, '', '/');
-            setCurrentPage('Dashboard');
+            
+            // If company has domain, redirect to subdomain with tokens in URL
+            // localStorage is not shared between different subdomains, so we need to pass data via URL
+            if (frontendUser.company?.domain) {
+                const accessToken = localStorage.getItem('accessToken');
+                const refreshToken = localStorage.getItem('refreshToken');
+                
+                // Encode tokens and user data to pass via URL
+                const authData = {
+                    access: accessToken,
+                    refresh: refreshToken,
+                    user: frontendUser
+                };
+                
+                // Use sessionStorage to temporarily store data (it's cleared on redirect but we'll use URL params)
+                // Actually, we'll use URL hash to pass the data securely
+                const encodedData = btoa(JSON.stringify(authData));
+                const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
+                const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
+                
+                console.log('🔄 Redirecting to company subdomain after login:', redirectUrl);
+                // Use window.location.replace to avoid back button issues
+                window.location.replace(redirectUrl);
+            } else {
+                // Wait a bit before navigating to ensure state is updated
+                setTimeout(() => {
+                    navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                    setCurrentPage('Dashboard');
+                }, 100);
+            }
         } catch (error: any) {
             const errorMessage = error.message || '';
-            if (errorMessage.includes('expired')) {
+            // Check if it's a subscription inactive error
+            if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
+                const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
+                if (subId) {
+                    setSubscriptionId(parseInt(subId));
+                    setError('SUBSCRIPTION_INACTIVE');
+                } else {
+                    setError(t('noActiveSubscription'));
+                }
+            } else if (errorMessage.includes('expired')) {
                 setError(t('twoFactorCodeExpired') || 'Two-factor authentication code has expired. Please request a new one');
             } else if (errorMessage.includes('Invalid') || errorMessage.includes('invalid')) {
                 setError(t('twoFactorCodeInvalid') || 'Invalid two-factor authentication code');
@@ -206,6 +252,13 @@ export const TwoFactorAuthPage = () => {
                                                 className="underline font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 ml-1"
                                             >
                                                 {t('completePayment')}
+                                            </a>
+                                            {t('noActiveSubscriptionMiddleLink')}
+                                            <a
+                                                href={`/change-plan${subscriptionId ? `?subscription_id=${subscriptionId}` : ''}`}
+                                                className="underline font-semibold text-primary-600 dark:text-primary-400 hover:text-primary-800 dark:hover:text-primary-300 ml-1"
+                                            >
+                                                {t('changePlan')}
                                             </a>
                                             {t('noActiveSubscriptionAfterLink')}
                                         </>

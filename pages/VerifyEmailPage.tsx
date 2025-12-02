@@ -3,9 +3,10 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, MoonIcon, SunIcon } from '../components/index';
 import { verifyEmailAPI, getCurrentUserAPI } from '../services/api';
+import { navigateToCompanyRoute } from '../utils/routing';
 
 export const VerifyEmailPage = () => {
-    const { setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setCurrentUser } = useAppContext();
+    const { setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setCurrentUser, currentUser } = useAppContext();
     const [isVerifying, setIsVerifying] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const hasVerified = useRef(false);
@@ -90,9 +91,14 @@ export const VerifyEmailPage = () => {
                             company: userData.company ? {
                                 id: typeof userData.company === 'object' ? userData.company.id : userData.company,
                                 name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+                                domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
                                 specialization: (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate') as 'real_estate' | 'services' | 'products',
                             } : undefined,
                         };
+                        
+                        // Clear old user data before setting new user
+                        localStorage.removeItem('currentUser');
+                        
                         setCurrentUser(frontendUser);
                     } catch (err) {
                         console.error('Failed to refresh user data:', err);
@@ -108,7 +114,7 @@ export const VerifyEmailPage = () => {
                 redirectTimeoutRef.current = setTimeout(() => {
                     if (isLoggedIn) {
                         // If logged in, go to dashboard
-                        window.history.replaceState({}, '', '/');
+                        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Dashboard');
                         setCurrentPage('Dashboard');
                     } else {
                         // If logged out, go to login
@@ -206,7 +212,7 @@ export const VerifyEmailPage = () => {
                                     
                                     if (isLoggedIn) {
                                         // Clear URL parameters and navigate to dashboard
-                                        window.history.replaceState({}, '', '/');
+                                        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Dashboard');
                                         setCurrentPage('Dashboard');
                                     } else {
                                         // Clear URL parameters and navigate to login
@@ -230,7 +236,7 @@ export const VerifyEmailPage = () => {
                                 onClick={() => {
                                     if (isLoggedIn) {
                                         // Clear URL parameters and navigate to dashboard
-                                        window.history.replaceState({}, '', '/');
+                                        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Dashboard');
                                         setCurrentPage('Dashboard');
                                     } else {
                                         // Clear URL parameters and navigate to login

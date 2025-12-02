@@ -1378,11 +1378,10 @@ export const deleteTaskAPI = async (taskId: number) => {
 // ==================== Integrations APIs ====================
 
 /**
- * TODO: استدعاء API للحصول على Connected Accounts
- * مثال:
- * GET /integrations/accounts
+ * الحصول على قائمة حسابات التكامل المتصلة
+ * GET /api/integrations/accounts/
  * Query params: ?platform=meta (أو tiktok أو whatsapp)
- * Response: Account[]
+ * Response: IntegrationAccount[]
  */
 export const getConnectedAccountsAPI = async (platform?: string) => {
   const query = platform ? `?platform=${platform}` : '';
@@ -1390,39 +1389,109 @@ export const getConnectedAccountsAPI = async (platform?: string) => {
 };
 
 /**
- * TODO: استدعاء API لإضافة Connected Account
- * مثال:
- * POST /integrations/accounts
- * Body: { platform: 'meta', name: string, link?: string, phone?: string, status: string }
+ * الحصول على تفاصيل حساب تكامل
+ * GET /api/integrations/accounts/:id/
  */
-export const createConnectedAccountAPI = async (accountData: any) => {
-  return apiRequest<any>('/integrations/accounts', {
+export const getConnectedAccountAPI = async (accountId: number) => {
+  return apiRequest<any>(`/integrations/accounts/${accountId}/`);
+};
+
+/**
+ * إنشاء حساب تكامل جديد
+ * POST /api/integrations/accounts/
+ * Body: { platform: 'meta' | 'tiktok' | 'whatsapp', name: string, account_link?: string, phone_number?: string }
+ */
+export const createConnectedAccountAPI = async (accountData: {
+  platform: string;
+  name: string;
+  account_link?: string;
+  phone_number?: string;
+}) => {
+  return apiRequest<any>('/integrations/accounts/', {
     method: 'POST',
     body: JSON.stringify(accountData),
   });
 };
 
 /**
- * TODO: استدعاء API لتحديث Connected Account
- * مثال:
- * PUT /integrations/accounts/:id
+ * تحديث حساب تكامل
+ * PUT /api/integrations/accounts/:id/
+ * Body: { name?: string, account_link?: string, phone_number?: string, is_active?: boolean }
  */
-export const updateConnectedAccountAPI = async (accountId: number, accountData: any) => {
-  return apiRequest<any>(`/integrations/accounts/${accountId}`, {
+export const updateConnectedAccountAPI = async (accountId: number, accountData: {
+  name?: string;
+  account_link?: string;
+  phone_number?: string;
+  is_active?: boolean;
+}) => {
+  return apiRequest<any>(`/integrations/accounts/${accountId}/`, {
     method: 'PUT',
     body: JSON.stringify(accountData),
   });
 };
 
 /**
- * TODO: استدعاء API لحذف Connected Account
- * مثال:
- * DELETE /integrations/accounts/:id
+ * حذف حساب تكامل
+ * DELETE /api/integrations/accounts/:id/
  */
 export const deleteConnectedAccountAPI = async (accountId: number) => {
-  return apiRequest<void>(`/integrations/accounts/${accountId}`, {
+  return apiRequest<void>(`/integrations/accounts/${accountId}/`, {
     method: 'DELETE',
   });
+};
+
+/**
+ * بدء عملية OAuth لربط الحساب
+ * POST /api/integrations/accounts/:id/connect/
+ * Response: { authorization_url: string, state: string }
+ */
+export const connectIntegrationAccountAPI = async (accountId: number) => {
+  return apiRequest<{ authorization_url: string; state: string }>(
+    `/integrations/accounts/${accountId}/connect/`,
+    {
+      method: 'POST',
+    }
+  );
+};
+
+/**
+ * قطع الاتصال مع حساب تكامل
+ * POST /api/integrations/accounts/:id/disconnect/
+ */
+export const disconnectIntegrationAccountAPI = async (accountId: number) => {
+  return apiRequest<void>(`/integrations/accounts/${accountId}/disconnect/`, {
+    method: 'POST',
+  });
+};
+
+/**
+ * مزامنة البيانات مع المنصة
+ * POST /api/integrations/accounts/:id/sync/
+ */
+export const syncIntegrationAccountAPI = async (accountId: number) => {
+  return apiRequest<void>(`/integrations/accounts/${accountId}/sync/`, {
+    method: 'POST',
+  });
+};
+
+/**
+ * الحصول على قائمة المنصات المدعومة
+ * GET /api/integrations/accounts/platforms/
+ */
+export const getIntegrationPlatformsAPI = async () => {
+  return apiRequest<Array<{ value: string; label: string }>>(
+    '/integrations/accounts/platforms/'
+  );
+};
+
+/**
+ * الحصول على سجلات التكامل
+ * GET /api/integrations/logs/
+ * Query params: ?account=1
+ */
+export const getIntegrationLogsAPI = async (accountId?: number) => {
+  const query = accountId ? `?account=${accountId}` : '';
+  return apiRequest<any[]>(`/integrations/logs/${query}`);
 };
 
 // ==================== Activities/Tasks APIs ====================

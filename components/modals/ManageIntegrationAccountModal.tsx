@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Page } from '../../types';
+import { createConnectedAccountAPI, updateConnectedAccountAPI } from '../../services/api';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -48,7 +49,6 @@ export const ManageIntegrationAccountModal = () => {
     const [accountName, setAccountName] = useState('');
     const [accountLink, setAccountLink] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
-    const [status, setStatus] = useState<'Connected' | 'Disconnected'>('Connected');
     const [isLoading, setIsLoading] = useState(false);
 
     const platformName = getPlatformName(currentPage);
@@ -61,13 +61,11 @@ export const ManageIntegrationAccountModal = () => {
             setAccountName(editingAccount.name || '');
             setAccountLink(editingAccount.link || '');
             setPhoneNumber(editingAccount.phone || '');
-            setStatus(editingAccount.status as 'Connected' | 'Disconnected' || 'Connected');
         } else {
             // Reset form for "add" mode
             setAccountName('');
             setAccountLink('');
             setPhoneNumber('');
-            setStatus('Connected');
         }
     }, [editingAccount, isManageIntegrationAccountModalOpen]);
 
@@ -77,47 +75,69 @@ export const ManageIntegrationAccountModal = () => {
     };
 
     const handleSubmit = async () => {
-        const payload = {
-            platform: platformName.toLowerCase() === 'meta' ? 'meta' : platformName.toLowerCase(),
-            name: accountName,
-            link: accountLink,
-            phone: phoneNumber,
-            status,
-        };
+        if (!accountName.trim()) {
+            alert(t('accountNameRequired') || 'Account name is required');
+            return;
+        }
 
         setIsLoading(true);
 
         try {
-            // TODO: استبدل هذا الكود باستدعاء API
-            // مثال:
-            // if (isEditMode) {
-            //   await updateConnectedAccountAPI(editingAccount.id, payload);
-            //   // ثم حدث state
-            // } else {
-            //   const newAccount = await createConnectedAccountAPI(payload);
-            //   // ثم أضف للstate
-            // }
-
-            // الكود الحالي (للاختبار فقط):
-            if (isEditMode) {
-                // Edit existing account
+            if (isEditMode && editingAccount) {
+                // تحديث حساب موجود
+                const updateData: any = {
+                    name: accountName,
+                };
+                
+                if (platformName === 'WhatsApp') {
+                    updateData.phone_number = phoneNumber;
+                } else {
+                    updateData.account_link = accountLink;
+                }
+                
+                await updateConnectedAccountAPI(editingAccount.id, updateData);
+                
+                // تحديث state
                 setConnectedAccounts((prev: any) => ({
                     ...prev,
                     [platformKey]: prev[platformKey].map((acc: any) => 
                         acc.id === editingAccount.id 
-                        ? { ...acc, ...payload } 
+                        ? { 
+                            ...acc, 
+                            name: accountName,
+                            link: accountLink,
+                            phone: phoneNumber,
+                        } 
                         : acc
                     )
                 }));
             } else {
-                // Add new account
-                const newAccount = {
-                    id: Date.now(),
-                    ...payload,
+                // إنشاء حساب جديد
+                const createData: any = {
+                    platform: platformName.toLowerCase() === 'meta' ? 'meta' : platformName.toLowerCase(),
+                    name: accountName,
                 };
+                
+                if (platformName === 'WhatsApp') {
+                    createData.phone_number = phoneNumber;
+                } else {
+                    createData.account_link = accountLink;
+                }
+                
+                const newAccount = await createConnectedAccountAPI(createData);
+                
+                // إضافة للstate
+                const formattedAccount = {
+                    id: newAccount.id,
+                    name: newAccount.name,
+                    status: newAccount.status === 'connected' ? 'Connected' : 'Disconnected',
+                    link: newAccount.account_link,
+                    phone: newAccount.phone_number,
+                };
+                
                 setConnectedAccounts((prev: any) => ({
                     ...prev,
-                    [platformKey]: [...(prev[platformKey] || []), newAccount]
+                    [platformKey]: [...(prev[platformKey] || []), formattedAccount]
                 }));
             }
 
@@ -125,9 +145,8 @@ export const ManageIntegrationAccountModal = () => {
             setAccountName('');
             setAccountLink('');
             setPhoneNumber('');
-            setStatus('Connected');
             
-            // Close modal immediately and show success modal
+            // Close modal and show success message
             handleClose();
             setSuccessMessage(isEditMode 
                 ? (t('accountUpdatedSuccessfully') || 'Account updated successfully!')
@@ -184,13 +203,6 @@ export const ManageIntegrationAccountModal = () => {
         >
             <div className="space-y-4">
                 {renderPlatformFields()}
-                <div>
-                    <Label htmlFor="status">{t('status')}</Label>
-                    <Select id="status" value={status} onChange={e => setStatus(e.target.value as 'Connected' | 'Disconnected')}>
-                        <option value="Connected">{t('connected')}</option>
-                        <option value="Disconnected">{t('disconnected')}</option>
-                    </Select>
-                </div>
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
                     <Button onClick={handleSubmit} disabled={isLoading} loading={isLoading}>{t('submit')}</Button>

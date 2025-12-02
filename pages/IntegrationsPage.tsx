@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader } from '../components/index';
 import { Page } from '../types';
+import { getConnectedAccountsAPI, deleteConnectedAccountAPI, connectIntegrationAccountAPI } from '../services/api';
 
 type Account = { id: number; name: string; status: string; };
 
@@ -53,35 +54,65 @@ export const IntegrationsPage = () => {
         };
     };
 
-    useEffect(() => {
-        // TODO: استدعي API لتحميل Connected Accounts عند فتح الصفحة
-        // مثال:
-        // const loadAccounts = async () => {
-        //   try {
-        //     const platform = currentPage === 'Meta' ? 'meta' : currentPage.toLowerCase();
-        //     const accounts = await getConnectedAccountsAPI(platform);
-        //     setConnectedAccounts(prev => ({ ...prev, [dataKey]: accounts }));
-        //   } catch (error) {
-        //     console.error('Error loading accounts:', error);
-        //   } finally {
-        //     setLoading(false);
-        //   }
-        // };
-        // loadAccounts();
-        
-        // الكود الحالي (للاختبار فقط):
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, [currentPage]);
-
+    // الحصول على platform details أولاً
     const platform = getPlatformDetails(currentPage);
     
     if (!platform) {
         return <PageWrapper title={t('integrations')}><div>Unknown integration platform.</div></PageWrapper>;
     }
     
-    const { name, icon: Icon, accounts, dataKey } = platform;
+    const { name, icon: Icon, accounts: platformAccounts, dataKey } = platform;
+    const accounts = platformAccounts || [];
     const pageTitle = `${name} ${t('integration')}`;
+
+    useEffect(() => {
+        // التحقق من OAuth callback
+        const urlParams = new URLSearchParams(window.location.search);
+        const connected = urlParams.get('connected');
+        const accountId = urlParams.get('account_id');
+        
+        if (connected === 'true' && accountId) {
+            // إزالة parameters من URL
+            window.history.replaceState({}, document.title, window.location.pathname);
+            // إعادة تحميل الحسابات
+        }
+        
+        const loadAccounts = async () => {
+            setLoading(true);
+            try {
+                let platformParam: string | undefined;
+                if (currentPage === 'Meta' || currentPage === 'Integrations') {
+                    platformParam = 'meta';
+                } else if (currentPage === 'TikTok') {
+                    platformParam = 'tiktok';
+                } else if (currentPage === 'WhatsApp') {
+                    platformParam = 'whatsapp';
+                }
+                
+                const accounts = await getConnectedAccountsAPI(platformParam);
+                
+                // تحويل البيانات من API إلى الصيغة المتوقعة
+                const formattedAccounts = accounts.map((acc: any) => ({
+                    id: acc.id,
+                    name: acc.name,
+                    status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
+                    link: acc.account_link,
+                    phone: acc.phone_number,
+                }));
+                
+                setConnectedAccounts(prev => ({
+                    ...prev,
+                    [dataKey]: formattedAccounts,
+                }));
+            } catch (error) {
+                console.error('Error loading accounts:', error);
+            } finally {
+                setLoading(false);
+            }
+        };
+        
+        loadAccounts();
+    }, [currentPage, dataKey, setConnectedAccounts]);
 
     const handleDelete = async (accountId: number) => {
         const account = accounts.find(acc => acc.id === accountId);
@@ -91,26 +122,32 @@ export const IntegrationsPage = () => {
                 message: t('confirmDisconnectAccount') || 'Are you sure you want to disconnect',
                 itemName: account.name,
                 onConfirm: async () => {
-                    // TODO: استدعي deleteConnectedAccountAPI(accountId) هنا
-                    // مثال:
-                    // try {
-                    //   await deleteConnectedAccountAPI(accountId);
-                    //   setConnectedAccounts(prev => ({
-                    //     ...prev,
-                    //     [dataKey]: prev[dataKey].filter((acc: Account) => acc.id !== accountId),
-                    //   }));
-                    // } catch (error) {
-                    //   console.error('Error deleting account:', error);
-                    // }
-                    
-                    // الكود الحالي (للاختبار فقط):
-                    setConnectedAccounts(prev => ({
-                        ...prev,
-                        [dataKey]: prev[dataKey].filter((acc: Account) => acc.id !== accountId),
-                    }));
+                    try {
+                        await deleteConnectedAccountAPI(accountId);
+                        setConnectedAccounts(prev => ({
+                            ...prev,
+                            [dataKey]: prev[dataKey].filter((acc: Account) => acc.id !== accountId),
+                        }));
+                    } catch (error: any) {
+                        console.error('Error deleting account:', error);
+                        alert(error?.message || t('errorDeletingAccount') || 'Failed to delete account');
+                    }
                 },
             });
             setIsConfirmDeleteModalOpen(true);
+        }
+    };
+
+    const handleConnect = async (accountId: number) => {
+        try {
+            const response = await connectIntegrationAccountAPI(accountId);
+            // توجيه المستخدم إلى صفحة OAuth
+            if (response.authorization_url) {
+                window.location.href = response.authorization_url;
+            }
+        } catch (error: any) {
+            console.error('Error connecting account:', error);
+            alert(error?.message || t('errorConnectingAccount') || 'Failed to connect account');
         }
     };
 
@@ -159,6 +196,11 @@ export const IntegrationsPage = () => {
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
+                                    {account.status !== 'Connected' && (
+                                        <Button variant="primary" onClick={() => handleConnect(account.id)}>
+                                            {t('connect') || 'Connect'}
+                                        </Button>
+                                    )}
                                     <Button variant="secondary" onClick={() => handleEdit(account)}><SettingsIcon className="w-4 h-4 me-2" /> {t('edit')}</Button>
                                     <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
                                 </div>

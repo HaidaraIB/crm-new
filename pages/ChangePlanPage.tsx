@@ -99,7 +99,11 @@ export const ChangePlanPage = () => {
         if (price === 0) {
             return t('free') || 'Free';
         }
-        return `${price.toLocaleString()} ${t('currency') || 'SAR'}/${billingCycle === 'monthly' ? t('month') || 'month' : t('year') || 'year'}`;
+        const formattedPrice = new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', {
+            style: 'currency',
+            currency: 'USD',
+        }).format(price);
+        return `${formattedPrice}/${billingCycle === 'monthly' ? t('month') || 'month' : t('year') || 'year'}`;
     };
 
     const handleChangePlan = async () => {

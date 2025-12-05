@@ -124,7 +124,7 @@ sudo nano /etc/nginx/sites-available/crm-project
 ```nginx
 server {
     listen 80;
-    server_name your-domain.com www.your-domain.com;
+    server_name dashboard.loop-crm.app www.dashboard.loop-crm.app;
 
     root /var/www/crm-project/dist;
     index index.html;
@@ -174,7 +174,7 @@ sudo apt install certbot python3-certbot-nginx -y
 
 #### 6.2 الحصول على شهادة SSL
 ```bash
-sudo certbot --nginx -d your-domain.com -d www.your-domain.com
+sudo certbot --nginx -d dashboard.loop-crm.app -d www.dashboard.loop-crm.app
 ```
 
 سيقوم Certbot بتحديث إعدادات Nginx تلقائياً لدعم HTTPS.

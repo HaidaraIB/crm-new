@@ -1653,37 +1653,18 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       setCurrentUserState(null);
       setDataLoaded(false); // إعادة تعيين dataLoaded عند تسجيل الخروج
       
-      // If on subdomain, redirect to main domain login page with logout parameter
+      // Redirect to login page on the same domain (no subdomain redirect)
+      const protocol = window.location.protocol;
       const hostname = window.location.hostname;
-      let isOnSubdomain = false;
-      let baseDomain = 'localhost';
-      
-      if (hostname.includes('.')) {
-        const parts = hostname.split('.');
-        // Check if we're on a subdomain
-        if (hostname.includes('.localhost')) {
-          // For localhost subdomains (e.g., memo.com.localhost)
-          isOnSubdomain = parts.length > 2;
-          baseDomain = 'localhost';
-        } else if (parts.length > 2 || (parts.length === 2 && parts[0] !== 'localhost' && parts[0] !== '127')) {
-          // For production subdomains
-          isOnSubdomain = true;
-          baseDomain = parts.slice(-2).join('.');
-        }
-      }
-      
-      if (isOnSubdomain) {
-        const protocol = window.location.protocol;
-        const port = window.location.port ? `:${window.location.port}` : '';
-        // Add logout parameter to ensure clean state
-        const loginUrl = `${protocol}//${baseDomain}${port}/login?logout=true&t=${Date.now()}`;
-        console.log('🔄 Logged out from subdomain, redirecting to main domain login:', loginUrl);
-        // Use window.location.replace to avoid back button issues and ensure clean logout
-        // Add a small delay to ensure localStorage is cleared
-        setTimeout(() => {
-          window.location.replace(loginUrl);
-        }, 100);
-      }
+      const port = window.location.port ? `:${window.location.port}` : '';
+      // Use current origin to stay on same domain
+      const loginUrl = `${protocol}//${hostname}${port}/login?logout=true&t=${Date.now()}`;
+      console.log('🔄 Logged out, redirecting to login:', loginUrl);
+      // Use window.location.replace to avoid back button issues and ensure clean logout
+      // Add a small delay to ensure localStorage is cleared
+      setTimeout(() => {
+        window.location.replace(loginUrl);
+      }, 100);
     } else {
       localStorage.setItem('isLoggedIn', loggedIn.toString());
     }

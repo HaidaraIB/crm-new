@@ -82,36 +82,30 @@ export const getCompanyRoute = (companyName?: string, companyDomain?: string, pa
 export const getCompanySubdomainUrl = (companyDomain: string, page?: string): string => {
   const baseDomain = getBaseDomain();
   const protocol = window.location.protocol;
-  const port = window.location.port ? `:${window.location.port}` : '';
+  
+  // Get port from current location (only if not default port)
+  let port = '';
+  const currentPort = window.location.port;
+  if (currentPort && currentPort !== '80' && currentPort !== '443') {
+    port = `:${currentPort}`;
+  }
   
   let path = '/';
   if (page && page !== 'Dashboard') {
     path = `/${page.toLowerCase()}`;
   }
   
-  return `${protocol}//${companyDomain}.${baseDomain}${port}${path}`;
+  // Build URL: protocol + companyDomain.baseDomain + port + path
+  // Example: http://memo.com.localhost:3000/Dashboard
+  const hostname = `${companyDomain}.${baseDomain}`;
+  return `${protocol}//${hostname}${port}${path}`;
 };
 
 /**
- * Navigate to company route (subdomain only, no path-based routing)
+ * Navigate to company route (path-based routing only, no subdomain)
  */
 export const navigateToCompanyRoute = (companyName?: string, companyDomain?: string, page: string = 'Dashboard'): void => {
-  // If company has domain and we're already on the subdomain, just update the path
-  if (companyDomain && isOnSubdomain() && isSubdomainMatch(companyDomain)) {
-    // We're already on the correct subdomain, just update the path
-    const route = getCompanyRoute(companyName, companyDomain, page);
-    window.history.replaceState({}, '', route);
-    return;
-  }
-  
-  // If company has domain but we're not on subdomain, redirect to subdomain
-  if (companyDomain && !isOnSubdomain()) {
-    const subdomainUrl = getCompanySubdomainUrl(companyDomain, page);
-    window.location.href = subdomainUrl;
-    return;
-  }
-  
-  // If no domain, just update the path (for main domain)
+  // Always use path-based routing, ignore subdomain
   const route = getCompanyRoute(companyName, companyDomain, page);
   window.history.replaceState({}, '', route);
 };

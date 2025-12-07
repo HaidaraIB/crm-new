@@ -275,6 +275,10 @@ export interface AppContextType {
   isChangePasswordModalOpen: boolean;
   setIsChangePasswordModalOpen: (isOpen: boolean) => void;
 
+  // Email Verification Modal state
+  isEmailVerificationModalOpen: boolean;
+  setIsEmailVerificationModalOpen: (isOpen: boolean) => void;
+
   // Success Modal state
   isSuccessModalOpen: boolean;
   setIsSuccessModalOpen: (isOpen: boolean) => void;
@@ -473,35 +477,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     return 'en';
   });
   const [isLoggedIn, setIsLoggedInState] = useState(() => {
-    // Simply load login state - subdomain check will happen after data is loaded
-    // Also check if we're on main domain but user has subdomain - clear login state
-    const hostname = window.location.hostname;
-    const isOnMainDomain = hostname === 'localhost' || hostname === '127.0.0.1' || (!hostname.includes('.localhost') && hostname.split('.').length <= 2);
-    
+    // Simply load login state from localStorage
     const stored = localStorage.getItem('isLoggedIn');
-    const storedUser = localStorage.getItem('currentUser');
-    
-    // If on main domain but user has subdomain, don't load login state
-    if (isOnMainDomain && storedUser) {
-      try {
-        const parsed = JSON.parse(storedUser);
-        if (parsed.company?.domain) {
-          console.log('🔄 On main domain but user has subdomain, clearing login state');
-          localStorage.removeItem('currentUser');
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('isLoggedIn');
-          return false;
-        }
-      } catch {
-        // Invalid data, clear it
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('isLoggedIn');
-        return false;
-      }
-    }
     
     return stored === 'true';
   });
@@ -630,25 +607,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
     // محاولة تحميل المستخدم من localStorage مع تنظيف الأدوار القديمة
-    // Subdomain check will happen after data is loaded from API
-    // Also check if we're on main domain but user has subdomain - clear data
-    const hostname = window.location.hostname;
-    const isOnMainDomain = hostname === 'localhost' || hostname === '127.0.0.1' || (!hostname.includes('.localhost') && hostname.split('.').length <= 2);
-    
     const stored = localStorage.getItem('currentUser');
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        
-        // If we're on main domain but user has a subdomain, clear the data
-        if (isOnMainDomain && parsed.company?.domain) {
-          console.log('🔄 On main domain but user has subdomain, clearing data');
-          localStorage.removeItem('currentUser');
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('isLoggedIn');
-          return null;
-        }
         
         // تنظيف الدور القديم
         parsed.role = normalizeRole(parsed.role);
@@ -800,6 +762,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   
   // Change Password Modal state
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
+
+  // Email Verification Modal state
+  const [isEmailVerificationModalOpen, setIsEmailVerificationModalOpen] = useState(false);
 
   // Success Modal state
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
@@ -1375,29 +1340,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         .then(() => {
           setDataLoaded(true);
           
-          // After data is loaded, check if we're on the correct subdomain
-          const loadedUser = currentUser || JSON.parse(localStorage.getItem('currentUser') || 'null');
-          if (loadedUser?.company?.domain) {
-            const hostname = window.location.hostname;
-            let currentSubdomain: string | null = null;
-            
-            // For localhost subdomains (e.g., memo.com.localhost)
-            if (hostname.includes('.localhost')) {
-              currentSubdomain = hostname.split('.localhost')[0];
-            } else if (hostname !== 'localhost' && !/^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
-              // For production subdomains
-              const parts = hostname.split('.');
-              if (parts.length > 2) {
-                currentSubdomain = parts.slice(0, -2).join('.');
-              }
-            }
-            
-            // If we're on wrong subdomain, redirect (but don't clear data yet - let redirect handle it)
-            if (currentSubdomain && currentSubdomain !== loadedUser.company.domain) {
-              console.log('🔄 Wrong subdomain detected, will redirect after data load');
-              // Don't clear data here - let the redirect in App.tsx handle it
-            }
-          }
         })
         .catch(() => {
           setIsLoggedInState(false);
@@ -4368,6 +4310,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     connectedAccounts, setConnectedAccounts,
     editingAccount, setEditingAccount,
     isChangePasswordModalOpen, setIsChangePasswordModalOpen,
+    isEmailVerificationModalOpen, setIsEmailVerificationModalOpen,
     isSuccessModalOpen, setIsSuccessModalOpen,
     successMessage, setSuccessMessage,
     // Data and functions

@@ -2,10 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI, getCurrentUserAPI } from '../services/api';
-import { navigateToCompanyRoute, getCompanySubdomainUrl } from '../utils/routing';
+import { navigateToCompanyRoute } from '../utils/routing';
 
 export const TwoFactorAuthPage = () => {
-    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
+    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn } = useAppContext();
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRequesting, setIsRequesting] = useState(false);
@@ -79,8 +79,27 @@ export const TwoFactorAuthPage = () => {
                 token: token || undefined,
             });
             
+            // Get tokens from response (API already saves them to localStorage)
+            const accessToken = response.access || localStorage.getItem('accessToken');
+            const refreshToken = response.refresh || localStorage.getItem('refreshToken');
+            
+            if (!accessToken || !refreshToken) {
+                throw new Error('No tokens received from server');
+            }
+            
             // Get full user data
-            const userData = await getCurrentUserAPI();
+            let userData;
+            try {
+                userData = await getCurrentUserAPI();
+            } catch (err: any) {
+                // If getCurrentUserAPI fails, try to use response.user if available
+                if (response.user) {
+                    console.log('⚠️ getCurrentUserAPI failed, using response.user data');
+                    userData = response.user;
+                } else {
+                    throw err;
+                }
+            }
             
             // Check if user has an active subscription
             const hasActiveSubscription = userData.company?.subscription?.is_active === true;
@@ -148,6 +167,15 @@ export const TwoFactorAuthPage = () => {
                 } : undefined,
             };
             
+            
+            if (!accessToken || !refreshToken) {
+                throw new Error('No tokens received from server');
+            }
+            
+            // Save tokens first
+            localStorage.setItem('accessToken', accessToken);
+            localStorage.setItem('refreshToken', refreshToken);
+            
             // Clear session storage
             sessionStorage.removeItem('2fa_username');
             sessionStorage.removeItem('2fa_password');
@@ -156,42 +184,18 @@ export const TwoFactorAuthPage = () => {
             // Clear old user data before setting new user
             localStorage.removeItem('currentUser');
             
-            // Save tokens and user data to localStorage first
+            // Save user data to localStorage
             localStorage.setItem('currentUser', JSON.stringify(frontendUser));
             localStorage.setItem('isLoggedIn', 'true');
             
+            // Update context state immediately BEFORE navigation
             setCurrentUser(frontendUser);
             setIsLoggedIn(true);
+            setCurrentPage('Dashboard');
             
-            // If company has domain, redirect to subdomain with tokens in URL
-            // localStorage is not shared between different subdomains, so we need to pass data via URL
-            if (frontendUser.company?.domain) {
-                const accessToken = localStorage.getItem('accessToken');
-                const refreshToken = localStorage.getItem('refreshToken');
-                
-                // Encode tokens and user data to pass via URL
-                const authData = {
-                    access: accessToken,
-                    refresh: refreshToken,
-                    user: frontendUser
-                };
-                
-                // Use sessionStorage to temporarily store data (it's cleared on redirect but we'll use URL params)
-                // Actually, we'll use URL hash to pass the data securely
-                const encodedData = btoa(JSON.stringify(authData));
-                const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
-                const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
-                
-                console.log('🔄 Redirecting to company subdomain after login:', redirectUrl);
-                // Use window.location.replace to avoid back button issues
-                window.location.replace(redirectUrl);
-            } else {
-                // Wait a bit before navigating to ensure state is updated
-                setTimeout(() => {
-                    navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                    setCurrentPage('Dashboard');
-                }, 100);
-            }
+            // Use window.location for immediate redirect to ensure state is applied
+            console.log('🔄 Redirecting to Dashboard after 2FA login');
+            window.location.href = '/Dashboard';
         } catch (error: any) {
             const errorMessage = error.message || '';
             // Check if it's a subscription inactive error
@@ -218,6 +222,47 @@ export const TwoFactorAuthPage = () => {
         const value = e.target.value.replace(/\D/g, '').slice(0, 6);
         setCode(value);
         setError('');
+    };
+
+    const handleDigitChange = (index: number, value: string) => {
+        const digit = value.replace(/\D/g, '').slice(0, 1);
+        const newCode = code.split('');
+        newCode[index] = digit;
+        const updatedCode = newCode.join('').slice(0, 6);
+        setCode(updatedCode);
+        setError('');
+
+        // Auto-focus next input
+        if (digit && index < 5) {
+            const nextInput = document.getElementById(`code-input-${index + 1}`);
+            nextInput?.focus();
+        }
+    };
+
+    const handleKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key === 'Backspace' && !code[index] && index > 0) {
+            const prevInput = document.getElementById(`code-input-${index - 1}`);
+            prevInput?.focus();
+        } else if (e.key === 'ArrowLeft' && index > 0) {
+            const prevInput = document.getElementById(`code-input-${index - 1}`);
+            prevInput?.focus();
+        } else if (e.key === 'ArrowRight' && index < 5) {
+            const nextInput = document.getElementById(`code-input-${index + 1}`);
+            nextInput?.focus();
+        }
+    };
+
+    const handlePaste = (e: React.ClipboardEvent) => {
+        e.preventDefault();
+        const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
+        if (pastedData) {
+            setCode(pastedData);
+            setError('');
+            // Focus the next empty input or the last one
+            const nextIndex = Math.min(pastedData.length, 5);
+            const nextInput = document.getElementById(`code-input-${nextIndex}`);
+            nextInput?.focus();
+        }
     };
 
     return (
@@ -298,24 +343,33 @@ export const TwoFactorAuthPage = () => {
                             </div>
                         )}
                         <div>
-                            <label htmlFor="code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 {t('twoFactorCodeLabel')}
                             </label>
-                            <Input 
-                                id="code" 
-                                type="text"
-                                inputMode="numeric"
-                                placeholder={t('twoFactorCodePlaceholder')}
-                                value={code}
-                                onChange={handleCodeChange}
-                                className="text-center text-2xl tracking-widest font-mono"
-                                maxLength={6}
-                                onKeyPress={(e) => {
-                                    if (e.key === 'Enter' && code.length === 6) {
-                                        handleVerify();
-                                    }
-                                }}
-                            />
+                            <div 
+                                className="flex gap-2 justify-center"
+                                onPaste={handlePaste}
+                            >
+                                {[0, 1, 2, 3, 4, 5].map((index) => (
+                                    <input
+                                        key={index}
+                                        id={`code-input-${index}`}
+                                        type="text"
+                                        inputMode="numeric"
+                                        maxLength={1}
+                                        value={code[index] || ''}
+                                        onChange={(e) => handleDigitChange(index, e.target.value)}
+                                        onKeyDown={(e) => handleKeyDown(index, e)}
+                                        onKeyPress={(e) => {
+                                            if (e.key === 'Enter' && code.length === 6) {
+                                                handleVerify();
+                                            }
+                                        }}
+                                        className="w-14 h-14 text-center text-2xl font-bold font-mono bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        autoFocus={index === 0 && !code}
+                                    />
+                                ))}
+                            </div>
                         </div>
                         <div>
                             <Button 

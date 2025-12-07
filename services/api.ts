@@ -326,32 +326,6 @@ export const paytabsReturnAPI = async (tranRef?: string, subscriptionId?: number
   return data;
 };
 
-/**
- * Handle Paytabs callback - verify payment (called by Paytabs server-to-server or frontend)
- * POST /api/payments/paytabs-callback/
- * Body: { tran_ref: string }
- */
-export const paytabsCallbackAPI = async (tranRef: string) => {
-  const response = await fetch(`${BASE_URL}/payments/paytabs-callback/`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ 
-      tran_ref: tranRef
-    }),
-  });
-
-  const data = await response.json().catch(() => ({}));
-
-  if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Failed to process payment callback'
-    );
-    throw error;
-  }
-  return data;
-};
 
 /**
  * Check payment status by subscription_id - for polling
@@ -442,6 +416,70 @@ export const verifyEmailAPI = async (payload: {
   if (!response.ok) {
     const error: any = new Error(
       data?.detail || data?.message || data?.error || 'Email verification failed'
+    );
+    if (data?.error) {
+      error.fields = data;
+    }
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * إعادة إرسال رمز التحقق من البريد الإلكتروني
+ * POST /api/auth/resend-verification/
+ * Body: { email: string }
+ * Response: { message: string, sent: bool, expires_at?: string }
+ */
+export const resendVerificationCodeAPI = async (email: string) => {
+  const token = localStorage.getItem('accessToken');
+  const response = await fetch(`${BASE_URL}/auth/resend-verification/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify({ email }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Failed to resend verification code'
+    );
+    if (data?.error) {
+      error.fields = data;
+    }
+    throw error;
+  }
+
+  return data;
+};
+
+/**
+ * تغيير البريد الإلكتروني (للمستخدمين غير المؤكدين)
+ * POST /api/auth/change-email/
+ * Body: { email: string, new_email: string }
+ * Response: { message: string, sent: bool, expires_at?: string }
+ */
+export const changeEmailAPI = async (email: string, newEmail: string) => {
+  const token = localStorage.getItem('accessToken');
+  const response = await fetch(`${BASE_URL}/auth/change-email/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify({ email, new_email: newEmail }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Failed to change email'
     );
     if (data?.error) {
       error.fields = data;

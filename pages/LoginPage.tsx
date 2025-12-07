@@ -69,8 +69,12 @@ export const LoginPage = () => {
         const pendingSubId = localStorage.getItem('pendingSubscriptionId');
         if (pendingSubId) {
             setSubscriptionId(pendingSubId);
-            // Set a flag error that will trigger the link display
-            setError('SUBSCRIPTION_INACTIVE');
+            // Only show error if payment_success is not in URL (to avoid showing error after successful payment)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('payment_success') !== 'true') {
+                // Set a flag error that will trigger the link display
+                setError('SUBSCRIPTION_INACTIVE');
+            }
             // Clear it after showing
             localStorage.removeItem('pendingSubscriptionId');
         }

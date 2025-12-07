@@ -71,3 +71,4 @@ export * from './modals/EditSupplierModal';
 export * from './modals/EditDealModal';
 export * from './modals/ViewDealModal';
 export * from './modals/SuccessModal';
+export * from './modals/EmailVerificationModal';

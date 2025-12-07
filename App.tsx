@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
-import { getCompanyRoute, isOnSubdomain, isSubdomainMatch, getCurrentSubdomain, getCompanySubdomainUrl } from './utils/routing';
+import { getCompanyRoute } from './utils/routing';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage } from './pages';
 
@@ -81,114 +81,35 @@ const CurrentPageContent = () => {
 }
 
 const TheApp = () => {
-    const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser } = useAppContext();
+    const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn } = useAppContext();
+    
+    // Redirect from subdomain to main domain (if on subdomain)
+    React.useEffect(() => {
+        const hostname = window.location.hostname;
+        // Check if we're on a subdomain (e.g., memo.com.localhost or company.example.com)
+        const isOnSubdomain = hostname.includes('.localhost') && hostname !== 'localhost' && hostname.split('.').length > 2;
+        
+        if (isOnSubdomain) {
+            // Extract main domain
+            const parts = hostname.split('.');
+            const localhostIndex = parts.indexOf('localhost');
+            if (localhostIndex > 0) {
+                // Redirect to main domain with same path
+                const protocol = window.location.protocol;
+                const port = window.location.port ? `:${window.location.port}` : '';
+                const path = window.location.pathname;
+                const mainUrl = `${protocol}//localhost${port}${path}${window.location.search}`;
+                console.log('🔄 Redirecting from subdomain to main domain:', mainUrl);
+                window.location.replace(mainUrl);
+            }
+        }
+    }, []);
     
     // Helper function to sanitize company name for URL
     const sanitizeCompanyName = (name: string): string => {
         return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
     };
     
-    // Track if we've already redirected to avoid loops
-    const redirectRef = React.useRef(false);
-    const lastUserRef = React.useRef<string | null>(null);
-    const redirectTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
-    
-    // Check subdomain routing - only on initial load or when user changes
-    // Don't redirect on every page change to avoid interfering with navigation
-    React.useEffect(() => {
-        // Only check subdomain routing if logged in and user data is loaded
-        // Skip if we're already on the correct subdomain or if redirect is in progress
-        if (!isLoggedIn || !currentUser?.company || redirectRef.current) {
-            return;
-        }
-        
-        const companyDomain = currentUser.company.domain;
-        const isOnSubdomainNow = isOnSubdomain();
-        
-        // If company has domain and we're not on the correct subdomain, redirect
-        // But only do this once when user first logs in or when user changes
-        const currentUserId = currentUser?.id?.toString() || null;
-        if (companyDomain && !isSubdomainMatch(companyDomain) && currentUserId !== lastUserRef.current) {
-            // Set flag to prevent multiple redirects
-            redirectRef.current = true;
-            lastUserRef.current = currentUserId;
-            
-            // Get current page from pathname
-            const pathname = window.location.pathname;
-            let page = 'Dashboard';
-            if (pathname !== '/' && pathname !== '') {
-                const pathParts = pathname.split('/').filter(Boolean);
-                if (pathParts.length > 0) {
-                    page = pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1);
-                }
-            }
-            
-            // Add a delay to ensure all data is loaded
-            redirectTimeoutRef.current = setTimeout(() => {
-                // Double-check that we still need to redirect
-                if (isLoggedIn && currentUser?.company?.domain === companyDomain && currentUserId === lastUserRef.current) {
-                    const correctUrl = getCompanySubdomainUrl(companyDomain, page);
-                    console.log('🔄 Redirecting to company subdomain:', correctUrl);
-                    window.location.href = correctUrl;
-                } else {
-                    redirectRef.current = false;
-                }
-                redirectTimeoutRef.current = null;
-            }, 500); // Reduced delay since we're only checking on user change
-            
-        } else if (!companyDomain && isOnSubdomainNow && currentUserId !== lastUserRef.current) {
-            // If company doesn't have domain but we're on a subdomain, redirect to main domain
-            redirectRef.current = true;
-            lastUserRef.current = currentUserId;
-            
-            // Get current page from pathname
-            const pathname = window.location.pathname;
-            let page = 'Dashboard';
-            if (pathname !== '/' && pathname !== '') {
-                const pathParts = pathname.split('/').filter(Boolean);
-                if (pathParts.length > 0) {
-                    page = pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1);
-                }
-            }
-            
-            redirectTimeoutRef.current = setTimeout(() => {
-                if (isLoggedIn && currentUser?.company && !currentUser.company.domain && currentUserId === lastUserRef.current) {
-                    // Get base domain from current location
-                    const hostname = window.location.hostname;
-                    let baseDomain = 'localhost';
-                    if (hostname.includes('.')) {
-                        const parts = hostname.split('.');
-                        if (parts.includes('localhost')) {
-                            baseDomain = 'localhost';
-                        } else if (parts.length >= 2) {
-                            baseDomain = parts.slice(-2).join('.');
-                        }
-                    }
-                    
-                    const protocol = window.location.protocol;
-                    const port = window.location.port ? `:${window.location.port}` : '';
-                    const route = getCompanyRoute(currentUser.company.name, undefined, page);
-                    const mainUrl = `${protocol}//${baseDomain}${port}${route}`;
-                    console.log('🔄 Company has no domain but on subdomain, redirecting to main domain:', mainUrl);
-                    window.location.href = mainUrl;
-                } else {
-                    redirectRef.current = false;
-                }
-                redirectTimeoutRef.current = null;
-            }, 500);
-        } else {
-            // Update lastUserRef if user hasn't changed
-            lastUserRef.current = currentUserId;
-        }
-        
-        // Cleanup function
-        return () => {
-            if (redirectTimeoutRef.current) {
-                clearTimeout(redirectTimeoutRef.current);
-                redirectTimeoutRef.current = null;
-            }
-        };
-    }, [isLoggedIn, currentUser?.id]); // Only depend on user ID, not currentPage
     
     // Ensure document direction is set on mount and when language changes
     React.useEffect(() => {
@@ -196,8 +117,7 @@ const TheApp = () => {
         document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     }, [language]);
     
-    // Check for auth data in URL (from subdomain redirect)
-    // This handles the case when user logs in on main domain and gets redirected to subdomain
+    // Check for auth data in URL
     const [authProcessed, setAuthProcessed] = React.useState(() => {
         // Check if auth was already processed in this session
         return sessionStorage.getItem('authProcessed') === 'true';
@@ -242,27 +162,37 @@ const TheApp = () => {
                     localStorage.setItem('currentUser', JSON.stringify(decodedData.user));
                     localStorage.setItem('isLoggedIn', 'true');
                     
-                    // Clean URL
-                    window.history.replaceState({}, '', window.location.pathname);
-                    
-                    // Mark as processed
+                    // Mark as processed FIRST to prevent re-processing
                     setAuthProcessed(true);
                     sessionStorage.setItem('authProcessed', 'true');
                     
-                    // Reload page to apply the new state
-                    window.location.reload();
+                    // Update context state immediately
+                    setCurrentUser(decodedData.user);
+                    setIsLoggedIn(true);
+                    
+                    // Clean URL and navigate to Dashboard (only once)
+                    const cleanPath = window.location.pathname === '/' ? '/Dashboard' : window.location.pathname;
+                    window.history.replaceState({}, '', cleanPath.replace(/\?.*$/, ''));
+                    setCurrentPage('Dashboard');
+                    
+                    // Reload to ensure all state is applied
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 50);
                     return;
                 }
             } catch (error) {
                 console.error('Failed to parse auth data from URL:', error);
                 // Clean URL if parsing fails
-                window.history.replaceState({}, '', window.location.pathname);
+                const cleanPath = window.location.pathname.replace(/\?.*$/, '');
+                window.history.replaceState({}, '', cleanPath);
                 setAuthProcessed(true);
                 sessionStorage.setItem('authProcessed', 'true');
             }
         } else {
             // User is logged in but URL has auth param, just clean it
-            window.history.replaceState({}, '', window.location.pathname);
+            const cleanPath = window.location.pathname.replace(/\?.*$/, '');
+            window.history.replaceState({}, '', cleanPath);
             setAuthProcessed(true);
             sessionStorage.setItem('authProcessed', 'true');
         }
@@ -333,74 +263,6 @@ const TheApp = () => {
         return <LoginPage />;
     }
 
-    // Check if user is logged in on main domain but should be on subdomain
-    // Only redirect after data is loaded to avoid race conditions
-    // This should only happen once when user first logs in
-    React.useEffect(() => {
-        // Wait for data to be loaded before redirecting
-        // Skip redirect if we're already redirecting or if user doesn't have domain
-        // Only redirect if user ID changed (new login)
-        const currentUserId = currentUser?.id?.toString() || null;
-        if (isLoggedIn && currentUser?.company?.domain && !isOnSubdomain() && !redirectRef.current && currentUserId !== lastUserRef.current) {
-            const companyDomain = currentUser.company.domain;
-            redirectRef.current = true;
-            lastUserRef.current = currentUserId;
-            
-            // Get current page from pathname
-            const pathname = window.location.pathname;
-            let page = 'Dashboard';
-            if (pathname !== '/' && pathname !== '') {
-                const pathParts = pathname.split('/').filter(Boolean);
-                if (pathParts.length > 0) {
-                    page = pathParts[0].charAt(0).toUpperCase() + pathParts[0].slice(1);
-                }
-            }
-            
-            // Wait a bit longer to ensure all state is updated
-            const redirectTimeout = setTimeout(() => {
-                // Double-check conditions before redirecting
-                if (isLoggedIn && currentUser?.company?.domain === companyDomain && !isOnSubdomain()) {
-                    const correctUrl = getCompanySubdomainUrl(companyDomain, page);
-                    console.log('🔄 User logged in with domain, redirecting to subdomain:', correctUrl);
-                    // Use replace to avoid back button issues
-                    window.location.replace(correctUrl);
-                } else {
-                    redirectRef.current = false;
-                }
-            }, 1000); // 1 second should be enough after login
-            
-            return () => clearTimeout(redirectTimeout);
-        }
-    }, [isLoggedIn, currentUser?.id]); // Only depend on user ID, not currentPage
-    
-    // Check if user is on subdomain but not logged in - redirect to main domain
-    // Only check if we're sure user is not logged in (after initial load)
-    React.useEffect(() => {
-        // Add a small delay to avoid checking too early
-        const checkTimeout = setTimeout(() => {
-            if (!isLoggedIn && isOnSubdomain()) {
-                const hostname = window.location.hostname;
-                let baseDomain = 'localhost';
-                if (hostname.includes('.')) {
-                    const parts = hostname.split('.');
-                    if (parts.includes('localhost')) {
-                        baseDomain = 'localhost';
-                    } else if (parts.length >= 2) {
-                        baseDomain = parts.slice(-2).join('.');
-                    }
-                }
-                
-                const protocol = window.location.protocol;
-                const port = window.location.port ? `:${window.location.port}` : '';
-                const loginUrl = `${protocol}//${baseDomain}${port}/login`;
-                console.log('🔄 Not logged in on subdomain, redirecting to main domain:', loginUrl);
-                window.location.href = loginUrl;
-            }
-        }, 1000); // 1 second delay to avoid race conditions
-        
-        return () => clearTimeout(checkTimeout);
-    }, [isLoggedIn]);
-
     return (
         <div className={`flex h-screen ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
             <Sidebar />
@@ -413,6 +275,29 @@ const TheApp = () => {
             )}
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header />
+                {isLoggedIn && currentUser && !currentUser.emailVerified && (
+                    <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3 flex-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                            <p className="text-sm font-medium">
+                                {language === 'ar' 
+                                    ? 'البريد الإلكتروني غير مؤكد. يرجى تأكيد بريدك الإلكتروني للاستمرار.'
+                                    : 'Your email is not verified. Please verify your email to continue.'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                setCurrentPage('Profile');
+                                setIsEmailVerificationModalOpen(true);
+                            }}
+                            className="bg-white text-red-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors whitespace-nowrap"
+                        >
+                            {language === 'ar' ? 'تأكيد البريد الإلكتروني' : 'Verify Email'}
+                        </button>
+                    </div>
+                )}
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
                     <CurrentPageContent />
                 </main>

@@ -3,7 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, Loader } from '../components/index';
+import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal } from '../components/index';
+import { changeEmailAPI, getCurrentUserAPI, updateUserAPI } from '../services/api';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -16,6 +17,8 @@ export const ProfilePage = () => {
         currentUser,
         setCurrentUser,
         setIsChangePasswordModalOpen,
+        isEmailVerificationModalOpen,
+        setIsEmailVerificationModalOpen,
         language
     } = useAppContext();
     const [loading, setLoading] = useState(true);
@@ -30,6 +33,7 @@ export const ProfilePage = () => {
     const [lastName, setLastName] = useState(initialLastName);
     const [email, setEmail] = useState(currentUser?.email || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
+    const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => setLoading(false), 1000);
@@ -112,17 +116,82 @@ export const ProfilePage = () => {
 
     if (!currentUser) return null;
 
-    const handleSave = () => {
-        // TODO: Add API call to update user profile
-        // For now, just update local state
-        const fullName = `${firstName} ${lastName}`.trim();
-        setCurrentUser({
-            ...currentUser,
-            name: fullName,
-            email: email,
-            phone: phone
-        });
-        // TODO: Show success message
+    const handleSave = async () => {
+        if (!currentUser) return;
+        
+        try {
+            const fullName = `${firstName} ${lastName}`.trim();
+            await updateUserAPI(currentUser.id, {
+                first_name: firstName,
+                last_name: lastName,
+                phone: phone,
+            });
+            
+            setCurrentUser({
+                ...currentUser,
+                name: fullName,
+                phone: phone
+            });
+            
+            // Refresh user data to get latest info
+            const userData = await getCurrentUserAPI();
+            if (userData) {
+                setCurrentUser({
+                    id: userData.id,
+                    name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
+                    username: userData.username,
+                    email: userData.email,
+                    role: userData.role || 'User',
+                    phone: userData.phone || '',
+                    avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
+                    company: userData.company,
+                    emailVerified: userData.email_verified || userData.is_email_verified || false,
+                });
+            }
+        } catch (error) {
+            console.error('Error updating profile:', error);
+        }
+    };
+
+    const handleChangeEmail = async (newEmail: string) => {
+        if (!currentUser) return;
+        
+        setIsUpdatingEmail(true);
+        try {
+            await changeEmailAPI(currentUser.email, newEmail);
+            // Update local email state
+            setEmail(newEmail);
+            setCurrentUser({
+                ...currentUser,
+                email: newEmail,
+            });
+        } catch (error: any) {
+            throw error;
+        } finally {
+            setIsUpdatingEmail(false);
+        }
+    };
+
+    const handleVerificationSuccess = async () => {
+        // Refresh user data after successful verification
+        try {
+            const userData = await getCurrentUserAPI();
+            if (userData) {
+                setCurrentUser({
+                    id: userData.id,
+                    name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
+                    username: userData.username,
+                    email: userData.email,
+                    role: userData.role || 'User',
+                    phone: userData.phone || '',
+                    avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
+                    company: userData.company,
+                    emailVerified: userData.email_verified || userData.is_email_verified || false,
+                });
+            }
+        } catch (error) {
+            console.error('Error refreshing user data:', error);
+        }
     };
 
     
@@ -169,8 +238,8 @@ export const ProfilePage = () => {
                                 type="email" 
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                disabled={true}
-                                className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                                disabled={currentUser.emailVerified}
+                                className={currentUser.emailVerified ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""}
                             />
                             {currentUser.emailVerified ? (
                                 <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
@@ -180,9 +249,18 @@ export const ProfilePage = () => {
                                     {t('emailVerified') || 'Email verified'}
                                 </p>
                             ) : (
-                                <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                                    {t('emailNotVerified') || 'Email not verified. Please check your inbox for verification email.'}
-                                </p>
+                                <div className="flex items-center justify-between mt-1">
+                                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                                        {t('emailNotVerified') || 'Email not verified. Please check your inbox for verification email.'}
+                                    </p>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setIsEmailVerificationModalOpen(true)}
+                                        className="text-xs px-3 py-1.5 h-auto"
+                                    >
+                                        {t('verifyEmail') || 'Verify Email'}
+                                    </Button>
+                                </div>
                             )}
                         </div>
                         <div>
@@ -240,6 +318,15 @@ export const ProfilePage = () => {
                     <Button onClick={handleSave}>{t('saveProfile')}</Button>
                 </div>
             </div>
+            
+            <EmailVerificationModal
+                isOpen={isEmailVerificationModalOpen}
+                onClose={() => setIsEmailVerificationModalOpen(false)}
+                email={currentUser.email}
+                onVerificationSuccess={handleVerificationSuccess}
+                allowEmailChange={!currentUser.emailVerified}
+                onEmailChange={handleChangeEmail}
+            />
         </PageWrapper>
     );
 };

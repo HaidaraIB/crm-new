@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
 import { registerCompanyAPI, getPublicPlansAPI, checkRegistrationAvailabilityAPI, verifyEmailAPI } from '../services/api';
-import { navigateToCompanyRoute, getCompanySubdomainUrl } from '../utils/routing';
+import { navigateToCompanyRoute } from '../utils/routing';
 
 type PublicPlan = {
     id: number;
@@ -240,19 +240,11 @@ export const RegisterPage = () => {
                         setCurrentUser(userData);
                         setIsLoggedIn(true);
                         
-                        // If company has domain, redirect to subdomain immediately
-                        // Otherwise, just navigate to dashboard
-                        if (userData.company?.domain) {
-                            const subdomainUrl = getCompanySubdomainUrl(userData.company.domain, 'Dashboard');
-                            console.log('🔄 Redirecting to company subdomain after registration:', subdomainUrl);
-                            window.location.href = subdomainUrl;
-                        } else {
-                            // Wait a bit before navigating to ensure state is updated
-                            setTimeout(() => {
-                                navigateToCompanyRoute(userData.company?.name, userData.company?.domain, 'Dashboard');
-                                setCurrentPage('Dashboard');
-                            }, 200);
-                        }
+                        // Navigate to dashboard
+                        setTimeout(() => {
+                            navigateToCompanyRoute(userData.company?.name, userData.company?.domain, 'Dashboard');
+                            setCurrentPage('Dashboard');
+                        }, 200);
                     }
                 } else {
                     window.location.href = '/';
@@ -577,63 +569,27 @@ export const RegisterPage = () => {
                 subscriptionId: subscription?.id,
             };
             
-            // Always show email verification modal first (if verification is available)
-            const verificationDetails = response.email_verification;
-            if (verificationDetails) {
-                setPendingUserData(userDataWithPayment);
-                setVerificationEmail(frontendUser.email);
-                setVerificationExpiresAt(verificationDetails.expires_at || null);
-                setVerificationCode('');
-                setVerificationStatus({
-                    type: verificationDetails.sent ? 'info' : 'error',
-                    message: verificationDetails.sent
-                        ? (t('verificationSentMessage') || `We sent a 6-digit code to ${frontendUser.email}. Enter it below to activate your account.`)
-                        : (t('verificationSendFailed') || 'We could not send the verification email automatically. Please request support.'),
-                });
-                setShowVerificationModal(true);
+            // No automatic email verification - user can verify later from profile
+            // Proceed directly to payment or dashboard
+            if (requiresPayment && subscription) {
+                // Save user data temporarily and redirect to payment
+                localStorage.setItem('pendingUserData', JSON.stringify(userDataWithPayment));
+                // Redirect to payment page
+                window.location.href = `/payment?subscription_id=${subscription.id}`;
             } else {
-                // No verification required - proceed directly
-                if (requiresPayment && subscription) {
-                    // Save user data temporarily and redirect to payment
-                    localStorage.setItem('pendingUserData', JSON.stringify(userDataWithPayment));
-                    // Redirect to payment page
-                    window.location.href = `/payment?subscription_id=${subscription.id}`;
-                } else {
-                    // Clear old user data before setting new user
-                    localStorage.removeItem('currentUser');
-                    localStorage.removeItem('accessToken');
-                    localStorage.removeItem('refreshToken');
-                    
-                    setCurrentUser(frontendUser);
-                    setIsLoggedIn(true);
-                    
-                    // If company has domain, redirect to subdomain with auth data in URL
-                    // localStorage is not shared between different subdomains
-                    if (frontendUser.company?.domain) {
-                        const accessToken = localStorage.getItem('accessToken');
-                        const refreshToken = localStorage.getItem('refreshToken');
-                        
-                        // Encode tokens and user data to pass via URL
-                        const authData = {
-                            access: accessToken,
-                            refresh: refreshToken,
-                            user: frontendUser
-                        };
-                        
-                        const encodedData = btoa(JSON.stringify(authData));
-                        const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
-                        const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
-                        
-                        console.log('🔄 Redirecting to company subdomain after registration:', redirectUrl);
-                        window.location.replace(redirectUrl);
-                    } else {
-                        // Wait a bit before navigating to ensure state is updated
-                        setTimeout(() => {
-                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                            setCurrentPage('Dashboard');
-                        }, 100);
-                    }
-                }
+                // Clear old user data before setting new user
+                localStorage.removeItem('currentUser');
+                localStorage.removeItem('accessToken');
+                localStorage.removeItem('refreshToken');
+                
+                setCurrentUser(frontendUser);
+                setIsLoggedIn(true);
+                
+                // Navigate to dashboard
+                setTimeout(() => {
+                    navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                    setCurrentPage('Dashboard');
+                }, 100);
             }
         } catch (error: any) {
             const backendFieldErrors = mapBackendErrorsToFields(error.fields || {});

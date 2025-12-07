@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Loader } from '../components/index';
 import { getCurrentUserAPI, checkPaymentStatusAPI, requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI } from '../services/api';
-import { navigateToCompanyRoute, getCompanySubdomainUrl, getBaseDomain, isOnSubdomain } from '../utils/routing';
+import { navigateToCompanyRoute } from '../utils/routing';
 
 export const PaymentSuccessPage = () => {
     const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage, currentUser } = useAppContext();
@@ -78,44 +78,23 @@ export const PaymentSuccessPage = () => {
                 };
                 
                 // If status is success and we have tranRef, backend already confirmed payment
-                // Do ONE quick check, and if subscription is active, proceed immediately
+                // Proceed directly to login without polling
                 if (urlStatus === 'success' && tranRef) {
-                    console.log('Backend confirmed payment success with status=success and tranRef, checking subscription status...');
+                    console.log('✅ Backend confirmed payment success with status=success and tranRef, proceeding directly to login...');
+                    paymentCompleted = true;
+                    
+                    // Try to get tokens from payment status API (optional - if backend provides them)
                     try {
                         const statusResult = await checkPaymentStatusAPI(parseInt(subscriptionId));
-                        console.log('=== PAYMENT STATUS CHECK RESULT ===');
-                        console.log('Full response:', JSON.stringify(statusResult, null, 2));
-                        console.log('subscription_active:', statusResult?.subscription_active, 'type:', typeof statusResult?.subscription_active);
-                        console.log('payment_status:', statusResult?.payment_status, 'type:', typeof statusResult?.payment_status);
-                        console.log('paytabs_status:', statusResult?.paytabs_status, 'type:', typeof statusResult?.paytabs_status);
                         
-                        const completed = checkPaymentCompleted(statusResult);
-                        console.log('=== PAYMENT COMPLETED CHECK ===');
-                        console.log('Result:', completed);
-                        
-                        if (completed) {
-                            // Skip polling, proceed to login
-                            console.log('✅ Payment confirmed! Setting paymentCompleted = true');
-                            paymentCompleted = true;
-                            console.log('✅ paymentCompleted is now:', paymentCompleted);
-                            console.log('✅ Will skip polling loop and proceed to login...');
-                            
-                            // Check if backend returned tokens in the response
-                            if (statusResult.access && statusResult.refresh) {
-                                console.log('🔑 Tokens found in payment status response!');
-                                localStorage.setItem('accessToken', statusResult.access);
-                                localStorage.setItem('refreshToken', statusResult.refresh);
-                            }
-                        } else {
-                            // If not yet updated, start polling but with fewer attempts
-                            console.log('⚠️ Payment not yet updated in database, will poll a few times...');
-                            maxPollAttempts = 5; // Only poll 5 times (10 seconds) if backend said success
+                        // Check if backend returned tokens in the response
+                        if (statusResult.access && statusResult.refresh) {
+                            console.log('🔑 Tokens found in payment status response!');
+                            localStorage.setItem('accessToken', statusResult.access);
+                            localStorage.setItem('refreshToken', statusResult.refresh);
                         }
                     } catch (err: any) {
-                        console.error('❌ Error checking payment status:', err);
-                        console.error('Error details:', err.message, err.stack);
-                        // If backend said success but API fails, still try polling
-                        console.log('Will try polling as fallback...');
+                        console.log('⚠️ Could not get tokens from payment status API (this is OK, user will login)');
                     }
                 }
                 
@@ -217,46 +196,69 @@ export const PaymentSuccessPage = () => {
                 const pendingUserData = JSON.parse(pendingUserDataStr);
                 console.log('📦 pendingUserData parsed:', pendingUserData);
                 
-                // Check if we have tokens - if not, try to get them by re-authenticating
+                // Check if we have tokens - if not, try to get them from pendingUserData or redirect to login
                 let accessToken = localStorage.getItem('accessToken');
                 let refreshToken = localStorage.getItem('refreshToken');
                 
-                // If no tokens, try to re-authenticate using sessionStorage credentials
+                // If no tokens, check if we can use pendingUserData to login
+                // If pendingUserData has username/password, we can try to login automatically
                 if (!accessToken || !refreshToken) {
-                    console.log('🔑 No tokens found, attempting to re-authenticate...');
+                    console.log('🔑 No tokens found, checking if we can auto-login...');
+                    
+                    // Check if we have credentials in sessionStorage from previous login attempt
                     const storedUsername = sessionStorage.getItem('2fa_username');
                     const storedPassword = sessionStorage.getItem('2fa_password');
                     
+                    // If we have credentials and pendingUserData matches, try to login
                     if (storedUsername && storedPassword && pendingUserData?.username === storedUsername) {
                         try {
-                            console.log('🔐 Re-authenticating with stored credentials...');
-                            // Request 2FA token
+                            console.log('🔐 Attempting auto-login with stored credentials...');
+                            // Request 2FA token first
                             const twoFAResponse = await requestTwoFactorAuthAPI(storedUsername, language);
                             
-                            // Try to verify with empty code (backend might allow this after payment)
+                            // For payment success, backend might allow login without 2FA code
+                            // Try to verify with empty code
                             try {
                                 const verifyResponse = await verifyTwoFactorAuthAPI({
                                     username: storedUsername,
                                     password: storedPassword,
                                     token: twoFAResponse.token,
-                                    code: '', // Try empty code first
+                                    code: '', // Try empty code
                                 });
                                 
-                                // If successful, we now have tokens
                                 if (verifyResponse.access && verifyResponse.refresh) {
                                     accessToken = verifyResponse.access;
                                     refreshToken = verifyResponse.refresh;
                                     localStorage.setItem('accessToken', accessToken);
                                     localStorage.setItem('refreshToken', refreshToken);
-                                    console.log('🔑 Tokens obtained from re-authentication!');
+                                    console.log('🔑 Tokens obtained from auto-login!');
                                 }
                             } catch (verifyErr: any) {
-                                console.log('⚠️ Empty code not accepted, will redirect to login');
-                                // Continue without tokens - will redirect to login in catch block
+                                console.log('⚠️ Auto-login failed, user needs to login manually');
                             }
                         } catch (err) {
-                            console.error('❌ Error re-authenticating:', err);
+                            console.error('❌ Error during auto-login:', err);
                         }
+                    }
+                    
+                    // If still no tokens after auto-login attempt, show message and redirect to login
+                    if (!accessToken || !refreshToken) {
+                        console.log('🔑 No tokens available after auto-login attempt, redirecting to login page');
+                        localStorage.setItem('paymentSuccessMessage', JSON.stringify({
+                            message: t('paymentSuccessMessage') || 'Payment successful! Your subscription is now active. Please login to continue.',
+                            timestamp: Date.now()
+                        }));
+                        
+                        // Clear pendingSubscriptionId to prevent redirect loop
+                        localStorage.removeItem('pendingSubscriptionId');
+                        
+                        // Redirect to login page
+                        const loginUrl = '/login?payment_success=true';
+                        console.log('🔄 Redirecting to login page:', loginUrl);
+                        window.location.href = loginUrl;
+                        setIsLoading(false);
+                        processingRef.current = false;
+                        return;
                     }
                 }
                 
@@ -320,33 +322,11 @@ export const PaymentSuccessPage = () => {
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
                         
-                        // If company has domain, redirect to subdomain with auth data in URL
-                        // localStorage is not shared between different subdomains
-                        if (frontendUser.company?.domain) {
-                            const accessToken = localStorage.getItem('accessToken');
-                            const refreshToken = localStorage.getItem('refreshToken');
-                            
-                            // Encode tokens and user data to pass via URL
-                            const authData = {
-                                access: accessToken,
-                                refresh: refreshToken,
-                                user: frontendUser
-                            };
-                            
-                            const encodedData = btoa(JSON.stringify(authData));
-                            const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
-                            const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
-                            
-                            console.log('🔄 Redirecting to company subdomain after payment:', redirectUrl);
-                            setTimeout(() => {
-                                window.location.replace(redirectUrl);
-                            }, 1000);
-                        } else {
-                            setTimeout(() => {
-                                navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                                setCurrentPage('Dashboard');
-                            }, 2000);
-                        }
+                        // Redirect to Dashboard
+                        setTimeout(() => {
+                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                            setCurrentPage('Dashboard');
+                        }, 1000);
                         setIsLoading(false);
                         processingRef.current = false;
                         return;
@@ -386,38 +366,14 @@ export const PaymentSuccessPage = () => {
                         timestamp: Date.now()
                     }));
                     
-                    // If company has domain, redirect to subdomain with auth data in URL
-                    // localStorage is not shared between different subdomains
-                    if (frontendUser.company?.domain) {
-                        const accessToken = localStorage.getItem('accessToken');
-                        const refreshToken = localStorage.getItem('refreshToken');
-                        
-                        // Encode tokens and user data to pass via URL
-                        const authData = {
-                            access: accessToken,
-                            refresh: refreshToken,
-                            user: frontendUser
-                        };
-                        
-                        const encodedData = btoa(JSON.stringify(authData));
-                        const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
-                        const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
-                        
-                        console.log('🔄 Redirecting to company subdomain after payment:', redirectUrl);
-                        setTimeout(() => {
-                            window.location.replace(redirectUrl);
-                        }, 1000);
-                    } else {
-                        // Redirect to dashboard after 2 seconds
-                        console.log('🔄 Redirecting to dashboard in 2 seconds...');
-                        setTimeout(() => {
-                            console.log('🔄 Executing redirect to dashboard...');
-                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                            setCurrentPage('Dashboard');
-                            setIsLoading(false);
-                            processingRef.current = false;
-                        }, 2000);
-                    }
+                    // Redirect to dashboard
+                    console.log('🔄 Redirecting to dashboard...');
+                    setTimeout(() => {
+                        navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                        setCurrentPage('Dashboard');
+                        setIsLoading(false);
+                        processingRef.current = false;
+                    }, 1000);
                 } catch (err: any) {
                     console.error('❌ Error getting user data:', err);
                     console.error('❌ Error details:', err.message, err.stack);
@@ -462,9 +418,7 @@ export const PaymentSuccessPage = () => {
                             }
                             
                             // Redirect to login page
-                            const loginUrl = isOnSubdomain() ? 
-                                `${window.location.protocol}//${getBaseDomain()}${window.location.port ? ':' + window.location.port : ''}/login?payment_success=true` :
-                                '/login?payment_success=true';
+                            const loginUrl = '/login?payment_success=true';
                             console.log('🔄 Redirecting to login page with payment success flag:', loginUrl);
                             window.location.href = loginUrl;
                             setIsLoading(false);
@@ -477,9 +431,7 @@ export const PaymentSuccessPage = () => {
                                 timestamp: Date.now()
                             }));
                             
-                            const loginUrl = isOnSubdomain() ? 
-                                `${window.location.protocol}//${getBaseDomain()}${window.location.port ? ':' + window.location.port : ''}/login` :
-                                '/login';
+                            const loginUrl = '/login';
                             console.log('🔄 Redirecting to login page:', loginUrl);
                             window.location.href = loginUrl;
                             setIsLoading(false);
@@ -522,35 +474,13 @@ export const PaymentSuccessPage = () => {
                         
                         console.log('✅ User logged in using pendingUserData!');
                         
-                        // If company has domain, redirect to subdomain with auth data in URL
-                        // localStorage is not shared between different subdomains
-                        if (frontendUser.company?.domain) {
-                            const accessToken = localStorage.getItem('accessToken');
-                            const refreshToken = localStorage.getItem('refreshToken');
-                            
-                            // Encode tokens and user data to pass via URL
-                            const authData = {
-                                access: accessToken,
-                                refresh: refreshToken,
-                                user: frontendUser
-                            };
-                            
-                            const encodedData = btoa(JSON.stringify(authData));
-                            const subdomainUrl = getCompanySubdomainUrl(frontendUser.company.domain, 'Dashboard');
-                            const redirectUrl = `${subdomainUrl}?auth=${encodeURIComponent(encodedData)}`;
-                            
-                            console.log('🔄 Redirecting to company subdomain after payment:', redirectUrl);
-                            setTimeout(() => {
-                                window.location.replace(redirectUrl);
-                            }, 1000);
-                        } else {
-                            setTimeout(() => {
-                                navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                                setCurrentPage('Dashboard');
-                                setIsLoading(false);
-                                processingRef.current = false;
-                            }, 2000);
-                        }
+                        // Redirect to dashboard
+                        setTimeout(() => {
+                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                            setCurrentPage('Dashboard');
+                            setIsLoading(false);
+                            processingRef.current = false;
+                        }, 1000);
                         return;
                     }
                     

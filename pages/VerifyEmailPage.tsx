@@ -88,6 +88,7 @@ export const VerifyEmailPage = () => {
                             role: userData.role === 'admin' ? 'Owner' : 'Employee',
                             phone: userData.phone || '',
                             avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
+                            emailVerified: userData.email_verified || userData.is_email_verified || false,
                             company: userData.company ? {
                                 id: typeof userData.company === 'object' ? userData.company.id : userData.company,
                                 name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
@@ -98,6 +99,9 @@ export const VerifyEmailPage = () => {
                         
                         // Clear old user data before setting new user
                         localStorage.removeItem('currentUser');
+                        
+                        // Save updated user data to localStorage
+                        localStorage.setItem('currentUser', JSON.stringify(frontendUser));
                         
                         setCurrentUser(frontendUser);
                     } catch (err) {

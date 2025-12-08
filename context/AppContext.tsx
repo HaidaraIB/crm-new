@@ -807,35 +807,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           setCurrentUserState(null);
           setDataLoaded(true);
           
-          // If on subdomain, redirect to main domain login page
+          // Redirect to login page on the same domain (keep current subdomain)
+          const protocol = window.location.protocol;
           const hostname = window.location.hostname;
-          let isOnSubdomain = false;
-          let baseDomain = 'localhost';
-          
-          if (hostname.includes('.')) {
-            const parts = hostname.split('.');
-            // Check if we're on a subdomain
-            if (hostname.includes('.localhost')) {
-              // For localhost subdomains (e.g., memo.com.localhost)
-              isOnSubdomain = parts.length > 2;
-              baseDomain = 'localhost';
-            } else if (parts.length > 2 || (parts.length === 2 && parts[0] !== 'localhost' && parts[0] !== '127')) {
-              // For production subdomains
-              isOnSubdomain = true;
-              baseDomain = parts.slice(-2).join('.');
-            }
-          }
-          
-          if (isOnSubdomain) {
-            const protocol = window.location.protocol;
-            const port = window.location.port ? `:${window.location.port}` : '';
-            const loginUrl = `${protocol}//${baseDomain}${port}/login`;
-            console.log('🔄 No active subscription on subdomain, redirecting to main domain login:', loginUrl);
-            window.location.replace(loginUrl);
-          } else {
-            // Redirect to login page on main domain
-            window.location.replace('/login');
-          }
+          const port = window.location.port ? `:${window.location.port}` : '';
+          const loginUrl = `${protocol}//${hostname}${port}/login`;
+          console.log('🔄 No active subscription, redirecting to login on same domain:', loginUrl);
+          window.location.replace(loginUrl);
           return;
         }
       }
@@ -1394,35 +1372,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           setCurrentUserState(null);
           setDataLoaded(false);
           
-          // If on subdomain, redirect to main domain login page
+          // Redirect to login page on the same domain (keep current subdomain)
+          const protocol = window.location.protocol;
           const hostname = window.location.hostname;
-          let isOnSubdomain = false;
-          let baseDomain = 'localhost';
-          
-          if (hostname.includes('.')) {
-            const parts = hostname.split('.');
-            // Check if we're on a subdomain
-            if (hostname.includes('.localhost')) {
-              // For localhost subdomains (e.g., memo.com.localhost)
-              isOnSubdomain = parts.length > 2;
-              baseDomain = 'localhost';
-            } else if (parts.length > 2 || (parts.length === 2 && parts[0] !== 'localhost' && parts[0] !== '127')) {
-              // For production subdomains
-              isOnSubdomain = true;
-              baseDomain = parts.slice(-2).join('.');
-            }
-          }
-          
-          if (isOnSubdomain) {
-            const protocol = window.location.protocol;
-            const port = window.location.port ? `:${window.location.port}` : '';
-            const loginUrl = `${protocol}//${baseDomain}${port}/login`;
-            console.log('🔄 No active subscription on subdomain (from polling), redirecting to main domain login:', loginUrl);
-            window.location.replace(loginUrl);
-          } else {
-            // Redirect to login page on main domain
-            window.location.replace('/login');
-          }
+          const port = window.location.port ? `:${window.location.port}` : '';
+          const loginUrl = `${protocol}//${hostname}${port}/login`;
+          console.log('🔄 No active subscription (from polling), redirecting to login on same domain:', loginUrl);
+          window.location.replace(loginUrl);
           return;
         }
       } catch (error) {

@@ -49,12 +49,16 @@ async function apiRequest<T>(
       // أعد المحاولة مرة أخرى بدون retry
       return apiRequest<T>(endpoint, options, false);
     } catch (refreshError) {
-      // إذا فشل refresh، أعد المستخدم إلى صفحة تسجيل الدخول
+      // إذا فشل refresh، أعد المستخدم إلى صفحة تسجيل الدخول على نفس النطاق الفرعي
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUser');
-      window.location.href = '/';
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port ? `:${window.location.port}` : '';
+      const loginUrl = `${protocol}//${hostname}${port}/login`;
+      window.location.replace(loginUrl);
       throw new Error('Session expired. Please login again.');
     }
   }
@@ -1625,7 +1629,11 @@ export const deleteClientTaskAPI = async (clientTaskId: number) => {
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUser');
-      window.location.href = '/';
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port ? `:${window.location.port}` : '';
+      const loginUrl = `${protocol}//${hostname}${port}/login`;
+      window.location.replace(loginUrl);
       throw new Error('Session expired. Please login again.');
     }
   }

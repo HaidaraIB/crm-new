@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI, getCurrentUserAPI } from '../services/api';
-import { navigateToCompanyRoute } from '../utils/routing';
 
 export const TwoFactorAuthPage = () => {
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn } = useAppContext();
@@ -11,7 +10,30 @@ export const TwoFactorAuthPage = () => {
     const [isRequesting, setIsRequesting] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
-    const [countdown, setCountdown] = useState(0);
+    const [countdown, setCountdown] = useState(() => {
+        // Load cooldown from localStorage on mount
+        const stored = localStorage.getItem('2faResendCooldown');
+        if (stored) {
+            try {
+                const { timestamp, username: storedUsername } = JSON.parse(stored);
+                // Check if cooldown is still valid (60 seconds)
+                const elapsed = Math.floor((Date.now() - timestamp) / 1000);
+                const remaining = Math.max(0, 60 - elapsed);
+                // Only use cooldown if it's for the same username
+                const currentUsername = sessionStorage.getItem('2fa_username');
+                if (remaining > 0 && storedUsername === currentUsername) {
+                    return remaining;
+                } else {
+                    // Clear expired or different username cooldown
+                    localStorage.removeItem('2faResendCooldown');
+                }
+            } catch (e) {
+                // Invalid data, clear it
+                localStorage.removeItem('2faResendCooldown');
+            }
+        }
+        return 0;
+    });
     const [token, setToken] = useState<string | null>(null);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -23,7 +45,30 @@ export const TwoFactorAuthPage = () => {
         const storedPassword = sessionStorage.getItem('2fa_password');
         const storedToken = sessionStorage.getItem('2fa_token');
         
-        if (storedUsername) setUsername(storedUsername);
+        if (storedUsername) {
+            setUsername(storedUsername);
+            // Load cooldown from localStorage when username is available
+            const stored = localStorage.getItem('2faResendCooldown');
+            if (stored) {
+                try {
+                    const { timestamp, username: cooldownUsername } = JSON.parse(stored);
+                    // Check if cooldown is still valid (60 seconds) and for same username
+                    if (cooldownUsername === storedUsername) {
+                        const elapsed = Math.floor((Date.now() - timestamp) / 1000);
+                        const remaining = Math.max(0, 60 - elapsed);
+                        setCountdown(remaining);
+                    } else {
+                        // Different username, clear cooldown
+                        localStorage.removeItem('2faResendCooldown');
+                        setCountdown(0);
+                    }
+                } catch (e) {
+                    // Invalid data, clear it
+                    localStorage.removeItem('2faResendCooldown');
+                    setCountdown(0);
+                }
+            }
+        }
         if (storedPassword) setPassword(storedPassword);
         if (storedToken) setToken(storedToken);
     }, []);
@@ -31,8 +76,31 @@ export const TwoFactorAuthPage = () => {
     // Countdown timer
     useEffect(() => {
         if (countdown > 0) {
-            const timer = setTimeout(() => setCountdown(countdown - 1), 1000);
+            const timer = setTimeout(() => {
+                const newCountdown = countdown - 1;
+                setCountdown(newCountdown);
+                // Update localStorage with remaining cooldown
+                const stored = localStorage.getItem('2faResendCooldown');
+                if (stored) {
+                    try {
+                        const { username: storedUsername } = JSON.parse(stored);
+                        if (newCountdown > 0) {
+                            localStorage.setItem('2faResendCooldown', JSON.stringify({
+                                timestamp: Date.now() - (60 - newCountdown) * 1000,
+                                username: storedUsername
+                            }));
+                        } else {
+                            localStorage.removeItem('2faResendCooldown');
+                        }
+                    } catch (e) {
+                        localStorage.removeItem('2faResendCooldown');
+                    }
+                }
+            }, 1000);
             return () => clearTimeout(timer);
+        } else if (countdown === 0) {
+            // Clear from localStorage when cooldown expires
+            localStorage.removeItem('2faResendCooldown');
         }
     }, [countdown]);
 
@@ -45,6 +113,35 @@ export const TwoFactorAuthPage = () => {
             return;
         }
 
+        // Check cooldown from localStorage first (more reliable than state)
+        const stored = localStorage.getItem('2faResendCooldown');
+        if (stored) {
+            try {
+                const { timestamp, username: storedUsername } = JSON.parse(stored);
+                // Check if cooldown is still valid and for same username
+                if (storedUsername === username.trim()) {
+                    const elapsed = Math.floor((Date.now() - timestamp) / 1000);
+                    const remaining = Math.max(0, 60 - elapsed);
+                    if (remaining > 0) {
+                        // Cooldown is still active, update state and return
+                        setCountdown(remaining);
+                        setError(language === 'ar' 
+                            ? `يرجى الانتظار ${remaining} ثانية قبل إعادة الإرسال`
+                            : `Please wait ${remaining} seconds before resending`);
+                        return;
+                    }
+                }
+            } catch (e) {
+                // Invalid data, clear it
+                localStorage.removeItem('2faResendCooldown');
+            }
+        }
+
+        // Also check state cooldown as backup
+        if (countdown > 0) {
+            return;
+        }
+
         setIsRequesting(true);
         
         try {
@@ -52,7 +149,13 @@ export const TwoFactorAuthPage = () => {
             setToken(response.token);
             sessionStorage.setItem('2fa_token', response.token);
             setSuccess(t('twoFactorCodeSent') || 'Two-factor authentication code has been sent to your email');
-            setCountdown(60); // 60 seconds cooldown
+            // Set cooldown to 60 seconds (1 minute) after successful send
+            setCountdown(60);
+            // Store cooldown in localStorage with timestamp and username
+            localStorage.setItem('2faResendCooldown', JSON.stringify({
+                timestamp: Date.now(),
+                username: username.trim()
+            }));
         } catch (error: any) {
             setError(error.message || t('twoFactorAuthRequestFailed') || 'Failed to request two-factor authentication code');
         } finally {
@@ -176,10 +279,11 @@ export const TwoFactorAuthPage = () => {
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
             
-            // Clear session storage
+            // Clear session storage and cooldown
             sessionStorage.removeItem('2fa_username');
             sessionStorage.removeItem('2fa_password');
             sessionStorage.removeItem('2fa_token');
+            localStorage.removeItem('2faResendCooldown');
             
             // Clear old user data before setting new user
             localStorage.removeItem('currentUser');
@@ -195,7 +299,7 @@ export const TwoFactorAuthPage = () => {
             
             // Use window.location for immediate redirect to ensure state is applied
             console.log('🔄 Redirecting to Dashboard after 2FA login');
-            window.location.href = '/Dashboard';
+            window.location.href = '/dashboard';
         } catch (error: any) {
             const errorMessage = error.message || '';
             // Check if it's a subscription inactive error

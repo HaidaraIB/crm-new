@@ -73,7 +73,8 @@ export const isOnSubdomain = (): boolean => {
  */
 export const getCompanyRoute = (companyName?: string, companyDomain?: string, page?: string): string => {
   // Always use simple paths - subdomain handles the routing
-  return page && page !== 'Dashboard' ? `/${page.toLowerCase()}` : '/';
+  if (!page) return '/dashboard';
+  return `/${page.toLowerCase()}`;
 };
 
 /**
@@ -90,8 +91,8 @@ export const getCompanySubdomainUrl = (companyDomain: string, page?: string): st
     port = `:${currentPort}`;
   }
   
-  let path = '/';
-  if (page && page !== 'Dashboard') {
+  let path = '/dashboard';
+  if (page) {
     path = `/${page.toLowerCase()}`;
   }
   

@@ -3,6 +3,7 @@
 import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute } from './utils/routing';
+import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage } from './pages';
 
@@ -171,7 +172,7 @@ const TheApp = () => {
                     setIsLoggedIn(true);
                     
                     // Clean URL and navigate to Dashboard (only once)
-                    const cleanPath = window.location.pathname === '/' ? '/Dashboard' : window.location.pathname;
+                    const cleanPath = window.location.pathname === '/' ? '/dashboard' : window.location.pathname;
                     window.history.replaceState({}, '', cleanPath.replace(/\?.*$/, ''));
                     setCurrentPage('Dashboard');
                     
@@ -263,6 +264,124 @@ const TheApp = () => {
         return <LoginPage />;
     }
 
+    // Handle pathname-based routing for logged-in users
+    React.useEffect(() => {
+        const pathnameToCheck = window.location.pathname;
+        
+        // Map pathname to page name
+        const pathToPageMap: Record<string, Page> = {
+            '/dashboard': 'Dashboard',
+            '/leads': 'Leads',
+            '/all leads': 'All Leads',
+            '/fresh leads': 'Fresh Leads',
+            '/cold leads': 'Cold Leads',
+            '/my leads': 'My Leads',
+            '/rotated leads': 'Rotated Leads',
+            '/activities': 'Activities',
+            '/properties': 'Properties',
+            '/owners': 'Owners',
+            '/services': 'Services',
+            '/service packages': 'Service Packages',
+            '/service providers': 'Service Providers',
+            '/products': 'Products',
+            '/product categories': 'Product Categories',
+            '/suppliers': 'Suppliers',
+            '/deals': 'Deals',
+            '/employees': 'Employees',
+            '/users': 'Users',
+            '/marketing': 'Marketing',
+            '/campaigns': 'Campaigns',
+            '/todos': 'Todos',
+            '/reports': 'Reports',
+            '/teams report': 'Teams Report',
+            '/employees report': 'Employees Report',
+            '/marketing report': 'Marketing Report',
+            '/integrations': 'Integrations',
+            '/meta': 'Meta',
+            '/tiktok': 'TikTok',
+            '/whatsapp': 'WhatsApp',
+            '/settings': 'Settings',
+            '/profile': 'Profile',
+        };
+        
+        // Handle root path - redirect to dashboard
+        if (pathnameToCheck === '/' || pathnameToCheck === '') {
+            window.history.replaceState({}, '', '/dashboard');
+            setCurrentPage('Dashboard');
+            return;
+        }
+        
+        // Check if pathname matches a known route
+        const normalizedPath = pathnameToCheck.toLowerCase();
+        const matchedPage = pathToPageMap[normalizedPath];
+        
+        if (matchedPage && currentPage !== matchedPage) {
+            setCurrentPage(matchedPage);
+        }
+    }, [currentPage, setCurrentPage]);
+    
+    // Also check pathname on mount and when pathname might have changed
+    React.useEffect(() => {
+        const checkPathname = () => {
+            const currentPath = window.location.pathname;
+            const pathToPageMap: Record<string, Page> = {
+                '/dashboard': 'Dashboard',
+                '/leads': 'Leads',
+                '/all leads': 'All Leads',
+                '/fresh leads': 'Fresh Leads',
+                '/cold leads': 'Cold Leads',
+                '/my leads': 'My Leads',
+                '/rotated leads': 'Rotated Leads',
+                '/activities': 'Activities',
+                '/properties': 'Properties',
+                '/owners': 'Owners',
+                '/services': 'Services',
+                '/service packages': 'Service Packages',
+                '/service providers': 'Service Providers',
+                '/products': 'Products',
+                '/product categories': 'Product Categories',
+                '/suppliers': 'Suppliers',
+                '/deals': 'Deals',
+                '/employees': 'Employees',
+                '/users': 'Users',
+                '/marketing': 'Marketing',
+                '/campaigns': 'Campaigns',
+                '/todos': 'Todos',
+                '/reports': 'Reports',
+                '/teams report': 'Teams Report',
+                '/employees report': 'Employees Report',
+                '/marketing report': 'Marketing Report',
+                '/integrations': 'Integrations',
+                '/meta': 'Meta',
+                '/tiktok': 'TikTok',
+                '/whatsapp': 'WhatsApp',
+                '/settings': 'Settings',
+                '/profile': 'Profile',
+            };
+            
+            const normalizedPath = currentPath.toLowerCase();
+            const matchedPage = pathToPageMap[normalizedPath];
+            
+            if (matchedPage && currentPage !== matchedPage) {
+                setCurrentPage(matchedPage);
+            }
+        };
+        
+        // Check immediately
+        checkPathname();
+        
+        // Listen to popstate for browser back/forward
+        window.addEventListener('popstate', checkPathname);
+        
+        // Check after a short delay to catch programmatic URL changes
+        const timeout = setTimeout(checkPathname, 50);
+        
+        return () => {
+            window.removeEventListener('popstate', checkPathname);
+            clearTimeout(timeout);
+        };
+    }, [currentPage, setCurrentPage]);
+
     return (
         <div className={`flex h-screen ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
             <Sidebar />
@@ -275,7 +394,7 @@ const TheApp = () => {
             )}
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header />
-                {isLoggedIn && currentUser && !currentUser.emailVerified && (
+                {isLoggedIn && currentUser && currentUser.emailVerified === false && (
                     <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 flex-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">

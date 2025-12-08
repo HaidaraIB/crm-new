@@ -257,12 +257,19 @@ export const registerCompanyAPI = async (data: {
  * Body: { subscription_id: number, plan_id?: number }
  * Response: { payment_id: number, redirect_url: string, tran_ref: string }
  */
-export const createPaytabsPaymentSessionAPI = async (subscriptionId: number, planId?: number) => {
+export const createPaytabsPaymentSessionAPI = async (
+  subscriptionId: number, 
+  planId?: number, 
+  billingCycle?: 'monthly' | 'yearly'
+) => {
   // Use direct fetch instead of apiRequest to avoid token requirement
   const token = localStorage.getItem('accessToken');
   const body: any = { subscription_id: subscriptionId };
   if (planId) {
     body.plan_id = planId;
+  }
+  if (billingCycle) {
+    body.billing_cycle = billingCycle;
   }
   const response = await fetch(`${BASE_URL}/payments/create-paytabs-session/`, {
     method: 'POST',

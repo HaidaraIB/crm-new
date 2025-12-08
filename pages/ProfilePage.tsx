@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal } from '../components/index';
-import { changeEmailAPI, getCurrentUserAPI, updateUserAPI } from '../services/api';
+import { changeEmailAPI, getCurrentUserAPI, updateUserAPI, createPaytabsPaymentSessionAPI } from '../services/api';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -22,7 +22,14 @@ export const ProfilePage = () => {
         language
     } = useAppContext();
     const [loading, setLoading] = useState(true);
-    const [subscriptionInfo, setSubscriptionInfo] = useState<{ id: number; isActive: boolean; plan?: { name?: string; name_ar?: string } } | null>(null);
+    const [subscriptionInfo, setSubscriptionInfo] = useState<{ 
+        id: number; 
+        isActive: boolean; 
+        plan?: { name?: string; name_ar?: string };
+        endDate?: string;
+        startDate?: string;
+    } | null>(null);
+    const [isRenewing, setIsRenewing] = useState(false);
     
     // Split name into first and last name
     const nameParts = currentUser?.name?.split(' ') || [];
@@ -92,7 +99,12 @@ export const ProfilePage = () => {
                         id: userData.company.subscription.id,
                         isActive: userData.company.subscription.is_active === true,
                         plan: planWithArabic,
+                        endDate: userData.company.subscription.end_date,
+                        startDate: userData.company.subscription.start_date,
                     });
+                } else {
+                    // Clear subscription info if no subscription
+                    setSubscriptionInfo(null);
                 }
             } catch (error) {
                 console.error('Error loading subscription info:', error);
@@ -191,6 +203,46 @@ export const ProfilePage = () => {
             }
         } catch (error) {
             console.error('Error refreshing user data:', error);
+        }
+    };
+
+    const handleRenewSubscription = async () => {
+        if (!subscriptionInfo || !subscriptionInfo.id) {
+            alert(t('subscriptionNotFound') || 'Subscription not found');
+            return;
+        }
+
+        try {
+            setIsRenewing(true);
+            // Determine billing cycle from current subscription duration
+            let billingCycle: 'monthly' | 'yearly' = 'monthly';
+            
+            if (subscriptionInfo.endDate && subscriptionInfo.startDate) {
+                const startDate = new Date(subscriptionInfo.startDate);
+                const endDate = new Date(subscriptionInfo.endDate);
+                const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                // If subscription is 330+ days, it's yearly
+                billingCycle = daysDiff >= 330 ? 'yearly' : 'monthly';
+            }
+
+            // Create payment session for renewal (no plan_id change, just extend subscription)
+            const response = await createPaytabsPaymentSessionAPI(
+                subscriptionInfo.id,
+                undefined, // No plan change
+                billingCycle
+            );
+            
+            if (response.redirect_url) {
+                window.location.href = response.redirect_url;
+            } else {
+                alert(t('paymentRedirectError') || 'Failed to get payment URL');
+            }
+        } catch (error: any) {
+            console.error('Error renewing subscription:', error);
+            const errorMessage = error?.message || t('errorRenewingSubscription') || 'Error renewing subscription';
+            alert(errorMessage);
+        } finally {
+            setIsRenewing(false);
         }
     };
 
@@ -308,6 +360,52 @@ export const ProfilePage = () => {
                                             ? subscriptionInfo.plan.name_ar
                                             : (subscriptionInfo.plan.name || '')}
                                     </p>
+                                </div>
+                            )}
+                            {subscriptionInfo.endDate && (
+                                <div>
+                                    <Label htmlFor="subscription-end-date">{t('subscriptionEndDate') || 'End Date'}</Label>
+                                    <p className="mt-1 text-gray-700 dark:text-gray-300">
+                                        {new Date(subscriptionInfo.endDate).toLocaleDateString(
+                                            language === 'ar' ? 'ar' : 'en-US',
+                                            { 
+                                                year: 'numeric', 
+                                                month: 'long', 
+                                                day: 'numeric',
+                                                hour: 'numeric',
+                                                minute: '2-digit'
+                                            }
+                                        )}
+                                    </p>
+                                    {(() => {
+                                        if (!subscriptionInfo.isActive || !subscriptionInfo.endDate) return null;
+                                        
+                                        const endDate = new Date(subscriptionInfo.endDate);
+                                        const now = new Date();
+                                        const daysUntilEnd = Math.ceil((endDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                                        
+                                        // Only show reminder if subscription ends within 30 days
+                                        if (daysUntilEnd > 0 && daysUntilEnd <= 30) {
+                                            return (
+                                                <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
+                                                    {t('subscriptionRenewalReminder') || `Your subscription will end in ${daysUntilEnd} day(s). Please renew to continue using our services.`}
+                                                </p>
+                                            );
+                                        }
+                                        return null;
+                                    })()}
+                                </div>
+                            )}
+                            {subscriptionInfo.isActive && (
+                                <div className="pt-2">
+                                    <Button 
+                                        onClick={handleRenewSubscription}
+                                        loading={isRenewing}
+                                        disabled={isRenewing}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        {isRenewing ? (t('processing') || 'Processing...') : (t('renewSubscription') || 'Renew Subscription')}
+                                    </Button>
                                 </div>
                             )}
                         </div>

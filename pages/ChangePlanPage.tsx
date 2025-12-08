@@ -119,9 +119,13 @@ export const ChangePlanPage = () => {
 
         try {
             setIsProcessing(true);
-            // Create payment session with plan_id to upgrade/downgrade plan
+            // Create payment session with plan_id and billing_cycle to upgrade/downgrade plan
             // The backend should handle plan change even if subscription is active
-            const response = await createPaytabsPaymentSessionAPI(parseInt(subscriptionId), selectedPlan);
+            const response = await createPaytabsPaymentSessionAPI(
+                parseInt(subscriptionId), 
+                selectedPlan,
+                billingCycle
+            );
             if (response.redirect_url) {
                 window.location.href = response.redirect_url;
             } else {

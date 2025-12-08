@@ -6,6 +6,7 @@ import { Button } from './Button';
 import { Input } from './Input';
 import { MoonIcon, SunIcon, MenuIcon, ChevronDownIcon } from './icons';
 import { Dropdown, DropdownItem } from './Dropdown';
+import { navigateToCompanyRoute } from '../utils/routing';
 
 export const Header = () => {
     const { t, theme, setTheme, language, setLanguage, setIsSidebarOpen, currentUser, setCurrentPage, setIsChangePasswordModalOpen } = useAppContext();
@@ -43,7 +44,10 @@ export const Header = () => {
                         </button>
                     }
                 >
-                    <DropdownItem onClick={() => setCurrentPage('Profile')}>
+                    <DropdownItem onClick={() => {
+                        setCurrentPage('Profile');
+                        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Profile');
+                    }}>
                         {t('profile')}
                     </DropdownItem>
                     <DropdownItem onClick={() => setIsChangePasswordModalOpen(true)}>

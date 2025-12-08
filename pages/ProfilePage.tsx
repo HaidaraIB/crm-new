@@ -386,9 +386,10 @@ export const ProfilePage = () => {
                                         
                                         // Only show reminder if subscription ends within 30 days
                                         if (daysUntilEnd > 0 && daysUntilEnd <= 30) {
+                                            const reminderText = t('subscriptionRenewalReminder') || `Your subscription will end in ${daysUntilEnd} day(s). Please renew to continue using our services.`;
                                             return (
                                                 <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
-                                                    {t('subscriptionRenewalReminder') || `Your subscription will end in ${daysUntilEnd} day(s). Please renew to continue using our services.`}
+                                                    {reminderText.replace('{days}', daysUntilEnd.toString())}
                                                 </p>
                                             );
                                         }

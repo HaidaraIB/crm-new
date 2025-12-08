@@ -851,6 +851,12 @@ export const translations = {
         errorLoadingPaymentLink: "Error loading payment link",
         subscriptionActiveButCanUpgrade: "Your subscription is active. You can still upgrade or downgrade your plan. Please try again or contact support.",
         paymentFailed: "Payment failed. Please try again.",
+        subscriptionNotFound: "Subscription not found",
+        errorRenewingSubscription: "Error renewing subscription",
+        subscriptionEndDate: "Subscription End Date",
+        subscriptionRenewalReminder: "Your subscription will end in {days} day(s). Please renew to continue using our services.",
+        renewSubscription: "Renew Subscription",
+        processing: "Processing...",
     },
     ar: {
         hello: "أهلاً بك! 👋",
@@ -1678,5 +1684,11 @@ export const translations = {
         errorLoadingPaymentLink: "خطأ في تحميل رابط الدفع",
         subscriptionActiveButCanUpgrade: "اشتراكك نشط. يمكنك ترقية أو تخفيض خطتك. يرجى المحاولة مرة أخرى أو التواصل مع الدعم.",
         paymentFailed: "فشل الدفع. يرجى المحاولة مرة أخرى.",
+        subscriptionNotFound: "الاشتراك غير موجود",
+        errorRenewingSubscription: "خطأ في تجديد الاشتراك",
+        subscriptionEndDate: "تاريخ انتهاء الاشتراك",
+        subscriptionRenewalReminder: "سينتهي اشتراكك خلال {days} يوم/أيام. يرجى التجديد للمتابعة في استخدام خدماتنا.",
+        renewSubscription: "تجديد الاشتراك",
+        processing: "جاري المعالجة...",
     }
 };

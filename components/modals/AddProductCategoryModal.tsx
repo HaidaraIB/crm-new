@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { useCreateProductCategory, useProductCategories } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -19,13 +20,23 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 };
 
 export const AddProductCategoryModal = () => {
-    const { isAddProductCategoryModalOpen, setIsAddProductCategoryModalOpen, t, addProductCategory, productCategories, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddProductCategoryModalOpen, setIsAddProductCategoryModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
         parentCategory: '',
     });
-    const [loading, setLoading] = useState(false);
+    
+    // Fetch product categories using React Query
+    const { data: categoriesResponse } = useProductCategories();
+    const productCategories = Array.isArray(categoriesResponse) 
+        ? categoriesResponse 
+        : (categoriesResponse?.results || []);
+    
+    // Create product category mutation
+    const addProductCategoryMutation = useCreateProductCategory();
+    const loading = addProductCategoryMutation.isPending;
+    
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -33,6 +44,10 @@ export const AddProductCategoryModal = () => {
 
         if (!formState.name.trim()) {
             newErrors.name = t('nameRequired') || 'Name is required';
+        }
+
+        if (!currentUser?.company?.id) {
+            newErrors._general = t('companyRequired') || 'Company is required';
         }
 
         setErrors(newErrors);
@@ -57,6 +72,7 @@ export const AddProductCategoryModal = () => {
                 description: '',
                 parentCategory: '',
             });
+            setErrors({});
         }
     }, [isAddProductCategoryModalOpen]);
 
@@ -82,13 +98,20 @@ export const AddProductCategoryModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await addProductCategory({
-                name: formState.name,
-                description: formState.description,
-                parentCategory: formState.parentCategory || undefined,
-            });
+            // Find parent category by name to get its ID
+            const selectedParentCategory = formState.parentCategory 
+                ? productCategories.find(cat => cat.name === formState.parentCategory)
+                : null;
+
+            const payload: any = {
+                name: formState.name.trim(),
+                description: formState.description?.trim() || '',
+                company: currentUser?.company?.id || currentUser?.company_id,
+                parent_category: selectedParentCategory ? selectedParentCategory.id : null,
+            };
+
+            await addProductCategoryMutation.mutateAsync(payload);
 
             // Reset form
             setFormState({
@@ -104,10 +127,23 @@ export const AddProductCategoryModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating product category:', error);
-            const errorMessage = error?.message || t('failedToCreateProductCategory') || 'Failed to create product category. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToCreateProductCategory') || 'Failed to create product category. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 
@@ -148,7 +184,7 @@ export const AddProductCategoryModal = () => {
                     <Label htmlFor="parentCategory">{t('parentCategory')}</Label>
                     <Select id="parentCategory" value={formState.parentCategory} onChange={handleChange}>
                         <option value="">{t('selectParentCategory') || 'Select Parent Category (Optional)'}</option>
-                        {productCategories.map(category => (
+                        {(productCategories || []).map(category => (
                             <option key={category.id} value={category.name}>{category.name}</option>
                         ))}
                     </Select>

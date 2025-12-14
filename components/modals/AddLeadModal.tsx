@@ -9,6 +9,7 @@ import { PhoneInput } from '../PhoneInput';
 import { Checkbox } from '../Checkbox';
 import { Lead, PhoneNumber } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
+import { useCreateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -16,28 +17,47 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; }) => (
-    <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary ${className || ''}`}>
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange, className, language }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; language?: 'ar' | 'en' }) => {
+    const { language: contextLanguage } = useAppContext();
+    const lang = language || contextLanguage;
+    return (
+        <select id={id} value={value} onChange={onChange} dir={lang === 'ar' ? 'rtl' : 'ltr'} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${className || ''}`}>
+            {children}
+        </select>
+    );
+};
 
 export const AddLeadModal = () => {
-    const { isAddLeadModalOpen, setIsAddLeadModalOpen, t, addLead, users, currentUser, statuses, channels, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
-    const [isLoading, setIsLoading] = useState(false);
+    const { isAddLeadModalOpen, setIsAddLeadModalOpen, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    
+    // Fetch data using React Query
+    const { data: usersResponse } = useUsers();
+    const users = usersResponse?.results || [];
+
+    const { data: statusesData } = useStatuses();
+    const statuses = Array.isArray(statusesData) ? statusesData : [];
+
+    const { data: channelsData } = useChannels();
+    const channels = Array.isArray(channelsData) ? channelsData : [];
+
+    // Create lead mutation
+    const createLeadMutation = useCreateLead();
+    const isLoading = createLeadMutation.isPending;
     
     // Get default status from settings (first non-hidden status or first status)
     const getDefaultStatus = () => {
+        if (!Array.isArray(statuses) || statuses.length === 0) return undefined;
         const defaultStatus = statuses.find(s => s.isDefault && !s.isHidden) || 
                              statuses.find(s => !s.isHidden) || 
                              statuses[0];
-        return defaultStatus ? defaultStatus.name as Lead['status'] : 'Untouched';
+        return defaultStatus ? defaultStatus.name as Lead['status'] : undefined;
     };
     
-    // Get default channel from settings (first channel or 'Call')
+    // Get default channel from settings (first channel)
     const getDefaultChannel = () => {
-        const defaultChannel = channels.find(c => c.name === 'Call') || channels[0];
-        return defaultChannel ? defaultChannel.name : 'Call';
+        if (!Array.isArray(channels) || channels.length === 0) return undefined;
+        const defaultChannel = channels[0];
+        return defaultChannel ? defaultChannel.name : undefined;
     };
     
     const [formState, setFormState] = useState({
@@ -45,10 +65,10 @@ export const AddLeadModal = () => {
         phone: '',
         budget: '',
         assignedTo: '',
-        type: 'Fresh' as Lead['type'],
-        communicationWay: getDefaultChannel(),
-        priority: 'Medium' as Lead['priority'],
-        status: getDefaultStatus(),
+        type: '' as Lead['type'],
+        communicationWay: getDefaultChannel() ?? '',
+        priority: '' as Lead['priority'],
+        status: getDefaultStatus() ?? '',
     });
     
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'>>>([]);
@@ -142,10 +162,8 @@ export const AddLeadModal = () => {
             return;
         }
         
-        setIsLoading(true);
-
         try {
-            await addLead({
+            await createLeadMutation.mutateAsync({
                 name: formState.name,
                 phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '',
                 phoneNumbers: finalPhoneNumbers,
@@ -161,7 +179,7 @@ export const AddLeadModal = () => {
             const defaultUserId = currentUser?.id || users[0]?.id || '';
             setFormState({
                 name: '', phone: '', budget: '', assignedTo: defaultUserId.toString(),
-                type: 'Fresh', communicationWay: getDefaultChannel(), priority: 'Medium', status: getDefaultStatus(),
+                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '',
             });
             setPhoneNumbers([]);
             
@@ -172,8 +190,6 @@ export const AddLeadModal = () => {
         } catch (error: any) {
             console.error('Error creating lead:', error);
             alert(error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.');
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -276,18 +292,14 @@ export const AddLeadModal = () => {
                     <div>
                         <Label htmlFor="communicationWay">{t('communicationWay')}</Label>
                         <Select id="communicationWay" value={formState.communicationWay} onChange={handleChange}>
-                            {channels.length > 0 ? (
-                                channels.map(channel => (
+                            {(channels || []).length > 0 ? (
+                                (channels || []).map(channel => (
                                     <option key={channel.id} value={channel.name}>
                                         {channel.name}
                                     </option>
                                 ))
                             ) : (
-                                // Fallback to default channels if no channels configured
-                                <>
-                                    <option value="Call">{t('call')}</option>
-                                    <option value="WhatsApp">{t('whatsapp')}</option>
-                                </>
+                                <option value="">{t('noChannelsAvailable') || 'No channels available'}</option>
                             )}
                         </Select>
                     </div>
@@ -302,8 +314,8 @@ export const AddLeadModal = () => {
                     <div>
                         <Label htmlFor="status">{t('status')}</Label>
                         <Select id="status" value={formState.status} onChange={handleChange}>
-                            {statuses.length > 0 ? (
-                                statuses
+                            {(statuses || []).length > 0 ? (
+                                (statuses || [])
                                     .filter(s => !s.isHidden) // Only show non-hidden statuses
                                     .map(status => (
                                         <option key={status.id} value={status.name}>

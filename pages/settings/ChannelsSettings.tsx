@@ -1,96 +1,71 @@
 
-
-
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, Input, TrashIcon, PlusIcon, Modal } from '../../components/index';
+import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/index';
 import { Channel } from '../../types';
 import { useAppContext } from '../../context/AppContext';
-
-// FIX: Made children optional to fix missing children prop error.
-const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor?: string }) => (
-    <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
-);
-
-// FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode, value?: string, onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void }) => (
-    <select id={id} value={value} onChange={onChange} className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
-        {children}
-    </select>
-);
+import { useChannels, useDeleteChannel } from '../../hooks/useQueries';
 
 
 export const ChannelsSettings = () => {
-    const { t, channels, addChannel, updateChannel, deleteChannel, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
-    const [defaultChannel, setDefaultChannel] = useState('');
-    const [channelTypes, setChannelTypes] = useState<string[]>(['advertising', 'email', 'Web', 'Social']);
-    const [isAddTypeModalOpen, setIsAddTypeModalOpen] = useState(false);
-    const [newTypeName, setNewTypeName] = useState('');
-    const [editingChannels, setEditingChannels] = useState<{ [key: number]: Partial<Channel> }>({});
-    const [updateTimeouts, setUpdateTimeouts] = useState<{ [key: number]: NodeJS.Timeout }>({});
+    const { 
+        t, 
+        language,
+        setConfirmDeleteConfig, 
+        setIsConfirmDeleteModalOpen,
+        setIsAddChannelModalOpen,
+        setIsEditChannelModalOpen,
+        setEditingChannel,
+        channelTypes
+    } = useAppContext();
+    
+    // Fetch channels using React Query
+    const { data: channelsData } = useChannels();
+    const channels = Array.isArray(channelsData) 
+        ? channelsData 
+        : (channelsData?.results || []);
+    
+    // Delete mutation
+    const deleteChannelMutation = useDeleteChannel();
 
-    // Extract unique types from channels
-    React.useEffect(() => {
+    // Helper function to translate channel type names
+    const translateChannelType = (type: string): string => {
+        if (!type) return type;
+        const typeLower = type.toLowerCase();
+        if (typeLower === 'web') return t('web');
+        if (typeLower === 'social') return t('social');
+        if (typeLower === 'advertising') return t('advertising');
+        if (typeLower === 'email') return t('email');
+        if (typeLower === 'phone') return t('phone') || 'Phone';
+        if (typeLower === 'sms') return t('sms') || 'SMS';
+        if (typeLower === 'whatsapp') return t('whatsapp') || 'WhatsApp';
+        if (typeLower === 'telegram') return t('telegram') || 'Telegram';
+        if (typeLower === 'instagram') return t('instagram') || 'Instagram';
+        if (typeLower === 'facebook') return t('facebook') || 'Facebook';
+        if (typeLower === 'linkedin') return t('linkedin') || 'LinkedIn';
+        if (typeLower === 'twitter') return t('twitter') || 'Twitter';
+        if (typeLower === 'tiktok') return t('tikTok') || 'TikTok';
+        if (typeLower === 'youtube') return t('youtube') || 'YouTube';
+        if (typeLower === 'other') return t('other') || 'Other';
+        return type; // Return original if no translation found
+    };
+
+    // Get unique channel types from channels (from API)
+    const localChannelTypes = React.useMemo(() => {
+        if (!channels || !Array.isArray(channels)) return [];
         const types = new Set<string>();
-        channels.forEach(c => types.add(c.type));
-        setChannelTypes(prev => {
-            const combined = new Set([...prev, ...Array.from(types)]);
-            return Array.from(combined);
+        channels.forEach(c => {
+            if (c.type) {
+                types.add(c.type);
+            }
         });
+        return Array.from(types);
     }, [channels]);
 
-    const handleAddType = () => {
-        if (newTypeName && !channelTypes.includes(newTypeName)) {
-            setChannelTypes(prev => [...prev, newTypeName]);
-            setNewTypeName('');
-            setIsAddTypeModalOpen(false);
-        }
-    };
-    
-    const handleChannelChange = async (id: number, field: keyof Channel, value: any, immediate: boolean = false) => {
-        const channel = channels.find(c => c.id === id);
-        if (!channel) return;
 
-        // Update local state immediately
-        setEditingChannels(prev => ({ ...prev, [id]: { ...prev[id], [field]: value } }));
-
-        if (immediate) {
-            // Update immediately (for selects)
-            const updatedChannel = { ...channel, [field]: value };
-            try {
-                await updateChannel(updatedChannel);
-            } catch (error) {
-                console.error('Error updating channel:', error);
-            }
-        } else {
-            // Debounce for text inputs
-            if (updateTimeouts[id]) {
-                clearTimeout(updateTimeouts[id]);
-            }
-            
-            const timeout = setTimeout(async () => {
-                const updatedChannel = { ...channel, [field]: value };
-                try {
-                    await updateChannel(updatedChannel);
-                } catch (error) {
-                    console.error('Error updating channel:', error);
-                }
-            }, 500);
-            
-            setUpdateTimeouts(prev => ({ ...prev, [id]: timeout }));
-        }
-    };
-
-    const handleAddChannel = async () => {
-        try {
-            await addChannel({
-                name: '',
-                type: channelTypes[0] || '',
-                priority: 'Medium',
-            });
-        } catch (error) {
-            console.error('Error adding channel:', error);
-        }
+    const handleEditChannel = (channel: Channel) => {
+        setEditingChannel(channel);
+        setIsEditChannelModalOpen(true);
     };
 
     const handleDeleteChannel = (id: number) => {
@@ -102,7 +77,7 @@ export const ChannelsSettings = () => {
                 itemName: channel.name,
                 onConfirm: async () => {
                     try {
-                        await deleteChannel(id);
+                        await deleteChannelMutation.mutateAsync(id);
                     } catch (error) {
                         console.error('Error deleting channel:', error);
                         throw error;
@@ -115,91 +90,90 @@ export const ChannelsSettings = () => {
 
     return (
         <div className="space-y-6">
-             <Modal isOpen={isAddTypeModalOpen} onClose={() => setIsAddTypeModalOpen(false)} title={t('addType')}>
-                <div className="space-y-4">
-                    <div>
-                        <Label htmlFor="new-type-name">{t('typeName')}</Label>
-                        <Input 
-                            id="new-type-name" 
-                            placeholder={t('enterTypeName')} 
-                            value={newTypeName}
-                            onChange={(e) => setNewTypeName(e.target.value)}
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button variant="secondary" onClick={() => setIsAddTypeModalOpen(false)}>{t('cancel')}</Button>
-                        <Button onClick={handleAddType}>{t('submit')}</Button>
-                    </div>
-                </div>
-            </Modal>
             <Card>
-                <h2 className="text-xl font-semibold mb-4">{t('channelAutomation')}</h2>
-                 <div className="space-y-6">
-                     <div className="max-w-sm">
-                        <Label htmlFor="default-channel">{t('defaultChannel')}</Label>
-                        <Select id="default-channel" value={defaultChannel} onChange={(e) => setDefaultChannel(e.target.value)}>
-                            {channels.map(c => <option key={c.id}>{c.name}</option>)}
-                        </Select>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">{t('defaultChannelDesc')}</p>
-                     </div>
-                 </div>
-            </Card>
-
-             <Card>
                 <div className="flex justify-between items-center mb-4">
                     <h2 className="text-xl font-semibold">{t('activeChannels')}</h2>
-                    <div className="flex gap-2">
-                        <Button variant="secondary" onClick={() => setIsAddTypeModalOpen(true)}>{t('addType')}</Button>
-                        <Button onClick={handleAddChannel}><PlusIcon className="w-4 h-4" /> {t('addChannel')}</Button>
-                    </div>
+                    <Button onClick={() => setIsAddChannelModalOpen(true)}>
+                        {language === 'ar' ? (
+                            <>{t('addChannel')} <PlusIcon className="w-4 h-4" /></>
+                        ) : (
+                            <><PlusIcon className="w-4 h-4" /> {t('addChannel')}</>
+                        )}
+                    </Button>
                 </div>
-                 <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="text-left rtl:text-right text-gray-700 dark:text-gray-300">
+                 <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                    <table className="w-full">
+                        <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th className="p-2 min-w-[200px]">{t('name')}</th>
-                                <th className="p-2 min-w-[150px]">{t('type')}</th>
-                                <th className="p-2 min-w-[150px]">{t('priority')}</th>
-                                <th className="p-2">{t('actions')}</th>
+                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
+                                    {t('name')}
+                                </th>
+                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
+                                    {t('type')}
+                                </th>
+                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
+                                    {t('priority')}
+                                </th>
+                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[120px]">
+                                    {t('actions')}
+                                </th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {channels.map(channel => (
-                                <tr key={channel.id} className="border-t dark:border-gray-700">
-                                    <td className="p-2 font-medium">
-                                        <Input
-                                            value={editingChannels[channel.id]?.name !== undefined ? editingChannels[channel.id].name : channel.name}
-                                            onChange={(e) => handleChannelChange(channel.id, 'name', e.target.value, false)}
-                                            className="text-sm"
-                                        />
+                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                            {channels && channels.length > 0 ? channels.map(channel => (
+                                <tr 
+                                    key={channel.id} 
+                                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
+                                >
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            {channel.name}
+                                        </div>
                                     </td>
-                                    <td className="p-2">
-                                        <Select
-                                            id={`type-${channel.id}`}
-                                            value={editingChannels[channel.id]?.type !== undefined ? editingChannels[channel.id].type : channel.type}
-                                            onChange={(e) => handleChannelChange(channel.id, 'type', e.target.value, true)}
-                                        >
-                                            {channelTypes.map(type => <option key={type} value={type}>{type}</option>)}
-                                        </Select>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className="text-sm text-gray-700 dark:text-gray-300">
+                                            {translateChannelType(channel.type)}
+                                        </div>
                                     </td>
-                                    <td className="p-2">
-                                        <Select
-                                            id={`priority-${channel.id}`}
-                                            value={editingChannels[channel.id]?.priority !== undefined ? editingChannels[channel.id].priority : channel.priority}
-                                            onChange={(e) => handleChannelChange(channel.id, 'priority', e.target.value as Channel['priority'], true)}
-                                        >
-                                            <option>High</option>
-                                            <option>Medium</option>
-                                            <option>Low</option>
-                                        </Select>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                            (channel.priority?.toLowerCase() || 'medium') === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
+                                            (channel.priority?.toLowerCase() || 'medium') === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                                            'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                        }`}>
+                                            {t((channel.priority?.toLowerCase() || 'medium'))}
+                                        </span>
                                     </td>
-                                    <td className="p-2">
-                                        <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => handleDeleteChannel(channel.id)}>
-                                            <TrashIcon className="w-4 h-4" />
-                                        </Button>
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div className={`flex items-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                                            <button
+                                                type="button"
+                                                className="p-2 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-600 dark:text-gray-400"
+                                                onClick={() => handleEditChannel(channel)}
+                                                title={t('edit') || 'Edit'}
+                                            >
+                                                <EditIcon className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                className="p-2 h-auto hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors text-red-600 dark:text-red-400"
+                                                onClick={() => handleDeleteChannel(channel.id)}
+                                                title={t('delete') || 'Delete'}
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
-                            ))}
+                            )) : (
+                                <tr>
+                                    <td colSpan={4} className="px-6 py-12 text-center">
+                                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                                            {t('noChannelsAvailable') || 'No channels available'}
+                                        </div>
+                                    </td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                 </div>

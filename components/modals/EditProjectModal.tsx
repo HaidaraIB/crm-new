@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Project } from '../../types';
+import { useUpdateProject, useDevelopers } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -24,7 +25,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 
 export const EditProjectModal = () => {
-    const { isEditProjectModalOpen, setIsEditProjectModalOpen, t, updateProject, editingProject, setEditingProject, developers, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditProjectModalOpen, setIsEditProjectModalOpen, t, editingProject, setEditingProject, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState<Omit<Project, 'id' | 'code'>>({
         name: '',
         developer: '',
@@ -33,7 +34,14 @@ export const EditProjectModal = () => {
         paymentMethod: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [isLoading, setIsLoading] = useState(false);
+    
+    // Fetch developers using React Query
+    const { data: developersResponse } = useDevelopers();
+    const developers = developersResponse?.results || [];
+    
+    // Update project mutation
+    const updateProjectMutation = useUpdateProject();
+    const isLoading = updateProjectMutation.isPending;
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -62,15 +70,30 @@ export const EditProjectModal = () => {
 
     useEffect(() => {
         if (editingProject) {
+            // Handle developer - it might be an object with id, or just an id, or a name
+            let developerId = '';
+            if (typeof editingProject.developer === 'object' && editingProject.developer?.id) {
+                developerId = editingProject.developer.id.toString();
+            } else if (typeof editingProject.developer === 'number') {
+                developerId = editingProject.developer.toString();
+            } else if (typeof editingProject.developer === 'string') {
+                // If it's a string, try to find the developer by name
+                const foundDeveloper = developers.find(d => d.name === editingProject.developer);
+                developerId = foundDeveloper ? foundDeveloper.id.toString() : '';
+            }
+            
+            // Handle paymentMethod - API might return payment_method (snake_case) or paymentMethod (camelCase)
+            const paymentMethod = (editingProject as any).paymentMethod || (editingProject as any).payment_method || 'Cash';
+            
             setFormState({
                 name: editingProject.name,
-                developer: editingProject.developer,
-                type: editingProject.type,
-                city: editingProject.city,
-                paymentMethod: editingProject.paymentMethod,
+                developer: developerId,
+                type: editingProject.type || '',
+                city: editingProject.city || '',
+                paymentMethod: paymentMethod,
             });
         }
-    }, [editingProject]);
+    }, [editingProject, developers]);
 
     const handleClose = () => {
         setIsEditProjectModalOpen(false);
@@ -91,11 +114,29 @@ export const EditProjectModal = () => {
             return;
         }
         
-        setIsLoading(true);
         try {
-            await updateProject({
-                ...editingProject,
-                ...formState,
+            // Prepare project data with developer ID (not name) and company ID
+            const projectData: any = {
+                name: formState.name,
+                developer: Number(formState.developer), // Convert to number (ID)
+                type: formState.type || null,
+                city: formState.city || null,
+                payment_method: formState.paymentMethod || null, // Send as payment_method (snake_case) for API
+                paymentMethod: formState.paymentMethod || null, // Also send as paymentMethod (camelCase) for compatibility
+                company: currentUser?.company?.id,
+            };
+            
+            if (!projectData.company) {
+                throw new Error(t('companyRequired') || 'Company information is required');
+            }
+            
+            if (!projectData.developer || isNaN(projectData.developer)) {
+                throw new Error(t('developerRequired') || 'Developer is required');
+            }
+            
+            await updateProjectMutation.mutateAsync({
+                id: editingProject.id,
+                data: projectData,
             });
 
             // Close modal immediately and show success modal
@@ -105,8 +146,6 @@ export const EditProjectModal = () => {
         } catch (error: any) {
             console.error('Error updating project:', error);
             setErrors({ _general: error?.message || t('errorUpdatingProject') || 'Failed to update project. Please try again.' });
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -135,14 +174,14 @@ export const EditProjectModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="developer">{t('developer')} <span className="text-red-500">*</span></Label>
-                    <Select 
-                        id="developer" 
+                    <Select
+                        id="developer"
                         value={formState.developer} 
                         onChange={handleChange}
                         className={errors.developer ? 'border-red-500 dark:border-red-500' : ''}
                     >
                         <option value="">{t('selectDeveloper') || 'Select Developer'}</option>
-                        {developers.map(dev => <option key={dev.id} value={dev.name}>{dev.name}</option>)}
+                        {developers.map(dev => <option key={dev.id} value={dev.id.toString()}>{dev.name}</option>)}
                     </Select>
                     {errors.developer && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.developer}</p>

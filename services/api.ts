@@ -576,9 +576,7 @@ export const resetPasswordAPI = async (payload: {
  */
 export const requestTwoFactorAuthAPI = async (username: string, language: string = 'ar') => {
   try {
-    console.log('🔐 Requesting 2FA for username:', username);
     const url = `${BASE_URL}/auth/request-2fa/`;
-    console.log('📡 API URL:', url);
     
     const response = await fetch(url, {
       method: 'POST',
@@ -590,7 +588,6 @@ export const requestTwoFactorAuthAPI = async (username: string, language: string
       credentials: 'include', // Include credentials for CORS
     });
     
-    console.log('📥 Response status:', response.status, response.statusText);
 
     // Try to parse response as JSON, but handle non-JSON responses
     let data: any = {};
@@ -610,6 +607,23 @@ export const requestTwoFactorAuthAPI = async (username: string, language: string
     }
 
     if (!response.ok) {
+      // Handle account temporarily inactive error (for employees)
+      if (response.status === 403 && data?.code === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+        const accountError: any = new Error(data?.error || data?.message || 'ACCOUNT_TEMPORARILY_INACTIVE');
+        accountError.code = 'ACCOUNT_TEMPORARILY_INACTIVE';
+        accountError.status = response.status;
+        throw accountError;
+      }
+      
+      // Handle subscription inactive error (for admins)
+      if (response.status === 403 && (data?.code === 'SUBSCRIPTION_INACTIVE' || data?.error?.toLowerCase().includes('subscription'))) {
+        const subscriptionError: any = new Error(data?.error || data?.message || 'SUBSCRIPTION_INACTIVE');
+        subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
+        subscriptionError.subscriptionId = data?.subscriptionId;
+        subscriptionError.status = response.status;
+        throw subscriptionError;
+      }
+      
       // Handle different error formats
       let errorMessage = data?.detail || data?.error || data?.message || 'Failed to request 2FA code';
       
@@ -626,7 +640,7 @@ export const requestTwoFactorAuthAPI = async (username: string, language: string
       if (errorMessage.toLowerCase().includes('user not found') || 
           errorMessage.toLowerCase().includes('not found')) {
         errorMessage = 'Invalid username or password';
-      } else if (errorMessage.toLowerCase().includes('inactive')) {
+      } else if (errorMessage.toLowerCase().includes('inactive') && !errorMessage.toLowerCase().includes('account is temporarily')) {
         errorMessage = 'Account is inactive';
       }
       
@@ -639,7 +653,6 @@ export const requestTwoFactorAuthAPI = async (username: string, language: string
       throw error;
     }
 
-    console.log('✅ 2FA request successful:', data);
     return data;
   } catch (error: any) {
     // If it's already our custom error, re-throw it
@@ -684,6 +697,21 @@ export const verifyTwoFactorAuthAPI = async (payload: {
   const data = await response.json().catch(() => ({}));
 
   if (!response.ok) {
+    // Handle account temporarily inactive error (for employees)
+    if (response.status === 403 && data?.code === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+      const accountError: any = new Error(data?.error || data?.message || 'ACCOUNT_TEMPORARILY_INACTIVE');
+      accountError.code = 'ACCOUNT_TEMPORARILY_INACTIVE';
+      throw accountError;
+    }
+    
+    // Handle subscription inactive error (for admins)
+    if (response.status === 403 && (data?.code === 'SUBSCRIPTION_INACTIVE' || data?.error?.toLowerCase().includes('subscription'))) {
+      const subscriptionError: any = new Error(data?.error || data?.message || 'SUBSCRIPTION_INACTIVE');
+      subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
+      subscriptionError.subscriptionId = data?.subscriptionId;
+      throw subscriptionError;
+    }
+    
     const error: any = new Error(
       data?.detail || data?.error || data?.message || 'Invalid 2FA code'
     );
@@ -1376,6 +1404,13 @@ export const createCampaignAPI = async (campaignData: any) => {
  * حذف Campaign
  * DELETE /api/campaigns/:id/
  */
+export const updateCampaignAPI = async (campaignId: number, campaignData: any) => {
+  return apiRequest<any>(`/campaigns/${campaignId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(campaignData),
+  });
+};
+
 export const deleteCampaignAPI = async (campaignId: number) => {
   return apiRequest<void>(`/campaigns/${campaignId}/`, {
     method: 'DELETE',

@@ -5,178 +5,114 @@ import { getCurrentUserAPI, checkPaymentStatusAPI, requestTwoFactorAuthAPI, veri
 import { navigateToCompanyRoute } from '../utils/routing';
 
 export const PaymentSuccessPage = () => {
-    const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage, currentUser } = useAppContext();
-    const [isLoading, setIsLoading] = useState(true);
+    const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage } = useAppContext();
     const [error, setError] = useState<string | null>(null);
-    const processingRef = React.useRef(false);
+    const [isLoadingState, setIsLoading] = useState(true);
+    const [paymentCompleted, setPaymentCompleted] = useState(false);
+    const processingRef = useRef(false);
+
+    // Get subscription_id from URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const subscriptionIdParam = urlParams.get('subscription_id');
+    const urlStatus = urlParams.get('status');
+    const tranRef = urlParams.get('tranRef') || urlParams.get('tran_ref');
+    const subscriptionId = subscriptionIdParam ? parseInt(subscriptionIdParam) : null;
+
+    // Helper function to check if payment is completed
+    const checkPaymentCompleted = (statusResult: any): boolean => {
+        if (!statusResult) return false;
+        
+        const isActive = statusResult.subscription_active === true || 
+                        statusResult.subscription_active === 'true' || 
+                        statusResult.subscription_active === 1 ||
+                        String(statusResult.subscription_active).toLowerCase() === 'true';
+        const isCompleted = statusResult.payment_status === 'completed';
+        const isApproved = statusResult.paytabs_status === 'A' || 
+                        statusResult.paytabs_status === 'Approved';
+        
+        return isActive || isCompleted || isApproved;
+    };
+
+    // Payment status will be checked via direct API calls in useEffect
+    const [paymentStatus, setPaymentStatus] = useState<any>(null);
+    const [paymentError, setPaymentError] = useState<any>(null);
 
     useEffect(() => {
         // Prevent multiple executions
         if (processingRef.current) {
-            console.log('Payment processing already in progress, skipping...');
             return;
         }
         
         const handlePaymentSuccess = async () => {
             processingRef.current = true;
-            console.log('🚀 Starting payment success handler...');
             try {
-                // Get subscription_id from URL (PayTabs redirects to backend, backend redirects here)
-                const urlParams = new URLSearchParams(window.location.search);
-                const subscriptionId = urlParams.get('subscription_id');
-                const urlStatus = urlParams.get('status');
-                const tranRef = urlParams.get('tranRef') || urlParams.get('tran_ref');
-                
                 // Check URL status parameter if present
                 if (urlStatus === 'failed') {
                     const message = urlParams.get('message');
                     setError(message || t('paymentFailed') || 'Payment failed. Please try again.');
-                    setIsLoading(false);
                     return;
                 }
                 
                 if (!subscriptionId) {
                     setError(t('paymentSubscriptionIdRequired') || 'Subscription ID is required');
-                    setIsLoading(false);
                     return;
                 }
                 
                 // If status is success and we have tranRef, backend already confirmed payment
-                // Just do a quick verification and proceed
                 if (urlStatus === 'success' && tranRef) {
-                    console.log('Backend confirmed payment success, proceeding with verification...');
-                }
-                
-                let pollAttempts = 0;
-                let maxPollAttempts = 10; // Reduced to 10 attempts (20 seconds max)
-                const pollInterval = 2000; // 2 seconds
-                let paymentCompleted = false;
-                
-                // Helper function to check if payment is completed
-                const checkPaymentCompleted = (statusResult: any): boolean => {
-                    if (!statusResult) return false;
-                    
-                    // Handle both boolean true and string "true"
-                    const isActive = statusResult.subscription_active === true || 
-                                    statusResult.subscription_active === 'true' || 
-                                    statusResult.subscription_active === 1 ||
-                                    String(statusResult.subscription_active).toLowerCase() === 'true';
-                    const isCompleted = statusResult.payment_status === 'completed';
-                    const isApproved = statusResult.paytabs_status === 'A' || 
-                                    statusResult.paytabs_status === 'Approved';
-                    
-                    console.log('Payment check:', {
-                        isActive,
-                        isCompleted,
-                        isApproved,
-                        subscription_active: statusResult.subscription_active,
-                        payment_status: statusResult.payment_status,
-                        paytabs_status: statusResult.paytabs_status
-                    });
-                    
-                    return isActive || isCompleted || isApproved;
-                };
-                
-                // If status is success and we have tranRef, backend already confirmed payment
-                // Proceed directly to login without polling
-                if (urlStatus === 'success' && tranRef) {
-                    console.log('✅ Backend confirmed payment success with status=success and tranRef, proceeding directly to login...');
-                    paymentCompleted = true;
+                    setPaymentCompleted(true);
                     
                     // Try to get tokens from payment status API (optional - if backend provides them)
                     try {
-                        const statusResult = await checkPaymentStatusAPI(parseInt(subscriptionId));
+                        const statusResult = await checkPaymentStatusAPI(subscriptionId);
                         
                         // Check if backend returned tokens in the response
                         if (statusResult.access && statusResult.refresh) {
-                            console.log('🔑 Tokens found in payment status response!');
                             localStorage.setItem('accessToken', statusResult.access);
                             localStorage.setItem('refreshToken', statusResult.refresh);
                         }
                     } catch (err: any) {
-                        console.log('⚠️ Could not get tokens from payment status API (this is OK, user will login)');
+                        // Tokens not available, user will login manually
                     }
                 }
                 
-                // If payment already confirmed, skip polling entirely
-                if (paymentCompleted) {
-                    console.log('✅✅✅ Payment already confirmed! Skipping polling and proceeding directly to login...');
-                } else {
-                    // Poll payment status - backend handles PayTabs callback/return
-                    // We just need to check if payment completed
-                    console.log('🔍 Payment not yet confirmed, starting to poll...');
-                    console.log('⏳ Starting to poll payment status for subscription:', subscriptionId);
+                // Check payment status from React Query
+                if (paymentStatus && checkPaymentCompleted(paymentStatus)) {
+                    setPaymentCompleted(true);
                     
-                    while (pollAttempts < maxPollAttempts && !paymentCompleted) {
-                    console.log(`🔄 Entering polling loop - attempt ${pollAttempts + 1}, paymentCompleted: ${paymentCompleted}`);
-                    try {
-                        const statusResult = await checkPaymentStatusAPI(parseInt(subscriptionId));
-                        console.log(`Poll attempt ${pollAttempts + 1}:`, JSON.stringify(statusResult, null, 2));
-                        
-                        // Check if payment is completed using helper function
-                        if (checkPaymentCompleted(statusResult)) {
-                            paymentCompleted = true;
-                            console.log('✅ Payment completed during polling! Breaking loop...');
-                            
-                            // Check if backend returned tokens in the response
-                            if (statusResult.access && statusResult.refresh) {
-                                console.log('🔑 Tokens found in payment status response!');
-                                localStorage.setItem('accessToken', statusResult.access);
-                                localStorage.setItem('refreshToken', statusResult.refresh);
-                            }
-                            
-                            break;
-                        }
-                        
-                        // Check if payment failed
-                        if (statusResult.payment_status === 'failed' || 
-                            (statusResult.paytabs_status && statusResult.paytabs_status !== 'A' && statusResult.paytabs_status !== 'pending')) {
-                            setError(t('paymentFailed') || 'Payment failed. Please try again.');
-                            setIsLoading(false);
-                            return;
-                        }
-                    } catch (err: any) {
-                        console.error(`Error polling payment status (attempt ${pollAttempts + 1}):`, err);
-                        // If it's a 404 or endpoint error, stop polling immediately
-                        if (err.message && (err.message.includes('404') || err.message.includes('Not Found') || err.message.includes('endpoint'))) {
-                            console.error('Payment status endpoint error. Stopping polling.');
-                            setError(t('paymentStatusEndpointError') || 'Payment status endpoint not found. Please contact support.');
-                            setIsLoading(false);
-                            return;
-                        }
-                        // For other errors, stop after 3 failed attempts to prevent infinite loop
-                        if (pollAttempts >= 3) {
-                            console.error('Too many errors, stopping polling');
-                            setError(t('paymentStatusError') || 'Unable to check payment status. Please refresh the page or contact support.');
-                            setIsLoading(false);
-                            return;
-                        }
-                    }
-                    
-                        await new Promise(resolve => setTimeout(resolve, pollInterval));
-                        pollAttempts++;
+                    // Check if backend returned tokens in the response
+                    if (paymentStatus.access && paymentStatus.refresh) {
+                        localStorage.setItem('accessToken', paymentStatus.access);
+                        localStorage.setItem('refreshToken', paymentStatus.refresh);
                     }
                 }
                 
-                // Final check - if still not completed, show error
-                console.log('🔍 Final check - paymentCompleted:', paymentCompleted);
-                if (!paymentCompleted) {
-                    console.log('❌ Payment not completed after polling, showing error');
-                    setError(t('paymentPending') || 'Payment is still being processed. Please wait a moment and refresh.');
-                    setIsLoading(false);
-                    processingRef.current = false;
+                // Check if payment failed
+                if (paymentStatus && (paymentStatus.payment_status === 'failed' || 
+                    (paymentStatus.paytabs_status && paymentStatus.paytabs_status !== 'A' && paymentStatus.paytabs_status !== 'pending'))) {
+                    setError(t('paymentFailed') || 'Payment failed. Please try again.');
                     return;
                 }
                 
-                console.log('✅✅✅ Payment confirmed! Proceeding to get user data and login...');
+                // Handle payment errors
+                if (paymentError) {
+                    const errorMessage = (paymentError as any)?.message || '';
+                    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('endpoint')) {
+                        setError(t('paymentStatusEndpointError') || 'Payment status endpoint not found. Please contact support.');
+                    } else {
+                        setError(t('paymentStatusError') || 'Unable to check payment status. Please refresh the page or contact support.');
+                    }
+                    return;
+                }
                 
+                // If payment completed, proceed to login
+                if (paymentCompleted) {
+                try {
                 // Payment completed - get user data and log in
-                console.log('📦 Checking for pendingUserData in localStorage...');
                 const pendingUserDataStr = localStorage.getItem('pendingUserData');
-                console.log('📦 pendingUserData exists:', !!pendingUserDataStr);
                 
                 if (!pendingUserDataStr) {
-                    console.error('❌ No pendingUserData found in localStorage');
+                    console.error('No pendingUserData found in localStorage');
                     // Store success message even if we redirect to login
                     localStorage.setItem('paymentSuccessMessage', JSON.stringify({
                         message: t('paymentSuccessMessage') || 'Payment successful! Your subscription is now active.',
@@ -192,9 +128,7 @@ export const PaymentSuccessPage = () => {
                     return;
                 }
                 
-                console.log('📦 Parsing pendingUserData...');
                 const pendingUserData = JSON.parse(pendingUserDataStr);
-                console.log('📦 pendingUserData parsed:', pendingUserData);
                 
                 // Check if we have tokens - if not, try to get them from pendingUserData or redirect to login
                 let accessToken = localStorage.getItem('accessToken');
@@ -203,8 +137,6 @@ export const PaymentSuccessPage = () => {
                 // If no tokens, check if we can use pendingUserData to login
                 // If pendingUserData has username/password, we can try to login automatically
                 if (!accessToken || !refreshToken) {
-                    console.log('🔑 No tokens found, checking if we can auto-login...');
-                    
                     // Check if we have credentials in sessionStorage from previous login attempt
                     const storedUsername = sessionStorage.getItem('2fa_username');
                     const storedPassword = sessionStorage.getItem('2fa_password');
@@ -212,7 +144,6 @@ export const PaymentSuccessPage = () => {
                     // If we have credentials and pendingUserData matches, try to login
                     if (storedUsername && storedPassword && pendingUserData?.username === storedUsername) {
                         try {
-                            console.log('🔐 Attempting auto-login with stored credentials...');
                             // Request 2FA token first
                             const twoFAResponse = await requestTwoFactorAuthAPI(storedUsername, language);
                             
@@ -231,19 +162,17 @@ export const PaymentSuccessPage = () => {
                                     refreshToken = verifyResponse.refresh;
                                     localStorage.setItem('accessToken', accessToken);
                                     localStorage.setItem('refreshToken', refreshToken);
-                                    console.log('🔑 Tokens obtained from auto-login!');
                                 }
                             } catch (verifyErr: any) {
-                                console.log('⚠️ Auto-login failed, user needs to login manually');
+                                // Auto-login failed, user needs to login manually
                             }
                         } catch (err) {
-                            console.error('❌ Error during auto-login:', err);
+                            console.error('Error during auto-login:', err);
                         }
                     }
                     
                     // If still no tokens after auto-login attempt, show message and redirect to login
                     if (!accessToken || !refreshToken) {
-                        console.log('🔑 No tokens available after auto-login attempt, redirecting to login page');
                         localStorage.setItem('paymentSuccessMessage', JSON.stringify({
                             message: t('paymentSuccessMessage') || 'Payment successful! Your subscription is now active. Please login to continue.',
                             timestamp: Date.now()
@@ -254,9 +183,7 @@ export const PaymentSuccessPage = () => {
                         
                         // Redirect to login page
                         const loginUrl = '/login?payment_success=true';
-                        console.log('🔄 Redirecting to login page:', loginUrl);
                         window.location.href = loginUrl;
-                        setIsLoading(false);
                         processingRef.current = false;
                         return;
                     }
@@ -266,29 +193,17 @@ export const PaymentSuccessPage = () => {
                 // If we don't have tokens, getCurrentUserAPI will fail with 401, and we'll handle it
                 let userData;
                 try {
-                    console.log('🌐 Calling getCurrentUserAPI()...');
                     userData = await getCurrentUserAPI();
-                    console.log('🌐 getCurrentUserAPI response:', userData);
                     
                     // Verify subscription is active
-                    console.log('🔍 Checking subscription status...');
-                    console.log('🔍 userData.company:', userData.company);
-                    console.log('🔍 userData.company?.subscription:', userData.company?.subscription);
-                    console.log('🔍 userData.company?.subscription?.is_active:', userData.company?.subscription?.is_active);
-                    
                     if (!userData.company?.subscription?.is_active) {
-                        console.log('⚠️ Subscription not active yet, waiting 2 seconds and retrying...');
                         // Wait a bit more and check again
                         await new Promise(resolve => setTimeout(resolve, 2000));
-                        console.log('🔄 Retrying getCurrentUserAPI()...');
                         const retryUserData = await getCurrentUserAPI();
-                        console.log('🔄 Retry response:', retryUserData);
-                        console.log('🔍 Retry subscription is_active:', retryUserData.company?.subscription?.is_active);
                         
                         if (!retryUserData.company?.subscription?.is_active) {
-                            console.error('❌ Subscription still not active after retry');
+                            console.error('Subscription still not active after retry');
                             setError(t('paymentPending') || 'Payment was successful but subscription activation is delayed. Please wait a moment and refresh.');
-                            setIsLoading(false);
                             processingRef.current = false;
                             return;
                         }
@@ -327,7 +242,6 @@ export const PaymentSuccessPage = () => {
                             navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
                             setCurrentPage('Dashboard');
                         }, 1000);
-                        setIsLoading(false);
                         processingRef.current = false;
                         return;
                     }
@@ -349,16 +263,12 @@ export const PaymentSuccessPage = () => {
                         } : pendingUserData.company,
                     };
                     
-                    console.log('👤 Setting user data and logging in...');
-                    console.log('👤 frontendUser:', frontendUser);
-                    
                     // Clear old user data before setting new user
                     localStorage.removeItem('currentUser');
                     
                     setCurrentUser(frontendUser);
                     setIsLoggedIn(true);
                     localStorage.removeItem('pendingUserData');
-                    console.log('✅ User logged in successfully!');
                     
                     // Store success message for dashboard
                     localStorage.setItem('paymentSuccessMessage', JSON.stringify({
@@ -367,7 +277,6 @@ export const PaymentSuccessPage = () => {
                     }));
                     
                     // Redirect to dashboard
-                    console.log('🔄 Redirecting to dashboard...');
                     setTimeout(() => {
                         navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
                         setCurrentPage('Dashboard');
@@ -375,14 +284,10 @@ export const PaymentSuccessPage = () => {
                         processingRef.current = false;
                     }, 1000);
                 } catch (err: any) {
-                    console.error('❌ Error getting user data:', err);
-                    console.error('❌ Error details:', err.message, err.stack);
-                    console.error('❌ Error status:', err.status);
+                    console.error('Error getting user data:', err);
                     
                     // If API fails due to 401 (no tokens), try to use pendingUserData to login
                     if (err.status === 401 || err.message?.includes('401') || err.message?.includes('Unauthorized')) {
-                        console.log('⚠️ No tokens available, but payment is complete. Using pendingUserData to proceed...');
-                        
                         // Use pendingUserData to create frontend user
                         if (pendingUserData) {
                             const frontendUser = {
@@ -399,8 +304,6 @@ export const PaymentSuccessPage = () => {
                                 } : undefined,
                             };
                             
-                            console.log('👤 Using pendingUserData to login:', frontendUser);
-                            
                             // Clear old user data
                             localStorage.removeItem('currentUser');
                             
@@ -414,12 +317,11 @@ export const PaymentSuccessPage = () => {
                             
                             // Also store subscription ID so login page can show payment link if needed
                             if (subscriptionId) {
-                                localStorage.setItem('pendingSubscriptionId', subscriptionId);
+                                localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
                             }
                             
                             // Redirect to login page
                             const loginUrl = '/login?payment_success=true';
-                            console.log('🔄 Redirecting to login page with payment success flag:', loginUrl);
                             window.location.href = loginUrl;
                             setIsLoading(false);
                             processingRef.current = false;
@@ -432,7 +334,6 @@ export const PaymentSuccessPage = () => {
                             }));
                             
                             const loginUrl = '/login';
-                            console.log('🔄 Redirecting to login page:', loginUrl);
                             window.location.href = loginUrl;
                             setIsLoading(false);
                             processingRef.current = false;
@@ -442,7 +343,6 @@ export const PaymentSuccessPage = () => {
                     
                     // If API fails but we have pendingUserData, use that instead
                     if (pendingUserData) {
-                        console.log('⚠️ API failed, but using pendingUserData from localStorage...');
                         const frontendUser = {
                             id: pendingUserData.id || pendingUserData.user?.id,
                             name: pendingUserData.name || `${pendingUserData.user?.first_name || ''} ${pendingUserData.user?.last_name || ''}`.trim() || pendingUserData.user?.username,
@@ -457,8 +357,6 @@ export const PaymentSuccessPage = () => {
                             } : undefined,
                         };
                         
-                        console.log('👤 Using pendingUserData:', frontendUser);
-                        
                         // Store success message for dashboard
                         localStorage.setItem('paymentSuccessMessage', JSON.stringify({
                             message: t('paymentSuccessMessage') || 'Payment successful! Your subscription is now active.',
@@ -471,8 +369,6 @@ export const PaymentSuccessPage = () => {
                         setCurrentUser(frontendUser);
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
-                        
-                        console.log('✅ User logged in using pendingUserData!');
                         
                         // Redirect to dashboard
                         setTimeout(() => {
@@ -491,16 +387,23 @@ export const PaymentSuccessPage = () => {
                     setIsLoading(false);
                     processingRef.current = false;
                 }
-            } catch (err: any) {
-                console.error('❌ Error processing payment:', err);
-                setError(err.message || t('paymentSuccessError') || 'Error processing payment success');
+                } catch (err: any) {
+                    console.error('Error processing payment:', err);
+                    setError(err.message || t('paymentSuccessError') || 'Error processing payment success');
+                    setIsLoading(false);
+                    processingRef.current = false;
+                } finally {
+                    // Reset processing flag after a delay to allow for retries if needed
+                    setTimeout(() => {
+                        processingRef.current = false;
+                    }, 5000);
+                }
+            }
+            } catch (outerErr: any) {
+                console.error('Error in payment success handler:', outerErr);
+                setError(outerErr.message || t('paymentSuccessError') || 'Error processing payment success');
                 setIsLoading(false);
                 processingRef.current = false;
-            } finally {
-                // Reset processing flag after a delay to allow for retries if needed
-                setTimeout(() => {
-                    processingRef.current = false;
-                }, 5000);
             }
         };
 
@@ -508,11 +411,11 @@ export const PaymentSuccessPage = () => {
         
         // Cleanup function
         return () => {
-            console.log('Payment success handler cleanup');
+            // Cleanup
         };
     }, [t, setCurrentUser, setIsLoggedIn, setCurrentPage]);
 
-    if (isLoading) {
+    if (isLoadingState && !error) {
         return (
             <div className={`min-h-screen flex items-center justify-center ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
                 <div className="text-center">

@@ -65,8 +65,8 @@ export const ProductCategoriesFilterDrawer = () => {
                 <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-200 dark:divide-gray-700">
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="product-categories-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="product-categories-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

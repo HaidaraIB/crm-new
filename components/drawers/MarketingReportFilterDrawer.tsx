@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { XIcon } from '../icons';
 import { Button } from '../Button';
+import { useCampaigns } from '../../hooks/useQueries';
 
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <details className="group" open>
@@ -45,8 +46,14 @@ interface MarketingReportFilters {
 }
 
 export const MarketingReportFilterDrawer = () => {
-    const { isMarketingReportFilterDrawerOpen, setIsMarketingReportFilterDrawerOpen, t, campaigns, marketingReportFilters, setMarketingReportFilters } = useAppContext();
+    const { isMarketingReportFilterDrawerOpen, setIsMarketingReportFilterDrawerOpen, t, marketingReportFilters, setMarketingReportFilters } = useAppContext();
     const [localFilters, setLocalFilters] = useState<MarketingReportFilters>(marketingReportFilters);
+    
+    // Fetch campaigns using React Query
+    const { data: campaignsData, isLoading: campaignsLoading, error: campaignsError } = useCampaigns();
+    const campaigns = Array.isArray(campaignsData) 
+        ? campaignsData 
+        : (campaignsData?.results || []);
 
     useEffect(() => {
         setLocalFilters(marketingReportFilters);
@@ -88,21 +95,27 @@ export const MarketingReportFilterDrawer = () => {
                     <FilterSection title={t('reportInfo') || 'Report Information'}>
                         <div className="space-y-3">
                             <div>
-                                <FilterLabel htmlFor="filter-campaign">{t('campaign')}</FilterLabel>
-                                <FilterSelect id="filter-campaign" value={localFilters.selectedCampaign} onChange={(e) => handleFilterChange('selectedCampaign', e.target.value)}>
-                                    <option value="all">{t('campaigns')}</option>
-                                    {campaigns.map(campaign => (
-                                        <option key={campaign.id} value={campaign.id.toString()}>{campaign.name}</option>
-                                    ))}
+                                <FilterLabel htmlFor="marketing-report-filter-campaign">{t('campaign')}</FilterLabel>
+                                <FilterSelect id="marketing-report-filter-campaign" value={localFilters.selectedCampaign} onChange={(e) => handleFilterChange('selectedCampaign', e.target.value)}>
+                                    <option value="all">{t('allCampaigns') || 'All Campaigns'}</option>
+                                    {campaignsLoading ? (
+                                        <option disabled>{t('loading') || 'Loading...'}</option>
+                                    ) : campaignsError ? (
+                                        <option disabled>{t('errorLoadingCampaigns') || 'Error loading campaigns'}</option>
+                                    ) : (
+                                        (campaigns || []).map(campaign => (
+                                            <option key={campaign.id} value={campaign.id.toString()}>{campaign.name}</option>
+                                        ))
+                                    )}
                                 </FilterSelect>
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-start-date">{t('startDate')}</FilterLabel>
-                                <FilterInput id="filter-start-date" type="date" value={localFilters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
+                                <FilterLabel htmlFor="marketing-report-filter-start-date">{t('startDate')}</FilterLabel>
+                                <FilterInput id="marketing-report-filter-start-date" type="date" value={localFilters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-end-date">{t('endDate') || 'End Date'}</FilterLabel>
-                                <FilterInput id="filter-end-date" type="date" value={localFilters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
+                                <FilterLabel htmlFor="marketing-report-filter-end-date">{t('endDate') || 'End Date'}</FilterLabel>
+                                <FilterInput id="marketing-report-filter-end-date" type="date" value={localFilters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
                             </div>
                         </div>
                     </FilterSection>

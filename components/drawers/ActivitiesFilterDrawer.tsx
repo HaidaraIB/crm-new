@@ -5,6 +5,8 @@ import { XIcon } from '../icons';
 import { Button } from '../Button';
 import { TaskStage } from '../../types';
 import { getStageDisplayLabel } from '../../utils/taskStageMapper';
+import { useUsers, useStages } from '../../hooks/useQueries';
+import { getUserDisplayName } from '../../types';
 
 // FIX: Made children optional to fix missing children prop error.
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
@@ -44,8 +46,25 @@ const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: 
 };
 
 export const ActivitiesFilterDrawer = () => {
-    const { isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen, t, users, activityFilters, setActivityFilters } = useAppContext();
+    const { isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen, t, activityFilters, setActivityFilters, currentUser } = useAppContext();
     const [localFilters, setLocalFilters] = useState(activityFilters);
+    
+    // Fetch users using React Query
+    const { data: usersData } = useUsers();
+    const usersArray = Array.isArray(usersData) 
+        ? usersData 
+        : (usersData?.results || []);
+    
+    // Ensure users list includes current user if available
+    const users = usersArray.length > 0 
+        ? usersArray 
+        : (currentUser ? [currentUser] : []);
+    
+    // Fetch stages using React Query
+    const { data: stagesData } = useStages();
+    const stagesArray = Array.isArray(stagesData) 
+        ? stagesData 
+        : (stagesData?.results || []);
 
     // Update local filters when activityFilters changes
     useEffect(() => {
@@ -78,7 +97,10 @@ export const ActivitiesFilterDrawer = () => {
         setIsActivitiesFilterDrawerOpen(false);
     };
 
-    const stages: Array<TaskStage | 'All'> = ['All', 'following', 'meeting', 'done_meeting', 'whatsapp_pending', 'no_answer', 'out_of_service', 'cancellation', 'not_interested', 'hold'];
+    // Use stages from API, fallback to hardcoded stages if API doesn't return any
+    const stages: Array<TaskStage | 'All'> = stagesArray.length > 0
+        ? ['All', ...stagesArray.map((s: any) => s.name || s.stage_name).filter(Boolean) as TaskStage[]]
+        : ['All', 'following', 'meeting', 'done_meeting', 'whatsapp_pending', 'no_answer', 'out_of_service', 'cancellation', 'not_interested', 'hold'];
     const leadTypes: Array<'All' | 'Fresh' | 'Cold'> = ['All', 'Fresh', 'Cold'];
     const timePeriods: Array<'All' | 'today' | 'yesterday' | 'last7' | 'thisMonth'> = ['All', 'today', 'yesterday', 'last7', 'thisMonth'];
 
@@ -96,20 +118,20 @@ export const ActivitiesFilterDrawer = () => {
                     <FilterSection title={t('activityInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-user">{t('user')}</FilterLabel>
-                                <FilterSelect id="filter-user" value={localFilters.user} onChange={(e) => handleFilterChange('user', e.target.value)}>
+                                <FilterLabel htmlFor="activities-filter-user">{t('user')}</FilterLabel>
+                                <FilterSelect id="activities-filter-user" value={localFilters.user} onChange={(e) => handleFilterChange('user', e.target.value)}>
                                     <option value="All">{t('allUsers') || 'All Users'}</option>
-                                    {users.map(user => (
+                                    {users?.map(user => (
                                         <option key={user.id} value={user.id.toString()}>
-                                            {user.name}
+                                            {getUserDisplayName(user)}
                                         </option>
-                                    ))}
+                                    )) || []}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-stage">{t('stage')}</FilterLabel>
-                                <FilterSelect id="filter-stage" value={localFilters.stage} onChange={(e) => handleFilterChange('stage', e.target.value)}>
+                                <FilterLabel htmlFor="activities-filter-stage">{t('stage')}</FilterLabel>
+                                <FilterSelect id="activities-filter-stage" value={localFilters.stage} onChange={(e) => handleFilterChange('stage', e.target.value)}>
                                     {stages.map(stage => (
                                         <option key={stage} value={stage}>
                                             {stage === 'All' ? t('all') : getStageDisplayLabel(stage as TaskStage)}
@@ -119,8 +141,8 @@ export const ActivitiesFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-lead-type">{t('leadType')}</FilterLabel>
-                                <FilterSelect id="filter-lead-type" value={localFilters.leadType} onChange={(e) => handleFilterChange('leadType', e.target.value)}>
+                                <FilterLabel htmlFor="activities-filter-lead-type">{t('leadType')}</FilterLabel>
+                                <FilterSelect id="activities-filter-lead-type" value={localFilters.leadType} onChange={(e) => handleFilterChange('leadType', e.target.value)}>
                                     {leadTypes.map(type => (
                                         <option key={type} value={type}>
                                             {type === 'All' ? t('all') : t(type.toLowerCase() + 'Lead') || type}
@@ -130,8 +152,8 @@ export const ActivitiesFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-time-period">{t('timePeriod')}</FilterLabel>
-                                <FilterSelect id="filter-time-period" value={localFilters.timePeriod} onChange={(e) => handleFilterChange('timePeriod', e.target.value)}>
+                                <FilterLabel htmlFor="activities-filter-time-period">{t('timePeriod')}</FilterLabel>
+                                <FilterSelect id="activities-filter-time-period" value={localFilters.timePeriod} onChange={(e) => handleFilterChange('timePeriod', e.target.value)}>
                                     {timePeriods.map(period => (
                                         <option key={period} value={period}>
                                             {period === 'All' ? (t('all') + ' ' + t('time')) : t(period) || period}
@@ -145,12 +167,12 @@ export const ActivitiesFilterDrawer = () => {
                     <FilterSection title={t('dates')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-date-from">{t('activityDateFrom') || t('date')} ({t('from')})</FilterLabel>
-                                <FilterInput id="filter-date-from" type="date" value={localFilters.dateFrom} onChange={(e) => handleFilterChange('dateFrom', e.target.value)} />
+                                <FilterLabel htmlFor="activities-filter-date-from">{t('activityDateFrom') || t('date')} ({t('from')})</FilterLabel>
+                                <FilterInput id="activities-filter-date-from" type="date" value={localFilters.dateFrom} onChange={(e) => handleFilterChange('dateFrom', e.target.value)} />
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-date-to">{t('activityDateTo') || t('date')} ({t('to')})</FilterLabel>
-                                <FilterInput id="filter-date-to" type="date" value={localFilters.dateTo} onChange={(e) => handleFilterChange('dateTo', e.target.value)} />
+                                <FilterLabel htmlFor="activities-filter-date-to">{t('activityDateTo') || t('date')} ({t('to')})</FilterLabel>
+                                <FilterInput id="activities-filter-date-to" type="date" value={localFilters.dateTo} onChange={(e) => handleFilterChange('dateTo', e.target.value)} />
                             </div>
                         </div>
                     </FilterSection>

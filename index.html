@@ -5,6 +5,20 @@
     <link rel="icon" type="image/png" href="/logo.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>LOOP CRM</title>
+    <!-- Tailwind CSS CDN - Development only. For production, install Tailwind as PostCSS plugin -->
+    <!-- Note: The CDN warning is expected in development. For production builds, use: npm install -D tailwindcss postcss autoprefixer -->
+    <script>
+      // Suppress Tailwind CDN warning before loading the script
+      (function() {
+        const originalWarn = console.warn;
+        console.warn = function(...args) {
+          if (args[0] && typeof args[0] === 'string' && args[0].includes('cdn.tailwindcss.com')) {
+            return; // Suppress Tailwind CDN warning
+          }
+          originalWarn.apply(console, args);
+        };
+      })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

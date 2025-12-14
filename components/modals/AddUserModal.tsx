@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
+import { useCreateUser } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -18,18 +19,22 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 );
 
 export const AddUserModal = () => {
-    const { isAddUserModalOpen, setIsAddUserModalOpen, addUser, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddUserModalOpen, setIsAddUserModalOpen, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    
+    // Create user mutation
+    const createUserMutation = useCreateUser();
+    const isLoading = createUserMutation.isPending;
+
     const [formData, setFormData] = useState({
         name: '',
         username: '',
         email: '',
         password: '',
         phone: '',
-        role: 'Employee',
+        role: 'employee',
     });
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
-    const [isLoading, setIsLoading] = useState(false);
 
     const validatePhone = (phone: string): string | null => {
         if (!phone.trim()) {
@@ -107,18 +112,46 @@ export const AddUserModal = () => {
     const handleSubmit = async () => {
         if (!validateForm()) return;
 
-        setIsLoading(true);
         setErrors({});
 
         try {
-            await addUser({
-                name: formData.name,
+            // Split name into first_name and last_name
+            const nameParts = formData.name.trim().split(/\s+/);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            
+            // Get company ID - ensure it's a number
+            const companyId = currentUser?.company?.id;
+            if (!companyId) {
+                console.error('Company ID is missing. Current user:', currentUser);
+                setErrors({ _general: t('companyRequired') || 'Company information is required. Please refresh the page and try again.' });
+                return;
+            }
+            
+            // Ensure companyId is a number
+            const companyIdNumber = typeof companyId === 'number' ? companyId : parseInt(companyId, 10);
+            if (isNaN(companyIdNumber)) {
+                console.error('Company ID is not a valid number:', companyId);
+                setErrors({ _general: t('companyRequired') || 'Company information is invalid. Please refresh the page and try again.' });
+                return;
+            }
+            
+            // Include company ID in the request
+            // Send as 'company_id' which the serializer accepts for writes
+            // The backend will also set it from request user's company as a fallback
+            const userData: any = {
+                first_name: firstName,
+                last_name: lastName,
                 username: formData.username,
                 email: formData.email,
                 password: formData.password,
                 phone: formData.phone,
                 role: formData.role,
-            });
+                company_id: companyIdNumber,
+            };
+            
+            
+            await createUserMutation.mutateAsync(userData);
 
             // Reset form
             setFormData({
@@ -127,7 +160,7 @@ export const AddUserModal = () => {
                 email: '',
                 password: '',
                 phone: '',
-                role: 'Employee',
+                role: 'employee',
             });
             setErrors({});
             
@@ -168,6 +201,9 @@ export const AddUserModal = () => {
             } else if (errorFields.password) {
                 const passwordError = Array.isArray(errorFields.password) ? errorFields.password[0] : errorFields.password;
                 setErrors({ password: passwordError || t('passwordRequired') || 'Password is required' });
+            } else if (errorFields.role) {
+                const roleError = Array.isArray(errorFields.role) ? errorFields.role[0] : errorFields.role;
+                setErrors({ role: roleError || t('invalidRole') || 'Invalid role' });
             } else if (lowerMessage.includes('email') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
                 setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
             } else if (lowerMessage.includes('username') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
@@ -180,8 +216,6 @@ export const AddUserModal = () => {
                     _general: errorMessage || t('errorCreatingEmployee') || 'Failed to create employee. Please try again.' 
                 });
             }
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -205,7 +239,7 @@ export const AddUserModal = () => {
                 email: '',
                 password: '',
                 phone: '',
-                role: 'Employee',
+                role: 'employee',
             });
             setErrors({});
         }} title={t('createEmployee')}>
@@ -269,7 +303,7 @@ export const AddUserModal = () => {
                         id="add-user-phone" 
                         value={formData.phone}
                         onChange={(value) => handleChange('phone', value)}
-                        placeholder={t('enterPhoneNumber') || 'Enter phone number'}
+                        placeholder={t('enterPhone') || 'Enter phone number'}
                         error={!!errors.phone}
                     />
                     {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
@@ -281,7 +315,7 @@ export const AddUserModal = () => {
                         value={formData.role}
                         onChange={(e) => handleChange('role', e.target.value)}
                     >
-                        <option value="Employee">{t('employee')}</option>
+                        <option value="employee">{t('employee')}</option>
                     </Select>
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>
@@ -296,7 +330,7 @@ export const AddUserModal = () => {
                                 email: '',
                                 password: '',
                                 phone: '',
-                                role: 'Employee',
+                                role: 'employee',
                             });
                             setErrors({});
                             setSuccessMessage('');
@@ -310,7 +344,7 @@ export const AddUserModal = () => {
                         loading={isLoading}
                         disabled={isLoading}
                     >
-                        {t('createUser')}
+                        {t('createEmployee')}
                     </Button>
                 </div>
             </div>

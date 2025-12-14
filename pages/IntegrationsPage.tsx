@@ -1,10 +1,12 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader } from '../components/index';
 import { Page } from '../types';
-import { getConnectedAccountsAPI, deleteConnectedAccountAPI, connectIntegrationAccountAPI } from '../services/api';
+import { connectIntegrationAccountAPI } from '../services/api';
+import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
 
 type Account = { id: number; name: string; status: string; };
 
@@ -22,13 +24,24 @@ const platformConfig: Record<string, { name: string, icon: React.FC<React.SVGPro
 };
 
 export const IntegrationsPage = () => {
-    const { t, currentPage, setIsManageIntegrationAccountModalOpen, connectedAccounts, setConnectedAccounts, setEditingAccount, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
-    const [loading, setLoading] = useState(true);
+    const { t, currentPage, setIsManageIntegrationAccountModalOpen, setEditingAccount, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
 
-    const getPlatformDetails = (page: Page): PlatformDetails | null => {
+    // Get platform param based on currentPage
+    const platformParam = useMemo(() => {
+        if (currentPage === 'Meta' || currentPage === 'Integrations') {
+            return 'meta';
+        } else if (currentPage === 'TikTok') {
+            return 'tiktok';
+        } else if (currentPage === 'WhatsApp') {
+            return 'whatsapp';
+        }
+        return undefined;
+    }, [currentPage]);
+
+    // Get dataKey based on currentPage (memoized)
+    const dataKey = useMemo(() => {
         let platformKey: string;
-    
-        switch (page) {
+        switch (currentPage) {
             case 'Integrations':
             case 'Meta':
                 platformKey = 'Meta';
@@ -42,77 +55,63 @@ export const IntegrationsPage = () => {
             default:
                 return null;
         }
-    
-        const config = platformConfig[platformKey];
-        if (!config) return null;
+        return platformConfig[platformKey]?.dataKey || null;
+    }, [currentPage]);
 
+    // Fetch connected accounts using React Query
+    const { data: accountsResponse, isLoading: loading } = useConnectedAccounts(platformParam);
+    
+    // Ensure accounts is always an array and format them
+    const accounts = useMemo(() => {
+        const accountsData = Array.isArray(accountsResponse) 
+            ? accountsResponse 
+            : (accountsResponse?.results || []);
+        
+        return accountsData.map((acc: any) => ({
+            id: acc.id,
+            name: acc.name,
+            status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
+            link: acc.account_link,
+            phone: acc.phone_number,
+        }));
+    }, [accountsResponse]);
+
+    // Get platform details (memoized)
+    const platform = useMemo(() => {
+        if (!dataKey) return null;
+        const config = platformConfig[Object.keys(platformConfig).find(key => platformConfig[key].dataKey === dataKey) || ''];
+        if (!config) return null;
         return {
             name: config.name,
             icon: config.icon,
-            accounts: connectedAccounts[config.dataKey],
-            dataKey: config.dataKey,
+            dataKey: dataKey,
         };
-    };
-
-    // الحصول على platform details أولاً
-    const platform = getPlatformDetails(currentPage);
+    }, [dataKey]);
     
-    if (!platform) {
-        return <PageWrapper title={t('integrations')}><div>Unknown integration platform.</div></PageWrapper>;
+    if (!platform || !dataKey) {
+        return <PageWrapper title={t('integrations')}><div>{t('unknownIntegration')}</div></PageWrapper>;
     }
     
-    const { name, icon: Icon, accounts: platformAccounts, dataKey } = platform;
-    const accounts = platformAccounts || [];
+    const { name, icon: Icon } = platform;
     const pageTitle = `${name} ${t('integration')}`;
 
+    // Delete account mutation
+    const deleteAccountMutation = useDeleteConnectedAccount();
+    const queryClient = useQueryClient();
+
+    // Handle OAuth callback
     useEffect(() => {
-        // التحقق من OAuth callback
         const urlParams = new URLSearchParams(window.location.search);
         const connected = urlParams.get('connected');
         const accountId = urlParams.get('account_id');
         
         if (connected === 'true' && accountId) {
-            // إزالة parameters من URL
+            // Remove parameters from URL
             window.history.replaceState({}, document.title, window.location.pathname);
-            // إعادة تحميل الحسابات
+            // Invalidate queries to refetch accounts
+            queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
         }
-        
-        const loadAccounts = async () => {
-            setLoading(true);
-            try {
-                let platformParam: string | undefined;
-                if (currentPage === 'Meta' || currentPage === 'Integrations') {
-                    platformParam = 'meta';
-                } else if (currentPage === 'TikTok') {
-                    platformParam = 'tiktok';
-                } else if (currentPage === 'WhatsApp') {
-                    platformParam = 'whatsapp';
-                }
-                
-                const accounts = await getConnectedAccountsAPI(platformParam);
-                
-                // تحويل البيانات من API إلى الصيغة المتوقعة
-                const formattedAccounts = accounts.map((acc: any) => ({
-                    id: acc.id,
-                    name: acc.name,
-                    status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
-                    link: acc.account_link,
-                    phone: acc.phone_number,
-                }));
-                
-                setConnectedAccounts(prev => ({
-                    ...prev,
-                    [dataKey]: formattedAccounts,
-                }));
-            } catch (error) {
-                console.error('Error loading accounts:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
-        
-        loadAccounts();
-    }, [currentPage, dataKey, setConnectedAccounts]);
+    }, [queryClient]);
 
     const handleDelete = async (accountId: number) => {
         const account = accounts.find(acc => acc.id === accountId);
@@ -123,11 +122,7 @@ export const IntegrationsPage = () => {
                 itemName: account.name,
                 onConfirm: async () => {
                     try {
-                        await deleteConnectedAccountAPI(accountId);
-                        setConnectedAccounts(prev => ({
-                            ...prev,
-                            [dataKey]: prev[dataKey].filter((acc: Account) => acc.id !== accountId),
-                        }));
+                        await deleteAccountMutation.mutateAsync(accountId);
                     } catch (error: any) {
                         console.error('Error deleting account:', error);
                         alert(error?.message || t('errorDeletingAccount') || 'Failed to delete account');

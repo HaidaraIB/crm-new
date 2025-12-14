@@ -88,20 +88,20 @@ export const EmployeesReportFilterDrawer = () => {
                     <FilterSection title={t('reportInfo') || 'Report Information'}>
                         <div className="space-y-3">
                             <div>
-                                <FilterLabel htmlFor="filter-lead-type">{t('leadType')}</FilterLabel>
-                                <FilterSelect id="filter-lead-type" value={localFilters.leadType} onChange={(e) => handleFilterChange('leadType', e.target.value)}>
+                                <FilterLabel htmlFor="employees-report-filter-lead-type">{t('leadType')}</FilterLabel>
+                                <FilterSelect id="employees-report-filter-lead-type" value={localFilters.leadType} onChange={(e) => handleFilterChange('leadType', e.target.value)}>
                                     <option value="all">{t('allLeadsType')}</option>
                                     <option value="fresh">{t('freshLeads')}</option>
                                     <option value="cold">{t('coldLeads')}</option>
                                 </FilterSelect>
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-start-date">{t('startDate')}</FilterLabel>
-                                <FilterInput id="filter-start-date" type="date" value={localFilters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
+                                <FilterLabel htmlFor="employees-report-filter-start-date">{t('startDate')}</FilterLabel>
+                                <FilterInput id="employees-report-filter-start-date" type="date" value={localFilters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-end-date">{t('endDate') || 'End Date'}</FilterLabel>
-                                <FilterInput id="filter-end-date" type="date" value={localFilters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
+                                <FilterLabel htmlFor="employees-report-filter-end-date">{t('endDate') || 'End Date'}</FilterLabel>
+                                <FilterInput id="employees-report-filter-end-date" type="date" value={localFilters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
                             </div>
                         </div>
                     </FilterSection>

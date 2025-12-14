@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
+import { useUpdateOwner } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -23,15 +24,19 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const EditOwnerModal = () => {
-    const { isEditOwnerModalOpen, setIsEditOwnerModalOpen, t, updateOwner, editingOwner, setEditingOwner, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditOwnerModalOpen, setIsEditOwnerModalOpen, t, editingOwner, setEditingOwner, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Update owner mutation
+    const updateOwnerMutation = useUpdateOwner();
+    const isLoading = updateOwnerMutation.isPending;
+    
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
-        city: 'Riyadh',
+        city: '',
         district: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -89,12 +94,21 @@ export const EditOwnerModal = () => {
             return;
         }
         
-        setIsLoading(true);
         try {
-            await updateOwner({
-                ...editingOwner,
-                ...formState,
-            });
+            // Prepare owner data with all fields and company ID
+            const ownerData = {
+                name: formState.name.trim(),
+                phone: formState.phone,
+                city: formState.city,
+                district: formState.district,
+                company: currentUser?.company?.id,
+            };
+            
+            if (!ownerData.company) {
+                throw new Error(t('companyRequired') || 'Company information is required');
+            }
+            
+            await updateOwnerMutation.mutateAsync({ id: editingOwner.id, data: ownerData });
 
             // Close modal immediately and show success modal
             handleClose();
@@ -103,8 +117,6 @@ export const EditOwnerModal = () => {
         } catch (error: any) {
             console.error('Error updating owner:', error);
             setErrors({ _general: error?.message || t('errorUpdatingOwner') || 'Failed to update owner. Please try again.' });
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -142,11 +154,12 @@ export const EditOwnerModal = () => {
                 </div>
                  <div>
                     <Label htmlFor="city">{t('city')}</Label>
-                    <Select id="city" value={formState.city} onChange={handleChange}>
-                        <option>{t('riyadh')}</option>
-                        <option>{t('jeddah')}</option>
-                        <option>{t('dammam')}</option>
-                    </Select>
+                    <Input 
+                        id="city" 
+                        placeholder={t('enterCity') || 'Enter city'} 
+                        value={formState.city} 
+                        onChange={handleChange}
+                    />
                 </div>
                 <div>
                     <Label htmlFor="district">{t('ownerDistrict')}</Label>

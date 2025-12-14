@@ -5,7 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Page } from '../../types';
-import { createConnectedAccountAPI, updateConnectedAccountAPI } from '../../services/api';
+import { useCreateConnectedAccount, useUpdateConnectedAccount } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -39,7 +39,6 @@ export const ManageIntegrationAccountModal = () => {
         setIsManageIntegrationAccountModalOpen, 
         currentPage, 
         t,
-        setConnectedAccounts,
         editingAccount,
         setEditingAccount,
         setIsSuccessModalOpen,
@@ -49,11 +48,14 @@ export const ManageIntegrationAccountModal = () => {
     const [accountName, setAccountName] = useState('');
     const [accountLink, setAccountLink] = useState('');
     const [phoneNumber, setPhoneNumber] = useState('');
-    const [isLoading, setIsLoading] = useState(false);
+
+    // React Query mutations
+    const createAccountMutation = useCreateConnectedAccount();
+    const updateAccountMutation = useUpdateConnectedAccount();
+    
+    const isLoading = createAccountMutation.isPending || updateAccountMutation.isPending;
 
     const platformName = getPlatformName(currentPage);
-    // Map Meta to 'facebook' for dataKey compatibility (API will use company-specific keys)
-    const platformKey = (platformName.toLowerCase() === 'meta' ? 'facebook' : platformName.toLowerCase()) as 'facebook' | 'tiktok' | 'whatsapp';
     const isEditMode = !!editingAccount;
 
     useEffect(() => {
@@ -80,8 +82,6 @@ export const ManageIntegrationAccountModal = () => {
             return;
         }
 
-        setIsLoading(true);
-
         try {
             if (isEditMode && editingAccount) {
                 // تحديث حساب موجود
@@ -95,22 +95,10 @@ export const ManageIntegrationAccountModal = () => {
                     updateData.account_link = accountLink;
                 }
                 
-                await updateConnectedAccountAPI(editingAccount.id, updateData);
-                
-                // تحديث state
-                setConnectedAccounts((prev: any) => ({
-                    ...prev,
-                    [platformKey]: prev[platformKey].map((acc: any) => 
-                        acc.id === editingAccount.id 
-                        ? { 
-                            ...acc, 
-                            name: accountName,
-                            link: accountLink,
-                            phone: phoneNumber,
-                        } 
-                        : acc
-                    )
-                }));
+                await updateAccountMutation.mutateAsync({
+                    id: editingAccount.id,
+                    data: updateData
+                });
             } else {
                 // إنشاء حساب جديد
                 const createData: any = {
@@ -124,21 +112,7 @@ export const ManageIntegrationAccountModal = () => {
                     createData.account_link = accountLink;
                 }
                 
-                const newAccount = await createConnectedAccountAPI(createData);
-                
-                // إضافة للstate
-                const formattedAccount = {
-                    id: newAccount.id,
-                    name: newAccount.name,
-                    status: newAccount.status === 'connected' ? 'Connected' : 'Disconnected',
-                    link: newAccount.account_link,
-                    phone: newAccount.phone_number,
-                };
-                
-                setConnectedAccounts((prev: any) => ({
-                    ...prev,
-                    [platformKey]: [...(prev[platformKey] || []), formattedAccount]
-                }));
+                await createAccountMutation.mutateAsync(createData);
             }
 
             // Reset form
@@ -156,8 +130,6 @@ export const ManageIntegrationAccountModal = () => {
         } catch (error: any) {
             console.error('Error saving account:', error);
             alert(error?.message || t('errorSavingAccount') || 'Failed to save account. Please try again.');
-        } finally {
-            setIsLoading(false);
         }
     };
     

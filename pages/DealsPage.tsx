@@ -1,30 +1,31 @@
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Loader, TrashIcon, EditIcon, EyeIcon } from '../components/index';
 import { Deal } from '../types';
+import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 
-const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate }: { deals: Deal[], onDelete: (id: number) => void, onEdit: (id: number) => void, onView: (id: number) => void, isRealEstate: boolean }) => {
-    const { t, projects, units } = useAppContext();
+const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, units }: { deals: Deal[], onDelete: (id: number) => void, onEdit: (id: number) => void, onView: (id: number) => void, isRealEstate: boolean, projects: any[], units: any[] }) => {
+    const { t } = useAppContext();
     
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1000px]">
+                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1000px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap">{t('dealId')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap">{t('clientName')}</th>
-                                {isRealEstate && <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell">{t('project')}</th>}
-                                {isRealEstate && <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden md:table-cell">{t('unit')}</th>}
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden sm:table-cell">{t('stage')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap">{t('status')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell">{t('paymentMethod')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-right">{t('value')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell">{t('startDate')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell">{t('closedDate')}</th>
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('dealId')}</th>
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('clientName')}</th>
+                                {isRealEstate && <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('project')}</th>}
+                                {isRealEstate && <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden md:table-cell text-center">{t('unit')}</th>}
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden sm:table-cell text-center">{t('stage')}</th>
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('status')}</th>
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('paymentMethod')}</th>
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('value')}</th>
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('startDate')}</th>
+                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('closedDate')}</th>
                                 <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('actions')}</th>
                             </tr>
                         </thead>
@@ -62,6 +63,27 @@ const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate }: { deals: 
                                         return stageMap[stage] || stage;
                                     };
 
+                                    const formatStatus = (status: string | undefined): string => {
+                                        if (!status) return '-';
+                                        const statusLower = status.toLowerCase();
+                                        const statusMap: { [key: string]: string } = {
+                                            'reservation': t('reservation') || 'Reservation',
+                                            'contracted': t('contracted') || 'Contracted',
+                                            'closed': t('closed') || 'Closed',
+                                        };
+                                        return statusMap[statusLower] || status;
+                                    };
+
+                                    const formatPaymentMethod = (method: string | undefined): string => {
+                                        if (!method) return '-';
+                                        const methodLower = method.toLowerCase();
+                                        const methodMap: { [key: string]: string } = {
+                                            'cash': t('cash') || 'Cash',
+                                            'installment': t('installment') || 'Installment',
+                                        };
+                                        return methodMap[methodLower] || method;
+                                    };
+
                                     const getStageColor = (stage: string | undefined): string => {
                                         if (!stage) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
                                         const colorMap: { [key: string]: string } = {
@@ -74,59 +96,71 @@ const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate }: { deals: 
                                         return colorMap[stage] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
                                     };
 
-                                    // Find project and unit names
+                                    // Get project and unit names from API serializer fields (project_name, unit_code)
+                                    // If not available, fall back to searching in projects/units arrays
                                     const projectName = isRealEstate && deal.project 
-                                        ? (projects.find(p => p.name === deal.project || p.id.toString() === deal.project)?.name || deal.project)
+                                        ? ((deal as any).project_name || projects.find(p => p.name === deal.project || p.id.toString() === deal.project || p.id === deal.project)?.name || (typeof deal.project === 'string' ? deal.project : null))
                                         : null;
                                     const unitCode = isRealEstate && deal.unit 
-                                        ? (units.find(u => u.code === deal.unit || u.id.toString() === deal.unit)?.code || deal.unit)
+                                        ? ((deal as any).unit_code || units.find(u => u.code === deal.unit || u.id.toString() === deal.unit || u.id === deal.unit)?.code || (typeof deal.unit === 'string' ? deal.unit : null))
                                         : null;
+
+                                    // Format value like budget: comma-separated with trailing zeros removed
+                                    const formattedValue = (() => {
+                                        const num = Number(deal.value);
+                                        const formatted = num.toLocaleString('en-US', { 
+                                            minimumFractionDigits: 0, 
+                                            maximumFractionDigits: 2 
+                                        });
+                                        return formatted.replace(/\.0+$/, '');
+                                    })();
 
                                     return (
                                         <tr key={deal.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
-                                            <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                                            <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap text-center">
                                                 <span className="text-sm">#{deal.id}</span>
                                             </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
+                                            <td className="px-4 py-4 whitespace-nowrap text-center">
                                                 <span className="text-sm font-medium text-gray-900 dark:text-white">{deal.clientName}</span>
                                             </td>
                                             {isRealEstate && (
-                                                <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap">
+                                                <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
                                                     <span className="text-sm text-gray-700 dark:text-gray-300">{projectName || '-'}</span>
                                                 </td>
                                             )}
                                             {isRealEstate && (
-                                                <td className="px-4 py-4 hidden md:table-cell whitespace-nowrap">
+                                                <td className="px-4 py-4 hidden md:table-cell whitespace-nowrap text-center">
                                                     <span className="text-sm text-gray-700 dark:text-gray-300">{unitCode || '-'}</span>
                                                 </td>
                                             )}
-                                            <td className="px-4 py-4 hidden sm:table-cell whitespace-nowrap">
+                                            <td className="px-4 py-4 hidden sm:table-cell whitespace-nowrap text-center">
                                                 <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${getStageColor(deal.stage)}`}>
                                                     {formatStage(deal.stage)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
+                                            <td className="px-4 py-4 whitespace-nowrap text-center">
                                                 <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${
-                                                    deal.status === 'Reservation' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                                    deal.status === 'Contracted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                    deal.status?.toLowerCase() === 'reservation' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                                                    deal.status?.toLowerCase() === 'contracted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                                    deal.status?.toLowerCase() === 'closed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                    'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
                                                 }`}>
-                                                    {deal.status}
+                                                    {formatStatus(deal.status)}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap">
-                                                <span className="text-sm text-gray-700 dark:text-gray-300">{deal.paymentMethod}</span>
+                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
+                                                <span className="text-sm text-gray-700 dark:text-gray-300">{formatPaymentMethod(deal.paymentMethod)}</span>
                                             </td>
-                                            <td className="px-4 py-4 text-right whitespace-nowrap">
-                                                <span className="text-sm font-semibold text-gray-900 dark:text-white">{deal.value.toLocaleString()}</span>
+                                            <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                <span className="text-sm font-semibold text-gray-900 dark:text-white">{formattedValue}</span>
                                             </td>
-                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap">
+                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
                                                 <span className="text-sm text-gray-600 dark:text-gray-400">{formatDate(deal.startDate)}</span>
                                             </td>
-                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap">
+                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
                                                 <span className="text-sm text-gray-600 dark:text-gray-400">{formatDate(deal.closedDate)}</span>
                                             </td>
-                                            <td className="px-4 py-4 whitespace-nowrap">
+                                            <td className="px-4 py-4 whitespace-nowrap text-center">
                                                 <div className="flex items-center justify-center gap-1.5">
                                                     <Button 
                                                         variant="ghost" 
@@ -167,27 +201,12 @@ const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate }: { deals: 
 }
 
 export const DealsPage = () => {
-    // TODO: أضف useEffect لتحميل Deals من API عند فتح الصفحة
-    // مثال:
-    // useEffect(() => {
-    //   const loadDeals = async () => {
-    //     try {
-    //       const dealsData = await getDealsAPI();
-    //       // TODO: استخدم setDeals من AppContext
-    //     } catch (error) {
-    //       console.error('Error loading deals:', error);
-    //     }
-    //   };
-    //   loadDeals();
-    // }, []);
     const { 
         t, 
         setCurrentPage, 
         setIsDealsFilterDrawerOpen, 
-        deals, 
         dealFilters,
         setDealFilters,
-        deleteDeal, 
         currentUser, 
         setConfirmDeleteConfig, 
         setIsConfirmDeleteModalOpen,
@@ -196,48 +215,140 @@ export const DealsPage = () => {
         setIsViewDealModalOpen,
         setViewingDeal
     } = useAppContext();
-    const [loading, setLoading] = useState(true);
+
+    // Fetch deals using React Query
+    const { data: dealsResponse, isLoading: dealsLoading, error: dealsError } = useDeals();
+    const dealsRaw = dealsResponse?.results || [];
+
+    // Fetch projects and units for real estate
+    const { data: projectsResponse } = useProjects();
+    const projectsRaw = projectsResponse?.results || [];
+
+    const { data: unitsResponse } = useUnits();
+    const unitsRaw = unitsResponse?.results || [];
+    
+    // Transform deals: convert client, project, unit from object/ID to string
+    const allDeals = useMemo(() => {
+        return dealsRaw.map((deal: any) => {
+            // Handle clientName - API might return client_name, clientName, or client object
+            let clientName = '';
+            if (deal.client_name) {
+                clientName = deal.client_name;
+            } else if (deal.clientName) {
+                clientName = deal.clientName;
+            } else if (typeof deal.client === 'object' && deal.client?.name) {
+                clientName = deal.client.name;
+            } else if (typeof deal.client === 'number') {
+                // Would need to fetch client, but for now use fallback
+                clientName = deal.client_name || deal.clientName || '';
+            }
+            
+            // Handle project - API might return project_name, project, or project object
+            let projectName = '';
+            if (deal.project_name) {
+                projectName = deal.project_name;
+            } else if (typeof deal.project === 'object' && deal.project?.name) {
+                projectName = deal.project.name;
+            } else if (typeof deal.project === 'number') {
+                const proj = projectsRaw.find((p: any) => p.id === deal.project);
+                projectName = proj?.name || '';
+            } else if (typeof deal.project === 'string') {
+                projectName = deal.project;
+            }
+            
+            // Handle unit - API might return unit_code, unit, or unit object
+            let unitCode = '';
+            if (deal.unit_code) {
+                unitCode = deal.unit_code;
+            } else if (typeof deal.unit === 'object' && deal.unit?.code) {
+                unitCode = deal.unit.code;
+            } else if (typeof deal.unit === 'number') {
+                const unit = unitsRaw.find((u: any) => u.id === deal.unit);
+                unitCode = unit?.code || '';
+            } else if (typeof deal.unit === 'string') {
+                unitCode = deal.unit;
+            }
+            
+            // Handle paymentMethod - API might return payment_method or paymentMethod
+            const paymentMethod = deal.payment_method || deal.paymentMethod || '';
+            
+            // Handle startedBy and closedBy - API might return started_by/closed_by or startedBy/closedBy
+            const startedBy = deal.started_by || deal.startedBy || null;
+            const closedBy = deal.closed_by || deal.closedBy || null;
+            
+            // Handle startDate and closedDate - API might return start_date/closed_date or startDate/closedDate
+            const startDate = deal.start_date || deal.startDate || null;
+            const closedDate = deal.closed_date || deal.closedDate || null;
+            
+            return {
+                ...deal,
+                clientName: clientName,
+                project: projectName,
+                unit: unitCode,
+                paymentMethod: paymentMethod,
+                startedBy: startedBy,
+                closedBy: closedBy,
+                startDate: startDate,
+                closedDate: closedDate,
+            };
+        });
+    }, [dealsRaw, projectsRaw, unitsRaw]);
+    
+    // Transform projects and units for display
+    const projects = projectsRaw;
+    const units = unitsRaw;
+
+    // Delete deal mutation
+    const deleteDealMutation = useDeleteDeal();
+
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, []);
-
     const filteredDeals = useMemo(() => {
-        let filtered = deals;
+        let filtered = allDeals;
 
         // Status filter
         if (dealFilters.status && dealFilters.status !== 'All') {
-            filtered = filtered.filter(deal => deal.status === dealFilters.status);
+            filtered = filtered.filter(deal => {
+                const status = deal.status || '';
+                return status === dealFilters.status;
+            });
         }
 
         // Payment method filter
         if (dealFilters.paymentMethod && dealFilters.paymentMethod !== 'All') {
-            filtered = filtered.filter(deal => deal.paymentMethod === dealFilters.paymentMethod);
+            filtered = filtered.filter(deal => {
+                const paymentMethod = deal.paymentMethod || '';
+                return paymentMethod === dealFilters.paymentMethod;
+            });
         }
 
         // Unit filter (for real estate)
         if (isRealEstate && dealFilters.unit && dealFilters.unit !== 'All') {
-            filtered = filtered.filter(deal => deal.unit === dealFilters.unit);
+            filtered = filtered.filter(deal => {
+                const unit = deal.unit || '';
+                return unit === dealFilters.unit;
+            });
         }
 
         // Project filter (for real estate) - filter by deal's project
         if (isRealEstate && dealFilters.project && dealFilters.project !== 'All') {
-            filtered = filtered.filter(deal => deal.project === dealFilters.project);
+            filtered = filtered.filter(deal => {
+                const project = deal.project || '';
+                return project === dealFilters.project;
+            });
         }
 
         // Value range filter
         if (dealFilters.valueMin) {
             const minValue = parseFloat(dealFilters.valueMin);
             if (!isNaN(minValue)) {
-                filtered = filtered.filter(deal => deal.value >= minValue);
+                filtered = filtered.filter(deal => (deal.value || 0) >= minValue);
             }
         }
         if (dealFilters.valueMax) {
             const maxValue = parseFloat(dealFilters.valueMax);
             if (!isNaN(maxValue)) {
-                filtered = filtered.filter(deal => deal.value <= maxValue);
+                filtered = filtered.filter(deal => (deal.value || 0) <= maxValue);
             }
         }
 
@@ -245,23 +356,28 @@ export const DealsPage = () => {
         if (dealFilters.search) {
             const searchLower = dealFilters.search.toLowerCase();
             filtered = filtered.filter(deal => 
-                deal.clientName.toLowerCase().includes(searchLower) || 
+                (deal.clientName || '').toLowerCase().includes(searchLower) || 
                 deal.id.toString().includes(searchLower)
             );
         }
 
         return filtered;
-    }, [deals, dealFilters, isRealEstate]);
+    }, [allDeals, dealFilters, isRealEstate]);
 
     const handleDelete = (id: number) => {
-        const deal = deals.find(d => d.id === id);
+        const deal = allDeals.find(d => d.id === id);
         if (deal) {
             setConfirmDeleteConfig({
                 title: t('deleteDeal') || 'Delete Deal',
                 message: t('confirmDeleteDeal') || 'Are you sure you want to delete the deal for',
                 itemName: deal.clientName,
                 onConfirm: async () => {
-                    await deleteDeal(id);
+                    try {
+                        await deleteDealMutation.mutateAsync(id);
+                    } catch (error: any) {
+                        console.error('Error deleting deal:', error);
+                        throw error;
+                    }
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -269,7 +385,7 @@ export const DealsPage = () => {
     };
 
     const handleEdit = (id: number) => {
-        const deal = deals.find(d => d.id === id);
+        const deal = allDeals.find(d => d.id === id);
         if (deal) {
             setEditingDeal(deal);
             setIsEditDealModalOpen(true);
@@ -277,18 +393,35 @@ export const DealsPage = () => {
     };
 
     const handleView = (id: number) => {
-        const deal = deals.find(d => d.id === id);
+        const deal = allDeals.find(d => d.id === id);
         if (deal) {
             setViewingDeal(deal);
             setIsViewDealModalOpen(true);
         }
     };
 
-    if (loading) {
+    if (dealsLoading) {
         return (
             <PageWrapper title={t('deals')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
                     <Loader variant="primary" className="h-12"/>
+                </div>
+            </PageWrapper>
+        );
+    }
+
+    if (dealsError) {
+        return (
+            <PageWrapper title={t('deals')}>
+                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
+                    <div className="text-center">
+                        <p className="text-red-600 dark:text-red-400 mb-4">
+                            {t('errorLoadingDeals') || 'Error loading deals. Please try again.'}
+                        </p>
+                        <Button onClick={() => window.location.reload()}>
+                            {t('reload') || 'Reload'}
+                        </Button>
+                    </div>
                 </div>
             </PageWrapper>
         );
@@ -299,17 +432,24 @@ export const DealsPage = () => {
             title={t('deals')}
             actions={
                 <>
-                    <Button variant="secondary" onClick={() => setIsDealsFilterDrawerOpen(true)} className="w-full sm:w-auto">
+                    <Button variant="secondary" onClick={() => setIsDealsFilterDrawerOpen(true)} className="w-full sm:w-auto" type="button">
                         <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
-                    <Button onClick={() => setCurrentPage('CreateDeal')} className="w-full sm:w-auto">
+                    <Button 
+                        onClick={() => {
+                            window.history.pushState({}, '', '/create-deal');
+                            setCurrentPage('CreateDeal');
+                        }} 
+                        className="w-full sm:w-auto" 
+                        type="button"
+                    >
                         <PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('createDeal')}</span>
                     </Button>
                 </>
             }
         >
             <Card>
-                <DealsTable deals={filteredDeals} onDelete={handleDelete} onEdit={handleEdit} onView={handleView} isRealEstate={isRealEstate} />
+                <DealsTable deals={filteredDeals} onDelete={handleDelete} onEdit={handleEdit} onView={handleView} isRealEstate={isRealEstate} projects={projects} units={units} />
             </Card>
         </PageWrapper>
     );

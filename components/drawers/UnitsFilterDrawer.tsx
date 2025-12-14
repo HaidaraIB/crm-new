@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { XIcon } from '../icons';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
+import { useProjects, useUnits } from '../../hooks/useQueries';
 
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <details className="group" open>
@@ -40,8 +41,15 @@ const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: 
 };
 
 export const UnitsFilterDrawer = () => {
-    const { isUnitsFilterDrawerOpen, setIsUnitsFilterDrawerOpen, t, unitFilters, setUnitFilters, projects, units } = useAppContext();
+    const { isUnitsFilterDrawerOpen, setIsUnitsFilterDrawerOpen, t, unitFilters, setUnitFilters } = useAppContext();
     const [localFilters, setLocalFilters] = useState(unitFilters);
+    
+    // Fetch data using React Query
+    const { data: projectsResponse } = useProjects();
+    const projects = projectsResponse?.results || [];
+    
+    const { data: unitsResponse } = useUnits();
+    const units = unitsResponse?.results || [];
 
     useEffect(() => {
         setLocalFilters(unitFilters);
@@ -76,13 +84,68 @@ export const UnitsFilterDrawer = () => {
     };
 
     // Get unique values from units for filters
-    const uniqueTypes = Array.from(new Set(units.map(u => u.type).filter(Boolean)));
-    const uniqueFinishing = Array.from(new Set(units.map(u => u.finishing).filter(Boolean)));
-    const uniqueCities = Array.from(new Set(units.map(u => u.city).filter(Boolean)));
-    const uniqueDistricts = Array.from(new Set(units.map(u => u.district).filter(Boolean)));
-    const uniqueZones = Array.from(new Set(units.map(u => u.zone).filter(Boolean)));
-    const uniqueBedrooms = Array.from(new Set(units.map(u => u.bedrooms).filter(Boolean))).sort((a, b) => a - b);
-    const uniqueBathrooms = Array.from(new Set(units.map(u => u.bathrooms).filter(Boolean))).sort((a, b) => a - b);
+    const uniqueTypes = Array.from(new Set((units || [])
+        .map(u => u.type)
+        .filter(type => type && type !== '-' && type.trim() !== '')))
+        .sort();
+    const uniqueFinishing = Array.from(new Set((units || [])
+        .map(u => u.finishing)
+        .filter(finishing => finishing && finishing !== '-' && finishing.trim() !== '')))
+        .sort();
+    const uniqueCities = Array.from(new Set((units || [])
+        .map(u => u.city)
+        .filter(city => city && city !== '-' && city.trim() !== '')))
+        .sort();
+    const uniqueDistricts = Array.from(new Set((units || [])
+        .map(u => u.district)
+        .filter(district => district && district !== '-' && district.trim() !== '')))
+        .sort();
+    const uniqueZones = Array.from(new Set((units || [])
+        .map(u => u.zone)
+        .filter(zone => zone && zone !== '-' && zone.trim() !== '')))
+        .sort();
+    const uniqueBedrooms = Array.from(new Set((units || [])
+        .map(u => u.bedrooms)
+        .filter(bedrooms => bedrooms !== null && bedrooms !== undefined && bedrooms !== '')))
+        .sort((a, b) => Number(a) - Number(b));
+    const uniqueBathrooms = Array.from(new Set((units || [])
+        .map(u => u.bathrooms)
+        .filter(bathrooms => bathrooms !== null && bathrooms !== undefined && bathrooms !== '')))
+        .sort((a, b) => Number(a) - Number(b));
+
+    // Helper function to translate type
+    const translateType = (type: string): string => {
+        if (!type) return type;
+        const typeLower = type.toLowerCase();
+        const typeMap: { [key: string]: string } = {
+            'apartment': t('apartment') || 'Apartment',
+            'villa': t('villa') || 'Villa',
+        };
+        return typeMap[typeLower] || type;
+    };
+
+    // Helper function to translate finishing
+    const translateFinishing = (finishing: string): string => {
+        if (!finishing) return finishing;
+        const finishingLower = finishing.toLowerCase();
+        const finishingMap: { [key: string]: string } = {
+            'finished': t('finished') || 'Finished',
+            'semi-finished': t('semiFinished') || 'Semi-Finished',
+            'semifinished': t('semiFinished') || 'Semi-Finished',
+        };
+        return finishingMap[finishingLower] || finishing;
+    };
+
+    // Helper function to translate status
+    const translateStatus = (status: string): string => {
+        if (!status) return status;
+        const statusLower = status.toLowerCase();
+        const statusMap: { [key: string]: string } = {
+            'true': t('sold') || 'Sold',
+            'false': t('available') || 'Available',
+        };
+        return statusMap[statusLower] || status;
+    };
 
     return (
         <>
@@ -98,38 +161,38 @@ export const UnitsFilterDrawer = () => {
                     <FilterSection title={t('unitInfo') || t('filterUnits')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-project">{t('project')}</FilterLabel>
-                                <FilterSelect id="filter-project" value={localFilters.project} onChange={(e) => handleFilterChange('project', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-project">{t('project')}</FilterLabel>
+                                <FilterSelect id="units-filter-project" value={localFilters.project} onChange={(e) => handleFilterChange('project', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    {projects.map(proj => (
+                                    {projects?.map(proj => (
                                         <option key={proj.id} value={proj.name}>{proj.name}</option>
-                                    ))}
+                                    )) || []}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-type">{t('type')}</FilterLabel>
-                                <FilterSelect id="filter-type" value={localFilters.type} onChange={(e) => handleFilterChange('type', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-type">{t('type')}</FilterLabel>
+                                <FilterSelect id="units-filter-type" value={localFilters.type} onChange={(e) => handleFilterChange('type', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueTypes.map(type => (
-                                        <option key={type} value={type}>{type}</option>
+                                        <option key={type} value={type}>{translateType(type)}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-finishing">{t('finishing')}</FilterLabel>
-                                <FilterSelect id="filter-finishing" value={localFilters.finishing} onChange={(e) => handleFilterChange('finishing', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-finishing">{t('finishing')}</FilterLabel>
+                                <FilterSelect id="units-filter-finishing" value={localFilters.finishing} onChange={(e) => handleFilterChange('finishing', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueFinishing.map(finishing => (
-                                        <option key={finishing} value={finishing}>{finishing}</option>
+                                        <option key={finishing} value={finishing}>{translateFinishing(finishing)}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-city">{t('city')}</FilterLabel>
-                                <FilterSelect id="filter-city" value={localFilters.city} onChange={(e) => handleFilterChange('city', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-city">{t('city')}</FilterLabel>
+                                <FilterSelect id="units-filter-city" value={localFilters.city} onChange={(e) => handleFilterChange('city', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueCities.map(city => (
                                         <option key={city} value={city}>{city}</option>
@@ -138,8 +201,8 @@ export const UnitsFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-district">{t('district')}</FilterLabel>
-                                <FilterSelect id="filter-district" value={localFilters.district} onChange={(e) => handleFilterChange('district', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-district">{t('district')}</FilterLabel>
+                                <FilterSelect id="units-filter-district" value={localFilters.district} onChange={(e) => handleFilterChange('district', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueDistricts.map(district => (
                                         <option key={district} value={district}>{district}</option>
@@ -148,8 +211,8 @@ export const UnitsFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-zone">{t('zone')}</FilterLabel>
-                                <FilterSelect id="filter-zone" value={localFilters.zone} onChange={(e) => handleFilterChange('zone', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-zone">{t('zone')}</FilterLabel>
+                                <FilterSelect id="units-filter-zone" value={localFilters.zone} onChange={(e) => handleFilterChange('zone', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueZones.map(zone => (
                                         <option key={zone} value={zone}>{zone}</option>
@@ -158,17 +221,17 @@ export const UnitsFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-sold">{t('status')}</FilterLabel>
-                                <FilterSelect id="filter-sold" value={localFilters.isSold} onChange={(e) => handleFilterChange('isSold', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-sold">{t('status')}</FilterLabel>
+                                <FilterSelect id="units-filter-sold" value={localFilters.isSold} onChange={(e) => handleFilterChange('isSold', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    <option value="false">{t('available') || 'Available'}</option>
-                                    <option value="true">{t('sold') || 'Sold'}</option>
+                                    <option value="false">{translateStatus('false')}</option>
+                                    <option value="true">{translateStatus('true')}</option>
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-bedrooms">{t('bedrooms')}</FilterLabel>
-                                <FilterSelect id="filter-bedrooms" value={localFilters.bedrooms} onChange={(e) => handleFilterChange('bedrooms', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-bedrooms">{t('bedrooms')}</FilterLabel>
+                                <FilterSelect id="units-filter-bedrooms" value={localFilters.bedrooms} onChange={(e) => handleFilterChange('bedrooms', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueBedrooms.map(bedrooms => (
                                         <option key={bedrooms} value={bedrooms.toString()}>{bedrooms}</option>
@@ -177,8 +240,8 @@ export const UnitsFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-bathrooms">{t('bathrooms')}</FilterLabel>
-                                <FilterSelect id="filter-bathrooms" value={localFilters.bathrooms} onChange={(e) => handleFilterChange('bathrooms', e.target.value)}>
+                                <FilterLabel htmlFor="units-filter-bathrooms">{t('bathrooms')}</FilterLabel>
+                                <FilterSelect id="units-filter-bathrooms" value={localFilters.bathrooms} onChange={(e) => handleFilterChange('bathrooms', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueBathrooms.map(bathrooms => (
                                         <option key={bathrooms} value={bathrooms.toString()}>{bathrooms}</option>
@@ -188,12 +251,12 @@ export const UnitsFilterDrawer = () => {
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <FilterLabel htmlFor="filter-price-min">{t('priceRangeStart') || 'Min Price'}</FilterLabel>
-                                    <NumberInput id="filter-price-min" name="filter-price-min" value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="units-filter-price-min">{t('priceRangeStart') || 'Min Price'}</FilterLabel>
+                                    <NumberInput id="units-filter-price-min" name="units-filter-price-min" value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
                                 </div>
                                 <div>
-                                    <FilterLabel htmlFor="filter-price-max">{t('priceRangeEnd') || 'Max Price'}</FilterLabel>
-                                    <NumberInput id="filter-price-max" name="filter-price-max" value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="units-filter-price-max">{t('priceRangeEnd') || 'Max Price'}</FilterLabel>
+                                    <NumberInput id="units-filter-price-max" name="units-filter-price-max" value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
                                 </div>
                             </div>
                         </div>
@@ -201,8 +264,8 @@ export const UnitsFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="units-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="units-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

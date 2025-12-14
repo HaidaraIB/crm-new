@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, Loader, ArrowLeftIcon } from '../components/index';
 import { Lead, PhoneNumber } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
+import { useUsers, useStatuses, useChannels, useUpdateLead } from '../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -11,24 +12,51 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; }) => (
-    <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${className || ''}`}>
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange, className, language }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; language?: 'ar' | 'en' }) => {
+    const { language: contextLanguage } = useAppContext();
+    const lang = language || contextLanguage;
+    return (
+        <select id={id} value={value} onChange={onChange} dir={lang === 'ar' ? 'rtl' : 'ltr'} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${className || ''}`}>
+            {children}
+        </select>
+    );
+};
 
 export const EditLeadPage = () => {
-    const { t, setCurrentPage, updateLead, users, editingLead, statuses, channels, setSelectedLead } = useAppContext();
+    const { t, setCurrentPage, editingLead, setSelectedLead, currentUser } = useAppContext();
+    
+    // Fetch data using React Query hooks
+    const { data: usersResponse } = useUsers();
+    const users = usersResponse?.results || [];
+    const userOptions = (users && users.length > 0)
+        ? users
+        : (currentUser ? [currentUser] : []);
+    
+    const { data: statusesData } = useStatuses();
+    // Handle both array response and object with results property
+    const statuses = Array.isArray(statusesData) 
+        ? statusesData 
+        : (statusesData?.results || []);
+    
+    const { data: channelsData } = useChannels();
+    // Handle both array response and object with results property
+    const channels = Array.isArray(channelsData) 
+        ? channelsData 
+        : (channelsData?.results || []);
+    
+    // Use React Query mutation for updating lead
+    const updateLeadMutation = useUpdateLead();
+    
     const [loading, setLoading] = useState(true);
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
         budget: '',
         assignedTo: '',
-        type: 'Fresh' as Lead['type'],
-        communicationWay: 'Call',
-        priority: 'Medium' as Lead['priority'],
-        status: 'Untouched' as Lead['status'],
+        type: '' as 'fresh' | 'cold' | '',
+        communicationWay: '',
+        priority: '' as 'low' | 'medium' | 'high' | '',
+        status: '',
     });
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -61,6 +89,23 @@ export const EditLeadPage = () => {
             newErrors.phone = t('phoneNumberRequired') || 'At least one phone number is required';
         }
 
+        // Validate required fields for API
+        if (!formState.communicationWay) {
+            newErrors.communicationWay = t('communicationWayRequired') || 'Communication way is required';
+        }
+
+        if (!formState.status) {
+            newErrors.status = t('statusRequired') || 'Status is required';
+        }
+
+        if (!formState.priority) {
+            newErrors.priority = t('priorityRequired') || 'Priority is required';
+        }
+
+        if (!formState.type) {
+            newErrors.type = t('typeRequired') || 'Type is required';
+        }
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -81,16 +126,48 @@ export const EditLeadPage = () => {
             // Set selectedLead to ensure ViewLeadPage has the lead data
             setSelectedLead(editingLead);
             
+            // Convert type and priority to lowercase for form state
+            const typeValue = editingLead.type ? editingLead.type.toLowerCase() as 'fresh' | 'cold' : '';
+            const priorityValue = editingLead.priority ? editingLead.priority.toLowerCase() as 'low' | 'medium' | 'high' : '';
+            
+            // Find channel and status IDs from names
+            // API may return names, but we need IDs for the form
+            let channelId = '';
+            let statusId = '';
+            
+            if (editingLead.communicationWay) {
+                // Try to find by name first (for backward compatibility)
+                const channel = channels.find(c => c.name === editingLead.communicationWay);
+                if (channel) {
+                    channelId = channel.id.toString();
+                } else {
+                    // If not found by name, assume it's already an ID
+                    channelId = editingLead.communicationWay;
+                }
+            }
+            
+            if (editingLead.status) {
+                // Try to find by name first (for backward compatibility)
+                const status = statuses.find(s => s.name === editingLead.status);
+                if (status) {
+                    statusId = status.id.toString();
+                } else {
+                    // If not found by name, assume it's already an ID
+                    statusId = editingLead.status;
+                }
+            }
+            
             setFormState({
                 name: editingLead.name || '',
                 phone: editingLead.phone || '',
-                budget: editingLead.budget?.toString() || '0',
-                assignedTo: editingLead.assignedTo?.toString() || '0',
-                type: editingLead.type || 'Fresh',
-                communicationWay: editingLead.communicationWay || 'Call',
-                priority: editingLead.priority || 'Medium',
-                status: editingLead.status || 'Untouched',
+                budget: editingLead.budget?.toString() || '',
+                assignedTo: editingLead.assignedTo?.toString() || (currentUser?.id ? currentUser.id.toString() : ''),
+                type: typeValue,
+                communicationWay: channelId,
+                priority: priorityValue,
+                status: statusId,
             });
+            
             // Initialize phone numbers from editingLead
             if (editingLead.phoneNumbers && editingLead.phoneNumbers.length > 0) {
                 setPhoneNumbers(editingLead.phoneNumbers.map(pn => ({
@@ -109,11 +186,13 @@ export const EditLeadPage = () => {
                 setPhoneNumbers([]);
             }
         }
-    }, [editingLead, setSelectedLead]);
+    }, [editingLead, setSelectedLead, channels, statuses, currentUser]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value } = e.target;
-        setFormState(prev => ({ ...prev, [id]: value }));
+        setFormState(prev => {
+            return { ...prev, [id]: value };
+        });
         clearError(id);
     };
 
@@ -156,6 +235,10 @@ export const EditLeadPage = () => {
         e.preventDefault();
         if (!editingLead) return;
         
+        // Clear previous errors
+        setErrors({});
+        
+        // Validate form before submission
         if (!validateForm()) {
             setLoading(false);
             return;
@@ -175,23 +258,112 @@ export const EditLeadPage = () => {
 
         setLoading(true);
         try {
-            await updateLead(editingLead.id, {
+            // Find channel and status IDs from names/IDs stored in formState
+            const channelId = formState.communicationWay 
+                ? (channels.find(c => c.id.toString() === formState.communicationWay || c.name === formState.communicationWay)?.id || null)
+                : null;
+            const statusId = formState.status 
+                ? (statuses.find(s => s.id.toString() === formState.status || s.name === formState.status)?.id || null)
+                : null;
+            
+            // Convert priority and type to lowercase for API (already lowercase, but ensure)
+            const priorityValue = formState.priority ? (formState.priority.toLowerCase() as 'low' | 'medium' | 'high') : null;
+            const typeValue = formState.type ? (formState.type.toLowerCase() as 'fresh' | 'cold') : null;
+            
+            // Prepare phone_number for backward compatibility (only if we have phone numbers)
+            const primaryPhone = finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '';
+            
+            // Get company ID from current user
+            const companyId = currentUser?.company?.id;
+            if (!companyId) {
+                setErrors({ 
+                    general: t('companyRequired') || 'Company is required. Please log in again.' 
+                });
+                setLoading(false);
+                return;
+            }
+            
+            const updateData: any = {
                 name: formState.name,
-                phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || formState.phone,
-                phoneNumbers: finalPhoneNumbers,
-                budget: Number(formState.budget) || 0,
-                assignedTo: formState.assignedTo ? Number(formState.assignedTo) : 0,
-                type: formState.type,
-                communicationWay: formState.communicationWay,
-                priority: formState.priority,
-                status: formState.status,
-            });
-            // updateLead in AppContext automatically updates selectedLead if it matches
+                phone_numbers: finalPhoneNumbers,
+                budget: formState.budget ? Number(formState.budget) : null,
+                assigned_to: formState.assignedTo ? Number(formState.assignedTo) : null,
+                type: typeValue,
+                communication_way: channelId,
+                priority: priorityValue,
+                status: statusId,
+                company: companyId,
+            };
+            
+            // Add phone_number for backward compatibility if we have phone numbers
+            if (primaryPhone) {
+                updateData.phone_number = primaryPhone;
+            }
+            
+            const updatedLead = await updateLeadMutation.mutateAsync({ id: editingLead.id, data: updateData });
+            
+            // Update selectedLead with the updated data
+            if (updatedLead) {
+                // Transform API response to Lead format
+                const transformedLead: Lead = {
+                    id: updatedLead.id,
+                    name: updatedLead.name,
+                    phone: updatedLead.phone_number || updatedLead.phone || '',
+                    phoneNumbers: updatedLead.phone_numbers || [],
+                    status: updatedLead.status_name || updatedLead.status || '',
+                    type: updatedLead.type || '',
+                    assignedTo: updatedLead.assigned_to || 0,
+                    budget: updatedLead.budget || 0,
+                    communicationWay: updatedLead.communication_way_name || updatedLead.communication_way || '',
+                    priority: updatedLead.priority || '',
+                    createdAt: updatedLead.created_at || updatedLead.createdAt || '',
+                };
+                setSelectedLead(transformedLead);
+            }
+            
             // Navigate to ViewLead page to see the updated lead
+            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
             setCurrentPage('ViewLead');
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error updating lead:', error);
-            alert(t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
+            
+            // Display field-specific errors if available
+            if (error.fields) {
+                const fieldErrors: { [key: string]: string } = {};
+                const fieldLabels: { [key: string]: string } = {
+                    name: t('clientName') || 'Name',
+                    phone: t('phoneNumbers') || 'Phone Numbers',
+                    phone_number: t('phoneNumbers') || 'Phone Numbers',
+                    phone_numbers: t('phoneNumbers') || 'Phone Numbers',
+                    budget: t('budget') || 'Budget',
+                    assigned_to: t('assignedTo') || 'Assigned To',
+                    type: t('type') || 'Type',
+                    communication_way: t('communicationWay') || 'Communication Way',
+                    priority: t('priority') || 'Priority',
+                    status: t('status') || 'Status',
+                    company: t('company') || 'Company',
+                };
+                
+                Object.keys(error.fields).forEach(field => {
+                    const fieldError = error.fields[field];
+                    let errorMessage = '';
+                    if (Array.isArray(fieldError)) {
+                        errorMessage = fieldError[0];
+                    } else {
+                        errorMessage = String(fieldError);
+                    }
+                    
+                    // Add field label to error message
+                    const fieldLabel = fieldLabels[field] || field;
+                    fieldErrors[field] = `${fieldLabel}: ${errorMessage}`;
+                });
+                setErrors(fieldErrors);
+            } else {
+                // Show general error message
+                setErrors({ 
+                    general: error.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.' 
+                });
+            }
         } finally {
             setLoading(false);
         }
@@ -203,10 +375,12 @@ export const EditLeadPage = () => {
                 <div className="text-center py-8">
                     <p className="text-gray-500 dark:text-gray-400">{t('noLeadSelected') || 'No lead selected for editing'}</p>
                     <Button variant="secondary" onClick={() => {
-                        if (editingLead) {
+ if (editingLead) {
                             setSelectedLead(editingLead);
+                            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
                             setCurrentPage('ViewLead');
                         } else {
+                            window.history.pushState({}, '', '/leads');
                             setCurrentPage('Leads');
                         }
                     }} className="mt-4">
@@ -234,6 +408,7 @@ export const EditLeadPage = () => {
                     <button
                         onClick={() => {
                             setSelectedLead(editingLead);
+                            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
                             setCurrentPage('ViewLead');
                         }}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
@@ -248,6 +423,25 @@ export const EditLeadPage = () => {
             <form onSubmit={handleSubmit}>
                 <Card>
                     <h3 className="text-lg font-semibold mb-6 border-b pb-3 dark:border-gray-700">{t('leadInformation') || 'Lead Information'}</h3>
+                    {(errors.general || Object.keys(errors).filter(key => key !== 'general').length > 0) && (
+                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                            {errors.general && (
+                                <p className="text-sm text-red-600 dark:text-red-400 mb-2 font-medium">{errors.general}</p>
+                            )}
+                            {Object.keys(errors).filter(key => key !== 'general').length > 0 && (
+                                <div className="text-sm text-red-600 dark:text-red-400">
+                                    {!errors.general && (
+                                        <p className="font-medium mb-2">{t('pleaseFixErrors') || 'Please fix the following errors:'}</p>
+                                    )}
+                                    <ul className="list-disc list-inside space-y-1">
+                                        {Object.keys(errors).filter(key => key !== 'general').map(key => (
+                                            <li key={key} className="font-medium">{errors[key]}</li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
+                        </div>
+                    )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div className="md:col-span-2 lg:col-span-1">
                             <Label htmlFor="name">{t('clientName')} <span className="text-red-500">*</span></Label>
@@ -344,62 +538,100 @@ export const EditLeadPage = () => {
                         <div>
                             <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                             <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
-                                <option value="0">{t('selectEmployee') || 'Select Employee'}</option>
-                                {users.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
+                                <option value="">{t('selectEmployee') || 'Select Employee'}</option>
+                                {userOptions.map(user => (
+                                    <option key={user.id} value={user.id.toString()}>
+                                        {user.name || user.username || user.email || `User ${user.id}`}
+                                    </option>
+                                ))}
                             </Select>
                         </div>
                         <div>
-                            <Label htmlFor="type">{t('type')}</Label>
-                            <Select id="type" value={formState.type} onChange={handleChange}>
-                                <option value="Fresh">{t('fresh')}</option>
-                                <option value="Cold">{t('cold')}</option>
+                            <Label htmlFor="type">{t('type')} <span className="text-red-500">*</span></Label>
+                            <Select 
+                                id="type" 
+                                value={formState.type} 
+                                onChange={handleChange}
+                                className={errors.type ? 'border-red-500 dark:border-red-500' : ''}
+                            >
+                                <option value="">{t('selectType') || 'Select Type'}</option>
+                                <option value="fresh">{t('fresh')}</option>
+                                <option value="cold">{t('cold')}</option>
                             </Select>
+                            {errors.type && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.type}</p>
+                            )}
                         </div>
                         <div>
-                            <Label htmlFor="communicationWay">{t('communicationWay')}</Label>
-                            <Select id="communicationWay" value={formState.communicationWay} onChange={handleChange}>
+                            <Label htmlFor="communicationWay">{t('communicationWay')} <span className="text-red-500">*</span></Label>
+                            <Select 
+                                id="communicationWay" 
+                                value={formState.communicationWay || ''} 
+                                onChange={handleChange}
+                                className={errors.communicationWay ? 'border-red-500 dark:border-red-500' : ''}
+                            >
+                                <option value="">{t('selectChannel') || 'Select Channel'}</option>
                                 {channels.length > 0 ? (
                                     channels.map(channel => (
-                                        <option key={channel.id} value={channel.name}>
+                                        <option key={channel.id} value={channel.id.toString()}>
                                             {channel.name}
                                         </option>
                                     ))
                                 ) : (
-                                    <>
-                                        <option value="Call">{t('call')}</option>
-                                        <option value="WhatsApp">{t('whatsapp')}</option>
-                                    </>
+                                    <option value="" disabled>{t('noChannelsAvailable') || 'No channels available'}</option>
                                 )}
                             </Select>
+                            {errors.communicationWay && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.communicationWay}</p>
+                            )}
                         </div>
                         <div>
-                            <Label htmlFor="priority">{t('priority')}</Label>
-                            <Select id="priority" value={formState.priority} onChange={handleChange}>
-                                <option value="High">{t('high')}</option>
-                                <option value="Medium">{t('medium')}</option>
-                                <option value="Low">{t('low')}</option>
+                            <Label htmlFor="priority">{t('priority')} <span className="text-red-500">*</span></Label>
+                            <Select 
+                                id="priority" 
+                                value={formState.priority} 
+                                onChange={handleChange}
+                                className={errors.priority ? 'border-red-500 dark:border-red-500' : ''}
+                            >
+                                <option value="">{t('selectPriority') || 'Select Priority'}</option>
+                                <option value="high">{t('high')}</option>
+                                <option value="medium">{t('medium')}</option>
+                                <option value="low">{t('low')}</option>
                             </Select>
+                            {errors.priority && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>
+                            )}
                         </div>
                         <div>
-                            <Label htmlFor="status">{t('status')}</Label>
-                            <Select id="status" value={formState.status} onChange={handleChange}>
+                            <Label htmlFor="status">{t('status')} <span className="text-red-500">*</span></Label>
+                            <Select 
+                                id="status" 
+                                value={formState.status || ''} 
+                                onChange={handleChange}
+                                className={errors.status ? 'border-red-500 dark:border-red-500' : ''}
+                            >
+                                <option value="">{t('selectStatus') || 'Select Status'}</option>
                                 {statuses.length > 0 ? (
                                     statuses
                                         .filter(s => !s.isHidden)
                                         .map(status => (
-                                            <option key={status.id} value={status.name}>
+                                            <option key={status.id} value={status.id.toString()}>
                                                 {status.name}
                                             </option>
                                         ))
                                 ) : (
-                                    <option value="">{t('noStatusesAvailable') || 'No statuses available'}</option>
+                                    <option value="" disabled>{t('noStatusesAvailable') || 'No statuses available'}</option>
                                 )}
                             </Select>
+                            {errors.status && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.status}</p>
+                            )}
                         </div>
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => {
                             setSelectedLead(editingLead);
+                            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
                             setCurrentPage('ViewLead');
                         }} disabled={loading}>
                             {t('cancel')}

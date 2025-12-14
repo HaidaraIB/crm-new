@@ -7,6 +7,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Product } from '../../types';
+import { useUpdateProduct, useProductCategories, useSuppliers } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -24,7 +25,23 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const EditProductModal = () => {
-    const { isEditProductModalOpen, setIsEditProductModalOpen, t, updateProduct, editingProduct, setEditingProduct, productCategories, suppliers, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditProductModalOpen, setIsEditProductModalOpen, t, editingProduct, setEditingProduct, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Fetch data using React Query
+    const { data: categoriesResponse } = useProductCategories();
+    const productCategories = Array.isArray(categoriesResponse) 
+        ? categoriesResponse 
+        : (categoriesResponse?.results || []);
+
+    const { data: suppliersResponse } = useSuppliers();
+    const suppliers = Array.isArray(suppliersResponse) 
+        ? suppliersResponse 
+        : (suppliersResponse?.results || []);
+
+    // Update product mutation
+    const updateProductMutation = useUpdateProduct();
+    const loading = updateProductMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -36,7 +53,6 @@ export const EditProductModal = () => {
         sku: '',
         isActive: true,
     });
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -70,19 +86,36 @@ export const EditProductModal = () => {
 
     useEffect(() => {
         if (editingProduct) {
+            // Get category name from productCategories if category is an ID
+            let categoryName = editingProduct.category || '';
+            if (editingProduct.category && typeof editingProduct.category === 'number') {
+                const category = productCategories.find(cat => cat.id === editingProduct.category);
+                categoryName = category?.name || '';
+            }
+            
+            // Get supplier name from suppliers if supplier is an ID
+            let supplierName = editingProduct.supplier || '';
+            if (editingProduct.supplier && typeof editingProduct.supplier === 'number') {
+                const supplier = suppliers.find(sup => sup.id === editingProduct.supplier);
+                supplierName = supplier?.name || '';
+            } else if (editingProduct.supplier && typeof editingProduct.supplier === 'string') {
+                supplierName = editingProduct.supplier;
+            }
+            
             setFormState({
-                name: editingProduct.name,
-                description: editingProduct.description,
-                price: editingProduct.price.toString(),
-                cost: editingProduct.cost.toString(),
-                stock: editingProduct.stock.toString(),
-                category: editingProduct.category,
-                supplier: editingProduct.supplier || '',
+                name: editingProduct.name || '',
+                description: editingProduct.description || '',
+                price: editingProduct.price !== undefined && editingProduct.price !== null ? editingProduct.price.toString() : '',
+                cost: editingProduct.cost !== undefined && editingProduct.cost !== null ? editingProduct.cost.toString() : '',
+                stock: editingProduct.stock !== undefined && editingProduct.stock !== null ? editingProduct.stock.toString() : '',
+                category: categoryName,
+                supplier: supplierName,
                 sku: editingProduct.sku || '',
-                isActive: editingProduct.isActive,
+                isActive: editingProduct.isActive !== undefined ? editingProduct.isActive : true,
             });
+            setErrors({});
         }
-    }, [editingProduct]);
+    }, [editingProduct, productCategories, suppliers]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;
@@ -107,19 +140,37 @@ export const EditProductModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await updateProduct({
-                ...editingProduct,
-                name: formState.name,
-                description: formState.description,
+            // Find category and supplier by name to get their IDs
+            const selectedCategory = productCategories.find(cat => cat.name === formState.category);
+            const selectedSupplier = formState.supplier 
+                ? suppliers.find(sup => sup.name === formState.supplier)
+                : null;
+
+            const updateData: any = {
+                name: formState.name.trim(),
+                description: formState.description?.trim() || '',
                 price: Number(formState.price) || 0,
                 cost: Number(formState.cost) || 0,
                 stock: Number(formState.stock) || 0,
-                category: formState.category,
-                supplier: formState.supplier || undefined,
-                sku: formState.sku || undefined,
-                isActive: formState.isActive,
+                category: selectedCategory?.id,
+                company: currentUser?.company?.id || currentUser?.company_id,
+                is_active: formState.isActive,
+            };
+
+            // Only include supplier if it's selected
+            if (selectedSupplier) {
+                updateData.supplier = selectedSupplier.id;
+            }
+
+            // Only include sku if it's provided
+            if (formState.sku?.trim()) {
+                updateData.sku = formState.sku.trim();
+            }
+
+            await updateProductMutation.mutateAsync({
+                id: editingProduct.id,
+                data: updateData
             });
 
             // Close modal immediately and show success modal
@@ -128,10 +179,23 @@ export const EditProductModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating product:', error);
-            const errorMessage = error?.message || t('failedToUpdateProduct') || 'Failed to update product. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToUpdateProduct') || 'Failed to update product. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 
@@ -212,7 +276,7 @@ export const EditProductModal = () => {
                             className={errors.category ? 'border-red-500 dark:border-red-500' : ''}
                         >
                             <option value="">{t('selectCategory') || 'Select Category'}</option>
-                            {productCategories.map(category => (
+                            {(productCategories || []).map(category => (
                                 <option key={category.id} value={category.name}>{category.name}</option>
                             ))}
                         </Select>
@@ -226,7 +290,7 @@ export const EditProductModal = () => {
                         <Label htmlFor="supplier">{t('supplier')}</Label>
                         <Select id="supplier" value={formState.supplier} onChange={handleChange}>
                             <option value="">{t('selectSupplier') || 'Select Supplier (Optional)'}</option>
-                            {suppliers.map(supplier => (
+                            {(suppliers || []).map(supplier => (
                                 <option key={supplier.id} value={supplier.name}>{supplier.name}</option>
                             ))}
                         </Select>

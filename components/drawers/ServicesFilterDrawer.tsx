@@ -69,8 +69,19 @@ export const ServicesFilterDrawer = () => {
         setIsServiceFilterDrawerOpen(false);
     };
 
-    const uniqueCategories = Array.from(new Set(services.map(s => s.category).filter(Boolean)));
-    const uniqueProviders = Array.from(new Set(services.map(s => s.provider).filter(Boolean)));
+    const uniqueCategories = Array.from(new Set((services || []).map(s => s.category).filter(Boolean)));
+    const uniqueProviders = Array.from(new Set((services || []).map(s => s.provider).filter(Boolean)));
+
+    // Helper function to translate status
+    const translateStatus = (status: string): string => {
+        if (!status) return status;
+        const statusLower = status.toLowerCase();
+        const statusMap: { [key: string]: string } = {
+            'true': t('active') || 'Active',
+            'false': t('inactive') || 'Inactive',
+        };
+        return statusMap[statusLower] || status;
+    };
 
     return (
         <>
@@ -86,8 +97,8 @@ export const ServicesFilterDrawer = () => {
                     <FilterSection title={t('serviceInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-category">{t('category')}</FilterLabel>
-                                <FilterSelect id="filter-category" value={localFilters.category} onChange={(e) => handleFilterChange('category', e.target.value)}>
+                                <FilterLabel htmlFor="services-filter-category">{t('category')}</FilterLabel>
+                                <FilterSelect id="services-filter-category" value={localFilters.category} onChange={(e) => handleFilterChange('category', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueCategories.map(category => (
                                         <option key={category} value={category}>{category}</option>
@@ -96,8 +107,8 @@ export const ServicesFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-provider">{t('provider')}</FilterLabel>
-                                <FilterSelect id="filter-provider" value={localFilters.provider} onChange={(e) => handleFilterChange('provider', e.target.value)}>
+                                <FilterLabel htmlFor="services-filter-provider">{t('provider')}</FilterLabel>
+                                <FilterSelect id="services-filter-provider" value={localFilters.provider} onChange={(e) => handleFilterChange('provider', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueProviders.map(provider => (
                                         <option key={provider} value={provider}>{provider}</option>
@@ -106,22 +117,22 @@ export const ServicesFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
-                                <FilterSelect id="filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
+                                <FilterLabel htmlFor="services-filter-status">{t('status')}</FilterLabel>
+                                <FilterSelect id="services-filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    <option value="true">{t('active')}</option>
-                                    <option value="false">{t('inactive')}</option>
+                                    <option value="true">{translateStatus('true')}</option>
+                                    <option value="false">{translateStatus('false')}</option>
                                 </FilterSelect>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <FilterLabel htmlFor="filter-price-min">{t('priceRangeStart')}</FilterLabel>
-                                    <NumberInput id="filter-price-min" name="filter-price-min" value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="services-filter-price-min">{t('priceRangeStart')}</FilterLabel>
+                                    <NumberInput id="services-filter-price-min" name="services-filter-price-min" value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
                                 </div>
                                 <div>
-                                    <FilterLabel htmlFor="filter-price-max">{t('priceRangeEnd')}</FilterLabel>
-                                    <NumberInput id="filter-price-max" name="filter-price-max" value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="services-filter-price-max">{t('priceRangeEnd')}</FilterLabel>
+                                    <NumberInput id="services-filter-price-max" name="services-filter-price-max" value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
                                 </div>
                             </div>
                         </div>
@@ -129,8 +140,8 @@ export const ServicesFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="services-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="services-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

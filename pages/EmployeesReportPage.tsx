@@ -3,36 +3,78 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PageWrapper, Card, Loader, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
 import { FilterIcon } from '../components/icons';
+import { useLeads, useDeals, useActivities, useUsers } from '../hooks/useQueries';
+import { User } from '../types';
+import { translations } from '../constants';
 
-const reportColumns = [
-    { header: 'Name', accessor: 'name' },
-    { header: 'Total Leads', accessor: 'totalLeads' },
-    { header: 'Touched Leads', accessor: 'touchedLeads' },
-    { header: 'Untouched Leads', accessor: 'untouchedLeads' },
-    { header: 'Following', accessor: 'following' },
-    { header: 'Meeting', accessor: 'meeting' },
-    { header: 'No Answer', accessor: 'noAnswer' },
-    { header: 'Out of Service', accessor: 'outOfService' },
-    { header: 'Total Calls', accessor: 'totalCalls' },
-    { header: 'Total Deals', accessor: 'totalDeals' },
-    { header: 'Won Deals', accessor: 'wonDeals' },
+// Helper function to get user display name
+const getUserDisplayName = (user: User): string => {
+    if (user.first_name || user.last_name) {
+        return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    }
+    return user.name || user.username || user.email || `User ${user.id}`;
+};
+
+// Helper function to get translated column headers
+const getReportColumns = (t: (key: keyof typeof translations.en) => string) => [
+    { header: t('name') || 'Name', accessor: 'name' },
+    { header: t('totalLeads') || 'Total Leads', accessor: 'totalLeads' },
+    { header: t('touchedLeads') || 'Touched Leads', accessor: 'touchedLeads' },
+    { header: t('untouchedLeads') || 'Untouched Leads', accessor: 'untouchedLeads' },
+    { header: t('following') || 'Following', accessor: 'following' },
+    { header: t('meeting') || 'Meeting', accessor: 'meeting' },
+    { header: t('noAnswer') || 'No Answer', accessor: 'noAnswer' },
+    { header: t('outOfService') || 'Out of Service', accessor: 'outOfService' },
+    { header: t('totalCalls') || 'Total Calls', accessor: 'totalCalls' },
+    { header: t('totalDeals') || 'Total Deals', accessor: 'totalDeals' },
+    { header: t('wonDeals') || 'Won Deals', accessor: 'wonDeals' },
 ];
 
 export const EmployeesReportPage = () => {
-    const { t, leads, activities, deals, users, employeesReportFilters, setIsEmployeesReportFilterDrawerOpen } = useAppContext();
+    const { t, employeesReportFilters, setIsEmployeesReportFilterDrawerOpen } = useAppContext();
     const { leadType, startDate, endDate } = employeesReportFilters;
     const [loading, setLoading] = useState(false);
+    
+    // Get translated column headers
+    const reportColumns = getReportColumns(t);
+    
+    // Fetch data using React Query
+    const { data: leadsData } = useLeads();
+    const leads = Array.isArray(leadsData) 
+        ? leadsData 
+        : (leadsData?.results || []);
+    
+    const { data: dealsData } = useDeals();
+    const deals = Array.isArray(dealsData) 
+        ? dealsData 
+        : (dealsData?.results || []);
+    
+    const { data: activitiesData } = useActivities();
+    const activities = Array.isArray(activitiesData) 
+        ? activitiesData 
+        : (activitiesData?.results || []);
+    
+    const { data: usersData } = useUsers();
+    const users = Array.isArray(usersData) 
+        ? usersData 
+        : (usersData?.results || []);
 
     // Calculate employee statistics
     const employeeStats = useMemo(() => {
-        let filteredLeads = leads;
-        let filteredActivities = activities;
-        let filteredDeals = deals;
+        // Ensure all data is arrays
+        const safeLeads = Array.isArray(leads) ? leads : [];
+        const safeActivities = Array.isArray(activities) ? activities : [];
+        const safeDeals = Array.isArray(deals) ? deals : [];
+        const safeUsers = Array.isArray(users) ? users : [];
+        
+        let filteredLeads = safeLeads;
+        let filteredActivities = safeActivities;
+        let filteredDeals = safeDeals;
 
         // Filter by lead type
         if (leadType !== 'all') {
             filteredLeads = filteredLeads.filter(lead => 
-                lead.type.toLowerCase() === leadType
+                lead.type?.toLowerCase() === leadType
             );
         }
 
@@ -41,19 +83,25 @@ export const EmployeesReportPage = () => {
             const start = new Date(startDate);
             const end = new Date(endDate);
             filteredLeads = filteredLeads.filter(lead => {
+                if (!lead.createdAt) return false;
                 const leadDate = new Date(lead.createdAt);
                 return leadDate >= start && leadDate <= end;
             });
             filteredActivities = filteredActivities.filter(activity => {
+                if (!activity.date) return false;
                 const activityDate = new Date(activity.date);
                 return activityDate >= start && activityDate <= end;
             });
         }
 
         // Group by employee
-        return users.map(user => {
+        return safeUsers.map(user => {
+            const userName = getUserDisplayName(user);
             const userLeads = filteredLeads.filter(lead => lead.assignedTo === user.id);
-            const userActivities = filteredActivities.filter(activity => activity.user === user.name);
+            const userActivities = filteredActivities.filter(activity => {
+                // Match by user name or user ID
+                return activity.user === userName || activity.user === user.name || activity.userId === user.id;
+            });
             const callActivities = userActivities.filter(activity => 
                 activity.stage === 'call' || activity.stage === 'following'
             );
@@ -64,7 +112,7 @@ export const EmployeesReportPage = () => {
 
             return {
                 id: user.id,
-                name: user.name,
+                name: userName,
                 totalLeads: userLeads.length,
                 touchedLeads: userLeads.filter(lead => lead.status !== 'Untouched').length,
                 untouchedLeads: userLeads.filter(lead => lead.status === 'Untouched').length,
@@ -88,7 +136,7 @@ export const EmployeesReportPage = () => {
 
     const handleExport = () => {
         // TODO: Implement export functionality
-        alert('Export functionality will be implemented soon');
+        alert(t('exportFunctionalityComingSoon') || 'Export functionality will be implemented soon');
     };
 
     if (loading) {
@@ -137,25 +185,30 @@ export const EmployeesReportPage = () => {
             {/* Employee Details Table */}
             <Card className="border border-gray-200/50 dark:border-gray-700/50">
                 <div className="p-6">
-                    <h3 className="text-lg font-semibold text-primary mb-4">Employee Details</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm text-left rtl:text-right">
-                            <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                    <h3 className="text-lg font-semibold text-primary mb-4">{t('employeeDetails') || 'Employee Details'}</h3>
+                    <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
+                        <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400" style={{ minWidth: '1000px' }}>
+                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                                 <tr>
                                     {reportColumns.map(col => (
-                                        <th key={col.accessor} className="px-4 py-3 font-semibold whitespace-nowrap">{col.header}</th>
+                                        <th key={col.accessor} scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{col.header}</th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                            <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-gray-700">
                                 {employeeStats.length > 0 ? (
                                     employeeStats.map((emp) => (
-                                        <tr key={emp.id} className="bg-white dark:bg-dark-card hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                                            {reportColumns.map(col => (
-                                                <td key={col.accessor} className="px-4 py-3 text-gray-900 dark:text-gray-100 whitespace-nowrap">
-                                                    {emp[col.accessor as keyof typeof emp]}
-                                                </td>
-                                            ))}
+                                        <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
+                                            {reportColumns.map(col => {
+                                                const value = emp[col.accessor as keyof typeof emp];
+                                                // Format numbers with toLocaleString
+                                                const displayValue = typeof value === 'number' ? value.toLocaleString() : value;
+                                                return (
+                                                    <td key={col.accessor} className="px-4 py-4 whitespace-nowrap text-center">
+                                                        <span className="text-sm text-gray-900 dark:text-gray-100">{displayValue}</span>
+                                                    </td>
+                                                );
+                                            })}
                                         </tr>
                                     ))
                                 ) : (

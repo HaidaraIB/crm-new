@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { useCreateClientTask, useStages } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -10,7 +11,19 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddActionModal = () => {
-    const { isAddActionModalOpen, setIsAddActionModalOpen, selectedLead, t, addClientTask, language, stages, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddActionModalOpen, setIsAddActionModalOpen, selectedLead, t, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    
+    // Fetch stages using React Query
+    const { data: stagesData } = useStages();
+    // Handle both array response and object with results property
+    const stages = Array.isArray(stagesData) 
+        ? stagesData 
+        : (stagesData?.results || []);
+
+    // Create client task mutation
+    const createClientTaskMutation = useCreateClientTask();
+    const loading = createClientTaskMutation.isPending;
+
     // Get default stage from selectedLead's lastStage or first stage from settings
     const getDefaultStage = () => {
         if (selectedLead?.lastStage) {
@@ -23,14 +36,13 @@ export const AddActionModal = () => {
                 return matchingStage.name;
             }
         }
-        // Return first stage from settings or fallback
-        return stages.length > 0 ? stages[0].name : 'Untouched';
+        // Return first stage from settings, or empty string if none
+        return stages.length > 0 ? stages[0].name : '';
     };
     
     const [stage, setStage] = useState(getDefaultStage());
     const [notes, setNotes] = useState('');
     const [reminder, setReminder] = useState('');
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -82,25 +94,26 @@ export const AddActionModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
             // البحث عن Stage من الإعدادات بناءً على الاسم
+            // Try exact match first, then case-insensitive, then normalized
             const stageObj = stages.find(s => 
+                s.name === stage ||
+                s.name.toLowerCase() === stage.toLowerCase() ||
                 s.name.toLowerCase().replace(/\s+/g, '_') === stage.toLowerCase().replace(/\s+/g, '_') ||
-                s.name === stage
+                s.name.toLowerCase().replace(/\s+/g, '') === stage.toLowerCase().replace(/\s+/g, '')
             );
             
             if (!stageObj) {
                 setErrors({ stage: t('stageNotFound') || 'Stage not found in settings. Please select a valid stage.' });
-                setLoading(false);
                 return;
             }
             
-            await addClientTask({
-                clientId: selectedLead.id,
-                stage: stageObj.name, // إرسال الاسم (سيتم تحويله إلى ID في addClientTask)
+            await createClientTaskMutation.mutateAsync({
+                client: selectedLead.id, // API expects 'client' not 'clientId'
+                stage: stageObj.id, // API expects stage ID (pk) not name
                 notes: notes,
-                reminderDate: reminder || null,
+                reminder_date: reminder || null, // API expects 'reminder_date' not 'reminderDate'
             });
 
             // Reset form
@@ -115,15 +128,8 @@ export const AddActionModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error adding action:', error);
-            // Only show error if it's not a successful creation
-            // Sometimes the error occurs after successful creation (e.g., in state update)
             const errorMessage = error?.message || 'Failed to add action. Please try again.';
-            // Check if the error is about state update (which happens after successful creation)
-            if (!errorMessage.includes('history') && !errorMessage.includes('selectedLead')) {
-                setErrors({ _general: errorMessage });
-            }
-        } finally {
-            setLoading(false);
+            setErrors({ _general: errorMessage });
         }
     };
 
@@ -146,22 +152,14 @@ export const AddActionModal = () => {
                         }}
                         className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.stage ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
                     >
-                        {stages.length > 0 ? (
-                            stages.map(s => (
+                        {(stages || []).length > 0 ? (
+                            (stages || []).map(s => (
                                 <option key={s.id} value={s.name}>
                                     {s.name}
                                 </option>
                             ))
                         ) : (
-                            // Fallback to default stages if no stages configured
-                            <>
-                                <option value="Untouched">{t('untouched')}</option>
-                                <option value="Touched">{t('touched')}</option>
-                                <option value="Following">{t('following')}</option>
-                                <option value="Meeting">{t('meeting')}</option>
-                                <option value="No Answer">{t('noAnswer')}</option>
-                                <option value="Out Of Service">{t('outOfService')}</option>
-                            </>
+                            <option value="">{t('noStagesAvailable') || 'No stages available'}</option>
                         )}
                     </select>
                     {errors.stage && (

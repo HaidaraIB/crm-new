@@ -83,8 +83,8 @@ export const CampaignsFilterDrawer = () => {
                     <FilterSection title={t('campaignInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
-                                <FilterSelect id="filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
+                                <FilterLabel htmlFor="campaigns-filter-status">{t('status')}</FilterLabel>
+                                <FilterSelect id="campaigns-filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     <option value="true">{t('active')}</option>
                                     <option value="false">{t('inactive')}</option>
@@ -93,12 +93,12 @@ export const CampaignsFilterDrawer = () => {
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <FilterLabel htmlFor="filter-budget-min">{t('budgetRangeStart')}</FilterLabel>
-                                    <NumberInput id="filter-budget-min" name="filter-budget-min" value={localFilters.budgetMin} onChange={(e) => handleFilterChange('budgetMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="campaigns-filter-budget-min">{t('budgetRangeStart')}</FilterLabel>
+                                    <NumberInput id="campaigns-filter-budget-min" name="campaigns-filter-budget-min" value={localFilters.budgetMin} onChange={(e) => handleFilterChange('budgetMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
                                 </div>
                                 <div>
-                                    <FilterLabel htmlFor="filter-budget-max">{t('budgetRangeEnd')}</FilterLabel>
-                                    <NumberInput id="filter-budget-max" name="filter-budget-max" value={localFilters.budgetMax} onChange={(e) => handleFilterChange('budgetMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="campaigns-filter-budget-max">{t('budgetRangeEnd')}</FilterLabel>
+                                    <NumberInput id="campaigns-filter-budget-max" name="campaigns-filter-budget-max" value={localFilters.budgetMax} onChange={(e) => handleFilterChange('budgetMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
                                 </div>
                             </div>
                         </div>
@@ -107,20 +107,20 @@ export const CampaignsFilterDrawer = () => {
                     <FilterSection title={t('dates')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-created-from">{t('campaignCreatedAtFrom') || t('createdAt')} ({t('from')})</FilterLabel>
-                                <FilterInput id="filter-created-from" type="date" value={localFilters.createdAtFrom} onChange={(e) => handleFilterChange('createdAtFrom', e.target.value)} />
+                                <FilterLabel htmlFor="campaigns-filter-created-from">{t('campaignCreatedAtFrom') || t('createdAt')} ({t('from')})</FilterLabel>
+                                <FilterInput id="campaigns-filter-created-from" type="date" value={localFilters.createdAtFrom} onChange={(e) => handleFilterChange('createdAtFrom', e.target.value)} />
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-created-to">{t('campaignCreatedAtTo') || t('createdAt')} ({t('to')})</FilterLabel>
-                                <FilterInput id="filter-created-to" type="date" value={localFilters.createdAtTo} onChange={(e) => handleFilterChange('createdAtTo', e.target.value)} />
+                                <FilterLabel htmlFor="campaigns-filter-created-to">{t('campaignCreatedAtTo') || t('createdAt')} ({t('to')})</FilterLabel>
+                                <FilterInput id="campaigns-filter-created-to" type="date" value={localFilters.createdAtTo} onChange={(e) => handleFilterChange('createdAtTo', e.target.value)} />
                             </div>
                         </div>
                     </FilterSection>
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="campaigns-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="campaigns-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { useAddDeveloper } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -11,12 +12,16 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddDeveloperModal = () => {
-    const { isAddDeveloperModalOpen, setIsAddDeveloperModalOpen, t, addDeveloper, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddDeveloperModalOpen, setIsAddDeveloperModalOpen, t, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Create developer mutation
+    const addDeveloperMutation = useAddDeveloper();
+    const isLoading = addDeveloperMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -52,9 +57,18 @@ export const AddDeveloperModal = () => {
             return;
         }
         
-        setIsLoading(true);
         try {
-            await addDeveloper(formState);
+            // Include company ID in the request
+            const developerData = {
+                ...formState,
+                company: currentUser?.company?.id,
+            };
+            
+            if (!developerData.company) {
+                throw new Error(t('companyRequired') || 'Company information is required');
+            }
+            
+            await addDeveloperMutation.mutateAsync(developerData);
 
             // Reset form
             setFormState({ name: '' });
@@ -67,8 +81,6 @@ export const AddDeveloperModal = () => {
         } catch (error: any) {
             console.error('Error adding developer:', error);
             setErrors({ _general: error?.message || t('errorCreatingDeveloper') || 'Failed to add developer. Please try again.' });
-        } finally {
-            setIsLoading(false);
         }
     };
 

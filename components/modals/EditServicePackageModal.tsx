@@ -7,13 +7,14 @@ import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
 import { ServicePackage } from '../../types';
+import { useUpdateServicePackage, useServices } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
 export const EditServicePackageModal = () => {
-    const { isEditServicePackageModalOpen, setIsEditServicePackageModalOpen, t, updateServicePackage, editingServicePackage, setEditingServicePackage, services, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditServicePackageModalOpen, setIsEditServicePackageModalOpen, t, editingServicePackage, setEditingServicePackage, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -22,7 +23,17 @@ export const EditServicePackageModal = () => {
         selectedServices: [] as number[],
         isActive: true,
     });
-    const [loading, setLoading] = useState(false);
+    
+    // Fetch services using React Query
+    const { data: servicesResponse } = useServices();
+    const services = Array.isArray(servicesResponse) 
+        ? servicesResponse 
+        : (servicesResponse?.results || []);
+    
+    // Update service package mutation
+    const updateServicePackageMutation = useUpdateServicePackage();
+    const loading = updateServicePackageMutation.isPending;
+    
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -52,22 +63,39 @@ export const EditServicePackageModal = () => {
 
     useEffect(() => {
         if (editingServicePackage) {
-            // Convert service names to IDs
-            const serviceIds = editingServicePackage.services
-                .map(serviceName => {
-                    const service = services.find(s => s.name === serviceName);
-                    return service?.id;
-                })
-                .filter((id): id is number => id !== undefined);
+            // Handle services - could be array of IDs or array of names/objects
+            let serviceIds: number[] = [];
+            
+            if (Array.isArray(editingServicePackage.services)) {
+                serviceIds = editingServicePackage.services
+                    .map(service => {
+                        // If it's a number, use it directly
+                        if (typeof service === 'number') {
+                            return service;
+                        }
+                        // If it's a string (name), find the service by name
+                        if (typeof service === 'string') {
+                            const foundService = services.find(s => s.name === service || s.id.toString() === service);
+                            return foundService?.id;
+                        }
+                        // If it's an object, use the id property
+                        if (typeof service === 'object' && service !== null) {
+                            return (service as any).id;
+                        }
+                        return undefined;
+                    })
+                    .filter((id): id is number => id !== undefined);
+            }
 
             setFormState({
-                name: editingServicePackage.name,
-                description: editingServicePackage.description,
-                price: editingServicePackage.price.toString(),
-                duration: editingServicePackage.duration,
+                name: editingServicePackage.name || '',
+                description: editingServicePackage.description || '',
+                price: editingServicePackage.price !== undefined && editingServicePackage.price !== null ? editingServicePackage.price.toString() : '',
+                duration: editingServicePackage.duration || '',
                 selectedServices: serviceIds,
-                isActive: editingServicePackage.isActive,
+                isActive: editingServicePackage.isActive !== undefined ? editingServicePackage.isActive : true,
             });
+            setErrors({});
         }
     }, [editingServicePackage, services]);
 
@@ -100,22 +128,19 @@ export const EditServicePackageModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            // Convert service IDs to service names for the API
-            const serviceNames = formState.selectedServices.map(id => {
-                const service = services.find(s => s.id === id);
-                return service?.name || '';
-            }).filter(Boolean);
-
-            await updateServicePackage({
-                ...editingServicePackage,
-                name: formState.name,
-                description: formState.description,
-                price: Number(formState.price) || 0,
-                duration: formState.duration,
-                services: serviceNames as unknown as number[],
-                isActive: formState.isActive,
+            // Use service IDs directly (API expects IDs)
+            await updateServicePackageMutation.mutateAsync({
+                id: editingServicePackage.id,
+                data: {
+                    name: formState.name.trim(),
+                    description: formState.description?.trim() || '',
+                    price: Number(formState.price) || 0,
+                    duration: formState.duration?.trim() || '',
+                    services: formState.selectedServices, // API expects service IDs
+                    company: currentUser?.company?.id || currentUser?.company_id,
+                    is_active: formState.isActive,
+                }
             });
 
             // Close modal immediately and show success modal
@@ -124,10 +149,23 @@ export const EditServicePackageModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating service package:', error);
-            const errorMessage = error?.message || t('failedToUpdateServicePackage') || 'Failed to update service package. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToUpdateServicePackage') || 'Failed to update service package. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 

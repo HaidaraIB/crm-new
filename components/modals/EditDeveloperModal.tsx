@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Developer } from '../../types';
+import { useUpdateDeveloper } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -12,12 +13,15 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const EditDeveloperModal = () => {
-    const { isEditDeveloperModalOpen, setIsEditDeveloperModalOpen, t, updateDeveloper, editingDeveloper, setEditingDeveloper, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditDeveloperModalOpen, setIsEditDeveloperModalOpen, t, editingDeveloper, setEditingDeveloper, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState<Omit<Developer, 'id' | 'code'>>({
         name: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [isLoading, setIsLoading] = useState(false);
+    
+    // Update developer mutation
+    const updateDeveloperMutation = useUpdateDeveloper();
+    const isLoading = updateDeveloperMutation.isPending;
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -67,11 +71,20 @@ export const EditDeveloperModal = () => {
             return;
         }
         
-        setIsLoading(true);
         try {
-            await updateDeveloper({
-                ...editingDeveloper,
+            // Include company ID in the request
+            const developerData = {
                 ...formState,
+                company: currentUser?.company?.id,
+            };
+            
+            if (!developerData.company) {
+                throw new Error(t('companyRequired') || 'Company information is required');
+            }
+            
+            await updateDeveloperMutation.mutateAsync({
+                id: editingDeveloper.id,
+                data: developerData,
             });
 
             // Close modal immediately and show success modal
@@ -81,8 +94,6 @@ export const EditDeveloperModal = () => {
         } catch (error: any) {
             console.error('Error updating developer:', error);
             setErrors({ _general: error?.message || t('errorUpdatingDeveloper') || 'Failed to update developer. Please try again.' });
-        } finally {
-            setIsLoading(false);
         }
     };
 

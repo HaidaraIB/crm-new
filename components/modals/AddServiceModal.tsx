@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
+import { useAddService, useServiceProviders } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -21,7 +22,18 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 };
 
 export const AddServiceModal = () => {
-    const { isAddServiceModalOpen, setIsAddServiceModalOpen, t, addService, serviceProviders, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddServiceModalOpen, setIsAddServiceModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Fetch service providers using React Query
+    const { data: providersResponse } = useServiceProviders();
+    const serviceProviders = Array.isArray(providersResponse) 
+        ? providersResponse 
+        : (providersResponse?.results || []);
+
+    // Create service mutation
+    const addServiceMutation = useAddService();
+    const loading = addServiceMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -31,7 +43,6 @@ export const AddServiceModal = () => {
         provider: '',
         isActive: true,
     });
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -43,6 +54,10 @@ export const AddServiceModal = () => {
 
         if (!formState.price || Number(formState.price) <= 0) {
             newErrors.price = t('priceRequired') || 'Price is required and must be greater than 0';
+        }
+
+        if (!currentUser?.company?.id) {
+            newErrors._general = t('companyRequired') || 'Company is required';
         }
 
         setErrors(newErrors);
@@ -71,6 +86,7 @@ export const AddServiceModal = () => {
                 provider: '',
                 isActive: true,
             });
+            setErrors({});
         }
     }, [isAddServiceModalOpen]);
 
@@ -104,17 +120,28 @@ export const AddServiceModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await addService({
-                name: formState.name,
-                description: formState.description,
+            // Find provider by name to get its ID
+            const selectedProvider = formState.provider 
+                ? serviceProviders.find(prov => prov.name === formState.provider)
+                : null;
+
+            const payload: any = {
+                name: formState.name.trim(),
+                description: formState.description?.trim() || '',
                 price: Number(formState.price) || 0,
-                duration: formState.duration,
-                category: formState.category,
-                provider: formState.provider || undefined,
-                isActive: formState.isActive,
-            });
+                duration: formState.duration?.trim() || '',
+                category: formState.category?.trim() || '',
+                company: currentUser?.company?.id || currentUser?.company_id,
+                is_active: formState.isActive,
+            };
+
+            // Only include provider if it's selected
+            if (selectedProvider) {
+                payload.provider = selectedProvider.id;
+            }
+
+            await addServiceMutation.mutateAsync(payload);
 
             // Reset form
             setFormState({
@@ -134,10 +161,23 @@ export const AddServiceModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating service:', error);
-            const errorMessage = error?.message || t('failedToCreateService') || 'Failed to create service. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToCreateService') || 'Failed to create service. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 

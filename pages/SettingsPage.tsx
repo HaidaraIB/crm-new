@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { PageWrapper, Loader } from '../components/index';
+import { PageWrapper } from '../components/index';
 import { ChannelsSettings } from './settings/ChannelsSettings';
 import { StagesSettings } from './settings/StagesSettings';
 import { StatusesSettings } from './settings/StatusesSettings';
@@ -11,13 +11,16 @@ type SettingsTab = 'Channels' | 'Stages' | 'Statuses';
 
 export const SettingsPage = () => {
     const { t } = useAppContext();
-    const [activeTab, setActiveTab] = useState<SettingsTab>('Channels');
-    const [loading, setLoading] = useState(true);
+    // Load saved tab from localStorage, default to 'Channels'
+    const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
+        const savedTab = localStorage.getItem('settingsActiveTab') as SettingsTab;
+        return savedTab && ['Channels', 'Stages', 'Statuses'].includes(savedTab) ? savedTab : 'Channels';
+    });
 
+    // Save active tab to localStorage whenever it changes
     useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, []);
+        localStorage.setItem('settingsActiveTab', activeTab);
+    }, [activeTab]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -27,16 +30,6 @@ export const SettingsPage = () => {
             default: return null;
         }
     };
-
-    if (loading) {
-        return (
-            <PageWrapper title={t('settings')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
-            </PageWrapper>
-        );
-    }
 
     return (
         <PageWrapper title={t('settings')}>

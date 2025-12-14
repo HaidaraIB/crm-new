@@ -9,8 +9,10 @@ import { TaskStage } from '../types';
 /**
  * Format stage name for display (convert snake_case to Title Case)
  */
-export function formatStageName(stage: TaskStage | string): string {
-  return stage
+export function formatStageName(stage: TaskStage | string | null | undefined): string {
+  if (!stage) return '';
+  const stageStr = String(stage);
+  return stageStr
     .split('_')
     .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join(' ');
@@ -21,7 +23,11 @@ export function formatStageName(stage: TaskStage | string): string {
  * @param stage - The stage value
  * @param t - Optional translation function
  */
-export function getStageDisplayLabel(stage: TaskStage | string, t?: (key: string) => string): string {
+export function getStageDisplayLabel(stage: TaskStage | string | null | undefined, t?: (key: string) => string): string {
+  if (!stage) return '';
+  
+  const stageStr = String(stage);
+  
   // If translation function is provided, use it
   if (t) {
     const translationMap: Record<string, string> = {
@@ -40,7 +46,7 @@ export function getStageDisplayLabel(stage: TaskStage | string, t?: (key: string
       'resale': 'resale',
     };
     
-    const translationKey = translationMap[stage];
+    const translationKey = translationMap[stageStr];
     if (translationKey) {
       return t(translationKey);
     }
@@ -63,14 +69,15 @@ export function getStageDisplayLabel(stage: TaskStage | string, t?: (key: string
     'resale': 'Resale',
   };
   
-  return stageMap[stage] || formatStageName(stage);
+  return stageMap[stageStr] || formatStageName(stageStr);
 }
 
 /**
  * Get stage category for grouping (Meeting, Call, WhatsApp, etc.)
  */
-export function getStageCategory(stage: TaskStage | string): 'Meeting' | 'Call' | 'WhatsApp' | 'Other' {
-  const normalizedStage = stage.toLowerCase();
+export function getStageCategory(stage: TaskStage | string | null | undefined): 'Meeting' | 'Call' | 'WhatsApp' | 'Other' {
+  if (!stage) return 'Other';
+  const normalizedStage = String(stage).toLowerCase();
   
   if (normalizedStage === 'meeting' || 
       normalizedStage === 'done_meeting' || 

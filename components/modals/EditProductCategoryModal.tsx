@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { ProductCategory } from '../../types';
+import { useUpdateProductCategory, useProductCategories } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -22,13 +23,23 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const EditProductCategoryModal = () => {
-    const { isEditProductCategoryModalOpen, setIsEditProductCategoryModalOpen, t, updateProductCategory, editingProductCategory, setEditingProductCategory, productCategories, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditProductCategoryModalOpen, setIsEditProductCategoryModalOpen, t, editingProductCategory, setEditingProductCategory, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
         parentCategory: '',
     });
-    const [loading, setLoading] = useState(false);
+    
+    // Fetch product categories using React Query
+    const { data: categoriesResponse } = useProductCategories();
+    const productCategories = Array.isArray(categoriesResponse) 
+        ? categoriesResponse 
+        : (categoriesResponse?.results || []);
+    
+    // Update product category mutation
+    const updateProductCategoryMutation = useUpdateProductCategory();
+    const loading = updateProductCategoryMutation.isPending;
+    
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -54,13 +65,31 @@ export const EditProductCategoryModal = () => {
 
     useEffect(() => {
         if (editingProductCategory) {
+            // Get parent category name from productCategories if parentCategory is an ID
+            let parentCategoryName = '';
+            if (editingProductCategory.parentCategory) {
+                const parentId = typeof editingProductCategory.parentCategory === 'number' 
+                    ? editingProductCategory.parentCategory 
+                    : Number(editingProductCategory.parentCategory);
+                
+                // Try to find parent category in the list
+                const parentCategory = productCategories.find(cat => cat.id === parentId);
+                if (parentCategory) {
+                    parentCategoryName = parentCategory.name;
+                } else {
+                    // If not found, wait a bit for categories to load, or use the ID as fallback
+                    // The select will show the ID if name is not found
+                }
+            }
+            
             setFormState({
-                name: editingProductCategory.name,
-                description: editingProductCategory.description,
-                parentCategory: editingProductCategory.parentCategory?.toString() || '',
+                name: editingProductCategory.name || '',
+                description: editingProductCategory.description || '',
+                parentCategory: parentCategoryName,
             });
+            setErrors({});
         }
-    }, [editingProductCategory]);
+    }, [editingProductCategory, productCategories]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -81,13 +110,22 @@ export const EditProductCategoryModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await updateProductCategory({
-                ...editingProductCategory,
-                name: formState.name,
-                description: formState.description,
-                parentCategory: formState.parentCategory || undefined,
+            // Find parent category by name to get its ID
+            const selectedParentCategory = formState.parentCategory 
+                ? productCategories.find(cat => cat.name === formState.parentCategory)
+                : null;
+
+            const updateData: any = {
+                name: formState.name.trim(),
+                description: formState.description?.trim() || '',
+                company: currentUser?.company?.id || currentUser?.company_id,
+                parent_category: selectedParentCategory ? selectedParentCategory.id : null,
+            };
+
+            await updateProductCategoryMutation.mutateAsync({
+                id: editingProductCategory.id,
+                data: updateData
             });
 
             // Close modal immediately and show success modal
@@ -96,10 +134,23 @@ export const EditProductCategoryModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating product category:', error);
-            const errorMessage = error?.message || t('failedToUpdateProductCategory') || 'Failed to update product category. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToUpdateProductCategory') || 'Failed to update product category. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 
@@ -142,7 +193,7 @@ export const EditProductCategoryModal = () => {
                     <Label htmlFor="parentCategory">{t('parentCategory')}</Label>
                     <Select id="parentCategory" value={formState.parentCategory} onChange={handleChange}>
                         <option value="">{t('selectParentCategory') || 'Select Parent Category (Optional)'}</option>
-                        {productCategories.filter(c => c.id !== editingProductCategory.id).map(category => (
+                        {(productCategories || []).filter(c => c.id !== editingProductCategory.id).map(category => (
                             <option key={category.id} value={category.name}>{category.name}</option>
                         ))}
                     </Select>

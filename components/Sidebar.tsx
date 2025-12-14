@@ -133,6 +133,10 @@ export const Sidebar = () => {
                     if (item.name === 'Integrations' && currentUser?.role !== 'Owner') {
                         return false;
                     }
+                    // Hide Employees item for employee role
+                    if (item.name === 'Employees' && currentUser?.role?.toLowerCase() === 'employee') {
+                        return false;
+                    }
                     return true;
                 }).map((item) => {
                     const isOpen = openSubMenus[item.name] ?? false;
@@ -178,12 +182,14 @@ export const Sidebar = () => {
                 })}
             </nav>
             <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700">
-                <SidebarItem
-                    name={t('settings')}
-                    icon={SETTINGS_ITEM.icon}
-                    isActive={currentPage === 'Settings'}
-                    onClick={() => handleNavigation('Settings')}
-                />
+                {currentUser?.role?.toLowerCase() !== 'employee' && (
+                    <SidebarItem
+                        name={t('settings')}
+                        icon={SETTINGS_ITEM.icon}
+                        isActive={currentPage === 'Settings'}
+                        onClick={() => handleNavigation('Settings')}
+                    />
+                )}
                 <a
                     href="#"
                     onClick={(e) => {

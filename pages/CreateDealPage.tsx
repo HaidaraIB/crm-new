@@ -2,6 +2,17 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, PlusIcon, Loader, NumberInput, ArrowLeftIcon } from '../components/index';
+import { useProjects, useUnits, useLeads, useUsers, useCreateDeal } from '../hooks/useQueries';
+import { User } from '../types';
+
+// Helper function to get user display name
+const getUserDisplayName = (user: User): string => {
+    if (user.name) return user.name;
+    if (user.first_name || user.last_name) {
+        return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+    }
+    return user.username || user.email || 'Unknown';
+};
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -9,11 +20,11 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode, value?: string | number; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string }) => {
+const Select = ({ id, children, value, onChange, className, disabled }: { id: string; children?: React.ReactNode, value?: string | number; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; disabled?: boolean }) => {
     const borderClass = className?.includes('border-red') ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600';
     const baseClassName = className?.replace(/border-\S+/g, '').trim() || '';
     return (
-        <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
+        <select id={id} value={value} onChange={onChange} disabled={disabled} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
             {children}
         </select>
     );
@@ -21,20 +32,45 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 
 export const CreateDealPage = () => {
-    const { t, setCurrentPage, setIsAddLeadModalOpen, addDeal, projects, units, leads, currentUser, selectedLeadForDeal, setSelectedLeadForDeal, users } = useAppContext();
+    const { t, setCurrentPage, setIsAddLeadModalOpen, currentUser, selectedLeadForDeal, setSelectedLeadForDeal } = useAppContext();
+    
+    // Fetch data using React Query hooks
+    const { data: projectsResponse } = useProjects();
+    const projects = projectsResponse?.results || [];
+    
+    const { data: unitsResponse } = useUnits();
+    const allUnits = Array.isArray(unitsResponse) 
+        ? unitsResponse 
+        : (unitsResponse?.results || []);
+    
+    const { data: leadsResponse } = useLeads();
+    const leads = leadsResponse?.results || [];
+    
+    const { data: usersResponse } = useUsers();
+    const users = Array.isArray(usersResponse) 
+        ? usersResponse 
+        : (usersResponse?.results || []);
+    const userOptions = (users && users.length > 0) ? users : (currentUser ? [currentUser] : []);
+    
+    // Use React Query mutation for creating deal
+    const createDealMutation = useCreateDeal();
+    
     const [loading, setLoading] = useState(true);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
     
     // Use selectedLeadForDeal if available, otherwise use first lead
-    const defaultLeadId = selectedLeadForDeal || (leads.length > 0 ? leads[0].id : 0);
+    const defaultLeadId = useMemo(() => {
+        return selectedLeadForDeal || (leads.length > 0 ? leads[0].id : 0);
+    }, [selectedLeadForDeal, leads]);
     
     const [formState, setFormState] = useState({
-        project: isRealEstate && projects.length > 0 ? projects[0].name : '',
-        unit: isRealEstate && units.length > 0 ? units[0].code : '',
-        leadId: defaultLeadId,
-        startedBy: currentUser?.id || 1,
-        closedBy: currentUser?.id || 1,
+        project: '',
+        unit: '',
+        leadId: 0,
+        employee: currentUser?.id || 0,
+        startedBy: currentUser?.id || 0,
+        closedBy: currentUser?.id || 0,
         paymentMethod: 'Cash',
         status: 'Reservation',
         stage: 'in_progress' as 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled',
@@ -46,6 +82,45 @@ export const CreateDealPage = () => {
         salesCommissionPercentage: '',
         description: '',
     });
+    
+    // Filter units by selected project (must be after formState declaration)
+    const units = useMemo(() => {
+        if (!isRealEstate || !formState.project) {
+            return allUnits;
+        }
+        const projectId = Number(formState.project);
+        return allUnits.filter((u: any) => u.project === projectId || u.project?.id === projectId || u.project_id === projectId);
+    }, [allUnits, formState.project, isRealEstate]);
+
+    // Update form state when data loads
+    useEffect(() => {
+        if (isRealEstate && projects.length > 0 && !formState.project) {
+            setFormState(prev => ({ ...prev, project: projects[0].id.toString() }));
+        }
+        if (defaultLeadId > 0 && formState.leadId === 0) {
+            setFormState(prev => ({ ...prev, leadId: defaultLeadId }));
+        }
+        // Set default employee, startedBy and closedBy if users are loaded and current values are invalid
+        if (userOptions.length > 0 && currentUser?.id) {
+            const currentUserInList = userOptions.find(u => u.id === currentUser.id);
+            if (currentUserInList && (formState.employee === 0 || !userOptions.find(u => u.id === formState.employee))) {
+                setFormState(prev => ({ ...prev, employee: currentUser.id }));
+            }
+            if (currentUserInList && (formState.startedBy === 0 || !userOptions.find(u => u.id === formState.startedBy))) {
+                setFormState(prev => ({ ...prev, startedBy: currentUser.id }));
+            }
+            if (currentUserInList && (formState.closedBy === 0 || !userOptions.find(u => u.id === formState.closedBy))) {
+                setFormState(prev => ({ ...prev, closedBy: currentUser.id }));
+            }
+        }
+    }, [projects, isRealEstate, defaultLeadId, formState.leadId, formState.startedBy, formState.closedBy, userOptions, currentUser]);
+
+    // Update unit when project changes or units load
+    useEffect(() => {
+        if (isRealEstate && formState.project && units.length > 0 && !formState.unit) {
+            setFormState(prev => ({ ...prev, unit: units[0].id.toString() }));
+        }
+    }, [isRealEstate, formState.project, units, formState.unit]);
 
     const calculatedValues = useMemo(() => {
         const value = parseFloat(formState.value) || 0;
@@ -57,7 +132,8 @@ export const CreateDealPage = () => {
     }, [formState.value, formState.discountAmount, formState.salesCommissionPercentage]);
 
     useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1000);
+        // Show loading screen briefly when page opens
+        const timer = setTimeout(() => setLoading(false), 500);
         return () => clearTimeout(timer);
     }, []);
 
@@ -87,6 +163,8 @@ export const CreateDealPage = () => {
             newErrors.unit = t('unitRequired') || 'Unit is required';
         }
 
+        // Note: startedBy and closedBy can be 0, we'll use currentUser?.id as fallback in payload
+
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -112,44 +190,123 @@ export const CreateDealPage = () => {
                 newState.discountAmount = (val * (discPercent / 100)).toFixed(2);
             }
 
+            // Reset unit when project changes
+            if (id === 'project' && isRealEstate) {
+                newState.unit = '';
+            }
+
             return newState;
         });
         clearError(id);
     };
     
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!validateForm()) {
+        const isValid = validateForm();
+        
+        if (!isValid) {
+            // Scroll to first error
+            const firstErrorField = Object.keys(errors)[0];
+            if (firstErrorField) {
+                const errorElement = document.getElementById(firstErrorField);
+                if (errorElement) {
+                    errorElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    errorElement.focus();
+                }
+            }
             return;
         }
         
-        const clientName = leads.find(l => l.id === formState.leadId)?.name || t('unknownClient');
-        addDeal({
-            clientName,
-            paymentMethod: formState.paymentMethod,
-            status: formState.status,
-            stage: formState.stage,
-            value: calculatedValues.totalValue,
-            leadId: formState.leadId,
-            startedBy: Number(formState.startedBy),
-            closedBy: Number(formState.closedBy),
-            startDate: formState.startDate,
-            closedDate: formState.closedDate,
-            discountPercentage: Number(formState.discountPercentage) || 0,
-            discountAmount: Number(formState.discountAmount) || 0,
-            salesCommissionPercentage: Number(formState.salesCommissionPercentage) || 0,
-            salesCommissionAmount: calculatedValues.salesCommissionAmount,
-            description: formState.description,
+        try {
+            const payload: any = {
+                client: formState.leadId, // API expects 'client' field with lead ID
+                employee: Number(formState.employee) || currentUser?.id || null, // Send employee ID to API
+                payment_method: formState.paymentMethod.toLowerCase() || null, // Send as payment_method (snake_case, lowercase) for API
+                status: formState.status.toLowerCase(), // Send as lowercase for API
+                stage: formState.stage,
+                value: calculatedValues.totalValue,
+                started_by: Number(formState.startedBy) || currentUser?.id || null, // Send as started_by (snake_case) for API
+                closed_by: Number(formState.closedBy) || currentUser?.id || null, // Send as closed_by (snake_case) for API
+                start_date: formState.startDate || null, // Send as start_date (snake_case) for API
+                closed_date: formState.closedDate || null, // Send as closed_date (snake_case) for API
+                discount_percentage: Number(formState.discountPercentage) || 0, // Send as discount_percentage (snake_case) for API
+                discount_amount: Number(formState.discountAmount) || 0, // Send as discount_amount (snake_case) for API
+                sales_commission_percentage: Number(formState.salesCommissionPercentage) || 0, // Send as sales_commission_percentage (snake_case) for API
+                sales_commission_amount: calculatedValues.salesCommissionAmount, // Send as sales_commission_amount (snake_case) for API
+                description: formState.description || '',
+                company: currentUser?.company?.id,
+            };
+            
             // Only include real estate fields if specialization is real_estate
-            ...(isRealEstate && {
-                unit: formState.unit,
-                project: formState.project,
-            }),
-        });
-        // Clear selectedLeadForDeal after creating deal
-        setSelectedLeadForDeal(null);
-        setCurrentPage('Deals');
+            if (isRealEstate) {
+                if (formState.project) {
+                    payload.project = Number(formState.project);
+                }
+                if (formState.unit) {
+                    payload.unit = Number(formState.unit);
+                }
+            }
+            
+            
+            await createDealMutation.mutateAsync(payload);
+            // Clear selectedLeadForDeal after creating deal
+            setSelectedLeadForDeal(null);
+            window.history.pushState({}, '', '/deals');
+            setCurrentPage('Deals');
+        } catch (error: any) {
+            console.error('Error creating deal:', error);
+            
+            // Handle API validation errors
+            let errorMessage = t('errorCreatingDeal') || 'Failed to create deal. Please try again.';
+            
+            if (error?.message) {
+                try {
+                    const errorData = JSON.parse(error.message);
+                    const newErrors: { [key: string]: string } = {};
+                    
+                    Object.keys(errorData).forEach(key => {
+                        if (Array.isArray(errorData[key])) {
+                            newErrors[key] = errorData[key][0];
+                        } else if (typeof errorData[key] === 'string') {
+                            newErrors[key] = errorData[key];
+                        }
+                    });
+                    
+                    setErrors(newErrors);
+                    
+                    // Show first error in alert
+                    const firstError = Object.values(newErrors)[0];
+                    if (firstError) {
+                        errorMessage = firstError;
+                    }
+                } catch (e) {
+                    // If parsing fails, use the error message as is
+                    errorMessage = error.message;
+                }
+            } else if (error?.fields || error?.response?.data) {
+                const errorData = error.fields || error.response?.data || {};
+                const newErrors: { [key: string]: string } = {};
+                
+                Object.keys(errorData).forEach(key => {
+                    if (Array.isArray(errorData[key])) {
+                        newErrors[key] = errorData[key][0];
+                    } else if (typeof errorData[key] === 'string') {
+                        newErrors[key] = errorData[key];
+                    }
+                });
+                
+                setErrors(newErrors);
+                
+                // Show first error in alert
+                const firstError = Object.values(newErrors)[0];
+                if (firstError) {
+                    errorMessage = firstError;
+                }
+            }
+            
+            alert(errorMessage);
+        }
     };
 
     if (loading) {
@@ -167,7 +324,10 @@ export const CreateDealPage = () => {
             title={
                 <div className="flex items-center gap-3">
                     <button
-                        onClick={() => setCurrentPage('Deals')}
+                        onClick={() => {
+                            window.history.pushState({}, '', '/deals');
+                            setCurrentPage('Deals');
+                        }}
                         className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
                         title={t('back') || 'Back'}
                     >
@@ -177,7 +337,12 @@ export const CreateDealPage = () => {
                 </div>
             }
         >
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} onKeyDown={(e) => {
+                if (e.key === 'Enter' && e.target instanceof HTMLInputElement) {
+                    e.preventDefault();
+                    handleSubmit(e as any);
+                }
+            }}>
                 <Card>
                     <h3 className="text-lg font-semibold mb-6 border-b pb-3 dark:border-gray-700">{t('dealInformation')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -192,14 +357,14 @@ export const CreateDealPage = () => {
                                     className={errors.project ? 'border-red-500 dark:border-red-500' : ''}
                                 >
                                     <option disabled value="">{t('selectProject')}</option>
-                                    {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                    {(projects || []).map(p => <option key={p.id} value={p.id.toString()}>{p.name}</option>)}
                                 </Select>
                                 {errors.project && (
                                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.project}</p>
                                 )}
                             </div>
                         )}
-                        {isRealEstate && units.length > 0 && (
+                        {isRealEstate && (
                             <div>
                                 <Label htmlFor="unit">{t('unit')} <span className="text-red-500">*</span></Label>
                                 <Select 
@@ -207,9 +372,21 @@ export const CreateDealPage = () => {
                                     value={formState.unit} 
                                     onChange={handleChange}
                                     className={errors.unit ? 'border-red-500 dark:border-red-500' : ''}
+                                    disabled={!formState.project || units.length === 0}
                                 >
-                                    <option disabled value="">{t('selectUnit')}</option>
-                                    {units.map(u => <option key={u.id} value={u.code}>{u.code}</option>)}
+                                    <option disabled value="">
+                                        {!formState.project 
+                                            ? (t('selectProjectFirst') || 'Select project first')
+                                            : units.length === 0 
+                                                ? (t('noUnitsAvailable') || 'No units available')
+                                                : t('selectUnit')
+                                        }
+                                    </option>
+                                    {units.map((u: any) => (
+                                        <option key={u.id} value={u.id.toString()}>
+                                            {u.code || `Unit ${u.id}`}
+                                        </option>
+                                    ))}
                                 </Select>
                                 {errors.unit && (
                                     <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.unit}</p>
@@ -229,7 +406,7 @@ export const CreateDealPage = () => {
                                     }}
                                 >
                                     <option disabled value={0}>{t('selectLead')}</option>
-                                    {leads.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+                                    {(leads || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </Select>
                                 <Button type="button" variant="secondary" className="px-3" onClick={() => setIsAddLeadModalOpen(true)}>
                                     <PlusIcon className="w-4 h-4"/>
@@ -241,16 +418,70 @@ export const CreateDealPage = () => {
                         </div>
                         {/* Row 2 */}
                         <div>
-                            <Label htmlFor="startedBy">{t('startedBy')}</Label>
-                            <Select id="startedBy" value={formState.startedBy} onChange={handleChange}>
-                                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            <Label htmlFor="employee">{t('employee') || 'Employee'}</Label>
+                            <Select 
+                                id="employee" 
+                                value={formState.employee} 
+                                onChange={handleChange}
+                                className={errors.employee ? 'border-red-500 dark:border-red-500' : ''}
+                            >
+                                {userOptions.length > 0 ? (
+                                    userOptions.map(u => (
+                                        <option key={u.id} value={u.id}>
+                                            {getUserDisplayName(u)}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="">{t('noUsersAvailable') || 'No users available'}</option>
+                                )}
                             </Select>
+                            {errors.employee && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.employee}</p>
+                            )}
+                        </div>
+                        <div>
+                            <Label htmlFor="startedBy">{t('startedBy')}</Label>
+                            <Select 
+                                id="startedBy" 
+                                value={formState.startedBy} 
+                                onChange={handleChange}
+                                className={errors.startedBy ? 'border-red-500 dark:border-red-500' : ''}
+                            >
+                                {userOptions.length > 0 ? (
+                                    userOptions.map(u => (
+                                        <option key={u.id} value={u.id}>
+                                            {getUserDisplayName(u)}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="">{t('noUsersAvailable') || 'No users available'}</option>
+                                )}
+                            </Select>
+                            {errors.startedBy && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.startedBy}</p>
+                            )}
                         </div>
                         <div>
                             <Label htmlFor="closedBy">{t('closedBy')}</Label>
-                            <Select id="closedBy" value={formState.closedBy} onChange={handleChange}>
-                                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                            <Select 
+                                id="closedBy" 
+                                value={formState.closedBy} 
+                                onChange={handleChange}
+                                className={errors.closedBy ? 'border-red-500 dark:border-red-500' : ''}
+                            >
+                                {userOptions.length > 0 ? (
+                                    userOptions.map(u => (
+                                        <option key={u.id} value={u.id}>
+                                            {getUserDisplayName(u)}
+                                        </option>
+                                    ))
+                                ) : (
+                                    <option value="">{t('noUsersAvailable') || 'No users available'}</option>
+                                )}
                             </Select>
+                            {errors.closedBy && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.closedBy}</p>
+                            )}
                         </div>
                         <div>
                             <Label htmlFor="paymentMethod">{t('paymentMethod')}</Label>
@@ -336,11 +567,20 @@ export const CreateDealPage = () => {
                         <textarea id="description" rows={4} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" placeholder={t('enterNotesAboutDeal')} value={formState.description} onChange={handleChange}></textarea>
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
-                        <Button type="button" variant="secondary" onClick={() => setCurrentPage('Deals')}>
+                        <Button type="button" variant="secondary" onClick={() => {
+                            window.history.pushState({}, '', '/deals');
+                            setCurrentPage('Deals');
+                        }}>
                             {t('cancel')}
                         </Button>
-                        <Button type="submit">
-                            {t('createDeal')}
+                        <Button 
+                            type="submit"
+                            onClick={(e) => {
+                                // Don't prevent default - let form handle it
+                            }}
+                            disabled={createDealMutation.isPending}
+                        >
+                            {createDealMutation.isPending ? (t('creating') || 'Creating...') : t('createDeal')}
                         </Button>
                     </div>
                 </Card>

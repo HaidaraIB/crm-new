@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { XIcon } from '../icons';
 import { Button } from '../Button';
+import { useDevelopers, useProjects } from '../../hooks/useQueries';
 
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <details className="group" open>
@@ -39,8 +40,15 @@ const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: 
 };
 
 export const ProjectsFilterDrawer = () => {
-    const { isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen, t, projectFilters, setProjectFilters, developers, projects } = useAppContext();
+    const { isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen, t, projectFilters, setProjectFilters } = useAppContext();
     const [localFilters, setLocalFilters] = useState(projectFilters);
+    
+    // Fetch data using React Query
+    const { data: developersResponse } = useDevelopers();
+    const developers = developersResponse?.results || [];
+    
+    const { data: projectsResponse } = useProjects();
+    const projects = projectsResponse?.results || [];
 
     useEffect(() => {
         setLocalFilters(projectFilters);
@@ -68,9 +76,40 @@ export const ProjectsFilterDrawer = () => {
     };
 
     // Get unique values from projects for filters
-    const uniqueTypes = Array.from(new Set(projects.map(p => p.type).filter(Boolean)));
-    const uniqueCities = Array.from(new Set(projects.map(p => p.city).filter(Boolean)));
-    const uniquePaymentMethods = Array.from(new Set(projects.map(p => p.paymentMethod).filter(Boolean)));
+    const uniqueTypes = Array.from(new Set((projects || [])
+        .map(p => p.type)
+        .filter(type => type && type !== '-' && type.trim() !== '')))
+        .sort();
+    const uniqueCities = Array.from(new Set((projects || [])
+        .map(p => p.city)
+        .filter(city => city && city !== '-' && city.trim() !== '')))
+        .sort();
+    const uniquePaymentMethods = Array.from(new Set((projects || [])
+        .map(p => p.paymentMethod)
+        .filter(method => method && method !== '-' && method.trim() !== '')))
+        .sort();
+
+    // Helper function to translate type
+    const translateType = (type: string): string => {
+        if (!type) return type;
+        const typeLower = type.toLowerCase();
+        const typeMap: { [key: string]: string } = {
+            'apartment': t('apartment') || 'Apartment',
+            'villa': t('villa') || 'Villa',
+        };
+        return typeMap[typeLower] || type;
+    };
+
+    // Helper function to translate payment method
+    const translatePaymentMethod = (method: string): string => {
+        if (!method) return method;
+        const methodLower = method.toLowerCase();
+        const methodMap: { [key: string]: string } = {
+            'cash': t('cash') || 'Cash',
+            'installment': t('installment') || 'Installment',
+        };
+        return methodMap[methodLower] || method;
+    };
 
     return (
         <>
@@ -86,28 +125,28 @@ export const ProjectsFilterDrawer = () => {
                     <FilterSection title={t('projectInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-developer">{t('developer')}</FilterLabel>
-                                <FilterSelect id="filter-developer" value={localFilters.developer} onChange={(e) => handleFilterChange('developer', e.target.value)}>
+                                <FilterLabel htmlFor="projects-filter-developer">{t('developer')}</FilterLabel>
+                                <FilterSelect id="projects-filter-developer" value={localFilters.developer} onChange={(e) => handleFilterChange('developer', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    {developers.map(dev => (
+                                    {developers?.map(dev => (
                                         <option key={dev.id} value={dev.name}>{dev.name}</option>
-                                    ))}
+                                    )) || []}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-type">{t('type')}</FilterLabel>
-                                <FilterSelect id="filter-type" value={localFilters.type} onChange={(e) => handleFilterChange('type', e.target.value)}>
+                                <FilterLabel htmlFor="projects-filter-type">{t('type')}</FilterLabel>
+                                <FilterSelect id="projects-filter-type" value={localFilters.type} onChange={(e) => handleFilterChange('type', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueTypes.map(type => (
-                                        <option key={type} value={type}>{type}</option>
+                                        <option key={type} value={type}>{translateType(type)}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-city">{t('city')}</FilterLabel>
-                                <FilterSelect id="filter-city" value={localFilters.city} onChange={(e) => handleFilterChange('city', e.target.value)}>
+                                <FilterLabel htmlFor="projects-filter-city">{t('city')}</FilterLabel>
+                                <FilterSelect id="projects-filter-city" value={localFilters.city} onChange={(e) => handleFilterChange('city', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueCities.map(city => (
                                         <option key={city} value={city}>{city}</option>
@@ -116,11 +155,11 @@ export const ProjectsFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-payment">{t('paymentMethod')}</FilterLabel>
-                                <FilterSelect id="filter-payment" value={localFilters.paymentMethod} onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}>
+                                <FilterLabel htmlFor="projects-filter-payment">{t('paymentMethod')}</FilterLabel>
+                                <FilterSelect id="projects-filter-payment" value={localFilters.paymentMethod} onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniquePaymentMethods.map(method => (
-                                        <option key={method} value={method}>{method}</option>
+                                        <option key={method} value={method}>{translatePaymentMethod(method)}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
@@ -129,8 +168,8 @@ export const ProjectsFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="projects-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="projects-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

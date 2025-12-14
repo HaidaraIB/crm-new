@@ -7,6 +7,7 @@ import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
 import { Service } from '../../types';
+import { useUpdateService, useServiceProviders } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -24,7 +25,18 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const EditServiceModal = () => {
-    const { isEditServiceModalOpen, setIsEditServiceModalOpen, t, updateService, editingService, setEditingService, serviceProviders, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditServiceModalOpen, setIsEditServiceModalOpen, t, editingService, setEditingService, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Fetch service providers using React Query
+    const { data: providersResponse } = useServiceProviders();
+    const serviceProviders = Array.isArray(providersResponse) 
+        ? providersResponse 
+        : (providersResponse?.results || []);
+
+    // Update service mutation
+    const updateServiceMutation = useUpdateService();
+    const loading = updateServiceMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -34,7 +46,6 @@ export const EditServiceModal = () => {
         provider: '',
         isActive: true,
     });
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -64,17 +75,27 @@ export const EditServiceModal = () => {
 
     useEffect(() => {
         if (editingService) {
+            // Get provider name from serviceProviders if provider is an ID
+            let providerName = editingService.provider || '';
+            if (editingService.provider && typeof editingService.provider === 'number') {
+                const provider = serviceProviders.find(p => p.id === editingService.provider);
+                providerName = provider?.name || '';
+            } else if (editingService.provider && typeof editingService.provider === 'string') {
+                providerName = editingService.provider;
+            }
+            
             setFormState({
-                name: editingService.name,
-                description: editingService.description,
-                price: editingService.price.toString(),
-                duration: editingService.duration,
-                category: editingService.category,
-                provider: editingService.provider || '',
-                isActive: editingService.isActive,
+                name: editingService.name || '',
+                description: editingService.description || '',
+                price: editingService.price !== undefined && editingService.price !== null ? editingService.price.toString() : '',
+                duration: editingService.duration || '',
+                category: editingService.category || '',
+                provider: providerName,
+                isActive: editingService.isActive !== undefined ? editingService.isActive : true,
             });
+            setErrors({});
         }
-    }, [editingService]);
+    }, [editingService, serviceProviders]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;
@@ -99,17 +120,30 @@ export const EditServiceModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await updateService({
-                ...editingService,
-                name: formState.name,
-                description: formState.description,
+            // Find provider by name to get its ID
+            const selectedProvider = formState.provider 
+                ? serviceProviders.find(prov => prov.name === formState.provider)
+                : null;
+
+            const updateData: any = {
+                name: formState.name.trim(),
+                description: formState.description?.trim() || '',
                 price: Number(formState.price) || 0,
-                duration: formState.duration,
-                category: formState.category,
-                provider: formState.provider || undefined,
-                isActive: formState.isActive,
+                duration: formState.duration?.trim() || '',
+                category: formState.category?.trim() || '',
+                company: currentUser?.company?.id || currentUser?.company_id,
+                is_active: formState.isActive,
+            };
+
+            // Only include provider if it's selected
+            if (selectedProvider) {
+                updateData.provider = selectedProvider.id;
+            }
+
+            await updateServiceMutation.mutateAsync({
+                id: editingService.id,
+                data: updateData
             });
 
             // Close modal immediately and show success modal
@@ -118,10 +152,23 @@ export const EditServiceModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating service:', error);
-            const errorMessage = error?.message || t('failedToUpdateService') || 'Failed to update service. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToUpdateService') || 'Failed to update service. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 

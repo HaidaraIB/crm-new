@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { XIcon } from '../icons';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
+import { useDeals, useProjects, useUnits } from '../../hooks/useQueries';
 
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <details className="group" open>
@@ -40,9 +41,19 @@ const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: 
 };
 
 export const DealsFilterDrawer = () => {
-    const { isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen, t, currentUser, projects, units, dealFilters, setDealFilters, deals } = useAppContext();
+    const { isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen, t, currentUser, dealFilters, setDealFilters } = useAppContext();
     const [localFilters, setLocalFilters] = useState(dealFilters);
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
+    
+    // Fetch data using React Query
+    const { data: dealsResponse } = useDeals();
+    const deals = dealsResponse?.results || [];
+    
+    const { data: projectsResponse } = useProjects();
+    const projects = projectsResponse?.results || [];
+    
+    const { data: unitsResponse } = useUnits();
+    const units = unitsResponse?.results || [];
 
     useEffect(() => {
         setLocalFilters(dealFilters);
@@ -72,9 +83,68 @@ export const DealsFilterDrawer = () => {
     };
 
     // Get unique values from deals for filters
-    const uniqueStatuses = Array.from(new Set(deals.map(d => d.status).filter(Boolean)));
-    const uniquePaymentMethods = Array.from(new Set(deals.map(d => d.paymentMethod).filter(Boolean)));
-    const uniqueUnits = Array.from(new Set(deals.map(d => d.unit).filter(Boolean)));
+    // Handle both raw API data and transformed data
+    // Helper function to translate status
+    const translateStatus = (status: string): string => {
+        if (!status) return status;
+        const statusLower = status.toLowerCase();
+        const statusMap: { [key: string]: string } = {
+            'reservation': t('reservation') || 'Reservation',
+            'contracted': t('contracted') || 'Contracted',
+            'closed': t('closed') || 'Closed',
+        };
+        return statusMap[statusLower] || status;
+    };
+
+    // Helper function to translate payment method
+    const translatePaymentMethod = (method: string): string => {
+        if (!method) return method;
+        const methodLower = method.toLowerCase();
+        const methodMap: { [key: string]: string } = {
+            'cash': t('cash') || 'Cash',
+            'installment': t('installment') || 'Installment',
+        };
+        return methodMap[methodLower] || method;
+    };
+
+    const uniqueStatuses = Array.from(new Set((deals || [])
+        .map(d => {
+            // Handle status from both raw and transformed data
+            return d.status || (d as any).status_name || '';
+        })
+        .filter(status => status && status.trim() !== '')))
+        .sort();
+    const uniquePaymentMethods = Array.from(new Set((deals || [])
+        .map(d => {
+            // Handle paymentMethod from both raw and transformed data
+            return d.paymentMethod || (d as any).payment_method || '';
+        })
+        .filter(method => method && method.trim() !== '' && method !== '-')))
+        .sort();
+    const uniqueUnits = Array.from(new Set((deals || [])
+        .map(d => {
+            // Handle unit from both raw and transformed data
+            // API now returns unit as ID (number) or unit_code (string) from serializer
+            if ((d as any).unit_code) return String((d as any).unit_code);
+            if (d.unit) {
+                // If unit is a number (ID), find the unit code from units array
+                if (typeof d.unit === 'number') {
+                    const unitObj = units.find((u: any) => u.id === d.unit);
+                    return unitObj ? String(unitObj.code || unitObj.id) : '';
+                }
+                // If unit is a string (code), return it
+                if (typeof d.unit === 'string') return d.unit;
+                // If unit is an object, get the code
+                if (typeof d.unit === 'object' && d.unit?.code) return String(d.unit.code);
+            }
+            return '';
+        })
+        .filter(unit => {
+            // Convert to string and check if it's valid
+            const unitStr = String(unit || '');
+            return unitStr && unitStr !== '-' && unitStr.trim() !== '';
+        })))
+        .sort();
 
     return (
         <>
@@ -90,21 +160,21 @@ export const DealsFilterDrawer = () => {
                     <FilterSection title={t('dealInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
-                                <FilterSelect id="filter-status" value={localFilters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
+                                <FilterLabel htmlFor="deals-filter-status">{t('status')}</FilterLabel>
+                                <FilterSelect id="deals-filter-status" value={localFilters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueStatuses.map(status => (
-                                        <option key={status} value={status}>{status}</option>
+                                        <option key={status} value={status}>{translateStatus(status)}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-payment">{t('paymentMethod')}</FilterLabel>
-                                <FilterSelect id="filter-payment" value={localFilters.paymentMethod} onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}>
+                                <FilterLabel htmlFor="deals-filter-payment">{t('paymentMethod')}</FilterLabel>
+                                <FilterSelect id="deals-filter-payment" value={localFilters.paymentMethod} onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniquePaymentMethods.map(method => (
-                                        <option key={method} value={method}>{method}</option>
+                                        <option key={method} value={method}>{translatePaymentMethod(method)}</option>
                                     ))}
                                 </FilterSelect>
                             </div>
@@ -112,18 +182,18 @@ export const DealsFilterDrawer = () => {
                             {isRealEstate && (
                                 <>
                                     <div>
-                                        <FilterLabel htmlFor="filter-project">{t('project')}</FilterLabel>
-                                        <FilterSelect id="filter-project" value={localFilters.project} onChange={(e) => handleFilterChange('project', e.target.value)}>
+                                        <FilterLabel htmlFor="deals-filter-project">{t('project')}</FilterLabel>
+                                        <FilterSelect id="deals-filter-project" value={localFilters.project} onChange={(e) => handleFilterChange('project', e.target.value)}>
                                             <option value="All">{t('all')}</option>
-                                            {projects.map(project => (
+                                            {(projects || []).map((project: any) => (
                                                 <option key={project.id} value={project.name}>{project.name}</option>
                                             ))}
                                         </FilterSelect>
                                     </div>
 
                                     <div>
-                                        <FilterLabel htmlFor="filter-unit">{t('unit')}</FilterLabel>
-                                        <FilterSelect id="filter-unit" value={localFilters.unit} onChange={(e) => handleFilterChange('unit', e.target.value)}>
+                                        <FilterLabel htmlFor="deals-filter-unit">{t('unit')}</FilterLabel>
+                                        <FilterSelect id="deals-filter-unit" value={localFilters.unit} onChange={(e) => handleFilterChange('unit', e.target.value)}>
                                             <option value="All">{t('all')}</option>
                                             {uniqueUnits.map(unit => (
                                                 <option key={unit} value={unit}>{unit}</option>
@@ -135,12 +205,12 @@ export const DealsFilterDrawer = () => {
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <FilterLabel htmlFor="filter-value-min">{t('valueRangeStart') || t('budgetRangeStart')}</FilterLabel>
-                                    <NumberInput id="filter-value-min" name="filter-value-min" value={localFilters.valueMin} onChange={(e) => handleFilterChange('valueMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="deals-filter-value-min">{t('valueRangeStart') || t('budgetRangeStart')}</FilterLabel>
+                                    <NumberInput id="deals-filter-value-min" name="deals-filter-value-min" value={localFilters.valueMin} onChange={(e) => handleFilterChange('valueMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
                                 </div>
                                 <div>
-                                    <FilterLabel htmlFor="filter-value-max">{t('valueRangeEnd') || t('budgetRangeEnd')}</FilterLabel>
-                                    <NumberInput id="filter-value-max" name="filter-value-max" value={localFilters.valueMax} onChange={(e) => handleFilterChange('valueMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="deals-filter-value-max">{t('valueRangeEnd') || t('budgetRangeEnd')}</FilterLabel>
+                                    <NumberInput id="deals-filter-value-max" name="deals-filter-value-max" value={localFilters.valueMax} onChange={(e) => handleFilterChange('valueMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
                                 </div>
                             </div>
                         </div>
@@ -148,8 +218,8 @@ export const DealsFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByClientNameOrId')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="deals-filter-search">{t('searchByClientNameOrId')}</FilterLabel>
+                            <FilterInput id="deals-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

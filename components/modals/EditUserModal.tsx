@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
+import { useUpdateUser } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -19,7 +20,12 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 );
 
 export const EditUserModal = () => {
-    const { isEditUserModalOpen, setIsEditUserModalOpen, selectedUser, t, updateUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditUserModalOpen, setIsEditUserModalOpen, selectedUser, t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    
+    // Update user mutation
+    const updateUserMutation = useUpdateUser();
+    const loading = updateUserMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -27,18 +33,34 @@ export const EditUserModal = () => {
         password: '',
         role: 'Employee' as string,
     });
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+
+    // Helper function to get user display name
+    const getUserDisplayName = (user: any): string => {
+        if (user.name) return user.name;
+        if (user.first_name || user.last_name) {
+            return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+        }
+        return user.username || user.email || t('unknown') || 'Unknown';
+    };
 
     // Initialize form state when modal opens or selectedUser changes
     useEffect(() => {
         if (selectedUser && isEditUserModalOpen) {
+            // Normalize role: API returns 'admin' or 'employee', but might also return 'Owner' from old data
+            const normalizedRole = selectedUser.role?.toLowerCase() === 'admin' || selectedUser.role === 'Owner' ? 'admin' : 'employee';
+            
+            // Get name from first_name + last_name or fallback to name
+            const fullName = selectedUser.first_name || selectedUser.last_name
+                ? [selectedUser.first_name, selectedUser.last_name].filter(Boolean).join(' ').trim()
+                : selectedUser.name || '';
+            
             setFormState({
-                name: selectedUser.name || '',
+                name: fullName,
                 phone: selectedUser.phone || '',
                 email: selectedUser.email || '',
                 password: '',
-                role: selectedUser.role === 'Owner' ? 'Owner' : 'Employee', // فقط Owner أو Employee
+                role: normalizedRole,
             });
         }
     }, [selectedUser, isEditUserModalOpen]);
@@ -137,7 +159,7 @@ export const EditUserModal = () => {
             phone: '',
             email: '',
             password: '',
-            role: 'Employee',
+            role: 'employee',
         });
         setErrors({});
     };
@@ -151,16 +173,30 @@ export const EditUserModal = () => {
             return;
         }
 
-        setLoading(true);
         setErrors({});
 
         try {
-            await updateUser(selectedUser.id, {
-                name: formState.name,
-                phone: formState.phone,
-                email: formState.email,
-                password: formState.password || undefined,
-                role: selectedUser.role === 'Owner' ? 'Owner' : formState.role, // لا يمكن تغيير دور Owner
+            // Split name into first_name and last_name
+            const nameParts = formState.name.trim().split(/\s+/);
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+            
+            // Normalize role to lowercase for API (API expects 'admin' or 'employee')
+            const currentRole = selectedUser.role?.toLowerCase();
+            const isAdmin = currentRole === 'admin' || selectedUser.role === 'Owner';
+            const roleToSend = isAdmin ? 'admin' : formState.role.toLowerCase();
+            
+            await updateUserMutation.mutateAsync({
+                id: selectedUser.id,
+                data: {
+                    first_name: firstName,
+                    last_name: lastName,
+                    username: selectedUser.username || '', // Include username (required by API)
+                    phone: formState.phone,
+                    email: formState.email,
+                    password: formState.password || undefined,
+                    role: roleToSend,
+                }
             });
 
             // Close modal immediately and show success modal
@@ -193,25 +229,31 @@ export const EditUserModal = () => {
             } else if (errorFields.password) {
                 const passwordError = Array.isArray(errorFields.password) ? errorFields.password[0] : errorFields.password;
                 setErrors({ password: passwordError || t('passwordRequired') || 'Password is required' });
+            } else if (errorFields.role) {
+                const roleError = Array.isArray(errorFields.role) ? errorFields.role[0] : errorFields.role;
+                setErrors({ role: roleError || t('invalidRole') || 'Invalid role' });
             } else if (lowerMessage.includes('email') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
                 setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
             } else if (lowerMessage.includes('phone') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
                 setErrors({ phone: t('phoneAlreadyExists') || 'This phone number is already registered' });
+            } else if (errorFields.username) {
+                const usernameError = Array.isArray(errorFields.username) ? errorFields.username[0] : errorFields.username;
+                setErrors({ username: usernameError || t('usernameRequired') || 'Username is required' });
             } else {
                 // Generic error - show at top
                 setErrors({ 
                     _general: errorMessage || t('errorUpdatingEmployee') || 'Failed to update employee. Please try again.' 
                 });
             }
-        } finally {
-            setLoading(false);
         }
     };
 
     if (!selectedUser) return null;
 
+    const displayName = getUserDisplayName(selectedUser);
+
     return (
-        <Modal isOpen={isEditUserModalOpen} onClose={handleClose} title={`${t('editEmployee')}: ${selectedUser.name}`}>
+        <Modal isOpen={isEditUserModalOpen} onClose={handleClose} title={`${t('editEmployee')}: ${displayName}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {errors._general && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
@@ -234,7 +276,7 @@ export const EditUserModal = () => {
                         id="edit-user-phone" 
                         value={formState.phone} 
                         onChange={handlePhoneChange}
-                        placeholder={t('enterPhoneNumber') || 'Enter phone number'}
+                        placeholder={t('enterPhone') || 'Enter phone number'}
                         error={!!errors.phone}
                     />
                     {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
@@ -265,12 +307,13 @@ export const EditUserModal = () => {
                         <p className="text-gray-500 text-xs mt-1">{t('leaveBlankPassword') || 'Leave blank to keep current password'}</p>
                     )}
                 </div>
-                {selectedUser.role !== 'Owner' && (
+                {(selectedUser.role?.toLowerCase() !== 'admin' && selectedUser.role !== 'Owner') && (
                     <div>
                         <Label htmlFor="edit-user-role">{t('role')}</Label>
                         <Select id="edit-user-role" value={formState.role} onChange={handleChange}>
-                            <option value="Employee">{t('employee')}</option>
+                            <option value="employee">{t('employee')}</option>
                         </Select>
+                        {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                     </div>
                 )}
                 <div className="flex justify-end gap-2">

@@ -4,12 +4,15 @@ import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute } from './utils/routing';
 import { Page } from './types';
-import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal } from './components/index';
+import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage } from './pages';
 
-const CurrentPageContent = () => {
-    const { currentPage } = useAppContext();
-    switch (currentPage) {
+const TheApp = () => {
+    const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn } = useAppContext();
+    
+    // CurrentPageContent component defined inside TheApp to have access to currentPage
+    const CurrentPageContent = () => {
+        switch (currentPage) {
         case 'Dashboard':
             return <DashboardPage />;
         case 'Leads':
@@ -79,10 +82,7 @@ const CurrentPageContent = () => {
             // FIX: The PageWrapper component requires children.
             return <PageWrapper title={currentPage}><div>Content for {currentPage}</div></PageWrapper>;
     }
-}
-
-const TheApp = () => {
-    const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn } = useAppContext();
+    };
     
     // Redirect from subdomain to main domain (if on subdomain)
     React.useEffect(() => {
@@ -100,7 +100,6 @@ const TheApp = () => {
                 const port = window.location.port ? `:${window.location.port}` : '';
                 const path = window.location.pathname;
                 const mainUrl = `${protocol}//localhost${port}${path}${window.location.search}`;
-                console.log('🔄 Redirecting from subdomain to main domain:', mainUrl);
                 window.location.replace(mainUrl);
             }
         }
@@ -143,7 +142,6 @@ const TheApp = () => {
         
         // If user is already logged in, just clean the URL
         if (isLoggedIn && hasAccessToken && hasCurrentUser) {
-            console.log('🔐 User already logged in, cleaning auth parameter from URL...');
             window.history.replaceState({}, '', window.location.pathname);
             setAuthProcessed(true);
             sessionStorage.setItem('authProcessed', 'true');
@@ -155,7 +153,6 @@ const TheApp = () => {
             try {
                 const decodedData = JSON.parse(atob(decodeURIComponent(authDataParam)));
                 if (decodedData.access && decodedData.refresh && decodedData.user) {
-                    console.log('🔐 Found auth data in URL, restoring session...');
                     
                     // Save tokens and user data
                     localStorage.setItem('accessToken', decodedData.access);
@@ -200,7 +197,7 @@ const TheApp = () => {
     }, [isLoggedIn, authProcessed]); // Run when isLoggedIn changes or on mount
     
     // Check for verify-email route first (accessible for both logged-in and logged-out users)
-    const pathname = window.location.pathname;
+    const pathname = decodeURIComponent(window.location.pathname);
     const urlParamsForRoutes = new URLSearchParams(window.location.search);
     const hasVerificationParams = urlParamsForRoutes.has('token') && urlParamsForRoutes.has('email');
     const hasResetParams = urlParamsForRoutes.has('token') && (urlParamsForRoutes.has('email') || pathname === '/reset-password');
@@ -266,7 +263,8 @@ const TheApp = () => {
 
     // Handle pathname-based routing for logged-in users
     React.useEffect(() => {
-        const pathnameToCheck = window.location.pathname;
+        // Decode URL-encoded pathname (e.g., /all%20leads -> /all leads)
+        const pathnameToCheck = decodeURIComponent(window.location.pathname);
         
         // Map pathname to page name
         const pathToPageMap: Record<string, Page> = {
@@ -277,6 +275,9 @@ const TheApp = () => {
             '/cold leads': 'Cold Leads',
             '/my leads': 'My Leads',
             '/rotated leads': 'Rotated Leads',
+            '/create-lead': 'CreateLead',
+            '/edit-lead': 'EditLead',
+            '/view-lead': 'ViewLead', // Base route, will handle /view-lead/:id pattern
             '/activities': 'Activities',
             '/properties': 'Properties',
             '/owners': 'Owners',
@@ -287,6 +288,7 @@ const TheApp = () => {
             '/product categories': 'Product Categories',
             '/suppliers': 'Suppliers',
             '/deals': 'Deals',
+            '/create-deal': 'CreateDeal',
             '/employees': 'Employees',
             '/users': 'Users',
             '/marketing': 'Marketing',
@@ -313,17 +315,36 @@ const TheApp = () => {
         
         // Check if pathname matches a known route
         const normalizedPath = pathnameToCheck.toLowerCase();
+        
+        // Check for /view-lead/:id pattern
+        if (normalizedPath.startsWith('/view-lead/')) {
+            const leadIdMatch = pathnameToCheck.match(/\/view-lead\/(\d+)/);
+            if (leadIdMatch && currentPage !== 'ViewLead') {
+                setCurrentPage('ViewLead');
+            } else if (!leadIdMatch) {
+                // Invalid /view-lead URL, redirect to leads
+                window.history.replaceState({}, '', '/leads');
+                setCurrentPage('Leads');
+            }
+            return;
+        }
+        
         const matchedPage = pathToPageMap[normalizedPath];
         
         if (matchedPage && currentPage !== matchedPage) {
             setCurrentPage(matchedPage);
+        } else if (!matchedPage && pathnameToCheck !== '/' && pathnameToCheck !== '') {
+            // If pathname doesn't match any route, redirect to dashboard
+            window.history.replaceState({}, '', '/dashboard');
+            setCurrentPage('Dashboard');
         }
     }, [currentPage, setCurrentPage]);
     
     // Also check pathname on mount and when pathname might have changed
     React.useEffect(() => {
         const checkPathname = () => {
-            const currentPath = window.location.pathname;
+            // Decode URL-encoded pathname (e.g., /all%20leads -> /all leads)
+            const currentPath = decodeURIComponent(window.location.pathname);
             const pathToPageMap: Record<string, Page> = {
                 '/dashboard': 'Dashboard',
                 '/leads': 'Leads',
@@ -332,6 +353,9 @@ const TheApp = () => {
                 '/cold leads': 'Cold Leads',
                 '/my leads': 'My Leads',
                 '/rotated leads': 'Rotated Leads',
+                '/create-lead': 'CreateLead',
+                '/edit-lead': 'EditLead',
+                '/view-lead': 'ViewLead',
                 '/activities': 'Activities',
                 '/properties': 'Properties',
                 '/owners': 'Owners',
@@ -342,6 +366,7 @@ const TheApp = () => {
                 '/product categories': 'Product Categories',
                 '/suppliers': 'Suppliers',
                 '/deals': 'Deals',
+                '/create-deal': 'CreateDeal',
                 '/employees': 'Employees',
                 '/users': 'Users',
                 '/marketing': 'Marketing',
@@ -360,10 +385,28 @@ const TheApp = () => {
             };
             
             const normalizedPath = currentPath.toLowerCase();
+            
+            // Check for /view-lead/:id pattern
+            if (normalizedPath.startsWith('/view-lead/')) {
+                const leadIdMatch = currentPath.match(/\/view-lead\/(\d+)/);
+                if (leadIdMatch && currentPage !== 'ViewLead') {
+                    setCurrentPage('ViewLead');
+                } else if (!leadIdMatch) {
+                    // Invalid /view-lead URL, redirect to leads
+                    window.history.replaceState({}, '', '/leads');
+                    setCurrentPage('Leads');
+                }
+                return;
+            }
+            
             const matchedPage = pathToPageMap[normalizedPath];
             
             if (matchedPage && currentPage !== matchedPage) {
                 setCurrentPage(matchedPage);
+            } else if (!matchedPage && currentPath !== '/' && currentPath !== '') {
+                // If pathname doesn't match any route, redirect to dashboard
+                window.history.replaceState({}, '', '/dashboard');
+                setCurrentPage('Dashboard');
             }
         };
         
@@ -470,6 +513,7 @@ const TheApp = () => {
             <EditUserModal />
             <DeleteUserModal />
             <AddCampaignModal />
+            <EditCampaignModal />
             <ManageIntegrationAccountModal />
             <ChangePasswordModal />
             <AddTodoModal />
@@ -488,6 +532,12 @@ const TheApp = () => {
             <EditDealModal />
             <ViewDealModal />
             <SuccessModal />
+            <AddChannelModal />
+            <EditChannelModal />
+            <AddStageModal />
+            <EditStageModal />
+            <AddStatusModal />
+            <EditStatusModal />
         </div>
         );
     };

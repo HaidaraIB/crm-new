@@ -3,6 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { XIcon } from '../icons';
 import { Button } from '../Button';
+import { useUsers } from '../../hooks/useQueries';
+import { User } from '../../types';
+
+// Helper function to get user display name
+const getUserDisplayName = (user: User): string => {
+    if (user.first_name || user.last_name) {
+        return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    }
+    return user.name || user.username || user.email || `User ${user.id}`;
+};
 
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <details className="group" open>
@@ -46,8 +56,14 @@ interface TeamsReportFilters {
 }
 
 export const TeamsReportFilterDrawer = () => {
-    const { isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen, t, users, teamsReportFilters, setTeamsReportFilters } = useAppContext();
+    const { isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen, t, teamsReportFilters, setTeamsReportFilters } = useAppContext();
     const [localFilters, setLocalFilters] = useState<TeamsReportFilters>(teamsReportFilters);
+    
+    // Fetch users using React Query
+    const { data: usersData, isLoading: usersLoading, error: usersError } = useUsers();
+    const users = Array.isArray(usersData) 
+        ? usersData 
+        : (usersData?.results || []);
 
     useEffect(() => {
         setLocalFilters(teamsReportFilters);
@@ -90,29 +106,35 @@ export const TeamsReportFilterDrawer = () => {
                     <FilterSection title={t('reportInfo') || 'Report Information'}>
                         <div className="space-y-3">
                             <div>
-                                <FilterLabel htmlFor="filter-team">{t('team') || 'Team'}</FilterLabel>
-                                <FilterSelect id="filter-team" value={localFilters.selectedTeam} onChange={(e) => handleFilterChange('selectedTeam', e.target.value)}>
-                                    <option value="all">{t('allTeams')}</option>
-                                    {users.map(user => (
-                                        <option key={user.id} value={user.id.toString()}>{user.name}</option>
-                                    ))}
+                                <FilterLabel htmlFor="teams-report-filter-team">{t('team') || 'Team'}</FilterLabel>
+                                <FilterSelect id="teams-report-filter-team" value={localFilters.selectedTeam} onChange={(e) => handleFilterChange('selectedTeam', e.target.value)}>
+                                    <option value="all">{t('allTeams') || 'All Teams'}</option>
+                                    {usersLoading ? (
+                                        <option disabled>{t('loading') || 'Loading...'}</option>
+                                    ) : usersError ? (
+                                        <option disabled>{t('errorLoadingUsers') || 'Error loading users'}</option>
+                                    ) : (
+                                        (users || []).map(user => (
+                                            <option key={user.id} value={user.id.toString()}>{getUserDisplayName(user)}</option>
+                                        ))
+                                    )}
                                 </FilterSelect>
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-lead-type">{t('leadType')}</FilterLabel>
-                                <FilterSelect id="filter-lead-type" value={localFilters.leadType} onChange={(e) => handleFilterChange('leadType', e.target.value)}>
+                                <FilterLabel htmlFor="teams-report-filter-lead-type">{t('leadType')}</FilterLabel>
+                                <FilterSelect id="teams-report-filter-lead-type" value={localFilters.leadType} onChange={(e) => handleFilterChange('leadType', e.target.value)}>
                                     <option value="all">{t('allLeadsType')}</option>
                                     <option value="fresh">{t('freshLeads')}</option>
                                     <option value="cold">{t('coldLeads')}</option>
                                 </FilterSelect>
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-start-date">{t('startDate')}</FilterLabel>
-                                <FilterInput id="filter-start-date" type="date" value={localFilters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
+                                <FilterLabel htmlFor="teams-report-filter-start-date">{t('startDate')}</FilterLabel>
+                                <FilterInput id="teams-report-filter-start-date" type="date" value={localFilters.startDate} onChange={(e) => handleFilterChange('startDate', e.target.value)} />
                             </div>
                             <div>
-                                <FilterLabel htmlFor="filter-end-date">{t('endDate') || 'End Date'}</FilterLabel>
-                                <FilterInput id="filter-end-date" type="date" value={localFilters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
+                                <FilterLabel htmlFor="teams-report-filter-end-date">{t('endDate') || 'End Date'}</FilterLabel>
+                                <FilterInput id="teams-report-filter-end-date" type="date" value={localFilters.endDate} onChange={(e) => handleFilterChange('endDate', e.target.value)} />
                             </div>
                         </div>
                     </FilterSection>

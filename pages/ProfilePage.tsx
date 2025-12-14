@@ -4,7 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal } from '../components/index';
-import { changeEmailAPI, getCurrentUserAPI, updateUserAPI, createPaytabsPaymentSessionAPI } from '../services/api';
+import { changeEmailAPI, createPaytabsPaymentSessionAPI } from '../services/api';
+import { useCurrentUser, useUpdateUser } from '../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -14,14 +15,23 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 export const ProfilePage = () => {
     const {
         t,
-        currentUser,
         setCurrentUser,
         setIsChangePasswordModalOpen,
         isEmailVerificationModalOpen,
         setIsEmailVerificationModalOpen,
-        language
+        setIsSuccessModalOpen,
+        setSuccessMessage,
+        language,
+        currentUser: contextCurrentUser
     } = useAppContext();
-    const [loading, setLoading] = useState(true);
+
+    // Fetch current user using React Query
+    const { data: currentUserData, isLoading: userLoading } = useCurrentUser();
+    const updateUserMutation = useUpdateUser();
+    
+    // Use currentUser from API if available, otherwise use context
+    const currentUser = currentUserData || contextCurrentUser;
+    
     const [subscriptionInfo, setSubscriptionInfo] = useState<{ 
         id: number; 
         isActive: boolean; 
@@ -31,28 +41,28 @@ export const ProfilePage = () => {
     } | null>(null);
     const [isRenewing, setIsRenewing] = useState(false);
     
-    // Split name into first and last name
+    // Get first_name and last_name from API, fallback to splitting name
+    const apiFirstName = currentUser?.first_name || '';
+    const apiLastName = currentUser?.last_name || '';
     const nameParts = currentUser?.name?.split(' ') || [];
-    const initialFirstName = nameParts[0] || '';
-    const initialLastName = nameParts.slice(1).join(' ') || '';
+    const initialFirstName = apiFirstName || nameParts[0] || '';
+    const initialLastName = apiLastName || nameParts.slice(1).join(' ') || '';
     
     const [firstName, setFirstName] = useState(initialFirstName);
     const [lastName, setLastName] = useState(initialLastName);
     const [email, setEmail] = useState(currentUser?.email || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
     const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
-
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, []);
+    const [isSaving, setIsSaving] = useState(false);
+    const [saveError, setSaveError] = useState<string>('');
 
     // Load subscription info
     useEffect(() => {
         const loadSubscriptionInfo = async () => {
+            if (!currentUser) return;
             try {
-                const { getCurrentUserAPI, getPublicPlansAPI } = await import('../services/api');
-                const userData = await getCurrentUserAPI();
+                const { getPublicPlansAPI } = await import('../services/api');
+                const userData = currentUser;
                 if (userData?.company?.subscription) {
                     const subscriptionPlan = userData.company.subscription.plan;
                     let planWithArabic: { name?: string; name_ar?: string } | undefined = undefined;
@@ -118,9 +128,18 @@ export const ProfilePage = () => {
     // Update form when currentUser changes
     useEffect(() => {
         if (currentUser) {
-            const nameParts = currentUser.name?.split(' ') || [];
-            setFirstName(nameParts[0] || '');
-            setLastName(nameParts.slice(1).join(' ') || '');
+            // Use first_name and last_name from API if available
+            const apiFirstName = currentUser.first_name || '';
+            const apiLastName = currentUser.last_name || '';
+            if (apiFirstName || apiLastName) {
+                setFirstName(apiFirstName);
+                setLastName(apiLastName);
+            } else {
+                // Fallback to splitting name
+                const nameParts = currentUser.name?.split(' ') || [];
+                setFirstName(nameParts[0] || '');
+                setLastName(nameParts.slice(1).join(' ') || '');
+            }
             setEmail(currentUser.email || '');
             setPhone(currentUser.phone || '');
         }
@@ -129,39 +148,57 @@ export const ProfilePage = () => {
     if (!currentUser) return null;
 
     const handleSave = async () => {
-        if (!currentUser) return;
+        if (!currentUser?.id) return;
+        
+        setIsSaving(true);
+        setSaveError('');
         
         try {
-            const fullName = `${firstName} ${lastName}`.trim();
-            await updateUserAPI(currentUser.id, {
-                first_name: firstName,
-                last_name: lastName,
-                phone: phone,
+            // API requires username, email, and role fields
+            await updateUserMutation.mutateAsync({
+                id: currentUser.id,
+                data: {
+                    username: currentUser.username || currentUser.email?.split('@')[0] || '',
+                    email: currentUser.email || '',
+                    role: currentUser.role || 'User',
+                    first_name: firstName.trim() || null,
+                    last_name: lastName.trim() || null,
+                    phone: phone.trim() || null,
+                },
             });
             
+            // Update context user with new data
+            const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
             setCurrentUser({
                 ...currentUser,
-                name: fullName,
-                phone: phone
+                first_name: firstName.trim(),
+                last_name: lastName.trim(),
+                name: fullName || currentUser.username,
+                phone: phone.trim() || '',
             });
             
-            // Refresh user data to get latest info
-            const userData = await getCurrentUserAPI();
-            if (userData) {
-                setCurrentUser({
-                    id: userData.id,
-                    name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-                    username: userData.username,
-                    email: userData.email,
-                    role: userData.role || 'User',
-                    phone: userData.phone || '',
-                    avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
-                    company: userData.company,
-                    emailVerified: userData.email_verified || userData.is_email_verified || false,
-                });
-            }
-        } catch (error) {
+            // Show success message
+            setSuccessMessage(t('profileUpdatedSuccessfully') || 'Profile updated successfully!');
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
             console.error('Error updating profile:', error);
+            // Handle field-specific errors
+            if (error?.fields) {
+                const fieldErrors: string[] = [];
+                Object.keys(error.fields).forEach(field => {
+                    const fieldError = error.fields[field];
+                    if (Array.isArray(fieldError)) {
+                        fieldErrors.push(`${field}: ${fieldError[0]}`);
+                    } else {
+                        fieldErrors.push(`${field}: ${fieldError}`);
+                    }
+                });
+                setSaveError(fieldErrors.join(', '));
+            } else {
+                setSaveError(error?.message || t('errorUpdatingProfile') || 'Failed to update profile. Please try again.');
+            }
+        } finally {
+            setIsSaving(false);
         }
     };
 
@@ -185,24 +222,15 @@ export const ProfilePage = () => {
     };
 
     const handleVerificationSuccess = async () => {
-        // Refresh user data after successful verification
-        try {
-            const userData = await getCurrentUserAPI();
-            if (userData) {
-                setCurrentUser({
-                    id: userData.id,
-                    name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-                    username: userData.username,
-                    email: userData.email,
-                    role: userData.role || 'User',
-                    phone: userData.phone || '',
-                    avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
-                    company: userData.company,
-                    emailVerified: userData.email_verified || userData.is_email_verified || false,
-                });
-            }
-        } catch (error) {
-            console.error('Error refreshing user data:', error);
+        // React Query will automatically refetch currentUser after email verification
+        // Just update context if needed
+        if (currentUserData) {
+            setCurrentUser({
+                ...currentUser,
+                emailVerified: true,
+                email_verified: true,
+                is_email_verified: true,
+            });
         }
     };
 
@@ -247,7 +275,7 @@ export const ProfilePage = () => {
     };
 
     
-    if (loading) {
+    if (userLoading) {
         return (
             <PageWrapper title={t('profile')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
@@ -290,10 +318,10 @@ export const ProfilePage = () => {
                                 type="email" 
                                 value={email}
                                 onChange={(e) => setEmail(e.target.value)}
-                                disabled={currentUser.emailVerified}
-                                className={currentUser.emailVerified ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""}
+                                disabled={currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified}
+                                className={(currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified) ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""}
                             />
-                            {currentUser.emailVerified ? (
+                            {(currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified) ? (
                                 <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
                                         <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
@@ -336,7 +364,7 @@ export const ProfilePage = () => {
                     </Button>
                 </Card>
 
-                {subscriptionInfo && (
+                {subscriptionInfo && currentUser?.role?.toLowerCase() !== 'employee' && (
                     <Card>
                         <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('subscription')}</h2>
                         <div className={`space-y-4 ${isRTL ? 'text-right' : 'text-left'}`}>
@@ -413,8 +441,16 @@ export const ProfilePage = () => {
                     </Card>
                 )}
                 
+                {saveError && (
+                    <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
+                        <p className="text-sm text-red-600 dark:text-red-400">{saveError}</p>
+                    </Card>
+                )}
+                
                 <div className="flex justify-end">
-                    <Button onClick={handleSave}>{t('saveProfile')}</Button>
+                    <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>
+                        {isSaving ? (t('saving') || 'Saving...') : t('saveProfile')}
+                    </Button>
                 </div>
             </div>
             
@@ -423,7 +459,7 @@ export const ProfilePage = () => {
                 onClose={() => setIsEmailVerificationModalOpen(false)}
                 email={currentUser.email}
                 onVerificationSuccess={handleVerificationSuccess}
-                allowEmailChange={!currentUser.emailVerified}
+                allowEmailChange={!(currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified)}
                 onEmailChange={handleChangeEmail}
             />
         </PageWrapper>

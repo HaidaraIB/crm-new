@@ -64,7 +64,7 @@ export const SuppliersFilterDrawer = () => {
         setIsSupplierFilterDrawerOpen(false);
     };
 
-    const uniqueSpecializations = Array.from(new Set(suppliers.map(s => s.specialization).filter(Boolean)));
+    const uniqueSpecializations = Array.from(new Set((suppliers || []).map(s => s.specialization).filter(Boolean)));
 
     return (
         <>
@@ -80,8 +80,8 @@ export const SuppliersFilterDrawer = () => {
                     <FilterSection title={t('supplierInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-specialization">{t('specialization')}</FilterLabel>
-                                <FilterSelect id="filter-specialization" value={localFilters.specialization} onChange={(e) => handleFilterChange('specialization', e.target.value)}>
+                                <FilterLabel htmlFor="suppliers-filter-specialization">{t('specialization')}</FilterLabel>
+                                <FilterSelect id="suppliers-filter-specialization" value={localFilters.specialization} onChange={(e) => handleFilterChange('specialization', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueSpecializations.map(spec => (
                                         <option key={spec} value={spec}>{spec}</option>
@@ -93,8 +93,8 @@ export const SuppliersFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="suppliers-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="suppliers-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

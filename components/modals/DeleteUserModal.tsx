@@ -3,51 +3,63 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { useDeleteUser } from '../../hooks/useQueries';
+
+// Helper function to get user display name
+const getUserDisplayName = (user: any, t?: (key: string) => string): string => {
+    if (user.name) return user.name;
+    if (user.first_name || user.last_name) {
+        return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+    }
+    return user.username || user.email || (t ? t('unknown') : 'Unknown');
+};
 
 export const DeleteUserModal = () => {
-    const { isDeleteUserModalOpen, setIsDeleteUserModalOpen, selectedUser, t, deleteUser } = useAppContext();
-    const [isLoading, setIsLoading] = useState(false);
-    const [successMessage, setSuccessMessage] = useState('');
+    const { isDeleteUserModalOpen, setIsDeleteUserModalOpen, selectedUser, t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    
+    // Delete user mutation
+    const deleteUserMutation = useDeleteUser();
+    const isLoading = deleteUserMutation.isPending;
+    
+    const [errorMessage, setErrorMessage] = useState('');
 
     const handleDelete = async () => {
         if (!selectedUser) return;
 
-        setIsLoading(true);
-        setSuccessMessage('');
+        setErrorMessage('');
 
         try {
-            await deleteUser(selectedUser.id);
+            await deleteUserMutation.mutateAsync(selectedUser.id);
             
-            // Success - show message and close after a delay
+            // Success - close modal and show success message
+            setIsDeleteUserModalOpen(false);
             setSuccessMessage(t('employeeDeletedSuccessfully') || 'Employee deleted successfully!');
-            
-            // Close modal after showing success message
-            setTimeout(() => {
-                setIsDeleteUserModalOpen(false);
-                setSuccessMessage('');
-            }, 1500);
+            setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error deleting user:', error);
-            alert(error?.message || t('errorDeletingEmployee') || 'Failed to delete employee. Please try again.');
-        } finally {
-            setIsLoading(false);
+            
+            // Extract error message from API response
+            const errorMsg = error?.message || error?.fields?.detail || t('errorDeletingEmployee') || 'Failed to delete employee. Please try again.';
+            setErrorMessage(errorMsg);
         }
     };
 
     if (!selectedUser) return null;
 
+    const displayName = getUserDisplayName(selectedUser, t);
+
     return (
         <Modal isOpen={isDeleteUserModalOpen} onClose={() => {
             setIsDeleteUserModalOpen(false);
-            setSuccessMessage('');
+            setErrorMessage('');
         }} title={t('deleteEmployee')}>
             <div className="space-y-4">
-                {successMessage && (
-                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                        {successMessage}
+                {errorMessage && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errorMessage}
                     </div>
                 )}
-                <p>{t('confirmDeleteEmployee1')} <span className="font-bold">{selectedUser.name}</span>{t('confirmDeleteEmployee2')}</p>
+                <p>{t('confirmDeleteEmployee1')} <span className="font-bold">{displayName}</span>{t('confirmDeleteEmployee2')}</p>
                 <div className="flex justify-end gap-2">
                     <Button 
                         variant="secondary" 

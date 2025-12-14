@@ -64,10 +64,27 @@ export const LoginPage = () => {
     const [error, setError] = useState('');
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
 
-    // Check for pending subscription ID on mount
+    // Check for pending subscription ID and error message on mount
     useEffect(() => {
+        const loginErrorMessage = localStorage.getItem('loginErrorMessage');
         const pendingSubId = localStorage.getItem('pendingSubscriptionId');
-        if (pendingSubId) {
+        
+        if (loginErrorMessage) {
+            // Only show error if payment_success is not in URL (to avoid showing error after successful payment)
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('payment_success') !== 'true') {
+                if (loginErrorMessage === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+                    setError('ACCOUNT_TEMPORARILY_INACTIVE');
+                } else if (loginErrorMessage === 'SUBSCRIPTION_INACTIVE' && pendingSubId) {
+                    setSubscriptionId(pendingSubId);
+                    setError('SUBSCRIPTION_INACTIVE');
+                } else {
+                    setError(t('noActiveSubscription'));
+                }
+            }
+            // Clear error message after showing
+            localStorage.removeItem('loginErrorMessage');
+        } else if (pendingSubId) {
             setSubscriptionId(pendingSubId);
             // Only show error if payment_success is not in URL (to avoid showing error after successful payment)
             const urlParams = new URLSearchParams(window.location.search);
@@ -75,7 +92,10 @@ export const LoginPage = () => {
                 // Set a flag error that will trigger the link display
                 setError('SUBSCRIPTION_INACTIVE');
             }
-            // Clear it after showing
+        }
+        
+        // Clear pending subscription ID after showing
+        if (pendingSubId) {
             localStorage.removeItem('pendingSubscriptionId');
         }
     }, [t]);
@@ -111,10 +131,8 @@ export const LoginPage = () => {
         setIsLoading(true);
         
         try {
-            console.log('🔐 Starting login process for:', username);
             // Request 2FA code (this will verify user exists and is active)
             const twoFAResponse = await requestTwoFactorAuthAPI(username, language);
-            console.log('✅ 2FA request successful, navigating to 2FA page');
             
             // Store username, password, and token in sessionStorage for 2FA page
             sessionStorage.setItem('2fa_username', username);
@@ -132,8 +150,12 @@ export const LoginPage = () => {
             console.error('❌ Error status:', error.status);
             console.error('❌ Full error:', error);
             
-            // Check if it's a subscription inactive error
-            if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
+            // Check if it's an account temporarily inactive error (for employees)
+            if (error.code === 'ACCOUNT_TEMPORARILY_INACTIVE' || errorMessage === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+                setError('ACCOUNT_TEMPORARILY_INACTIVE');
+            } 
+            // Check if it's a subscription inactive error (for admins)
+            else if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
                 const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
                 if (subId) {
                     setSubscriptionId(subId);
@@ -201,7 +223,9 @@ export const LoginPage = () => {
                         {error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                                 <div>
-                                    {error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
+                                    {error === 'ACCOUNT_TEMPORARILY_INACTIVE' ? (
+                                        t('accountTemporarilyInactive') || 'Your account is temporarily inactive'
+                                    ) : error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
                                         <>
                                             {t('noActiveSubscriptionBeforeLink')}
                                             <a

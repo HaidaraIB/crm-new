@@ -3,15 +3,17 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { Supplier } from '../../types';
+import { useUpdateSupplier } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
 export const EditSupplierModal = () => {
-    const { isEditSupplierModalOpen, setIsEditSupplierModalOpen, t, updateSupplier, editingSupplier, setEditingSupplier, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditSupplierModalOpen, setIsEditSupplierModalOpen, t, editingSupplier, setEditingSupplier, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -20,7 +22,11 @@ export const EditSupplierModal = () => {
         contactPerson: '',
         specialization: '',
     });
-    const [loading, setLoading] = useState(false);
+    
+    // Update supplier mutation
+    const updateSupplierMutation = useUpdateSupplier();
+    const loading = updateSupplierMutation.isPending;
+    
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -51,13 +57,14 @@ export const EditSupplierModal = () => {
     useEffect(() => {
         if (editingSupplier) {
             setFormState({
-                name: editingSupplier.name,
-                phone: editingSupplier.phone,
-                email: editingSupplier.email,
-                address: editingSupplier.address,
-                contactPerson: editingSupplier.contactPerson,
-                specialization: editingSupplier.specialization,
+                name: editingSupplier.name || '',
+                phone: editingSupplier.phone || '',
+                email: editingSupplier.email || '',
+                address: editingSupplier.address || '',
+                contactPerson: editingSupplier.contactPerson || '',
+                specialization: editingSupplier.specialization || '',
             });
+            setErrors({});
         }
     }, [editingSupplier]);
 
@@ -80,16 +87,18 @@ export const EditSupplierModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await updateSupplier({
-                ...editingSupplier,
-                name: formState.name,
-                phone: formState.phone || '',
-                email: formState.email || '',
-                address: formState.address || '',
-                contactPerson: formState.contactPerson || '',
-                specialization: formState.specialization || '',
+            await updateSupplierMutation.mutateAsync({
+                id: editingSupplier.id,
+                data: {
+                    name: formState.name.trim(),
+                    phone: formState.phone?.trim() || '',
+                    email: formState.email?.trim() || '',
+                    address: formState.address?.trim() || '',
+                    contact_person: formState.contactPerson?.trim() || '',
+                    specialization: formState.specialization?.trim() || '',
+                    company: currentUser?.company?.id || currentUser?.company_id,
+                }
             });
 
             // Close modal immediately and show success modal
@@ -98,10 +107,23 @@ export const EditSupplierModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating supplier:', error);
-            const errorMessage = error?.message || t('failedToUpdateSupplier') || 'Failed to update supplier. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToUpdateSupplier') || 'Failed to update supplier. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 
@@ -128,25 +150,32 @@ export const EditSupplierModal = () => {
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="phone">{t('phone')}</Label>
-                        <Input id="phone" placeholder={t('enterPhone') || 'Enter phone'} value={formState.phone} onChange={handleChange} />
-                    </div>
-                    <div>
-                        <Label htmlFor="email">{t('email')}</Label>
-                        <Input 
-                            id="email" 
-                            type="email" 
-                            placeholder={t('enterEmail') || 'Enter email'} 
-                            value={formState.email} 
-                            onChange={handleChange}
-                            className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
-                        />
-                        {errors.email && (
-                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-                        )}
-                    </div>
+                <div>
+                    <Label htmlFor="phone">{t('phone')}</Label>
+                    <PhoneInput 
+                        id="phone" 
+                        placeholder={t('enterPhoneNumber') || 'Enter phone number'} 
+                        value={formState.phone} 
+                        onChange={(value) => {
+                            setFormState(prev => ({ ...prev, phone: value }));
+                            clearError('phone');
+                        }}
+                        defaultCountry="SY"
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="email">{t('email')}</Label>
+                    <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder={t('enterEmail') || 'Enter email'} 
+                        value={formState.email} 
+                        onChange={handleChange}
+                        className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.email && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="address">{t('address')}</Label>

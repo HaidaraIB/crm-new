@@ -3,14 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
+import { useCreateSupplier } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-secondary mb-1">{children}</label>
 );
 
 export const AddSupplierModal = () => {
-    const { isAddSupplierModalOpen, setIsAddSupplierModalOpen, t, addSupplier, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddSupplierModalOpen, setIsAddSupplierModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -19,7 +21,11 @@ export const AddSupplierModal = () => {
         contactPerson: '',
         specialization: '',
     });
-    const [loading, setLoading] = useState(false);
+    
+    // Create supplier mutation
+    const addSupplierMutation = useCreateSupplier();
+    const loading = addSupplierMutation.isPending;
+    
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -31,6 +37,10 @@ export const AddSupplierModal = () => {
 
         if (formState.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
             newErrors.email = t('invalidEmail') || 'Invalid email format';
+        }
+
+        if (!currentUser?.company?.id) {
+            newErrors._general = t('companyRequired') || 'Company is required';
         }
 
         setErrors(newErrors);
@@ -58,6 +68,7 @@ export const AddSupplierModal = () => {
                 contactPerson: '',
                 specialization: '',
             });
+            setErrors({});
         }
     }, [isAddSupplierModalOpen]);
 
@@ -86,15 +97,15 @@ export const AddSupplierModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await addSupplier({
-                name: formState.name,
-                phone: formState.phone || '',
-                email: formState.email || '',
-                address: formState.address || '',
-                contactPerson: formState.contactPerson || '',
-                specialization: formState.specialization || '',
+            await addSupplierMutation.mutateAsync({
+                name: formState.name.trim(),
+                phone: formState.phone?.trim() || '',
+                email: formState.email?.trim() || '',
+                address: formState.address?.trim() || '',
+                contact_person: formState.contactPerson?.trim() || '',
+                specialization: formState.specialization?.trim() || '',
+                company: currentUser?.company?.id || currentUser?.company_id,
             });
 
             // Reset form
@@ -114,10 +125,23 @@ export const AddSupplierModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating supplier:', error);
-            const errorMessage = error?.message || t('failedToCreateSupplier') || 'Failed to create supplier. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToCreateSupplier') || 'Failed to create supplier. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 
@@ -142,25 +166,32 @@ export const AddSupplierModal = () => {
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <Label htmlFor="phone">{t('phone')}</Label>
-                        <Input id="phone" placeholder={t('enterPhone') || 'Enter phone'} value={formState.phone} onChange={handleChange} />
-                    </div>
-                    <div>
-                        <Label htmlFor="email">{t('email')}</Label>
-                        <Input 
-                            id="email" 
-                            type="email" 
-                            placeholder={t('enterEmail') || 'Enter email'} 
-                            value={formState.email} 
-                            onChange={handleChange}
-                            className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
-                        />
-                        {errors.email && (
-                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
-                        )}
-                    </div>
+                <div>
+                    <Label htmlFor="phone">{t('phone')}</Label>
+                    <PhoneInput 
+                        id="phone" 
+                        placeholder={t('enterPhoneNumber') || 'Enter phone number'} 
+                        value={formState.phone} 
+                        onChange={(value) => {
+                            setFormState(prev => ({ ...prev, phone: value }));
+                            clearError('phone');
+                        }}
+                        defaultCountry="SY"
+                    />
+                </div>
+                <div>
+                    <Label htmlFor="email">{t('email')}</Label>
+                    <Input 
+                        id="email" 
+                        type="email" 
+                        placeholder={t('enterEmail') || 'Enter email'} 
+                        value={formState.email} 
+                        onChange={handleChange}
+                        className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.email && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="address">{t('address')}</Label>

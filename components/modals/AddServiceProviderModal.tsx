@@ -6,13 +6,14 @@ import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
+import { useCreateServiceProvider } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
 export const AddServiceProviderModal = () => {
-    const { isAddServiceProviderModalOpen, setIsAddServiceProviderModalOpen, t, addServiceProvider, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddServiceProviderModalOpen, setIsAddServiceProviderModalOpen, t, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
@@ -20,7 +21,11 @@ export const AddServiceProviderModal = () => {
         specialization: '',
         rating: '',
     });
-    const [loading, setLoading] = useState(false);
+    
+    // Create service provider mutation
+    const addServiceProviderMutation = useCreateServiceProvider();
+    const loading = addServiceProviderMutation.isPending;
+    
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -36,6 +41,10 @@ export const AddServiceProviderModal = () => {
 
         if (formState.rating && (Number(formState.rating) < 0 || Number(formState.rating) > 5)) {
             newErrors.rating = t('ratingRange') || 'Rating must be between 0 and 5';
+        }
+
+        if (!currentUser?.company?.id) {
+            newErrors._general = t('companyRequired') || 'Company is required';
         }
 
         setErrors(newErrors);
@@ -62,6 +71,7 @@ export const AddServiceProviderModal = () => {
                 specialization: '',
                 rating: '',
             });
+            setErrors({});
         }
     }, [isAddServiceProviderModalOpen]);
 
@@ -89,14 +99,14 @@ export const AddServiceProviderModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await addServiceProvider({
-                name: formState.name,
-                phone: formState.phone || '',
-                email: formState.email || '',
-                specialization: formState.specialization || '',
+            await addServiceProviderMutation.mutateAsync({
+                name: formState.name.trim(),
+                phone: formState.phone?.trim() || '',
+                email: formState.email?.trim() || '',
+                specialization: formState.specialization?.trim() || '',
                 rating: formState.rating ? Number(formState.rating) : undefined,
+                company: currentUser?.company?.id || currentUser?.company_id,
             });
 
             // Reset form
@@ -115,10 +125,23 @@ export const AddServiceProviderModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating service provider:', error);
-            const errorMessage = error?.message || t('failedToCreateServiceProvider') || 'Failed to create service provider. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToCreateServiceProvider') || 'Failed to create service provider. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 

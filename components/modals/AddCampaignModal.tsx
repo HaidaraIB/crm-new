@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { formatDateToLocal } from '../../utils/dateUtils';
+import { useAddCampaign } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -13,7 +14,12 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const AddCampaignModal = () => {
-    const { isAddCampaignModalOpen, setIsAddCampaignModalOpen, t, addCampaign, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddCampaignModalOpen, setIsAddCampaignModalOpen, t, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Create campaign mutation
+    const addCampaignMutation = useAddCampaign();
+    const isLoading = addCampaignMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         code: '',
@@ -21,7 +27,6 @@ export const AddCampaignModal = () => {
         createdAt: new Date().toLocaleDateString('en-CA'), // YYYY-MM-DD format in local timezone
         isActive: true,
     });
-    const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -47,13 +52,21 @@ export const AddCampaignModal = () => {
             return;
         }
         
-        setIsLoading(true);
         setErrors({});
+        
+        // Get company ID - ensure it exists
+        const companyId = currentUser?.company?.id;
+        if (!companyId) {
+            setErrors({ _general: t('companyRequired') || 'Company information is required. Please refresh the page and try again.' });
+            return;
+        }
+        
         try {
-            await addCampaign({
+            await addCampaignMutation.mutateAsync({
                 name: formState.name.trim(),
                 budget: Number(formState.budget) || 0,
                 isActive: formState.isActive,
+                company: companyId,
             });
 
             // Reset form
@@ -69,10 +82,25 @@ export const AddCampaignModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating campaign:', error);
-            const errorMessage = error?.message || t('errorCreatingCampaign') || 'Failed to create campaign. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setIsLoading(false);
+            
+            // Handle API errors - Django REST Framework returns errors in specific format
+            const errorMessage = error?.message || '';
+            const errorFields = error?.fields || {};
+            
+            // Check for field-specific errors first (from API response)
+            if (errorFields.company) {
+                const companyError = Array.isArray(errorFields.company) ? errorFields.company[0] : errorFields.company;
+                setErrors({ _general: companyError || t('companyRequired') || 'Company information is required' });
+            } else if (errorFields.name) {
+                const nameError = Array.isArray(errorFields.name) ? errorFields.name[0] : errorFields.name;
+                setErrors({ name: nameError || t('nameRequired') || 'Name is required' });
+            } else if (errorFields.budget) {
+                const budgetError = Array.isArray(errorFields.budget) ? errorFields.budget[0] : errorFields.budget;
+                setErrors({ budget: budgetError || t('invalidBudget') || 'Invalid budget value' });
+            } else {
+                // Generic error - show at top
+                setErrors({ _general: errorMessage || t('errorCreatingCampaign') || 'Failed to create campaign. Please try again.' });
+            }
         }
     };
 

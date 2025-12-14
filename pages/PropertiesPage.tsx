@@ -7,6 +7,7 @@ import { Developer, Project, Unit } from '../types';
 import { DevelopersFilterDrawer } from '../components/drawers/DevelopersFilterDrawer';
 import { ProjectsFilterDrawer } from '../components/drawers/ProjectsFilterDrawer';
 import { UnitsFilterDrawer } from '../components/drawers/UnitsFilterDrawer';
+import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
 
 type Tab = 'units' | 'projects' | 'developers';
 
@@ -16,21 +17,21 @@ const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { develope
         <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[500px]">
+                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[500px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('code')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('name')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('actions')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('name')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {developers.length > 0 ? developers.map(dev => (
                                 <tr key={dev.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{dev.code}</td>
-                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{dev.name}</td>
-                                    <td className="px-3 sm:px-6 py-4">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm whitespace-nowrap text-center">{dev.code}</td>
+                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm whitespace-nowrap text-center">{dev.name}</td>
+                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
+                                        <div className="flex items-center justify-center gap-2">
                                             {isAdmin && (
                                                 <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(dev)}>
                                                     <EditIcon className="w-4 h-4" />
@@ -63,29 +64,29 @@ const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Pr
         <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[800px]">
+                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[800px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('code')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('name')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('developer')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell">{t('type')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell">{t('city')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('paymentMethod')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('actions')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('name')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell text-center">{t('developer')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell text-center">{t('type')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell text-center">{t('city')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell text-center">{t('paymentMethod')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {projects.length > 0 ? projects.map(proj => (
                                 <tr key={proj.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{proj.code}</td>
-                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{proj.name}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{proj.developer}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{proj.type}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{proj.city}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{proj.paymentMethod}</td>
-                                    <td className="px-3 sm:px-6 py-4">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm whitespace-nowrap text-center">{proj.code}</td>
+                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm whitespace-nowrap text-center">{proj.name}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.developer}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.type || '-'}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.city || '-'}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.paymentMethod || '-'}</td>
+                                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
+                                        <div className="flex items-center justify-center gap-2">
                                             {isAdmin && (
                                                 <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(proj)}>
                                                     <EditIcon className="w-4 h-4" />
@@ -118,57 +119,69 @@ const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: Unit[], onU
         <div className="overflow-x-auto -mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1200px]">
+                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1200px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('code')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('project')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('bedrooms')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('bathrooms')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('price')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell">{t('type')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell">{t('finishing')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell">{t('city')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden xl:table-cell">{t('district')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden xl:table-cell">{t('zone')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('status')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('actions')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('project')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell text-center">{t('bedrooms')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell text-center">{t('bathrooms')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('price')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell text-center">{t('type')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell text-center">{t('finishing')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell text-center">{t('city')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden xl:table-cell text-center">{t('district')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden xl:table-cell text-center">{t('zone')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell text-center">{t('status')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {units.length > 0 ? units.map(unit => (
-                                <tr key={`${unit.id}-${unit.project}`} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{unit.code}</td>
-                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{unit.project}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{unit.bedrooms}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{unit.bathrooms}</td>
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{unit.price.toLocaleString()}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{unit.type || '-'}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{unit.finishing || '-'}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{unit.city || '-'}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-xs sm:text-sm">{unit.district || '-'}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-xs sm:text-sm">{unit.zone || '-'}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">
-                                        <span className={`px-2 py-1 text-xs rounded-full ${unit.isSold ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'}`}>
-                                            {unit.isSold ? t('sold') || 'Sold' : t('available') || 'Available'}
-                                        </span>
-                                    </td>
-                                    <td className="px-3 sm:px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(unit)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
-                                            )}
-                                            {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(unit.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
-                                            )}
-                                        </div>
-                                    </td>
-                                </tr>
-                            )) : (
+                            {units.length > 0 ? units.map(unit => {
+                                // Format price like budget: comma-separated with trailing zeros removed
+                                const formattedPrice = (() => {
+                                    const num = Number(unit.price);
+                                    const formatted = num.toLocaleString('en-US', { 
+                                        minimumFractionDigits: 0, 
+                                        maximumFractionDigits: 2 
+                                    });
+                                    return formatted.replace(/\.0+$/, '');
+                                })();
+                                
+                                return (
+                                    <tr key={`${unit.id}-${unit.project}`} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                        <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm whitespace-nowrap text-center">{unit.code}</td>
+                                        <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm whitespace-nowrap text-center">{unit.project}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.bedrooms}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.bathrooms}</td>
+                                        <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm whitespace-nowrap text-center">{formattedPrice}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.type || '-'}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.finishing || '-'}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.city || '-'}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.district || '-'}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.zone || '-'}</td>
+                                        <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">
+                                            <span className={`px-2 py-1 text-xs rounded-full ${unit.isSold ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'}`}>
+                                                {unit.isSold ? t('sold') || 'Sold' : t('available') || 'Available'}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
+                                            <div className="flex items-center justify-center gap-2">
+                                                {isAdmin && (
+                                                    <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(unit)}>
+                                                        <EditIcon className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                                {isAdmin && (
+                                                    <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(unit.id)}>
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            }) : (
                                 <tr>
                                     <td colSpan={12} className="text-center py-10 text-xs sm:text-sm">{t('noUnitsFound')}</td>
                                 </tr>
@@ -191,56 +204,96 @@ export const PropertiesPage = () => {
         setIsAddDeveloperModalOpen,
         setIsAddProjectModalOpen,
         setIsAddUnitModalOpen,
-        units,
-        projects,
-        developers,
         developerFilters,
         setDeveloperFilters,
         projectFilters,
         setProjectFilters,
         unitFilters,
         setUnitFilters,
-        deleteDeveloper,
         setEditingDeveloper,
         setIsEditDeveloperModalOpen,
         setDeletingDeveloper,
         setIsDeleteDeveloperModalOpen,
-        deleteProject,
         setEditingProject,
         setIsEditProjectModalOpen,
-        updateUnit,
-        deleteUnit,
         setEditingUnit,
         setIsEditUnitModalOpen,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen
     } = useAppContext();
-    const [activeTab, setActiveTab] = useState<Tab>('units');
-    const [loading, setLoading] = useState(true);
 
+    // Fetch data using React Query
+    const { data: developersResponse, isLoading: developersLoading } = useDevelopers();
+    const developersRaw = developersResponse?.results || [];
+    
+    // Transform developers (already in correct format)
+    const developers = developersRaw;
+
+    const { data: projectsResponse, isLoading: projectsLoading } = useProjects();
+    const projectsRaw = projectsResponse?.results || [];
+    
+    // Transform projects: convert developer from object/ID to string name, and normalize paymentMethod
+    const projects = useMemo(() => {
+        return projectsRaw.map((proj: any) => {
+            let developerName = '';
+            if (typeof proj.developer === 'object' && proj.developer?.name) {
+                developerName = proj.developer.name;
+            } else if (typeof proj.developer === 'number') {
+                const dev = developers.find(d => d.id === proj.developer);
+                developerName = dev?.name || '';
+            } else if (typeof proj.developer === 'string') {
+                developerName = proj.developer;
+            }
+            
+            // Handle paymentMethod: API might return payment_method (snake_case) or paymentMethod (camelCase)
+            const paymentMethod = proj.paymentMethod || proj.payment_method || '';
+            
+            return {
+                ...proj,
+                developer: developerName,
+                paymentMethod: paymentMethod,
+            };
+        });
+    }, [projectsRaw, developers]);
+
+    const { data: unitsResponse, isLoading: unitsLoading } = useUnits(unitFilters);
+    const unitsRaw = unitsResponse?.results || [];
+    
+    // Transform units: convert project from object/ID to string name
+    const units = useMemo(() => {
+        return unitsRaw.map((unit: any) => {
+            let projectName = '';
+            if (typeof unit.project === 'object' && unit.project?.name) {
+                projectName = unit.project.name;
+            } else if (typeof unit.project === 'number') {
+                const proj = projectsRaw.find((p: any) => p.id === unit.project);
+                projectName = proj?.name || '';
+            } else if (typeof unit.project === 'string') {
+                projectName = unit.project;
+            }
+            
+            return {
+                ...unit,
+                project: projectName,
+            };
+        });
+    }, [unitsRaw, projectsRaw]);
+
+    // Delete mutations
+    const deleteDeveloperMutation = useDeleteDeveloper();
+    const deleteProjectMutation = useDeleteProject();
+    const deleteUnitMutation = useDeleteUnit();
+
+    // Load saved tab from localStorage, default to 'units'
+    const [activeTab, setActiveTab] = useState<Tab>(() => {
+        const savedTab = localStorage.getItem('propertiesActiveTab') as Tab;
+        return savedTab && ['units', 'projects', 'developers'].includes(savedTab) ? savedTab : 'units';
+    });
+
+    // Save active tab to localStorage whenever it changes
     useEffect(() => {
-        // TODO: استدعي APIs لتحميل البيانات عند فتح الصفحة (لشركات العقارات فقط)
-        // مثال:
-        // const loadData = async () => {
-        //   try {
-        //     const [developersData, projectsData, unitsData] = await Promise.all([
-        //       getDevelopersAPI(),
-        //       getProjectsAPI(),
-        //       getUnitsAPI()
-        //     ]);
-        //     // TODO: استخدم setDevelopers, setProjects, setUnits من AppContext
-        //   } catch (error) {
-        //     console.error('Error loading data:', error);
-        //   } finally {
-        //     setLoading(false);
-        //   }
-        // };
-        // if (isRealEstate) loadData();
-        
-        // الكود الحالي (للاختبار فقط):
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, []);
+        localStorage.setItem('propertiesActiveTab', activeTab);
+    }, [activeTab]);
 
     // Check if user's company specialization is real_estate
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
@@ -331,7 +384,12 @@ export const PropertiesPage = () => {
                 message: t('confirmDeleteProject') || 'Are you sure you want to delete',
                 itemName: project.name,
                 onConfirm: async () => {
-                    await deleteProject(id);
+                    try {
+                        await deleteProjectMutation.mutateAsync(id);
+                    } catch (error: any) {
+                        console.error('Error deleting project:', error);
+                        throw error;
+                    }
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -356,7 +414,12 @@ export const PropertiesPage = () => {
                 message: t('confirmDeleteUnit') || 'Are you sure you want to delete',
                 itemName: unit.code,
                 onConfirm: async () => {
-                    await deleteUnit(id);
+                    try {
+                        await deleteUnitMutation.mutateAsync(id);
+                    } catch (error: any) {
+                        console.error('Error deleting unit:', error);
+                        throw error;
+                    }
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -379,22 +442,34 @@ export const PropertiesPage = () => {
     const filteredProjects = useMemo(() => {
         let filtered = projects;
         if (projectFilters.developer && projectFilters.developer !== 'All') {
-            filtered = filtered.filter(proj => proj.developer === projectFilters.developer);
+            filtered = filtered.filter(proj => {
+                const developerName = proj.developer || '';
+                return developerName === projectFilters.developer;
+            });
         }
         if (projectFilters.type && projectFilters.type !== 'All') {
-            filtered = filtered.filter(proj => proj.type === projectFilters.type);
+            filtered = filtered.filter(proj => {
+                const type = proj.type || '';
+                return type === projectFilters.type;
+            });
         }
         if (projectFilters.city && projectFilters.city !== 'All') {
-            filtered = filtered.filter(proj => proj.city === projectFilters.city);
+            filtered = filtered.filter(proj => {
+                const city = proj.city || '';
+                return city === projectFilters.city;
+            });
         }
         if (projectFilters.paymentMethod && projectFilters.paymentMethod !== 'All') {
-            filtered = filtered.filter(proj => proj.paymentMethod === projectFilters.paymentMethod);
+            filtered = filtered.filter(proj => {
+                const paymentMethod = proj.paymentMethod || '';
+                return paymentMethod === projectFilters.paymentMethod;
+            });
         }
         if (projectFilters.search) {
             const searchLower = projectFilters.search.toLowerCase();
             filtered = filtered.filter(proj => 
-                proj.name.toLowerCase().includes(searchLower) || 
-                proj.code.toLowerCase().includes(searchLower)
+                (proj.name || '').toLowerCase().includes(searchLower) || 
+                (proj.code || '').toLowerCase().includes(searchLower)
             );
         }
         return filtered;
@@ -403,49 +478,73 @@ export const PropertiesPage = () => {
     const filteredUnits = useMemo(() => {
         let filtered = units;
         if (unitFilters.project && unitFilters.project !== 'All') {
-            filtered = filtered.filter(unit => unit.project === unitFilters.project);
+            filtered = filtered.filter(unit => {
+                const projectName = unit.project || '';
+                return projectName === unitFilters.project;
+            });
         }
         if (unitFilters.type && unitFilters.type !== 'All') {
-            filtered = filtered.filter(unit => unit.type === unitFilters.type);
+            filtered = filtered.filter(unit => {
+                const type = unit.type || '';
+                return type === unitFilters.type;
+            });
         }
         if (unitFilters.finishing && unitFilters.finishing !== 'All') {
-            filtered = filtered.filter(unit => unit.finishing === unitFilters.finishing);
+            filtered = filtered.filter(unit => {
+                const finishing = unit.finishing || '';
+                return finishing === unitFilters.finishing;
+            });
         }
         if (unitFilters.city && unitFilters.city !== 'All') {
-            filtered = filtered.filter(unit => unit.city === unitFilters.city);
+            filtered = filtered.filter(unit => {
+                const city = unit.city || '';
+                return city === unitFilters.city;
+            });
         }
         if (unitFilters.district && unitFilters.district !== 'All') {
-            filtered = filtered.filter(unit => unit.district === unitFilters.district);
+            filtered = filtered.filter(unit => {
+                const district = unit.district || '';
+                return district === unitFilters.district;
+            });
         }
         if (unitFilters.zone && unitFilters.zone !== 'All') {
-            filtered = filtered.filter(unit => unit.zone === unitFilters.zone);
+            filtered = filtered.filter(unit => {
+                const zone = unit.zone || '';
+                return zone === unitFilters.zone;
+            });
         }
         if (unitFilters.isSold && unitFilters.isSold !== 'All') {
             filtered = filtered.filter(unit => unit.isSold === (unitFilters.isSold === 'true'));
         }
         if (unitFilters.bedrooms && unitFilters.bedrooms !== 'All') {
-            filtered = filtered.filter(unit => unit.bedrooms === parseInt(unitFilters.bedrooms));
+            const bedroomsFilter = parseInt(unitFilters.bedrooms);
+            if (!isNaN(bedroomsFilter)) {
+                filtered = filtered.filter(unit => unit.bedrooms === bedroomsFilter);
+            }
         }
         if (unitFilters.bathrooms && unitFilters.bathrooms !== 'All') {
-            filtered = filtered.filter(unit => unit.bathrooms === parseInt(unitFilters.bathrooms));
+            const bathroomsFilter = parseInt(unitFilters.bathrooms);
+            if (!isNaN(bathroomsFilter)) {
+                filtered = filtered.filter(unit => unit.bathrooms === bathroomsFilter);
+            }
         }
         if (unitFilters.priceMin) {
             const minPrice = parseFloat(unitFilters.priceMin);
             if (!isNaN(minPrice)) {
-                filtered = filtered.filter(unit => unit.price >= minPrice);
+                filtered = filtered.filter(unit => (unit.price || 0) >= minPrice);
             }
         }
         if (unitFilters.priceMax) {
             const maxPrice = parseFloat(unitFilters.priceMax);
             if (!isNaN(maxPrice)) {
-                filtered = filtered.filter(unit => unit.price <= maxPrice);
+                filtered = filtered.filter(unit => (unit.price || 0) <= maxPrice);
             }
         }
         if (unitFilters.search) {
             const searchLower = unitFilters.search.toLowerCase();
             filtered = filtered.filter(unit => 
-                unit.code.toLowerCase().includes(searchLower) || 
-                unit.project.toLowerCase().includes(searchLower)
+                (unit.code || '').toLowerCase().includes(searchLower) || 
+                (unit.project || '').toLowerCase().includes(searchLower)
             );
         }
         return filtered;
@@ -476,7 +575,9 @@ export const PropertiesPage = () => {
         }
     };
 
-    if (loading) {
+    const isLoading = developersLoading || projectsLoading || unitsLoading;
+
+    if (isLoading) {
         return (
             <PageWrapper title={t('properties')} actions={pageActions}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>

@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
+import { useAddProduct, useProductCategories, useSuppliers } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-secondary mb-1">{children}</label>
@@ -23,7 +24,23 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const AddProductModal = () => {
-    const { isAddProductModalOpen, setIsAddProductModalOpen, t, addProduct, productCategories, suppliers, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddProductModalOpen, setIsAddProductModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Fetch data using React Query
+    const { data: categoriesResponse } = useProductCategories();
+    const productCategories = Array.isArray(categoriesResponse) 
+        ? categoriesResponse 
+        : (categoriesResponse?.results || []);
+
+    const { data: suppliersResponse } = useSuppliers();
+    const suppliers = Array.isArray(suppliersResponse) 
+        ? suppliersResponse 
+        : (suppliersResponse?.results || []);
+
+    // Create product mutation
+    const addProductMutation = useAddProduct();
+    const loading = addProductMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -35,7 +52,6 @@ export const AddProductModal = () => {
         sku: '',
         isActive: true,
     });
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -51,6 +67,10 @@ export const AddProductModal = () => {
 
         if (!formState.category) {
             newErrors.category = t('categoryRequired') || 'Category is required';
+        }
+
+        if (!currentUser?.company?.id) {
+            newErrors._general = t('companyRequired') || 'Company is required';
         }
 
         setErrors(newErrors);
@@ -81,6 +101,7 @@ export const AddProductModal = () => {
                 sku: '',
                 isActive: true,
             });
+            setErrors({});
         }
     }, [isAddProductModalOpen]);
 
@@ -116,19 +137,35 @@ export const AddProductModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await addProduct({
-                name: formState.name,
-                description: formState.description,
+            // Find category and supplier by name to get their IDs
+            const selectedCategory = productCategories.find(cat => cat.name === formState.category);
+            const selectedSupplier = formState.supplier 
+                ? suppliers.find(sup => sup.name === formState.supplier)
+                : null;
+
+            const payload: any = {
+                name: formState.name.trim(),
+                description: formState.description?.trim() || '',
                 price: Number(formState.price) || 0,
                 cost: Number(formState.cost) || 0,
                 stock: Number(formState.stock) || 0,
-                category: formState.category,
-                supplier: formState.supplier || undefined,
-                sku: formState.sku || undefined,
-                isActive: formState.isActive,
-            });
+                category: selectedCategory?.id,
+                company: currentUser?.company?.id || currentUser?.company_id,
+                is_active: formState.isActive,
+            };
+
+            // Only include supplier if it's selected
+            if (selectedSupplier) {
+                payload.supplier = selectedSupplier.id;
+            }
+
+            // Only include sku if it's provided
+            if (formState.sku?.trim()) {
+                payload.sku = formState.sku.trim();
+            }
+
+            await addProductMutation.mutateAsync(payload);
 
             // Reset form
             setFormState({
@@ -150,10 +187,23 @@ export const AddProductModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating product:', error);
-            const errorMessage = error?.message || t('failedToCreateProduct') || 'Failed to create product. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToCreateProduct') || 'Failed to create product. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 

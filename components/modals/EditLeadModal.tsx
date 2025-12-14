@@ -9,6 +9,7 @@ import { PhoneInput } from '../PhoneInput';
 import { Checkbox } from '../Checkbox';
 import { Lead, PhoneNumber } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
+import { useUpdateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -16,25 +17,43 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; }) => (
-    <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${className || ''}`}>
-        {children}
-    </select>
-);
+const Select = ({ id, children, value, onChange, className, language }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; language?: 'ar' | 'en' }) => {
+    const { language: contextLanguage } = useAppContext();
+    const lang = language || contextLanguage;
+    return (
+        <select id={id} value={value} onChange={onChange} dir={lang === 'ar' ? 'rtl' : 'ltr'} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${className || ''}`}>
+            {children}
+        </select>
+    );
+};
 
 export const EditLeadModal = () => {
-    const { isEditLeadModalOpen, setIsEditLeadModalOpen, t, updateLead, users, editingLead, statuses, channels, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditLeadModalOpen, setIsEditLeadModalOpen, t, editingLead, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    
+    // Fetch data using React Query
+    const { data: usersResponse } = useUsers();
+    const users = usersResponse?.results || [];
+
+    const { data: statusesData } = useStatuses();
+    const statuses = statusesData || [];
+
+    const { data: channelsData } = useChannels();
+    const channels = channelsData || [];
+
+    // Update lead mutation
+    const updateLeadMutation = useUpdateLead();
+    const loading = updateLeadMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
         budget: '',
         assignedTo: '',
-        type: 'Fresh' as Lead['type'],
-        communicationWay: 'Call',
-        priority: 'Medium' as Lead['priority'],
-        status: 'Untouched' as Lead['status'],
+        type: '' as Lead['type'],
+        communicationWay: '',
+        priority: '' as Lead['priority'],
+        status: '' as Lead['status'],
     });
-    const [loading, setLoading] = useState(false);
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
 
     // Initialize form state when editingLead changes
@@ -45,10 +64,10 @@ export const EditLeadModal = () => {
                 phone: editingLead.phone || '',
                 budget: editingLead.budget?.toString() || '0',
                 assignedTo: editingLead.assignedTo?.toString() || '0',
-                type: editingLead.type || 'Fresh',
-                communicationWay: editingLead.communicationWay || 'Call',
-                priority: editingLead.priority || 'Medium',
-                status: editingLead.status || 'Untouched',
+                type: editingLead.type || '',
+                communicationWay: editingLead.communicationWay || '',
+                priority: editingLead.priority || '',
+                status: editingLead.status || '',
             });
             // Initialize phone numbers from editingLead
             if (editingLead.phoneNumbers && editingLead.phoneNumbers.length > 0) {
@@ -140,9 +159,8 @@ export const EditLeadModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await updateLead(editingLead.id, {
+            const updateData = {
                 name: formState.name,
                 phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || formState.phone,
                 phoneNumbers: finalPhoneNumbers,
@@ -152,7 +170,8 @@ export const EditLeadModal = () => {
                 communicationWay: formState.communicationWay,
                 priority: formState.priority,
                 status: formState.status,
-            });
+            };
+            await updateLeadMutation.mutateAsync({ id: editingLead.id, data: updateData });
 
             // Close modal immediately and show success modal
             handleClose();
@@ -161,8 +180,6 @@ export const EditLeadModal = () => {
         } catch (error: any) {
             console.error('Error updating lead:', error);
             alert(error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -264,19 +281,16 @@ export const EditLeadModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="communicationWay">{t('communicationWay')}</Label>
-                        <Select id="communicationWay" value={formState.communicationWay} onChange={handleChange}>
-                            {channels.length > 0 ? (
-                                channels.map(channel => (
+                        <Select id="communicationWay" value={formState.communicationWay || ''} onChange={handleChange}>
+                            <option value="">{t('selectChannel') || 'Select Channel'}</option>
+                            {(channels || []).length > 0 ? (
+                                (channels || []).map(channel => (
                                     <option key={channel.id} value={channel.name}>
                                         {channel.name}
                                     </option>
                                 ))
                             ) : (
-                                // Fallback to default channels if no channels configured
-                                <>
-                                    <option value="Call">{t('call')}</option>
-                                    <option value="WhatsApp">{t('whatsapp')}</option>
-                                </>
+                                <option value="" disabled>{t('noChannelsAvailable') || 'No channels available'}</option>
                             )}
                         </Select>
                     </div>
@@ -290,9 +304,10 @@ export const EditLeadModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="status">{t('status')}</Label>
-                        <Select id="status" value={formState.status} onChange={handleChange}>
-                            {statuses.length > 0 ? (
-                                statuses
+                        <Select id="status" value={formState.status || ''} onChange={handleChange}>
+                            <option value="">{t('selectStatus') || 'Select Status'}</option>
+                            {(statuses || []).length > 0 ? (
+                                (statuses || [])
                                     .filter(s => !s.isHidden) // Only show non-hidden statuses
                                     .map(status => (
                                         <option key={status.id} value={status.name}>
@@ -300,7 +315,7 @@ export const EditLeadModal = () => {
                                         </option>
                                     ))
                             ) : (
-                                <option value="">{t('noStatusesAvailable') || 'No statuses available'}</option>
+                                <option value="" disabled>{t('noStatusesAvailable') || 'No statuses available'}</option>
                             )}
                         </Select>
                     </div>

@@ -5,13 +5,32 @@ import { useAppContext } from '../context/AppContext';
 import { Card, PageWrapper, TargetIcon, UsersIcon, Loader, DealIcon, CheckIcon } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
+import { useLeads, useDeals, useActivities, useTasks, useUsers, useClientTasks } from '../hooks/useQueries';
 
 export const DashboardPage = () => {
-    const { t, leads, activities, deals, todos, users, currentUser, language } = useAppContext();
+    const { t, currentUser, language } = useAppContext();
     const isAdmin = currentUser?.role === 'Owner';
-    const [loading, setLoading] = useState(false);
     const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
     const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
+
+    // Fetch all data using React Query
+    const { data: leadsResponse } = useLeads();
+    const leads = leadsResponse?.results || [];
+
+    const { data: dealsResponse } = useDeals();
+    const deals = dealsResponse?.results || [];
+
+    const { data: activitiesResponse } = useActivities();
+    const activities = activitiesResponse?.results || [];
+
+    const { data: tasksResponse } = useTasks();
+    const todos = tasksResponse?.results || [];
+
+    const { data: usersResponse } = useUsers();
+    const users = usersResponse?.results || [];
+    
+    const { data: clientTasksResponse } = useClientTasks();
+    const clientTasks = clientTasksResponse?.results || [];
 
     // Check for payment success message on mount
     useEffect(() => {
@@ -41,37 +60,51 @@ export const DashboardPage = () => {
         
         // Today's new leads (created today)
         const todayNewLeads = leads.filter(lead => {
-            const leadDate = new Date(lead.createdAt);
+            const createdAt = (lead as any).created_at || lead.createdAt;
+            if (!createdAt) return false;
+            const leadDate = new Date(createdAt);
             leadDate.setHours(0, 0, 0, 0);
             return leadDate.getTime() === today.getTime();
         }).length;
         
         // Today's touched leads (created today AND status is not Untouched)
         const todayTouchedLeads = leads.filter(lead => {
-            const leadDate = new Date(lead.createdAt);
+            const createdAt = (lead as any).created_at || lead.createdAt;
+            if (!createdAt) return false;
+            const leadDate = new Date(createdAt);
             leadDate.setHours(0, 0, 0, 0);
-            return leadDate.getTime() === today.getTime() && lead.status !== 'Untouched';
+            const statusName = (lead as any).status_name || lead.status || '';
+            return leadDate.getTime() === today.getTime() && statusName !== 'Untouched';
         }).length;
         
         // Today's untouched leads (created today AND status is Untouched)
         const todayUntouchedLeads = leads.filter(lead => {
-            const leadDate = new Date(lead.createdAt);
+            const createdAt = (lead as any).created_at || lead.createdAt;
+            if (!createdAt) return false;
+            const leadDate = new Date(createdAt);
             leadDate.setHours(0, 0, 0, 0);
-            return leadDate.getTime() === today.getTime() && lead.status === 'Untouched';
+            const statusName = (lead as any).status_name || lead.status || '';
+            return leadDate.getTime() === today.getTime() && statusName === 'Untouched';
         }).length;
         
         // Delayed leads (created more than 3 days ago, untouched, and not assigned)
         const threeDaysAgo = new Date(today);
         threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
         const delayedLeads = leads.filter(lead => {
-            const leadDate = new Date(lead.createdAt);
+            const createdAt = (lead as any).created_at || lead.createdAt;
+            if (!createdAt) return false;
+            const leadDate = new Date(createdAt);
             leadDate.setHours(0, 0, 0, 0);
-            const hasRecentActivity = activities.some(activity => {
-                const activityDate = new Date(activity.date);
+            const hasRecentActivity = clientTasks.some((ct: any) => {
+                const ctCreatedAt = ct.created_at || ct.createdAt;
+                if (!ctCreatedAt) return false;
+                const activityDate = new Date(ctCreatedAt);
                 activityDate.setHours(0, 0, 0, 0);
-                return activity.lead === lead.name && activityDate >= leadDate;
+                const clientId = ct.client || ct.clientId;
+                return clientId === lead.id && activityDate >= leadDate;
             });
-            return leadDate < threeDaysAgo && !hasRecentActivity && lead.assignedTo === 0;
+            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
+            return leadDate < threeDaysAgo && !hasRecentActivity && (!assignedToId || assignedToId === 0);
         }).length;
         
         // Total leads
@@ -160,15 +193,25 @@ export const DashboardPage = () => {
                 textColor: 'text-emerald-600 dark:text-emerald-400'
             },
         ];
-    }, [leads, activities, deals, todos, t]);
+    }, [leads, clientTasks, deals, todos, t]);
     
-    // Stages report data
+    // Stages report data - get from ClientTasks
     const stagesData = useMemo(() => {
         const stageCounts: { [key: string]: number } = {};
-        leads.forEach(lead => {
-            const stage = lead.lastStage || 'Untouched';
-            stageCounts[stage] = (stageCounts[stage] || 0) + 1;
+        
+        // Count stages from ClientTasks
+        clientTasks.forEach((ct: any) => {
+            const stageName = ct.stage_name || ct.stage || 'Untouched';
+            stageCounts[stageName] = (stageCounts[stageName] || 0) + 1;
         });
+        
+        // If no ClientTasks, count by status
+        if (Object.keys(stageCounts).length === 0) {
+            leads.forEach(lead => {
+                const statusName = (lead as any).status_name || lead.status || 'Untouched';
+                stageCounts[statusName] = (stageCounts[statusName] || 0) + 1;
+            });
+        }
         
         const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
         return Object.entries(stageCounts).map(([name, value], index) => ({
@@ -176,7 +219,7 @@ export const DashboardPage = () => {
             value,
             fill: colors[index % colors.length],
         }));
-    }, [leads]);
+    }, [leads, clientTasks]);
     
     // Week leads chart data (last 7 days)
     const weekLeadsData = useMemo(() => {
@@ -191,7 +234,9 @@ export const DashboardPage = () => {
             const dateStr = date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
             
             const leadsCount = leads.filter(lead => {
-                const leadDate = new Date(lead.createdAt);
+                const createdAt = (lead as any).created_at || lead.createdAt;
+                if (!createdAt) return false;
+                const leadDate = new Date(createdAt);
                 leadDate.setHours(0, 0, 0, 0);
                 return leadDate.getTime() === date.getTime();
             }).length;
@@ -204,55 +249,75 @@ export const DashboardPage = () => {
     
     // Top users (users with most activities) - only from the same company
     const topUsers = useMemo(() => {
-        if (!currentUser?.company?.id) return [];
+        const currentCompanyId = currentUser?.company?.id || currentUser?.company_id || (currentUser?.company as any)?.id;
+        if (!currentCompanyId) return [];
         
         const userActivityCounts: { [userId: number]: number } = {};
-        activities.forEach(activity => {
-            const user = users.find(u => u.name === activity.user);
-            if (user && user.company?.id === currentUser.company.id) {
-                userActivityCounts[user.id] = (userActivityCounts[user.id] || 0) + 1;
+        // Count activities from ClientTasks
+        clientTasks.forEach((ct: any) => {
+            const createdById = ct.created_by || ct.createdBy;
+            if (createdById) {
+                userActivityCounts[createdById] = (userActivityCounts[createdById] || 0) + 1;
             }
         });
         
-        return users
-            .filter(user => user.company?.id === currentUser.company.id)
+        // Filter users by company and map activity counts
+        const filteredUsers = users
+            .filter(user => {
+                const userCompanyId = user.company?.id || user.company_id || (user.company as any)?.id;
+                return userCompanyId === currentCompanyId;
+            })
             .map(user => ({
                 ...user,
                 activityCount: userActivityCounts[user.id] || 0,
             }))
             .sort((a, b) => b.activityCount - a.activityCount)
             .slice(0, 3);
-    }, [users, activities, currentUser]);
+        
+        // If no users with activities, show all users from company (with 0 activities)
+        if (filteredUsers.length === 0) {
+            return users
+                .filter(user => {
+                    const userCompanyId = user.company?.id || user.company_id || (user.company as any)?.id;
+                    return userCompanyId === currentCompanyId;
+                })
+                .slice(0, 3)
+                .map(user => ({
+                    ...user,
+                    activityCount: 0,
+                }));
+        }
+        
+        return filteredUsers;
+    }, [users, clientTasks, currentUser]);
     
-    // Latest feedbacks (latest activities)
+    // Latest feedbacks (latest ClientTasks)
     const latestFeedbacks = useMemo(() => {
-        return activities
-            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+        return clientTasks
+            .sort((a: any, b: any) => {
+                const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
+                const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
+                return dateB - dateA;
+            })
             .slice(0, 5)
-            .map(activity => ({
-                id: activity.id,
-                date: activity.date,
-                user: activity.user,
-                lead: activity.lead,
-                stage: activity.stage,
-                notes: activity.notes,
-            }));
-    }, [activities]);
+            .map((ct: any) => {
+                const createdAt = ct.created_at || ct.createdAt || '';
+                const createdById = ct.created_by || ct.createdBy;
+                const user = users.find(u => u.id === createdById);
+                const clientId = ct.client || ct.clientId;
+                const lead = leads.find((l: any) => l.id === clientId);
+                
+                return {
+                    id: ct.id,
+                    date: createdAt ? new Date(createdAt).toLocaleDateString() : '',
+                    user: user?.name || ct.created_by_username || t('unknown'),
+                    lead: ct.client_name || lead?.name || '',
+                    stage: ct.stage_name || ct.stage || '',
+                    notes: ct.notes || '',
+                };
+            });
+    }, [clientTasks, users, leads, t]);
 
-    useEffect(() => {
-        // Data is already loaded from AppContext
-        setLoading(false);
-    }, []);
-
-    if (loading) {
-        return (
-            <PageWrapper title={t('dashboard')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
-            </PageWrapper>
-        );
-    }
 
     return (
         <PageWrapper title={t('dashboard')}>
@@ -375,7 +440,7 @@ export const DashboardPage = () => {
                     </div>
                     {stagesData.length > 0 ? (
                         <div className="space-y-4">
-                          <div className="h-[240px]">
+                          <div className="h-[240px] min-h-[240px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie 

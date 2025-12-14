@@ -4,7 +4,7 @@ import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI, getCurrentUserAPI } from '../services/api';
 
 export const TwoFactorAuthPage = () => {
-    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn } = useAppContext();
+    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRequesting, setIsRequesting] = useState(false);
@@ -197,61 +197,18 @@ export const TwoFactorAuthPage = () => {
             } catch (err: any) {
                 // If getCurrentUserAPI fails, try to use response.user if available
                 if (response.user) {
-                    console.log('⚠️ getCurrentUserAPI failed, using response.user data');
                     userData = response.user;
                 } else {
                     throw err;
                 }
             }
             
-            // Check if user has an active subscription
-            const hasActiveSubscription = userData.company?.subscription?.is_active === true;
-            const subId = userData.company?.subscription?.id;
+            // Note: Subscription check is now done in backend before returning tokens
+            // If we reach here, the user has an active subscription or is super admin
             
-            if (!hasActiveSubscription) {
-                // Convert user data to frontend format before clearing tokens
-                const frontendUser = {
-                    id: userData.id,
-                    name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-                    username: userData.username,
-                    email: userData.email,
-                    role: userData.role === 'admin' ? 'Owner' : 'Employee',
-                    phone: userData.phone || '',
-                    avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
-                    company: userData.company ? {
-                        id: typeof userData.company === 'object' ? userData.company.id : userData.company,
-                        name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
-                        domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
-                        specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
-                    } : undefined,
-                };
-                
-                // Store user data for payment success page
-                localStorage.setItem('pendingUserData', JSON.stringify({
-                    ...frontendUser,
-                    requiresPayment: true,
-                    subscriptionId: subId,
-                }));
-                
-                // Clear tokens and session storage
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('refreshToken');
-                sessionStorage.removeItem('2fa_username');
-                sessionStorage.removeItem('2fa_password');
-                sessionStorage.removeItem('2fa_token');
-                
-                // Store subscription ID for payment link (set it even if we need to show error)
-                if (subId) {
-                    setSubscriptionId(subId);
-                    // Set a flag error that will trigger the link display
-                    setError('SUBSCRIPTION_INACTIVE');
-                } else {
-                    // No subscription ID available, show plain error
-                    setError(t('noActiveSubscription'));
-                }
-                setIsLoading(false);
-                return;
-            }
+            // Reset subscription inactive flag since user passed backend check
+            setIsCompanySubscriptionInactive(false);
+            localStorage.removeItem('isCompanySubscriptionInactive');
             
             // Convert user data from API to Frontend format
             const frontendUser = {
@@ -270,6 +227,9 @@ export const TwoFactorAuthPage = () => {
                 } : undefined,
             };
             
+            // Reset subscription inactive flag since user passed backend check
+            setIsCompanySubscriptionInactive(false);
+            localStorage.removeItem('isCompanySubscriptionInactive');
             
             if (!accessToken || !refreshToken) {
                 throw new Error('No tokens received from server');
@@ -298,12 +258,15 @@ export const TwoFactorAuthPage = () => {
             setCurrentPage('Dashboard');
             
             // Use window.location for immediate redirect to ensure state is applied
-            console.log('🔄 Redirecting to Dashboard after 2FA login');
             window.location.href = '/dashboard';
         } catch (error: any) {
             const errorMessage = error.message || '';
-            // Check if it's a subscription inactive error
-            if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
+            // Check if it's an account temporarily inactive error (for employees)
+            if (error.code === 'ACCOUNT_TEMPORARILY_INACTIVE' || errorMessage === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+                setError('ACCOUNT_TEMPORARILY_INACTIVE');
+            } 
+            // Check if it's a subscription inactive error (for admins)
+            else if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
                 const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
                 if (subId) {
                     setSubscriptionId(parseInt(subId));
@@ -417,7 +380,9 @@ export const TwoFactorAuthPage = () => {
                         {error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                                 <div>
-                                    {error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
+                                    {error === 'ACCOUNT_TEMPORARILY_INACTIVE' ? (
+                                        t('accountTemporarilyInactive') || 'Your account is temporarily inactive'
+                                    ) : error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
                                         <>
                                             {t('noActiveSubscriptionBeforeLink')}
                                             <a

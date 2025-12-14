@@ -23,7 +23,9 @@ export interface Company {
 
 export interface User {
   id: number;
-  name: string;
+  name?: string; // Computed from first_name + last_name, kept for backward compatibility
+  first_name?: string;
+  last_name?: string;
   role: string;
   phone: string;
   avatar: string;
@@ -69,7 +71,7 @@ export interface Lead {
   name: string;
   phone: string; // Keep for backward compatibility
   phoneNumbers?: PhoneNumber[]; // New field for multiple phone numbers
-  status: 'Untouched' | 'Touched' | 'Following' | 'Meeting' | 'No Answer' | 'Out Of Service' | 'All';
+  status?: 'Untouched' | 'Touched' | 'Following' | 'Meeting' | 'No Answer' | 'Out Of Service' | 'All' | string; // Optional, can be undefined or any status name from settings
   type: 'Fresh' | 'Cold' | 'My' | 'Rotated' | 'All';
   assignedTo: number; // User ID
   budget: number;
@@ -114,8 +116,10 @@ export interface Deal {
   salesCommissionPercentage?: number;
   salesCommissionAmount?: number;
   description?: string;
-  unit?: string; // For real estate deals
-  project?: string; // For real estate deals
+  unit?: number | string; // For real estate deals - can be ID (number) or code (string) from API
+  project?: number | string; // For real estate deals - can be ID (number) or name (string) from API
+  unit_code?: string; // Read-only field from API serializer
+  project_name?: string; // Read-only field from API serializer
   createdAt?: string;
   updatedAt?: string;
 }
@@ -421,3 +425,11 @@ export interface Status {
     isDefault?: boolean;
     isHidden?: boolean;
 }
+
+// Helper function to get user display name
+export const getUserDisplayName = (user: User): string => {
+    if (user.first_name || user.last_name) {
+        return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+    }
+    return user.name || user.username || user.email || `User ${user.id}`;
+};

@@ -1,47 +1,64 @@
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Loader, Button, FilterIcon, SearchIcon, Input } from '../components/index';
 import { Activity, TaskStage } from '../types';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
+import { useClientTasks, useUsers, useLeads, useStages } from '../hooks/useQueries';
+import { formatDateToLocal } from '../utils/dateUtils';
 
 export const ActivitiesPage = () => {
     const { 
         t, 
-        activities, 
-        users, 
-        leads,
         activityFilters,
         setActivityFilters,
         setIsActivitiesFilterDrawerOpen,
-        stages,
     } = useAppContext();
-    const [loading, setLoading] = useState(false);
 
-    // Filter activities based on filters from FilterDrawer
+    // Fetch data using React Query
+    const { data: clientTasksResponse } = useClientTasks();
+    const clientTasks = clientTasksResponse?.results || [];
+
+    const { data: usersResponse } = useUsers();
+    const users = usersResponse?.results || [];
+
+    const { data: leadsResponse } = useLeads();
+    const leads = leadsResponse?.results || [];
+
+    const { data: stagesData } = useStages();
+    const stages = Array.isArray(stagesData) 
+        ? stagesData 
+        : (stagesData?.results || []);
+
+    // Filter and transform ClientTasks to Activities format
     const filteredActivities = useMemo(() => {
-        let filtered = activities;
+        let filtered = clientTasks;
 
         // User filter
         if (activityFilters.user && activityFilters.user !== 'All') {
-            filtered = filtered.filter(activity => {
-                const user = users.find(u => u.name === activity.user);
-                return user && user.id.toString() === activityFilters.user;
+            filtered = filtered.filter((ct: any) => {
+                const createdById = ct.created_by || ct.createdBy;
+                return createdById && createdById.toString() === activityFilters.user;
             });
         }
 
         // Stage filter
         if (activityFilters.stage && activityFilters.stage !== 'All') {
-            filtered = filtered.filter(activity => activity.stage === activityFilters.stage);
+            filtered = filtered.filter((ct: any) => {
+                const stageName = ct.stage_name || ct.stage || '';
+                return stageName === activityFilters.stage;
+            });
         }
 
         // Lead type filter
         if (activityFilters.leadType && activityFilters.leadType !== 'All') {
-            filtered = filtered.filter(activity => {
-                const lead = leads.find(l => l.name === activity.lead);
+            filtered = filtered.filter((ct: any) => {
+                const clientId = ct.client || ct.clientId;
+                const lead = leads.find(l => l.id === clientId);
                 if (!lead) return false;
-                return lead.type.toLowerCase() === activityFilters.leadType.toLowerCase();
+                const leadType = (lead as any).type || lead.type || '';
+                return leadType.toLowerCase() === activityFilters.leadType.toLowerCase();
             });
         }
 
@@ -50,8 +67,9 @@ export const ActivitiesPage = () => {
             const today = new Date();
             today.setHours(0, 0, 0, 0);
             
-            filtered = filtered.filter(activity => {
-                const activityDate = new Date(activity.date);
+            filtered = filtered.filter((ct: any) => {
+                const createdAt = ct.created_at || ct.createdAt;
+                const activityDate = new Date(createdAt);
                 
                 switch (activityFilters.timePeriod) {
                     case 'today': {
@@ -85,8 +103,9 @@ export const ActivitiesPage = () => {
         if (activityFilters.dateFrom) {
             const fromDate = new Date(activityFilters.dateFrom);
             fromDate.setHours(0, 0, 0, 0);
-            filtered = filtered.filter(activity => {
-                const activityDate = new Date(activity.date);
+            filtered = filtered.filter((ct: any) => {
+                const createdAt = ct.created_at || ct.createdAt;
+                const activityDate = new Date(createdAt);
                 activityDate.setHours(0, 0, 0, 0);
                 return activityDate >= fromDate;
             });
@@ -95,8 +114,9 @@ export const ActivitiesPage = () => {
         if (activityFilters.dateTo) {
             const toDate = new Date(activityFilters.dateTo);
             toDate.setHours(23, 59, 59, 999);
-            filtered = filtered.filter(activity => {
-                const activityDate = new Date(activity.date);
+            filtered = filtered.filter((ct: any) => {
+                const createdAt = ct.created_at || ct.createdAt;
+                const activityDate = new Date(createdAt);
                 return activityDate <= toDate;
             });
         }
@@ -104,25 +124,53 @@ export const ActivitiesPage = () => {
         // Search filter
         if (activityFilters.search) {
             const searchLower = activityFilters.search.toLowerCase();
-            filtered = filtered.filter(activity =>
-                activity.lead.toLowerCase().includes(searchLower) ||
-                activity.notes.toLowerCase().includes(searchLower) ||
-                activity.user.toLowerCase().includes(searchLower)
-            );
+            filtered = filtered.filter((ct: any) => {
+                // Find user and lead names for search
+                const createdById = ct.created_by || ct.createdBy;
+                const user = users.find(u => u.id === createdById);
+                const userName = user?.name || ct.created_by_username || '';
+                
+                const clientId = ct.client || ct.clientId;
+                const lead = leads.find(l => l.id === clientId);
+                const leadName = lead?.name || ct.client_name || '';
+                
+                const notes = ct.notes || '';
+                
+                return leadName.toLowerCase().includes(searchLower) ||
+                    notes.toLowerCase().includes(searchLower) ||
+                    userName.toLowerCase().includes(searchLower);
+            });
         }
 
-        return filtered;
-    }, [activities, activityFilters, users, leads]);
+        // Transform filtered ClientTasks to Activities format
+        return filtered.map((ct: any) => {
+            // Find user by created_by ID
+            const createdById = ct.created_by || ct.createdBy;
+            const user = users.find(u => u.id === createdById);
+            const userName = user?.name || ct.created_by_username || t('unknown');
 
-    if (loading) {
-        return (
-            <PageWrapper title={t('activities')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
-            </PageWrapper>
-        );
-    }
+            // Find lead by client ID
+            const clientId = ct.client || ct.clientId;
+            const lead = leads.find(l => l.id === clientId);
+            const leadName = lead?.name || ct.client_name || t('unknown');
+
+            // Get stage name
+            const stageName = ct.stage_name || ct.stage || '';
+
+            // Format date
+            const createdAt = ct.created_at || ct.createdAt;
+            const formattedDate = formatDateToLocal(createdAt);
+
+            return {
+                id: ct.id,
+                user: userName,
+                lead: leadName,
+                stage: stageName,
+                date: formattedDate,
+                notes: ct.notes || '',
+            } as Activity;
+        });
+    }, [clientTasks, activityFilters, users, leads, t]);
 
     return (
             <PageWrapper
@@ -141,20 +189,20 @@ export const ActivitiesPage = () => {
                         <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
-                                    <th scope="col" className="px-6 py-3">{t('user')}</th>
-                                    <th scope="col" className="px-6 py-3">{t('lead')}</th>
-                                    <th scope="col" className="px-6 py-3">{t('stage')}</th>
-                                    <th scope="col" className="px-6 py-3">{t('date')}</th>
-                                    <th scope="col" className="px-6 py-3">{t('notes')}</th>
+                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('user')}</th>
+                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('lead')}</th>
+                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('stage')}</th>
+                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('date')}</th>
+                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('notes')}</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {filteredActivities.length > 0 ? (
                                     filteredActivities.map(activity => (
                                     <tr key={activity.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap">{activity.user}</td>
-                                        <td className="px-6 py-4">{activity.lead}</td>
-                                        <td className="px-6 py-4">
+                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap text-center">{activity.user}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">{activity.lead}</td>
+                                        <td className="px-6 py-4 text-center">
                                             {(() => {
                                                 // Find stage from settings by name (normalize to match)
                                                 const stageName = typeof activity.stage === 'string' 
@@ -186,7 +234,7 @@ export const ActivitiesPage = () => {
                                                 
                                                 return (
                                                     <span 
-                                                        className={`px-2 py-1 rounded-full text-xs font-medium ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
+                                                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
                                                         style={rgb ? {
                                                             backgroundColor: bgColor,
                                                             color: textColor,
@@ -197,8 +245,8 @@ export const ActivitiesPage = () => {
                                                 );
                                             })()}
                                         </td>
-                                        <td className="px-6 py-4">{activity.date}</td>
-                                        <td className="px-6 py-4">{activity.notes}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">{activity.date}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-center">{activity.notes}</td>
                                     </tr>
                                     ))
                                  ) : (

@@ -5,6 +5,17 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
+import { useUpdateDeal, useProjects, useUnits, useLeads, useUsers } from '../../hooks/useQueries';
+import { User } from '../../types';
+
+// Helper function to get user display name
+const getUserDisplayName = (user: User): string => {
+    if (user.name) return user.name;
+    if (user.first_name || user.last_name) {
+        return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
+    }
+    return user.username || user.email || 'Unknown';
+};
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -12,11 +23,11 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode, value?: string | number; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string }) => {
+const Select = ({ id, children, value, onChange, className, disabled }: { id: string; children?: React.ReactNode, value?: string | number; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; disabled?: boolean }) => {
     const borderClass = className?.includes('border-red') ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600';
     const baseClassName = className?.replace(/border-\S+/g, '').trim() || '';
     return (
-        <select id={id} value={value} onChange={onChange} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
+        <select id={id} value={value} onChange={onChange} disabled={disabled} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
             {children}
         </select>
     );
@@ -27,27 +38,44 @@ export const EditDealModal = () => {
         isEditDealModalOpen, 
         setIsEditDealModalOpen, 
         t, 
-        updateDeal, 
         editingDeal, 
-        projects, 
-        units, 
-        leads, 
-        currentUser, 
-        users,
+        currentUser,
         setIsSuccessModalOpen,
         setSuccessMessage
     } = useAppContext();
     
+    // Fetch data using React Query
+    const { data: projectsResponse } = useProjects();
+    const projects = projectsResponse?.results || [];
+
+    const { data: unitsResponse } = useUnits();
+    const allUnits = Array.isArray(unitsResponse) 
+        ? unitsResponse 
+        : (unitsResponse?.results || []);
+
+    const { data: leadsResponse } = useLeads();
+    const leads = leadsResponse?.results || [];
+
+    const { data: usersResponse } = useUsers();
+    const users = Array.isArray(usersResponse) 
+        ? usersResponse 
+        : (usersResponse?.results || []);
+    const userOptions = (users && users.length > 0) ? users : (currentUser ? [currentUser] : []);
+
+    // Update deal mutation
+    const updateDealMutation = useUpdateDeal();
+    const loading = updateDealMutation.isPending;
+    
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     
     const [formState, setFormState] = useState({
         project: '',
         unit: '',
         leadId: 0,
-        startedBy: currentUser?.id || 1,
-        closedBy: currentUser?.id || 1,
+        employee: currentUser?.id || 0,
+        startedBy: currentUser?.id || 0,
+        closedBy: currentUser?.id || 0,
         paymentMethod: 'Cash',
         status: 'Reservation',
         stage: 'in_progress' as 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled',
@@ -59,6 +87,17 @@ export const EditDealModal = () => {
         salesCommissionPercentage: '',
         description: '',
     });
+    
+    // Filter units by selected project (must be after formState declaration)
+    const units = useMemo(() => {
+        if (!isRealEstate || !formState.project) {
+            return allUnits;
+        }
+        // If project is a name, find the project ID first
+        const projectObj = projects.find((p: any) => p.name === formState.project || p.id.toString() === formState.project);
+        const projectId = projectObj?.id || Number(formState.project);
+        return allUnits.filter((u: any) => u.project === projectId || u.project?.id === projectId || u.project_id === projectId);
+    }, [allUnits, formState.project, isRealEstate, projects]);
 
     const calculatedValues = useMemo(() => {
         const value = parseFloat(formState.value) || 0;
@@ -74,13 +113,40 @@ export const EditDealModal = () => {
     // Initialize form state when editingDeal changes
     useEffect(() => {
         if (editingDeal && isEditDealModalOpen) {
-            // Find project by name (editingDeal.project is project_name from API)
-            const projectName = editingDeal.project || '';
-            const foundProject = projects.find(p => p.name === projectName);
+            // Handle project - could be ID, name, project_name, or object
+            let projectValue = '';
+            if (typeof editingDeal.project === 'object' && editingDeal.project?.id) {
+                projectValue = editingDeal.project.id.toString();
+            } else if (typeof editingDeal.project === 'number') {
+                projectValue = editingDeal.project.toString();
+            } else {
+                // Try to find by name or project_name
+                const projectName = (editingDeal as any).project_name || editingDeal.project || '';
+                const foundProject = projects.find((p: any) => 
+                    p.name === projectName || 
+                    p.id.toString() === projectName ||
+                    p.id === Number(projectName)
+                );
+                projectValue = foundProject ? foundProject.id.toString() : '';
+                
+                // If still not found and project is a string that looks like an ID, use it
+                if (!projectValue && typeof editingDeal.project === 'string' && /^\d+$/.test(editingDeal.project)) {
+                    projectValue = editingDeal.project;
+                }
+            }
             
-            // Find unit by code (editingDeal.unit is unit_code from API, which should match unit.code)
-            const unitCode = editingDeal.unit || '';
-            const foundUnit = units.find(u => u.code === unitCode);
+            // Handle unit - could be ID, code, or object
+            let unitValue = '';
+            if (typeof editingDeal.unit === 'object' && editingDeal.unit?.id) {
+                unitValue = editingDeal.unit.id.toString();
+            } else if (typeof editingDeal.unit === 'number') {
+                unitValue = editingDeal.unit.toString();
+            } else {
+                // Try to find by code
+                const unitCode = editingDeal.unit || '';
+                const foundUnit = allUnits.find((u: any) => u.code === unitCode || u.id.toString() === unitCode);
+                unitValue = foundUnit ? foundUnit.id.toString() : '';
+            }
             
             // Format dates for date inputs (YYYY-MM-DD)
             const formatDate = (dateStr: string | undefined): string => {
@@ -103,30 +169,72 @@ export const EditDealModal = () => {
             
             // Calculate original value (before discount)
             // editingDeal.value is totalValue (after discount), so we need to add discountAmount back
-            const totalValue = editingDeal.value || 0;
-            const discountAmount = editingDeal.discountAmount || 0;
+            const totalValue = Number(editingDeal.value || (editingDeal as any).value || 0);
+            
+            // Handle discount fields - API might return discount_percentage/discount_amount or discountPercentage/discountAmount
+            const discountAmount = Number(editingDeal.discountAmount || (editingDeal as any).discount_amount || 0);
+            const discountPercentage = Number(editingDeal.discountPercentage || (editingDeal as any).discount_percentage || 0);
+            
+            // Handle sales commission fields - API might return sales_commission_percentage/sales_commission_amount or salesCommissionPercentage/salesCommissionAmount
+            const salesCommissionPercentage = Number(editingDeal.salesCommissionPercentage || (editingDeal as any).sales_commission_percentage || 0);
+            
             const originalValue = totalValue + discountAmount;
             
+            // Handle employee - API might return employee as object or ID
+            const employeeId = (editingDeal as any).employee 
+                ? (typeof (editingDeal as any).employee === 'object' ? (editingDeal as any).employee.id : (editingDeal as any).employee)
+                : currentUser?.id || 0;
+            
+            // Handle startedBy and closedBy - API might return started_by/closed_by or startedBy/closedBy
+            const startedById = (editingDeal as any).started_by || editingDeal.startedBy || currentUser?.id || 0;
+            const closedById = (editingDeal as any).closed_by || editingDeal.closedBy || currentUser?.id || 0;
+            
+            // Handle startDate and closedDate - API might return start_date/closed_date or startDate/closedDate
+            const startDateValue = (editingDeal as any).start_date || editingDeal.startDate;
+            const closedDateValue = (editingDeal as any).closed_date || editingDeal.closedDate;
+            
+            // Handle paymentMethod - API might return payment_method or paymentMethod
+            // API expects lowercase: 'cash' or 'installment'
+            const paymentMethodRaw = (editingDeal as any).paymentMethod || (editingDeal as any).payment_method || 'cash';
+            const paymentMethodDisplay = paymentMethodRaw.charAt(0).toUpperCase() + paymentMethodRaw.slice(1).toLowerCase(); // Display as 'Cash' or 'Installment'
+            
+            // Handle status - API expects lowercase: 'reservation', 'contracted', 'closed'
+            const statusRaw = editingDeal.status || 'reservation';
+            const statusDisplay = statusRaw.charAt(0).toUpperCase() + statusRaw.slice(1).toLowerCase(); // Display as 'Reservation', 'Contracted', 'Closed'
+            
             setFormState({
-                project: foundProject?.name || projectName || '',
-                unit: foundUnit?.code || unitCode || '',
+                project: projectValue,
+                unit: unitValue,
                 leadId: editingDeal.leadId || editingDeal.client || 0,
-                startedBy: editingDeal.startedBy || currentUser?.id || 1,
-                closedBy: editingDeal.closedBy || currentUser?.id || 1,
-                paymentMethod: editingDeal.paymentMethod || 'Cash',
-                status: editingDeal.status || 'Reservation',
+                employee: employeeId,
+                startedBy: startedById,
+                closedBy: closedById,
+                paymentMethod: paymentMethodDisplay,
+                status: statusDisplay,
                 stage: editingDeal.stage || 'in_progress',
-                startDate: formatDate(editingDeal.startDate),
-                closedDate: formatDate(editingDeal.closedDate),
+                startDate: formatDate(startDateValue),
+                closedDate: formatDate(closedDateValue),
                 value: originalValue > 0 ? originalValue.toString() : '',
-                discountPercentage: editingDeal.discountPercentage !== undefined && editingDeal.discountPercentage !== null ? editingDeal.discountPercentage.toString() : '',
+                discountPercentage: discountPercentage > 0 ? discountPercentage.toString() : '',
                 discountAmount: discountAmount > 0 ? discountAmount.toString() : '',
-                salesCommissionPercentage: editingDeal.salesCommissionPercentage !== undefined && editingDeal.salesCommissionPercentage !== null ? editingDeal.salesCommissionPercentage.toString() : '',
+                salesCommissionPercentage: salesCommissionPercentage > 0 ? salesCommissionPercentage.toString() : '',
                 description: editingDeal.description || '',
             });
             setErrors({});
         }
-    }, [editingDeal, isEditDealModalOpen, projects, units, currentUser?.id]);
+    }, [editingDeal, isEditDealModalOpen, projects, allUnits, currentUser?.id]);
+
+    // Update unit when project changes or units load
+    useEffect(() => {
+        if (isRealEstate && formState.project && units.length > 0 && !formState.unit && editingDeal) {
+            // Only auto-select if we don't have a unit yet (not when editing existing deal with unit)
+            // This prevents overwriting the existing unit when the modal opens
+            const hasExistingUnit = editingDeal.unit && (typeof editingDeal.unit === 'object' ? editingDeal.unit.id : editingDeal.unit);
+            if (!hasExistingUnit) {
+                setFormState(prev => ({ ...prev, unit: units[0].id.toString() }));
+            }
+        }
+    }, [isRealEstate, formState.project, units, formState.unit, editingDeal]);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -172,6 +280,11 @@ export const EditDealModal = () => {
                 newState.discountAmount = (val * (discPercent / 100)).toFixed(2);
             }
 
+            // Reset unit when project changes
+            if (id === 'project' && isRealEstate) {
+                newState.unit = '';
+            }
+
             return newState;
         });
         clearError(id);
@@ -189,28 +302,44 @@ export const EditDealModal = () => {
             return;
         }
         
-        setLoading(true);
-        
         try {
-            await updateDeal(editingDeal.id, {
-                leadId: formState.leadId,
-                startedBy: Number(formState.startedBy),
-                closedBy: Number(formState.closedBy),
-                paymentMethod: formState.paymentMethod,
-                status: formState.status,
+            const payload: any = {
+                client: formState.leadId, // API expects 'client' field with lead ID
+                employee: Number(formState.employee) || currentUser?.id || null, // Send employee ID to API
+                started_by: Number(formState.startedBy) || currentUser?.id || null, // Send as started_by (snake_case) for API
+                closed_by: Number(formState.closedBy) || currentUser?.id || null, // Send as closed_by (snake_case) for API
+                payment_method: formState.paymentMethod.toLowerCase() || null, // Send as payment_method (snake_case, lowercase) for API
+                status: formState.status.toLowerCase(), // Send as lowercase for API
                 stage: formState.stage,
                 value: calculatedValues.totalValue, // Send totalValue as value to API
-                startDate: formState.startDate || undefined,
-                closedDate: formState.closedDate || undefined,
-                discountPercentage: Number(formState.discountPercentage) || 0,
-                discountAmount: calculatedValues.discountAmount, // Use calculated discountAmount
-                salesCommissionPercentage: Number(formState.salesCommissionPercentage) || 0,
-                salesCommissionAmount: calculatedValues.salesCommissionAmount,
-                description: formState.description || undefined,
-                ...(isRealEstate && {
-                    unit: formState.unit,
-                    project: formState.project,
-                }),
+                start_date: formState.startDate || null, // Send as start_date (snake_case) for API
+                closed_date: formState.closedDate || null, // Send as closed_date (snake_case) for API
+                discount_percentage: Number(formState.discountPercentage) || 0,
+                discount_amount: calculatedValues.discountAmount, // Use calculated discountAmount
+                sales_commission_percentage: Number(formState.salesCommissionPercentage) || 0,
+                sales_commission_amount: calculatedValues.salesCommissionAmount,
+                description: formState.description || '',
+                company: currentUser?.company?.id,
+            };
+            
+            // Add real estate fields if applicable - convert to IDs
+            if (isRealEstate) {
+                if (formState.project) {
+                    // Convert project name/ID to project ID
+                    const projectObj = projects.find((p: any) => p.name === formState.project || p.id.toString() === formState.project);
+                    payload.project = projectObj ? projectObj.id : Number(formState.project);
+                }
+                if (formState.unit) {
+                    // Convert unit code/ID to unit ID
+                    const unitObj = allUnits.find((u: any) => u.code === formState.unit || u.id.toString() === formState.unit);
+                    payload.unit = unitObj ? unitObj.id : Number(formState.unit);
+                }
+            }
+            
+            
+            await updateDealMutation.mutateAsync({
+                id: editingDeal.id,
+                data: payload
             });
 
             // Close modal immediately and show success modal
@@ -219,10 +348,56 @@ export const EditDealModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating deal:', error);
-            const errorMessage = error?.message || t('errorUpdatingDeal') || 'Failed to update deal. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Handle API validation errors
+            let errorMessage = t('errorUpdatingDeal') || 'Failed to update deal. Please try again.';
+            
+            if (error?.message) {
+                try {
+                    const errorData = JSON.parse(error.message);
+                    const newErrors: { [key: string]: string } = {};
+                    
+                    Object.keys(errorData).forEach(key => {
+                        if (Array.isArray(errorData[key])) {
+                            newErrors[key] = errorData[key][0];
+                        } else if (typeof errorData[key] === 'string') {
+                            newErrors[key] = errorData[key];
+                        }
+                    });
+                    
+                    setErrors(newErrors);
+                    
+                    // Show first error in alert
+                    const firstError = Object.values(newErrors)[0];
+                    if (firstError) {
+                        errorMessage = firstError;
+                    }
+                } catch (e) {
+                    // If parsing fails, use the error message as is
+                    errorMessage = error.message;
+                }
+            } else if (error?.fields || error?.response?.data) {
+                const errorData = error.fields || error.response?.data || {};
+                const newErrors: { [key: string]: string } = {};
+                
+                Object.keys(errorData).forEach(key => {
+                    if (Array.isArray(errorData[key])) {
+                        newErrors[key] = errorData[key][0];
+                    } else if (typeof errorData[key] === 'string') {
+                        newErrors[key] = errorData[key];
+                    }
+                });
+                
+                setErrors(newErrors);
+                
+                // Show first error in alert
+                const firstError = Object.values(newErrors)[0];
+                if (firstError) {
+                    errorMessage = firstError;
+                }
+            }
+            
+            setErrors(prev => ({ ...prev, _general: errorMessage }));
         }
     };
 
@@ -248,14 +423,14 @@ export const EditDealModal = () => {
                                 className={errors.project ? 'border-red-500 dark:border-red-500' : ''}
                             >
                                 <option disabled value="">{t('selectProject')}</option>
-                                {projects.map(p => <option key={p.id} value={p.name}>{p.name}</option>)}
+                                {projects.map((p: any) => <option key={p.id} value={p.id.toString()}>{p.name}</option>)}
                             </Select>
                             {errors.project && (
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.project}</p>
                             )}
                         </div>
                     )}
-                    {isRealEstate && units.length > 0 && (
+                    {isRealEstate && (
                         <div>
                             <Label htmlFor="unit">{t('unit')} <span className="text-red-500">*</span></Label>
                             <Select 
@@ -263,9 +438,21 @@ export const EditDealModal = () => {
                                 value={formState.unit} 
                                 onChange={handleChange}
                                 className={errors.unit ? 'border-red-500 dark:border-red-500' : ''}
+                                disabled={!formState.project || units.length === 0}
                             >
-                                <option disabled value="">{t('selectUnit')}</option>
-                                {units.map(u => <option key={u.id} value={u.code}>{u.code}</option>)}
+                                <option disabled value="">
+                                    {!formState.project 
+                                        ? (t('selectProjectFirst') || 'Select project first')
+                                        : units.length === 0 
+                                            ? (t('noUnitsAvailable') || 'No units available')
+                                            : t('selectUnit')
+                                    }
+                                </option>
+                                {units.map((u: any) => (
+                                    <option key={u.id} value={u.id.toString()}>
+                                        {u.code || `Unit ${u.id}`}
+                                    </option>
+                                ))}
                             </Select>
                             {errors.unit && (
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.unit}</p>
@@ -291,6 +478,28 @@ export const EditDealModal = () => {
                         )}
                     </div>
                     <div>
+                        <Label htmlFor="employee">{t('employee') || 'Employee'}</Label>
+                        <Select 
+                            id="employee" 
+                            value={formState.employee} 
+                            onChange={handleChange}
+                            className={errors.employee ? 'border-red-500 dark:border-red-500' : ''}
+                        >
+                            {userOptions.length > 0 ? (
+                                userOptions.map(u => (
+                                    <option key={u.id} value={u.id}>
+                                        {getUserDisplayName(u)}
+                                    </option>
+                                ))
+                            ) : (
+                                <option value="">{t('noUsersAvailable') || 'No users available'}</option>
+                            )}
+                        </Select>
+                        {errors.employee && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.employee}</p>
+                        )}
+                    </div>
+                    <div>
                         <Label htmlFor="stage">{t('stage')} <span className="text-red-500">*</span></Label>
                         <Select 
                             id="stage" 
@@ -308,15 +517,47 @@ export const EditDealModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="startedBy">{t('startedBy')}</Label>
-                        <Select id="startedBy" value={formState.startedBy} onChange={handleChange}>
-                            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        <Select 
+                            id="startedBy" 
+                            value={formState.startedBy} 
+                            onChange={handleChange}
+                            className={errors.startedBy ? 'border-red-500 dark:border-red-500' : ''}
+                        >
+                            {userOptions.length > 0 ? (
+                                userOptions.map((u: any) => (
+                                    <option key={u.id} value={u.id}>
+                                        {getUserDisplayName(u)}
+                                    </option>
+                                ))
+                            ) : (
+                                <option value="">{t('noUsersAvailable') || 'No users available'}</option>
+                            )}
                         </Select>
+                        {errors.startedBy && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.startedBy}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="closedBy">{t('closedBy')}</Label>
-                        <Select id="closedBy" value={formState.closedBy} onChange={handleChange}>
-                            {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                        <Select 
+                            id="closedBy" 
+                            value={formState.closedBy} 
+                            onChange={handleChange}
+                            className={errors.closedBy ? 'border-red-500 dark:border-red-500' : ''}
+                        >
+                            {userOptions.length > 0 ? (
+                                userOptions.map((u: any) => (
+                                    <option key={u.id} value={u.id}>
+                                        {getUserDisplayName(u)}
+                                    </option>
+                                ))
+                            ) : (
+                                <option value="">{t('noUsersAvailable') || 'No users available'}</option>
+                            )}
                         </Select>
+                        {errors.closedBy && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.closedBy}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="paymentMethod">{t('paymentMethod')}</Label>

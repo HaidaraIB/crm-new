@@ -65,8 +65,8 @@ export const OwnersFilterDrawer = () => {
         setIsOwnerFilterDrawerOpen(false);
     };
 
-    const uniqueCities = Array.from(new Set(owners.map(o => o.city).filter(Boolean)));
-    const uniqueDistricts = Array.from(new Set(owners.map(o => o.district).filter(Boolean)));
+    const uniqueCities = Array.from(new Set((owners || []).map(o => o.city).filter(Boolean)));
+    const uniqueDistricts = Array.from(new Set((owners || []).map(o => o.district).filter(Boolean)));
 
     return (
         <>
@@ -82,8 +82,8 @@ export const OwnersFilterDrawer = () => {
                     <FilterSection title={t('ownerInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-city">{t('city')}</FilterLabel>
-                                <FilterSelect id="filter-city" value={localFilters.city} onChange={(e) => handleFilterChange('city', e.target.value)}>
+                                <FilterLabel htmlFor="owners-filter-city">{t('city')}</FilterLabel>
+                                <FilterSelect id="owners-filter-city" value={localFilters.city} onChange={(e) => handleFilterChange('city', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueCities.map(city => (
                                         <option key={city} value={city}>{city}</option>
@@ -92,8 +92,8 @@ export const OwnersFilterDrawer = () => {
                             </div>
 
                             <div>
-                                <FilterLabel htmlFor="filter-district">{t('district')}</FilterLabel>
-                                <FilterSelect id="filter-district" value={localFilters.district} onChange={(e) => handleFilterChange('district', e.target.value)}>
+                                <FilterLabel htmlFor="owners-filter-district">{t('district')}</FilterLabel>
+                                <FilterSelect id="owners-filter-district" value={localFilters.district} onChange={(e) => handleFilterChange('district', e.target.value)}>
                                     <option value="All">{t('all')}</option>
                                     {uniqueDistricts.map(district => (
                                         <option key={district} value={district}>{district}</option>
@@ -105,8 +105,8 @@ export const OwnersFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="owners-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="owners-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

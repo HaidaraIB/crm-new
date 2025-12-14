@@ -131,7 +131,6 @@ const ProvidersTable = ({ providers, onUpdate, onDelete }: { providers: ServiceP
                             {providers.map(provider => (
                                 <tr key={provider.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{provider.code}</td>
-                                    <td className="px-3 sm:px-6 py-4"><img src={provider.logo} alt={provider.name} className="w-8 h-8 rounded-full object-cover" /></td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{provider.name}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.specialization}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{provider.phone}</td>
@@ -211,7 +210,6 @@ export const ServicesInventoryPage = () => {
 
     const handleUpdateService = (service: Service) => {
         // TODO: Implement update modal
-        console.log('Update service:', service);
     };
 
     const handleDeletePackage = (id: number) => {
@@ -231,7 +229,6 @@ export const ServicesInventoryPage = () => {
 
     const handleUpdatePackage = (pkg: ServicePackage) => {
         // TODO: Implement update modal
-        console.log('Update package:', pkg);
     };
 
     const handleDeleteProvider = (id: number) => {
@@ -251,7 +248,6 @@ export const ServicesInventoryPage = () => {
 
     const handleUpdateProvider = (provider: ServiceProvider) => {
         // TODO: Implement update modal
-        console.log('Update provider:', provider);
     };
 
     const renderContent = () => {

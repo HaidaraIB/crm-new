@@ -1,9 +1,51 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { TimelineEntry as TimelineEntryType } from '../types';
 import { ClockIcon } from './icons';
 
 type TimelineProps = {
     history: TimelineEntryType[];
+};
+
+// Avatar component with fallback
+const Avatar = ({ src, alt, className }: { src: string; alt: string; className?: string }) => {
+    const [imgError, setImgError] = useState(false);
+    const [imgLoaded, setImgLoaded] = useState(false);
+
+    // Generate initials from name
+    const getInitials = (name: string): string => {
+        if (!name) return '?';
+        const parts = name.trim().split(/\s+/);
+        if (parts.length >= 2) {
+            return (parts[0][0] + parts[1][0]);
+        }
+        return name.substring(0, 2);
+    };
+
+    // Fallback avatar with initials
+    const fallbackAvatar = (
+        <div className={`${className || 'h-10 w-10'} rounded-full flex items-center justify-center bg-gradient-to-br from-primary to-secondary text-white font-semibold text-sm border-2 border-gray-200 dark:border-gray-700 shadow-md overflow-hidden`}>
+            {getInitials(alt)}
+        </div>
+    );
+
+    if (imgError || !src) {
+        return fallbackAvatar;
+    }
+
+    return (
+        <div className={`relative ${className || 'h-10 w-10'} rounded-full overflow-hidden border-2 border-gray-200 dark:border-gray-700 shadow-md`}>
+            <img 
+                src={src} 
+                alt={alt} 
+                className={`w-full h-full object-cover transition-all duration-200 ${imgLoaded ? 'opacity-100' : 'opacity-0'}`}
+                onError={() => setImgError(true)}
+                onLoad={() => setImgLoaded(true)}
+            />
+            {!imgLoaded && !imgError && (
+                <div className="absolute inset-0 rounded-full bg-gray-200 dark:bg-gray-700 animate-pulse" />
+            )}
+        </div>
+    );
 };
 
 export const Timeline = ({ history }: TimelineProps) => {
@@ -12,7 +54,7 @@ export const Timeline = ({ history }: TimelineProps) => {
             {history.map(entry => (
                 <div key={entry.id} className="flex gap-4">
                     <div className="flex flex-col items-center">
-                        <img src={entry.avatar} alt={entry.user} className="h-10 w-10 rounded-full" />
+                        <Avatar src={entry.avatar} alt={entry.user} className="h-10 w-10" />
                         <div className="flex-1 w-px bg-gray-300 dark:bg-gray-600 my-2"></div>
                     </div>
                     <div className="flex-1">

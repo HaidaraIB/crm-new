@@ -209,7 +209,6 @@ export const ProductsInventoryPage = () => {
 
     const handleUpdateProduct = (product: Product) => {
         // TODO: Implement update modal
-        console.log('Update product:', product);
     };
 
     const handleDeleteCategory = (id: number) => {
@@ -229,7 +228,6 @@ export const ProductsInventoryPage = () => {
 
     const handleUpdateCategory = (category: ProductCategory) => {
         // TODO: Implement update modal
-        console.log('Update category:', category);
     };
 
     const handleDeleteSupplier = (id: number) => {
@@ -249,7 +247,6 @@ export const ProductsInventoryPage = () => {
 
     const handleUpdateSupplier = (supplier: Supplier) => {
         // TODO: Implement update modal
-        console.log('Update supplier:', supplier);
     };
 
     const renderContent = () => {

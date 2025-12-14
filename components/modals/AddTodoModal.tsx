@@ -4,8 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
-import { TaskStage } from '../../types';
-import { getStageDisplayLabel } from '../../utils/taskStageMapper';
+import { useCreateTask, useDeals, useStages } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -13,33 +12,49 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 // FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; }) => {
+const Select = ({ id, children, value, onChange, className }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; }) => {
     const { language } = useAppContext();
+    const borderClass = className?.includes('border-red') ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600';
+    const baseClassName = className?.replace(/border-\S+/g, '').trim() || '';
     return (
-        <select id={id} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
+        <select id={id} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 ${borderClass} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${baseClassName}`}>
             {children}
         </select>
     );
 };
 
 export const AddTodoModal = () => {
-    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, addTodo, deals, leads, language, stages, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     
-    // Get default stage from settings (first stage or 'Hold')
-    const getDefaultStage = () => {
+    // Fetch data using React Query
+    const { data: dealsResponse } = useDeals();
+    const deals = Array.isArray(dealsResponse) 
+        ? dealsResponse 
+        : (dealsResponse?.results || []);
+
+    const { data: stagesData } = useStages();
+    const stages = Array.isArray(stagesData) 
+        ? stagesData 
+        : (stagesData?.results || []);
+
+    // Create task mutation
+    const createTaskMutation = useCreateTask();
+    const loading = createTaskMutation.isPending;
+
+    // Get default stage ID from settings (first stage)
+    const getDefaultStageId = () => {
         if (stages.length > 0) {
-            return stages[0].name as TaskStage;
+            return stages[0].id.toString();
         }
-        return 'Hold' as TaskStage;
+        return '';
     };
     
     const [formState, setFormState] = useState({
         dealId: '',
-        stage: getDefaultStage(),
+        stageId: '',
         notes: '',
         reminderDate: '',
     });
-    const [loading, setLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -47,6 +62,10 @@ export const AddTodoModal = () => {
 
         if (!formState.dealId || formState.dealId === '') {
             newErrors.dealId = t('dealRequired') || 'Deal is required';
+        }
+
+        if (!formState.stageId || formState.stageId === '') {
+            newErrors.stageId = t('stageRequired') || 'Stage is required';
         }
 
         if (!formState.reminderDate || formState.reminderDate.trim() === '') {
@@ -78,7 +97,7 @@ export const AddTodoModal = () => {
             
             setFormState({
                 dealId: deals[0].id.toString(),
-                stage: getDefaultStage(),
+                stageId: getDefaultStageId(),
                 notes: '',
                 reminderDate: reminderDateStr,
             });
@@ -101,7 +120,7 @@ export const AddTodoModal = () => {
         
         setFormState({
             dealId: deals.length > 0 ? deals[0].id.toString() : '',
-            stage: getDefaultStage(),
+            stageId: getDefaultStageId(),
             notes: '',
             reminderDate: reminderDateStr,
         });
@@ -114,14 +133,16 @@ export const AddTodoModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            await addTodo({
-                dealId: Number(formState.dealId),
-                stage: formState.stage,
-                notes: formState.notes,
-                reminderDate: formState.reminderDate,
-            });
+            const payload = {
+                deal: Number(formState.dealId), // API expects 'deal' field with deal ID
+                stage: Number(formState.stageId), // API expects stage ID (pk), not name
+                notes: formState.notes || '',
+                reminder_date: formState.reminderDate, // API expects snake_case
+            };
+            
+            
+            await createTaskMutation.mutateAsync(payload);
 
             // Reset form
             const tomorrow = new Date();
@@ -131,7 +152,7 @@ export const AddTodoModal = () => {
             
             setFormState({
                 dealId: deals.length > 0 ? deals[0].id.toString() : '',
-                stage: getDefaultStage(),
+                stageId: getDefaultStageId(),
                 notes: '',
                 reminderDate: reminderDateStr,
             });
@@ -143,10 +164,75 @@ export const AddTodoModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating todo:', error);
-            const errorMessage = error?.message || t('failedToCreateTodo') || 'Failed to create todo. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Handle API validation errors
+            let errorMessage = t('failedToCreateTodo') || 'Failed to create todo. Please try again.';
+            const newErrors: { [key: string]: string } = {};
+            
+            if (error?.message) {
+                try {
+                    const errorData = JSON.parse(error.message);
+                    
+                    Object.keys(errorData).forEach(key => {
+                        if (Array.isArray(errorData[key])) {
+                            newErrors[key] = errorData[key][0];
+                        } else if (typeof errorData[key] === 'string') {
+                            newErrors[key] = errorData[key];
+                        }
+                    });
+                    
+                    // Map API field names to form field names
+                    if (newErrors.deal) {
+                        newErrors.dealId = newErrors.deal;
+                        delete newErrors.deal;
+                    }
+                    if (newErrors.stage) {
+                        newErrors.stageId = newErrors.stage;
+                        delete newErrors.stage;
+                    }
+                    
+                    setErrors(newErrors);
+                    
+                    // Show first error in alert
+                    const firstError = Object.values(newErrors)[0];
+                    if (firstError) {
+                        errorMessage = firstError;
+                    }
+                } catch (e) {
+                    // If parsing fails, use the error message as is
+                    errorMessage = error.message;
+                }
+            } else if (error?.fields || error?.response?.data) {
+                const errorData = error.fields || error.response?.data || {};
+                
+                Object.keys(errorData).forEach(key => {
+                    if (Array.isArray(errorData[key])) {
+                        newErrors[key] = errorData[key][0];
+                    } else if (typeof errorData[key] === 'string') {
+                        newErrors[key] = errorData[key];
+                    }
+                });
+                
+                // Map API field names to form field names
+                if (newErrors.deal) {
+                    newErrors.dealId = newErrors.deal;
+                    delete newErrors.deal;
+                }
+                if (newErrors.stage) {
+                    newErrors.stageId = newErrors.stage;
+                    delete newErrors.stage;
+                }
+                
+                setErrors(newErrors);
+                
+                // Show first error in alert
+                const firstError = Object.values(newErrors)[0];
+                if (firstError) {
+                    errorMessage = firstError;
+                }
+            }
+            
+            setErrors(prev => ({ ...prev, _general: errorMessage }));
         }
     };
 
@@ -166,28 +252,43 @@ export const AddTodoModal = () => {
                         onChange={handleChange}
                         className={errors.dealId ? 'border-red-500 dark:border-red-500' : ''}
                     >
-                        <option value="">{t('selectDeal')}</option>
-                        {deals.map(deal => (
-                            <option key={deal.id} value={deal.id}>{deal.clientName}</option>
-                        ))}
+                        <option value="">{t('selectDeal') || 'Select Deal'}</option>
+                        {deals.length > 0 ? (
+                            deals.map((deal: any) => (
+                                <option key={deal.id} value={deal.id.toString()}>
+                                    {deal.clientName || `Deal #${deal.id}`}
+                                </option>
+                            ))
+                        ) : (
+                            <option value="" disabled>{t('noDealsAvailable') || 'No deals available'}</option>
+                        )}
                     </Select>
                     {errors.dealId && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.dealId}</p>
                     )}
                 </div>
                 <div>
-                    <Label htmlFor="stage">{t('stage')}</Label>
-                    <Select id="stage" value={formState.stage} onChange={handleChange}>
-                        {stages.length > 0 ? (
-                            stages.map(stage => (
-                                <option key={stage.id} value={stage.name}>
+                    <Label htmlFor="stageId">{t('stage')} <span className="text-red-500">*</span></Label>
+                    <Select 
+                        id="stageId" 
+                        value={formState.stageId} 
+                        onChange={handleChange}
+                        className={errors.stageId ? 'border-red-500 dark:border-red-500' : ''}
+                    >
+                        <option disabled value="">{t('selectStage') || 'Select Stage'}</option>
+                        {(stages || []).length > 0 ? (
+                            (stages || []).map((stage: any) => (
+                                <option key={stage.id} value={stage.id.toString()}>
                                     {stage.name}
                                 </option>
                             ))
                         ) : (
-                            <option value="">{t('noStagesAvailable') || 'No stages available'}</option>
+                            <option value="" disabled>{t('noStagesAvailable') || 'No stages available'}</option>
                         )}
                     </Select>
+                    {errors.stageId && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.stageId}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="reminderDate">{t('reminderDateAndTime')} <span className="text-red-500">*</span></Label>

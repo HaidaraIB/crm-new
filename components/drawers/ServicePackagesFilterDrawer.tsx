@@ -67,6 +67,17 @@ export const ServicePackagesFilterDrawer = () => {
         setIsServicePackageFilterDrawerOpen(false);
     };
 
+    // Helper function to translate status
+    const translateStatus = (status: string): string => {
+        if (!status) return status;
+        const statusLower = status.toLowerCase();
+        const statusMap: { [key: string]: string } = {
+            'true': t('active') || 'Active',
+            'false': t('inactive') || 'Inactive',
+        };
+        return statusMap[statusLower] || status;
+    };
+
     return (
         <>
             <aside className={`fixed inset-y-0 end-0 z-50 flex h-full w-full max-w-xs flex-col bg-card dark:bg-dark-card border-s dark:border-gray-800 transform transition-transform duration-300 ease-in-out 
@@ -81,22 +92,22 @@ export const ServicePackagesFilterDrawer = () => {
                     <FilterSection title={t('packageInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
-                                <FilterLabel htmlFor="filter-status">{t('status')}</FilterLabel>
-                                <FilterSelect id="filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
+                                <FilterLabel htmlFor="service-packages-filter-status">{t('status')}</FilterLabel>
+                                <FilterSelect id="service-packages-filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    <option value="true">{t('active')}</option>
-                                    <option value="false">{t('inactive')}</option>
+                                    <option value="true">{translateStatus('true')}</option>
+                                    <option value="false">{translateStatus('false')}</option>
                                 </FilterSelect>
                             </div>
 
                             <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                    <FilterLabel htmlFor="filter-price-min">{t('priceRangeStart')}</FilterLabel>
-                                    <NumberInput id="filter-price-min" name="filter-price-min" value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="service-packages-filter-price-min">{t('priceRangeStart')}</FilterLabel>
+                                    <NumberInput id="service-packages-filter-price-min" name="service-packages-filter-price-min" value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
                                 </div>
                                 <div>
-                                    <FilterLabel htmlFor="filter-price-max">{t('priceRangeEnd')}</FilterLabel>
-                                    <NumberInput id="filter-price-max" name="filter-price-max" value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
+                                    <FilterLabel htmlFor="service-packages-filter-price-max">{t('priceRangeEnd')}</FilterLabel>
+                                    <NumberInput id="service-packages-filter-price-max" name="service-packages-filter-price-max" value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
                                 </div>
                             </div>
                         </div>
@@ -104,8 +115,8 @@ export const ServicePackagesFilterDrawer = () => {
 
                     <FilterSection title={t('search')}>
                         <div className="pt-2">
-                            <FilterLabel htmlFor="filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
+                            <FilterLabel htmlFor="service-packages-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+                            <FilterInput id="service-packages-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
                         </div>
                     </FilterSection>
                 </div>

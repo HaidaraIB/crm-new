@@ -45,10 +45,15 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         <Modal isOpen={isOpen} onClose={onClose} title={title}>
             <div className="space-y-4">
                 <p className="text-gray-700 dark:text-gray-300">
-                    {message}
-                    {itemName && <span className="font-bold"> {itemName}</span>}
-                    {itemName ? '? ' : ' '}
-                    {t('confirmDeleteWarning') || 'This action cannot be undone.'}
+                    {itemName ? (
+                        <>
+                            {message} <span className="font-bold">{itemName}</span>? {t('confirmDeleteWarning') || 'This action cannot be undone.'}
+                        </>
+                    ) : (
+                        <>
+                            {message} {t('confirmDeleteWarning') || 'This action cannot be undone.'}
+                        </>
+                    )}
                 </p>
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={onClose} disabled={isDeleting}>

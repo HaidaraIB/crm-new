@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { useAddProject, useDevelopers } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -22,7 +23,16 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const AddProjectModal = () => {
-    const { isAddProjectModalOpen, setIsAddProjectModalOpen, t, addProject, developers, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddProjectModalOpen, setIsAddProjectModalOpen, t, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    
+    // Fetch developers using React Query
+    const { data: developersResponse } = useDevelopers();
+    const developers = developersResponse?.results || [];
+
+    // Create project mutation
+    const addProjectMutation = useAddProject();
+    const isLoading = addProjectMutation.isPending;
+
     const [formState, setFormState] = useState({
         name: '',
         developer: '',
@@ -31,7 +41,6 @@ export const AddProjectModal = () => {
         paymentMethod: 'Cash',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [isLoading, setIsLoading] = useState(false);
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -66,9 +75,9 @@ export const AddProjectModal = () => {
     useEffect(() => {
         if (isAddProjectModalOpen && developers.length > 0) {
             setFormState(prev => {
-                // إذا كان developer فارغ، اختر الأول
+                // إذا كان developer فارغ، اختر الأول (استخدم ID بدلاً من name)
                 if (!prev.developer) {
-                    return { ...prev, developer: developers[0].name };
+                    return { ...prev, developer: developers[0].id.toString() };
                 }
                 return prev;
             });
@@ -88,9 +97,27 @@ export const AddProjectModal = () => {
             return;
         }
         
-        setIsLoading(true);
         try {
-            await addProject(formState);
+            // Prepare project data with developer ID (not name) and company ID
+            const projectData: any = {
+                name: formState.name,
+                developer: Number(formState.developer), // Convert to number (ID)
+                type: formState.type || null,
+                city: formState.city || null,
+                payment_method: formState.paymentMethod || null, // Send as payment_method (snake_case) for API
+                paymentMethod: formState.paymentMethod || null, // Also send as paymentMethod (camelCase) for compatibility
+                company: currentUser?.company?.id,
+            };
+            
+            if (!projectData.company) {
+                throw new Error(t('companyRequired') || 'Company information is required');
+            }
+            
+            if (!projectData.developer || isNaN(projectData.developer)) {
+                throw new Error(t('developerRequired') || 'Developer is required');
+            }
+            
+            await addProjectMutation.mutateAsync(projectData);
 
             // Reset form
             setFormState({
@@ -109,8 +136,6 @@ export const AddProjectModal = () => {
         } catch (error: any) {
             console.error('Error adding project:', error);
             setErrors({ _general: error?.message || t('errorCreatingProject') || 'Failed to add project. Please try again.' });
-        } finally {
-            setIsLoading(false);
         }
     };
 
@@ -156,7 +181,7 @@ export const AddProjectModal = () => {
                         className={errors.developer ? 'border-red-500 dark:border-red-500' : ''}
                     >
                         <option value="">{t('selectDeveloper') || 'Select Developer'}</option>
-                        {developers.map(dev => <option key={dev.id} value={dev.name}>{dev.name}</option>)}
+                        {developers.map(dev => <option key={dev.id} value={dev.id.toString()}>{dev.name}</option>)}
                     </Select>
                     {errors.developer && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.developer}</p>

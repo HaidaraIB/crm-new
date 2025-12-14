@@ -60,25 +60,9 @@ export const VerifyEmailPage = () => {
                     try {
                         const userData = await getCurrentUserAPI();
                         
-                        // Check if user has an active subscription
-                        const hasActiveSubscription = userData.company?.subscription?.is_active === true;
-                        const subscriptionId = userData.company?.subscription?.id;
-                        
-                        if (!hasActiveSubscription) {
-                            // Store subscription ID for payment link before clearing tokens
-                            if (subscriptionId) {
-                                localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
-                            }
-                            // Clear tokens and logout user
-                            localStorage.removeItem('accessToken');
-                            localStorage.removeItem('refreshToken');
-                            localStorage.removeItem('currentUser');
-                            localStorage.removeItem('isLoggedIn');
-                            setCurrentUser(null);
-                            // Redirect to login page
-                            window.location.href = '/';
-                            return;
-                        }
+                        // Note: Subscription check is now done in backend
+                        // If we reach here, the user has an active subscription or is super admin
+                        // No need to check subscription here
                         
                         const frontendUser = {
                             id: userData.id,

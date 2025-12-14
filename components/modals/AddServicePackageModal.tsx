@@ -6,13 +6,14 @@ import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
+import { useCreateServicePackage, useServices } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
 export const AddServicePackageModal = () => {
-    const { isAddServicePackageModalOpen, setIsAddServicePackageModalOpen, t, addServicePackage, services, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddServicePackageModalOpen, setIsAddServicePackageModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [formState, setFormState] = useState({
         name: '',
         description: '',
@@ -21,7 +22,17 @@ export const AddServicePackageModal = () => {
         selectedServices: [] as number[],
         isActive: true,
     });
-    const [loading, setLoading] = useState(false);
+    
+    // Fetch services using React Query
+    const { data: servicesResponse } = useServices();
+    const services = Array.isArray(servicesResponse) 
+        ? servicesResponse 
+        : (servicesResponse?.results || []);
+    
+    // Create service package mutation
+    const addServicePackageMutation = useCreateServicePackage();
+    const loading = addServicePackageMutation.isPending;
+    
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     const validateForm = (): boolean => {
@@ -33,6 +44,10 @@ export const AddServicePackageModal = () => {
 
         if (!formState.price || Number(formState.price) <= 0) {
             newErrors.price = t('priceRequired') || 'Price is required and must be greater than 0';
+        }
+
+        if (!currentUser?.company?.id) {
+            newErrors._general = t('companyRequired') || 'Company is required';
         }
 
         setErrors(newErrors);
@@ -60,6 +75,7 @@ export const AddServicePackageModal = () => {
                 selectedServices: [],
                 isActive: true,
             });
+            setErrors({});
         }
     }, [isAddServicePackageModalOpen]);
 
@@ -98,21 +114,16 @@ export const AddServicePackageModal = () => {
             return;
         }
 
-        setLoading(true);
         try {
-            // Convert service IDs to service names for the API (addServicePackage expects names)
-            const serviceNames = formState.selectedServices.map(id => {
-                const service = services.find(s => s.id === id);
-                return service?.name || '';
-            }).filter(Boolean);
-
-            await addServicePackage({
-                name: formState.name,
-                description: formState.description,
+            // Use service IDs directly (API expects IDs)
+            await addServicePackageMutation.mutateAsync({
+                name: formState.name.trim(),
+                description: formState.description?.trim() || '',
                 price: Number(formState.price) || 0,
-                duration: formState.duration,
-                services: serviceNames as unknown as number[], // addServicePackage expects service names (strings), but converts them to IDs internally
-                isActive: formState.isActive,
+                duration: formState.duration?.trim() || '',
+                services: formState.selectedServices, // API expects service IDs
+                company: currentUser?.company?.id || currentUser?.company_id,
+                is_active: formState.isActive,
             });
 
             // Reset form
@@ -132,10 +143,23 @@ export const AddServicePackageModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating service package:', error);
-            const errorMessage = error?.message || t('failedToCreateServicePackage') || 'Failed to create service package. Please try again.';
-            setErrors({ _general: errorMessage });
-        } finally {
-            setLoading(false);
+            
+            // Parse API validation errors
+            const apiErrors = error?.response?.data || {};
+            const newErrors: { [key: string]: string } = {};
+            
+            Object.keys(apiErrors).forEach(key => {
+                const errorMessages = Array.isArray(apiErrors[key]) 
+                    ? apiErrors[key] 
+                    : [apiErrors[key]];
+                newErrors[key] = errorMessages[0];
+            });
+            
+            if (Object.keys(newErrors).length === 0) {
+                newErrors._general = error?.message || t('failedToCreateServicePackage') || 'Failed to create service package. Please try again.';
+            }
+            
+            setErrors(newErrors);
         }
     };
 

@@ -32,6 +32,7 @@ export const AddStatusModal = () => {
         name: '',
         description: '',
         category: 'active' as 'active' | 'inactive' | 'follow_up' | 'closed',
+        color: '#808080',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -70,6 +71,7 @@ export const AddStatusModal = () => {
                 name: '',
                 description: '',
                 category: 'active',
+                color: '#808080',
             });
             setErrors({});
         }
@@ -87,6 +89,7 @@ export const AddStatusModal = () => {
             name: '',
             description: '',
             category: 'active',
+            color: '#808080',
         });
         setErrors({});
     };
@@ -103,7 +106,7 @@ export const AddStatusModal = () => {
                 name: formState.name,
                 description: formState.description,
                 category: formState.category,
-                color: '#808080',
+                color: formState.color,
                 isDefault: false,
                 isHidden: false,
                 company: currentUser?.company?.id,
@@ -188,6 +191,19 @@ export const AddStatusModal = () => {
                     {errors.category && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.category}</p>
                     )}
+                </div>
+                <div>
+                    <Label htmlFor="color">{t('color') || 'Color'}</Label>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="color"
+                            id="color"
+                            value={formState.color}
+                            onChange={(e) => setFormState(prev => ({ ...prev, color: e.target.value }))}
+                            className="h-10 w-20 p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded cursor-pointer"
+                        />
+                        <span className="text-sm font-mono text-gray-600 dark:text-gray-400 uppercase">{formState.color}</span>
+                    </div>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

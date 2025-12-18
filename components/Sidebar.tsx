@@ -52,9 +52,12 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
 
 
 export const Sidebar = () => {
-    const { currentPage, setCurrentPage, setIsLoggedIn, isSidebarOpen, setIsSidebarOpen, t, currentUser, language } = useAppContext();
+    const { currentPage, setCurrentPage, setIsLoggedIn, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+    
+    // Get logo path based on theme
+    const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
 
     const handleToggleSubMenu = (name: string) => {
         setOpenSubMenus(prev => ({ ...prev, [name]: !prev[name] }));
@@ -106,7 +109,7 @@ export const Sidebar = () => {
             <div className="h-16 flex items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
                 <div className="flex items-center gap-2">
                     <img 
-                        src="/logo.png" 
+                        src={logoPath} 
                         alt="LOOP CRM Logo" 
                         className="h-10 w-auto object-contain" 
                     />

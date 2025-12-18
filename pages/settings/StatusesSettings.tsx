@@ -72,6 +72,9 @@ export const StatusesSettings = () => {
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
+                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[100px]">
+                                    {t('color') || 'Color'}
+                                </th>
                                 <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
                                     {t('name')}
                                 </th>
@@ -92,14 +95,15 @@ export const StatusesSettings = () => {
                                     key={status.id} 
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
                                 >
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div 
+                                            className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700" 
+                                            style={{ backgroundColor: status.color || '#808080' }}
+                                            title={status.color}
+                                        />
+                                    </td>
                                     <td className={`px-6 py-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
                                         <div className={`flex items-center gap-2 ${language === 'ar' ? 'flex-row-reverse' : ''} ${language === 'ar' ? 'justify-end' : ''}`}>
-                                            {status.color && (
-                                                <div 
-                                                    className="w-3 h-3 rounded-full flex-shrink-0" 
-                                                    style={{ backgroundColor: status.color }}
-                                                />
-                                            )}
                                             <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                                 {status.name}
                                             </span>
@@ -163,7 +167,7 @@ export const StatusesSettings = () => {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center">
+                                    <td colSpan={5} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noStatusesFound') || 'No statuses found'}
                                         </div>

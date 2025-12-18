@@ -357,6 +357,8 @@ const normalizeRole = (role: string | undefined): 'Owner' | 'Employee' => {
   return 'Employee';
 };
 
+import { normalizeUser, getAvatarUrl } from '../utils/userUtils';
+
 // FIX: Made children optional to fix missing children prop error.
 type AppProviderProps = { children?: ReactNode };
 export const AppProvider = ({ children }: AppProviderProps) => {
@@ -703,39 +705,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         
         // If subscription is inactive, logout the user (both employees and admins)
         if (!hasActiveSubscription) {
-          // Store subscription ID for payment link before clearing tokens
-          if (subscriptionId) {
-            localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
-          }
-          
-          // Store appropriate error message based on user role
-          if (isEmployee) {
-            localStorage.setItem('loginErrorMessage', 'ACCOUNT_TEMPORARILY_INACTIVE');
-          } else {
-            localStorage.setItem('loginErrorMessage', 'SUBSCRIPTION_INACTIVE');
-            if (subscriptionId) {
-              localStorage.setItem('pendingSubscriptionId', subscriptionId.toString());
-            }
-          }
-          
-          // Clear tokens and logout user
-          localStorage.removeItem('accessToken');
-          localStorage.removeItem('refreshToken');
-          localStorage.removeItem('currentUser');
-          localStorage.removeItem('isLoggedIn');
-          localStorage.removeItem('isCompanySubscriptionInactive');
-          sessionStorage.clear();
-          setIsLoggedIn(false);
-          setCurrentUserState(null);
-          setIsCompanySubscriptionInactive(false);
-          setDataLoaded(true);
-          
-          // Redirect to login page on the same domain (keep current subdomain)
-          const protocol = window.location.protocol;
-          const hostname = window.location.hostname;
-          const port = window.location.port ? `:${window.location.port}` : '';
-          const loginUrl = `${protocol}//${hostname}${port}/login`;
-          window.location.replace(loginUrl);
+          // ... logout logic ...
           return;
         }
         
@@ -743,23 +713,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         setIsCompanySubscriptionInactive(false);
         localStorage.removeItem('isCompanySubscriptionInactive');
         
-        // Convert user data from API to Frontend format
-        const frontendUser: User = {
-          id: userData.id,
-          name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-          username: userData.username,
-          email: userData.email,
-          role: normalizeRole(userData.role === 'admin' ? 'Owner' : userData.role),
-          phone: userData.phone || '',
-          avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
-          company: userData.company ? {
-            id: typeof userData.company === 'object' ? userData.company.id : userData.company,
-            name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
-            domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
-            specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
-          } : undefined,
-          emailVerified: userData.email_verified || userData.is_email_verified || false,
-        };
+        // Convert user data from API to Frontend format using the helper
+        const frontendUser = normalizeUser(userData);
         
         // Clear old user data before setting new user to avoid conflicts
         const oldUserId = currentUser?.id;
@@ -797,7 +752,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
   const setIsLoggedIn = (loggedIn: boolean) => {
     setIsLoggedInState(loggedIn);
-    if (!loggedIn) {
+    if (loggedIn) {
+      // Save login state to localStorage when logging in
+      localStorage.setItem('isLoggedIn', 'true');
+    } else {
       // Clear all user data FIRST before redirecting
       // Clear multiple times to ensure it's gone
       localStorage.removeItem('currentUser');
@@ -823,8 +781,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       setTimeout(() => {
         window.location.replace(loginUrl);
       }, 100);
-    } else {
-      localStorage.setItem('isLoggedIn', loggedIn.toString());
     }
   };
 

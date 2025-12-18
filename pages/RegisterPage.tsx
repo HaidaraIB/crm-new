@@ -642,7 +642,7 @@ export const RegisterPage = () => {
                 <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary-700 to-primary-500 text-white p-12 flex-col justify-between">
                     <div>
                         <img
-                            src="/logo.png"
+                            src="/logo_white.png"
                             alt="LOOP CRM Logo"
                             className="h-20 w-auto object-contain mb-6"
                         />
@@ -659,7 +659,7 @@ export const RegisterPage = () => {
                     <div className="max-w-md w-full space-y-8">
                         <div className="flex flex-col items-center">
                             <img
-                                src="/logo.png"
+                                src="/logo_purple.png"
                                 alt="LOOP CRM Logo"
                                 className="h-12 w-auto object-contain mb-4 lg:hidden"
                             />

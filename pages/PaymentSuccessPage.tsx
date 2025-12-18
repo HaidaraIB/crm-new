@@ -58,55 +58,62 @@ export const PaymentSuccessPage = () => {
                     return;
                 }
                 
-                // If status is success and we have tranRef, backend already confirmed payment
-                if (urlStatus === 'success' && tranRef) {
-                    setPaymentCompleted(true);
+                // Check payment status from API
+                let statusResult = null;
+                let isPaymentCompleted = false;
+                
+                try {
+                    statusResult = await checkPaymentStatusAPI(subscriptionId);
+                    setPaymentStatus(statusResult);
                     
-                    // Try to get tokens from payment status API (optional - if backend provides them)
-                    try {
-                        const statusResult = await checkPaymentStatusAPI(subscriptionId);
+                    // Check if payment is completed based on status result
+                    isPaymentCompleted = checkPaymentCompleted(statusResult);
+                    
+                    if (isPaymentCompleted) {
+                        setPaymentCompleted(true);
                         
                         // Check if backend returned tokens in the response
                         if (statusResult.access && statusResult.refresh) {
                             localStorage.setItem('accessToken', statusResult.access);
                             localStorage.setItem('refreshToken', statusResult.refresh);
                         }
-                    } catch (err: any) {
-                        // Tokens not available, user will login manually
+                    } else if (statusResult.payment_status === 'failed' || 
+                        (statusResult.paytabs_status && statusResult.paytabs_status !== 'A' && statusResult.paytabs_status !== 'pending')) {
+                        setError(t('paymentFailed') || 'Payment failed. Please try again.');
+                        setIsLoading(false);
+                        processingRef.current = false;
+                        return;
                     }
-                }
-                
-                // Check payment status from React Query
-                if (paymentStatus && checkPaymentCompleted(paymentStatus)) {
-                    setPaymentCompleted(true);
+                } catch (err: any) {
+                    console.error('Error checking payment status:', err);
+                    setPaymentError(err);
                     
-                    // Check if backend returned tokens in the response
-                    if (paymentStatus.access && paymentStatus.refresh) {
-                        localStorage.setItem('accessToken', paymentStatus.access);
-                        localStorage.setItem('refreshToken', paymentStatus.refresh);
-                    }
-                }
-                
-                // Check if payment failed
-                if (paymentStatus && (paymentStatus.payment_status === 'failed' || 
-                    (paymentStatus.paytabs_status && paymentStatus.paytabs_status !== 'A' && paymentStatus.paytabs_status !== 'pending'))) {
-                    setError(t('paymentFailed') || 'Payment failed. Please try again.');
-                    return;
-                }
-                
-                // Handle payment errors
-                if (paymentError) {
-                    const errorMessage = (paymentError as any)?.message || '';
-                    if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('endpoint')) {
-                        setError(t('paymentStatusEndpointError') || 'Payment status endpoint not found. Please contact support.');
+                    // If status is success and we have tranRef, assume payment is completed
+                    if (urlStatus === 'success' && tranRef) {
+                        isPaymentCompleted = true;
+                        setPaymentCompleted(true);
                     } else {
-                        setError(t('paymentStatusError') || 'Unable to check payment status. Please refresh the page or contact support.');
+                        // Handle payment errors
+                        const errorMessage = (err as any)?.message || '';
+                        if (errorMessage.includes('404') || errorMessage.includes('Not Found') || errorMessage.includes('endpoint')) {
+                            setError(t('paymentStatusEndpointError') || 'Payment status endpoint not found. Please contact support.');
+                        } else {
+                            setError(t('paymentStatusError') || 'Unable to check payment status. Please refresh the page or contact support.');
+                        }
+                        setIsLoading(false);
+                        processingRef.current = false;
+                        return;
                     }
-                    return;
+                }
+                
+                // If status is success and we have tranRef, backend already confirmed payment
+                if (urlStatus === 'success' && tranRef && !statusResult) {
+                    isPaymentCompleted = true;
+                    setPaymentCompleted(true);
                 }
                 
                 // If payment completed, proceed to login
-                if (paymentCompleted) {
+                if (isPaymentCompleted || paymentCompleted) {
                 try {
                 // Payment completed - get user data and log in
                 const pendingUserDataStr = localStorage.getItem('pendingUserData');
@@ -237,10 +244,13 @@ export const PaymentSuccessPage = () => {
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
                         
-                        // Redirect to Dashboard
+                        // Store currentUser in localStorage for persistence
+                        localStorage.setItem('currentUser', JSON.stringify(frontendUser));
+                        localStorage.setItem('isLoggedIn', 'true');
+                        
+                        // Redirect to Dashboard using window.location.replace for full page reload
                         setTimeout(() => {
-                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                            setCurrentPage('Dashboard');
+                            window.location.replace('/dashboard');
                         }, 1000);
                         processingRef.current = false;
                         return;
@@ -276,12 +286,14 @@ export const PaymentSuccessPage = () => {
                         timestamp: Date.now()
                     }));
                     
-                    // Redirect to dashboard
+                    // Store currentUser in localStorage for persistence
+                    localStorage.setItem('currentUser', JSON.stringify(frontendUser));
+                    localStorage.setItem('isLoggedIn', 'true');
+                    
+                    // Redirect to dashboard using window.location.replace for full page reload
+                    // Use replace instead of href to avoid back button issues
                     setTimeout(() => {
-                        navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                        setCurrentPage('Dashboard');
-                        setIsLoading(false);
-                        processingRef.current = false;
+                        window.location.replace('/dashboard');
                     }, 1000);
                 } catch (err: any) {
                     console.error('Error getting user data:', err);
@@ -370,12 +382,13 @@ export const PaymentSuccessPage = () => {
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
                         
-                        // Redirect to dashboard
+                        // Store currentUser in localStorage for persistence
+                        localStorage.setItem('currentUser', JSON.stringify(frontendUser));
+                        localStorage.setItem('isLoggedIn', 'true');
+                        
+                        // Redirect to dashboard using window.location for full page reload
                         setTimeout(() => {
-                            navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                            setCurrentPage('Dashboard');
-                            setIsLoading(false);
-                            processingRef.current = false;
+                            window.location.href = '/dashboard';
                         }, 1000);
                         return;
                     }

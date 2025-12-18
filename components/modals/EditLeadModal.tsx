@@ -32,7 +32,17 @@ export const EditLeadModal = () => {
     
     // Fetch data using React Query
     const { data: usersResponse } = useUsers();
+    const { currentUser } = useAppContext();
     const users = usersResponse?.results || [];
+
+    // Ensure admin (current user) is included in the options even if not in the users list
+    const userOptions = React.useMemo(() => {
+        const options = [...users];
+        if (currentUser && !options.find(u => u.id === currentUser.id)) {
+            options.unshift(currentUser);
+        }
+        return options;
+    }, [users, currentUser]);
 
     const { data: statusesData } = useStatuses();
     const statuses = statusesData || [];
@@ -269,7 +279,7 @@ export const EditLeadModal = () => {
                         <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                         <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
                             <option value="0">{t('selectEmployee') || 'Select Employee'}</option>
-                            {users.map(user => <option key={user.id} value={user.id}>{user.name}</option>)}
+                            {userOptions.map(user => <option key={user.id} value={user.id}>{user.name || user.username || user.email}</option>)}
                         </Select>
                     </div>
                     <div>

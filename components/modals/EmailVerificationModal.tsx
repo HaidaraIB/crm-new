@@ -1,8 +1,11 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { normalizeUser } from '../../utils/userUtils';
 import { Modal, Button, Input } from '../index';
 import { verifyEmailAPI, getCurrentUserAPI, resendVerificationCodeAPI, changeEmailAPI } from '../../services/api';
+import { useQueryClient } from '@tanstack/react-query';
+import { queryKeys } from '../../hooks/useQueries';
 
 type EmailVerificationModalProps = {
     isOpen: boolean;
@@ -22,6 +25,7 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
     onEmailChange,
 }) => {
     const { t, language, setCurrentUser } = useAppContext();
+    const queryClient = useQueryClient();
     const [verificationEmail, setVerificationEmail] = useState(initialEmail);
     const [verificationCode, setVerificationCode] = useState('');
     const [verificationStatus, setVerificationStatus] = useState<{ type: 'info' | 'success' | 'error'; message: string } | null>(null);
@@ -295,19 +299,18 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
 
             // Refresh user data to get updated email_verified status
             try {
+                // Invalidate query first so components using useCurrentUser get updated
+                await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
+                
                 const userData = await getCurrentUserAPI();
                 if (userData) {
-                    setCurrentUser({
-                        id: userData.id,
-                        name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
-                        username: userData.username,
-                        email: userData.email,
-                        role: userData.role || 'User',
-                        phone: userData.phone || '',
-                        avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
-                        company: userData.company,
-                        emailVerified: userData.email_verified || userData.is_email_verified || false,
-                    });
+                    // Use the helper to ensure consistent normalization
+                    const updatedUser = normalizeUser(userData);
+                    setCurrentUser(updatedUser);
+                    
+                    // Also update query data directly for immediate response
+                    // Note: setQueryData expects the API response format
+                    queryClient.setQueryData(queryKeys.currentUser, userData);
                 }
             } catch (error) {
                 console.error('Error refreshing user data:', error);

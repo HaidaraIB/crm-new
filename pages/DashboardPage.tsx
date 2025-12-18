@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { Card, PageWrapper, TargetIcon, UsersIcon, Loader, DealIcon, CheckIcon } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
-import { useLeads, useDeals, useActivities, useTasks, useUsers, useClientTasks } from '../hooks/useQueries';
+import { useLeads, useDeals, useActivities, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
 
 export const DashboardPage = () => {
     const { t, currentUser, language } = useAppContext();
@@ -32,6 +32,11 @@ export const DashboardPage = () => {
     const { data: clientTasksResponse } = useClientTasks();
     const clientTasks = clientTasksResponse?.results || [];
 
+    const { data: stagesResponse } = useStages();
+    const stages = Array.isArray(stagesResponse) 
+        ? stagesResponse 
+        : (stagesResponse?.results || []);
+
     // Check for payment success message on mount
     useEffect(() => {
         const paymentSuccessData = localStorage.getItem('paymentSuccessMessage');
@@ -39,11 +44,16 @@ export const DashboardPage = () => {
             try {
                 const data = JSON.parse(paymentSuccessData);
                 // Only show if message is recent (within last 10 seconds)
-                if (Date.now() - data.timestamp < 10000) {
+                const timeElapsed = Date.now() - data.timestamp;
+                if (timeElapsed < 10000) {
                     setPaymentSuccessMessage(data.message);
                     setShowPaymentSuccess(true);
-                    // Remove from localStorage so it doesn't show again on refresh
-                    localStorage.removeItem('paymentSuccessMessage');
+                    // Remove from localStorage after remaining time (don't remove immediately)
+                    const remainingTime = 10000 - timeElapsed;
+                    setTimeout(() => {
+                        localStorage.removeItem('paymentSuccessMessage');
+                        setShowPaymentSuccess(false);
+                    }, remainingTime);
                 } else {
                     localStorage.removeItem('paymentSuccessMessage');
                 }
@@ -196,7 +206,7 @@ export const DashboardPage = () => {
     }, [leads, clientTasks, deals, todos, t]);
     
     // Stages report data - get from ClientTasks
-    const stagesData = useMemo(() => {
+    const stagesReportData = useMemo(() => {
         const stageCounts: { [key: string]: number } = {};
         
         // Count stages from ClientTasks
@@ -213,13 +223,23 @@ export const DashboardPage = () => {
             });
         }
         
-        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
-        return Object.entries(stageCounts).map(([name, value], index) => ({
-            name: getStageDisplayLabel(name.toLowerCase().replace(/\s+/g, '_') as any) || name,
-            value,
-            fill: colors[index % colors.length],
-        }));
-    }, [leads, clientTasks]);
+        const fallbackColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+        
+        // Use colors from stages settings if available
+        return Object.entries(stageCounts).map(([name, value], index) => {
+            // Find stage config to get color
+            const stageConfig = stages.find(s => 
+                s.name.toLowerCase().replace(/\s+/g, '_') === name.toLowerCase().replace(/\s+/g, '_') ||
+                s.name === name
+            );
+            
+            return {
+                name: getStageDisplayLabel(name.toLowerCase().replace(/\s+/g, '_') as any) || name,
+                value,
+                fill: stageConfig?.color || fallbackColors[index % fallbackColors.length],
+            };
+        });
+    }, [leads, clientTasks, stages]);
     
     // Week leads chart data (last 7 days)
     const weekLeadsData = useMemo(() => {
@@ -438,13 +458,13 @@ export const DashboardPage = () => {
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('distributionByStage')}</p>
                         </div>
                     </div>
-                    {stagesData.length > 0 ? (
+                    {stagesReportData.length > 0 ? (
                         <div className="space-y-4">
                           <div className="h-[240px] min-h-[240px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
                               <PieChart>
                                 <Pie 
-                                  data={stagesData} 
+                                  data={stagesReportData} 
                                   dataKey="value" 
                                   nameKey="name" 
                                   cx="50%" 
@@ -455,7 +475,7 @@ export const DashboardPage = () => {
                                   label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
                                   labelLine={false}
                                 >
-                                  {stagesData.map((entry, index) => (
+                                  {stagesReportData.map((entry, index) => (
                                       <Cell 
                                           key={`cell-${index}`} 
                                           fill={entry.fill}
@@ -480,7 +500,7 @@ export const DashboardPage = () => {
                           </div>
                           {/* Legend */}
                           <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2 max-h-32 overflow-y-auto px-1">
-                            {stagesData.map((entry, index) => (
+                            {stagesReportData.map((entry, index) => (
                                 <div key={index} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2 min-w-0 flex-1">
                                         <div 
@@ -621,9 +641,26 @@ export const DashboardPage = () => {
                                                             </span>
                                                         </td>
                                                         <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell">
-                                                            <span className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-sm">
-                                                                {getStageDisplayLabel(feedback.stage)}
-                                                            </span>
+                                                            {(() => {
+                                                                const stageName = feedback.stage;
+                                                                const stageConfig = stages.find(s => 
+                                                                    s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
+                                                                    s.name === stageName
+                                                                );
+                                                                const stageColor = stageConfig?.color || '#3b82f6';
+                                                                
+                                                                return (
+                                                                    <span 
+                                                                        className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-sm"
+                                                                        style={{ 
+                                                                            backgroundColor: stageColor,
+                                                                            backgroundImage: `linear-gradient(to right, ${stageColor}, ${stageColor}dd)`
+                                                                        }}
+                                                                    >
+                                                                        {getStageDisplayLabel(stageName)}
+                                                                    </span>
+                                                                );
+                                                            })()}
                                                         </td>
                                                         <td className="px-4 py-4">
                                                             <p className="text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">

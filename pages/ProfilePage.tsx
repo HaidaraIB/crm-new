@@ -3,9 +3,11 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { normalizeUser } from '../utils/userUtils';
 import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal } from '../components/index';
 import { changeEmailAPI, createPaytabsPaymentSessionAPI } from '../services/api';
-import { useCurrentUser, useUpdateUser } from '../hooks/useQueries';
+import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
+import { useQueryClient } from '@tanstack/react-query';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -25,8 +27,8 @@ export const ProfilePage = () => {
         currentUser: contextCurrentUser
     } = useAppContext();
 
-    // Fetch current user using React Query
     const { data: currentUserData, isLoading: userLoading } = useCurrentUser();
+    const queryClient = useQueryClient();
     const updateUserMutation = useUpdateUser();
     
     // Use currentUser from API if available, otherwise use context
@@ -168,14 +170,13 @@ export const ProfilePage = () => {
             });
             
             // Update context user with new data
-            const fullName = `${firstName.trim()} ${lastName.trim()}`.trim();
-            setCurrentUser({
+            const updatedUser = normalizeUser({
                 ...currentUser,
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
-                name: fullName || currentUser.username,
-                phone: phone.trim() || '',
+                phone: phone.trim(),
             });
+            setCurrentUser(updatedUser);
             
             // Show success message
             setSuccessMessage(t('profileUpdatedSuccessfully') || 'Profile updated successfully!');
@@ -210,10 +211,10 @@ export const ProfilePage = () => {
             await changeEmailAPI(currentUser.email, newEmail);
             // Update local email state
             setEmail(newEmail);
-            setCurrentUser({
+            setCurrentUser(normalizeUser({
                 ...currentUser,
                 email: newEmail,
-            });
+            }));
         } catch (error: any) {
             throw error;
         } finally {
@@ -222,15 +223,18 @@ export const ProfilePage = () => {
     };
 
     const handleVerificationSuccess = async () => {
-        // React Query will automatically refetch currentUser after email verification
-        // Just update context if needed
-        if (currentUserData) {
-            setCurrentUser({
+        // Invalidate the query to force a refetch of up-to-date data
+        await queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
+        
+        // Use normalization helper to ensure all fields like avatar and name are present
+        if (currentUser) {
+            const updatedUser = normalizeUser({
                 ...currentUser,
-                emailVerified: true,
                 email_verified: true,
                 is_email_verified: true,
+                emailVerified: true
             });
+            setCurrentUser(updatedUser);
         }
     };
 

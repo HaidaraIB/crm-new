@@ -172,6 +172,13 @@ export const LoginPage = () => {
         }
     };
 
+    // Get logo path based on background
+    // For purple background: use logo_white
+    // For white/light background: use logo_purple
+    const getLogoForBackground = (isPurpleBackground: boolean) => {
+        return isPurpleBackground ? '/logo_white.png' : '/logo_purple.png';
+    };
+    
     return (
         <div className={`min-h-screen flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
             {/* Theme and Language Toggle Buttons */}
@@ -190,7 +197,7 @@ export const LoginPage = () => {
             <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary-700 to-primary-500 text-white p-12 flex-col justify-between">
                 <div>
                     <img 
-                        src="/logo.png" 
+                        src={getLogoForBackground(true)} 
                         alt="LOOP CRM Logo" 
                         className="h-20 w-auto object-contain mb-6" 
                     />
@@ -205,7 +212,7 @@ export const LoginPage = () => {
                 <div className="max-w-md w-full space-y-8">
                     <div className="flex flex-col items-center">
                         <img 
-                            src="/logo.png" 
+                            src={getLogoForBackground(false)} 
                             alt="LOOP CRM Logo" 
                             className="h-12 w-auto object-contain mb-4 lg:hidden" 
                         />

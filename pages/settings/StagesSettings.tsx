@@ -67,6 +67,9 @@ export const StagesSettings = () => {
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
+                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[100px]">
+                                    {t('color') || 'Color'}
+                                </th>
                                 <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
                                     {t('stageName')}
                                 </th>
@@ -84,6 +87,13 @@ export const StagesSettings = () => {
                                     key={stage.id} 
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
                                 >
+                                    <td className="px-6 py-4 whitespace-nowrap">
+                                        <div 
+                                            className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700" 
+                                            style={{ backgroundColor: stage.color || '#808080' }}
+                                            title={stage.color}
+                                        />
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                             {stage.name}
@@ -117,10 +127,10 @@ export const StagesSettings = () => {
                                 </tr>
                             )) : (
                                 <tr>
-                                    <td colSpan={3} className="px-6 py-12 text-center">
+                                    <td colSpan={4} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noStagesFound') || 'No stages found'}
-                        </div>
+                                        </div>
                                     </td>
                                 </tr>
                             )}

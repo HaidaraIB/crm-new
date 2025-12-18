@@ -63,8 +63,28 @@ export const Timeline = ({ history }: TimelineProps) => {
                                 <div className="flex items-center gap-2 flex-wrap">
                                     <p className="font-semibold text-gray-800 dark:text-gray-100">{entry.user}</p>
                                     {entry.stage ? (
-                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                        <span 
+                                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                            style={entry.color ? {
+                                                backgroundColor: `${entry.color}20`, // 20 is 12.5% opacity in hex
+                                                color: entry.color,
+                                                border: `1px solid ${entry.color}40` // 40 is 25% opacity
+                                            } : undefined}
+                                            className={!entry.color ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" : ""}
+                                        >
                                             {entry.stage}
+                                        </span>
+                                    ) : entry.type === 'event' ? (
+                                        <span 
+                                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                            style={entry.color ? {
+                                                backgroundColor: `${entry.color}20`,
+                                                color: entry.color,
+                                                border: `1px solid ${entry.color}40`
+                                            } : undefined}
+                                            className={!entry.color ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200" : ""}
+                                        >
+                                            {entry.action}
                                         </span>
                                     ) : (
                                         <span className="font-normal text-gray-500 dark:text-gray-400">- {entry.action}</span>
@@ -72,6 +92,21 @@ export const Timeline = ({ history }: TimelineProps) => {
                                 </div>
                                 {entry.stage && (
                                     <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{entry.action}</p>
+                                )}
+                                {entry.type === 'event' && (entry.oldValue || entry.newValue) && (
+                                    <div className="mt-1 flex items-center gap-2 text-sm">
+                                        {entry.oldValue && (
+                                            <span className="text-gray-500 line-through decoration-gray-400">{entry.oldValue}</span>
+                                        )}
+                                        {entry.oldValue && entry.newValue && (
+                                            <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="9 5l7 7-7 7" />
+                                            </svg>
+                                        )}
+                                        {entry.newValue && (
+                                            <span className="font-medium text-primary-600 dark:text-primary-400">{entry.newValue}</span>
+                                        )}
+                                    </div>
                                 )}
                                 {entry.details && (
                                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{entry.details}</p>

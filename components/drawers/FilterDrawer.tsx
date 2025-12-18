@@ -55,10 +55,14 @@ export const FilterDrawer = () => {
         ? usersResponse 
         : (usersResponse?.results || []);
     
-    // Ensure users list includes current user if available
-    const users = usersArray.length > 0 
-        ? usersArray 
-        : (currentUser ? [currentUser] : []);
+    // Ensure admin (current user) is included in the options even if not in the users list
+    const userOptions = React.useMemo(() => {
+        const options = [...usersArray];
+        if (currentUser && !options.find(u => u.id === currentUser.id)) {
+            options.unshift(currentUser);
+        }
+        return options;
+    }, [usersArray, currentUser]);
     
     const { data: channelsResponse } = useChannels();
     const channels = Array.isArray(channelsResponse) 
@@ -188,19 +192,11 @@ export const FilterDrawer = () => {
                                 <FilterLabel htmlFor="leads-filter-assigned">{t('assignedTo')}</FilterLabel>
                                 <FilterSelect id="leads-filter-assigned" value={localFilters.assignedTo} onChange={(e) => handleFilterChange('assignedTo', e.target.value)}>
                                     <option value="All">{t('all')}</option>
-                                    {users && users.length > 0 ? (
-                                        users.map(user => (
-                                            <option key={user.id} value={user.id.toString()}>
-                                                {getUserDisplayName(user)}
-                                            </option>
-                                        ))
-                                    ) : (
-                                        currentUser && (
-                                            <option value={currentUser.id.toString()}>
-                                                {getUserDisplayName(currentUser)}
-                                            </option>
-                                        )
-                                    )}
+                                    {userOptions.map(user => (
+                                        <option key={user.id} value={user.id.toString()}>
+                                            {getUserDisplayName(user)}
+                                        </option>
+                                    ))}
                                 </FilterSelect>
                             </div>
 

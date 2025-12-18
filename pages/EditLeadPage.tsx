@@ -28,9 +28,15 @@ export const EditLeadPage = () => {
     // Fetch data using React Query hooks
     const { data: usersResponse } = useUsers();
     const users = usersResponse?.results || [];
-    const userOptions = (users && users.length > 0)
-        ? users
-        : (currentUser ? [currentUser] : []);
+    
+    // Ensure admin (current user) is included in the options even if not in the users list
+    const userOptions = React.useMemo(() => {
+        const options = [...users];
+        if (currentUser && !options.find(u => u.id === currentUser.id)) {
+            options.unshift(currentUser);
+        }
+        return options;
+    }, [users, currentUser]);
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon } from '../components/index';
 import { formatDateToLocal } from '../utils/dateUtils';
-import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead } from '../hooks/useQueries';
+import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages } from '../hooks/useQueries';
 import { ChevronDownIcon } from '../components/icons';
 import { Lead } from '../types';
 
@@ -15,7 +15,8 @@ const StatusDropdown = ({
     availableStatuses, 
     onStatusChange, 
     isUpdating,
-    hexToRgb 
+    hexToRgb,
+    theme
 }: { 
     leadId: number;
     currentStatus: any;
@@ -23,6 +24,7 @@ const StatusDropdown = ({
     onStatusChange: (leadId: number, statusId: number) => void;
     isUpdating: boolean;
     hexToRgb: (hex: string) => { r: number; g: number; b: number } | null;
+    theme: 'light' | 'dark';
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [openUpward, setOpenUpward] = useState(false);
@@ -37,9 +39,8 @@ const StatusDropdown = ({
     const bgColor = rgb 
         ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
         : 'bg-gray-200 dark:bg-gray-600';
-    const textColor = rgb
-        ? '#ffffff'
-        : 'text-gray-900 dark:text-gray-50';
+    // Simple: white text in dark mode, black text in light mode - no other conditions
+    const textColor = theme === 'light' ? '#000000' : '#ffffff';
     
     useEffect(() => {
         if (isOpen && buttonRef.current) {
@@ -108,32 +109,28 @@ const StatusDropdown = ({
                 type="button"
                 onClick={() => !isUpdating && setIsOpen(!isOpen)}
                 disabled={isUpdating}
-                className={`inline-flex items-center justify-between px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap outline-none cursor-pointer transition-all duration-200 focus:ring-2 focus:ring-primary/70 focus:ring-offset-2 pr-9 min-w-[110px] ${
+                className={`inline-flex items-center justify-between px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap outline-none cursor-pointer transition-colors focus:ring-2 focus:ring-primary/70 focus:ring-offset-2 pr-9 min-w-[110px] ${
                     !rgb 
-                        ? 'bg-gray-200 text-gray-900 dark:bg-gray-600 dark:text-gray-50 border-2 border-gray-400 dark:border-gray-400' 
-                        : 'border-2'
-                } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-95 active:opacity-85 hover:shadow-lg hover:scale-[1.03]'}`}
+                        ? 'bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-500' 
+                        : 'border'
+                } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
                 style={rgb ? {
                     backgroundColor: bgColor,
                     color: textColor,
-                    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.6)`,
-                    boxShadow: `0 2px 8px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
-                } : undefined}
+                    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`,
+                } : {
+                    color: textColor,
+                }}
             >
                 <span 
-                    className="flex-1 text-center font-bold"
-                    style={rgb ? {
-                        color: '#ffffff',
-                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                        WebkitFontSmoothing: 'antialiased',
-                        MozOsxFontSmoothing: 'grayscale',
-                    } : undefined}
+                    className="flex-1 text-center font-medium"
+                    style={{ color: textColor }}
                 >
                     {statusName}
                 </span>
                 <div 
                     className="absolute right-2.5 flex items-center pointer-events-none"
-                    style={rgb ? { color: '#ffffff' } : undefined}
+                    style={{ color: textColor }}
                 >
                     <ChevronDownIcon 
                         className={`w-4 h-4 transition-all duration-200 ${isUpdating ? 'opacity-50' : 'opacity-100'} ${isOpen ? (openUpward ? '' : 'rotate-180') : ''}`}
@@ -194,7 +191,7 @@ const StatusDropdown = ({
 };
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
     
     // Update lead mutation
     const updateLeadMutation = useUpdateLead();
@@ -266,11 +263,19 @@ export const ViewLeadPage = () => {
     const { data: clientTasksResponse } = useClientTasks();
     const clientTasks = clientTasksResponse?.results || [];
     
+    const { data: clientEventsResponse } = useClientEvents(leadId);
+    const clientEvents = clientEventsResponse?.results || [];
+    
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
     const statuses = Array.isArray(statusesData) 
         ? statusesData 
         : (statusesData?.results || []);
+    
+    const { data: stagesData } = useStages();
+    const stages = Array.isArray(stagesData) 
+        ? stagesData 
+        : (stagesData?.results || []);
     
     // Fetch leads to get updated data
     const { data: leadsResponse, refetch: refetchLeads } = useLeads();
@@ -406,42 +411,80 @@ export const ViewLeadPage = () => {
     
     // تحويل ClientTasks إلى TimelineEntries
     const leadClientTasks = displayLead ? clientTasks.filter(ct => {
-        // API returns 'client' (ID) not 'clientId'
         const clientId = ct.client || ct.clientId;
         return clientId === displayLead.id;
-    }).sort((a, b) => {
-        // Sort by created_at descending to get latest first
+    }) : [];
+
+    // Get last feedback from the most recent ClientTask
+    const sortedClientTasks = [...leadClientTasks].sort((a, b) => {
         const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
         const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
         return dateB - dateA;
-    }) : [];
-    
-    // Get last feedback from the most recent ClientTask
-    const lastClientTask = leadClientTasks.length > 0 ? leadClientTasks[0] : null;
+    });
+    const lastClientTask = sortedClientTasks.length > 0 ? sortedClientTasks[0] : null;
     const lastFeedback = lastClientTask?.notes || '';
     
-    const timelineHistory = displayLead ? leadClientTasks.map(ct => {
-        // API returns 'created_by' not 'createdBy'
-        const createdById = ct.created_by || ct.createdBy;
-        const user = users.find(u => u.id === createdById);
-        
-        // API returns 'stage_name' for display, or 'stage' (ID)
-        const stageName = ct.stage_name || ct.stage;
-        const formattedStage = formatStage(stageName || '');
-        
-        // API returns 'created_at' not 'createdAt'
-        const createdAt = ct.created_at || ct.createdAt;
-        
-        return {
-            id: ct.id,
-            user: user?.name || ct.created_by_username || t('unknown'),
-            avatar: user?.avatar || '',
-            action: t('stageUpdated') || 'Stage updated',
-            details: ct.notes || '',
-            date: formatDateToLocal(createdAt),
-            stage: formattedStage, // إضافة stage منسق للاستخدام في العرض
-        };
-    }) : [];
+    const timelineHistory = useMemo(() => {
+        if (!displayLead) return [];
+
+        // Format Actions (ClientTasks)
+        const actions = leadClientTasks.map(ct => {
+            const user = users.find(u => u.id === (ct.created_by || ct.createdBy));
+            const stageName = ct.stage_name || ct.stage;
+            const stageConfig = stages.find(s => s.name === stageName || s.id.toString() === (ct.stage?.toString() || ''));
+            const formattedStage = formatStage(stageName || '');
+            
+            return {
+                id: `action-${ct.id}`,
+                type: 'action',
+                user: user?.name || ct.created_by_username || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('stageUpdated') || 'Stage updated',
+                details: ct.notes || '',
+                date: formatDateToLocal(ct.created_at || ct.createdAt),
+                timestamp: new Date(ct.created_at || ct.createdAt).getTime(),
+                stage: formattedStage,
+                color: stageConfig?.color,
+            };
+        });
+
+        // Format Events (ClientEvents)
+        const events = clientEvents.map(ce => {
+            const user = users.find(u => u.id === ce.created_by);
+            
+            let actionText = '';
+            let eventColor = undefined;
+            
+            if (ce.event_type === 'status_change') {
+                actionText = t('statusUpdated') || 'Status updated';
+                // Try to find the status color
+                const statusConfig = statuses.find(s => s.name === ce.new_value || s.id.toString() === ce.new_value);
+                if (statusConfig) {
+                    eventColor = statusConfig.color;
+                }
+            }
+            else if (ce.event_type === 'assignment') actionText = t('leadAssigned') || 'Lead assigned';
+            else if (ce.event_type === 'edit') actionText = t('leadEdited') || 'Lead edited';
+            else actionText = ce.event_type;
+
+            return {
+                id: `event-${ce.id}`,
+                type: 'event',
+                user: user?.name || ce.created_by_username || t('unknown'),
+                avatar: user?.avatar || '',
+                action: actionText,
+                details: ce.notes || '',
+                date: formatDateToLocal(ce.created_at),
+                timestamp: new Date(ce.created_at).getTime(),
+                oldValue: ce.old_value,
+                newValue: ce.new_value,
+                color: eventColor,
+            };
+        });
+
+        // Combine and sort by date descending
+        return [...actions, ...events].sort((a, b) => b.timestamp - a.timestamp);
+    }, [displayLead, leadClientTasks, clientEvents, users, t, stages, statuses]);
 
     if (!displayLead) {
         return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
@@ -513,66 +556,142 @@ export const ViewLeadPage = () => {
                             <div className="mt-2 space-y-2">
                                 {displayLead.phoneNumbers && displayLead.phoneNumbers.length > 0 ? (
                                     displayLead.phoneNumbers.map((pn) => (
-                                        <div key={pn.id} className="flex items-center gap-2">
-                                            <div className="flex-1">
-                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                                    {pn.phone_number}
-                                                    {pn.is_primary && (
-                                                        <span className="mr-2 ml-2 text-xs text-primary"> ({t('primary') || 'Primary'})</span>
-                                                    )}
-                                                </p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {pn.phone_type === 'mobile' ? t('mobile') : 
-                                                     pn.phone_type === 'home' ? t('home') : 
-                                                     pn.phone_type === 'work' ? t('work') : 
-                                                     pn.phone_type === 'other' ? t('other') : 
-                                                     pn.phone_type}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-2">
-                                                <a 
-                                                    href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity"
-                                                    title={`${t('call') || 'Call'} - ${pn.phone_type}`}
-                                                >
-                                                    <PhoneIcon className="w-5 h-5"/>
-                                                </a>
-                                                <a 
-                                                    href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity"
-                                                    title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                >
-                                                    <WhatsappIcon className="w-5 h-5"/>
-                                                </a>
-                                            </div>
+                                        <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-2`}>
+                                            {language === 'ar' ? (
+                                                <>
+                                                    <div className="min-w-0">
+                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                            {pn.phone_number}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {pn.phone_type === 'mobile' ? t('mobile') : 
+                                                             pn.phone_type === 'home' ? t('home') : 
+                                                             pn.phone_type === 'work' ? t('work') : 
+                                                             pn.phone_type === 'other' ? t('other') : 
+                                                             pn.phone_type}
+                                                        </p>
+                                                    </div>
+                                                    <div className="w-16 text-right">
+                                                        {pn.is_primary ? (
+                                                            <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
+                                                        ) : (
+                                                            <span className="text-xs whitespace-nowrap">&nbsp;</span>
+                                                        )}
+                                                    </div>
+                                                    <a 
+                                                        href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={`${t('call') || 'Call'} - ${pn.phone_type}`}
+                                                    >
+                                                        <PhoneIcon className="w-5 h-5"/>
+                                                    </a>
+                                                    <a 
+                                                        href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                    >
+                                                        <WhatsappIcon className="w-5 h-5"/>
+                                                    </a>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <a 
+                                                        href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                    >
+                                                        <WhatsappIcon className="w-5 h-5"/>
+                                                    </a>
+                                                    <a 
+                                                        href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={`${t('call') || 'Call'} - ${pn.phone_type}`}
+                                                    >
+                                                        <PhoneIcon className="w-5 h-5"/>
+                                                    </a>
+                                                    <div className="w-16 text-left">
+                                                        {pn.is_primary ? (
+                                                            <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
+                                                        ) : (
+                                                            <span className="text-xs whitespace-nowrap">&nbsp;</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                            {pn.phone_number}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {pn.phone_type === 'mobile' ? t('mobile') : 
+                                                             pn.phone_type === 'home' ? t('home') : 
+                                                             pn.phone_type === 'work' ? t('work') : 
+                                                             pn.phone_type === 'other' ? t('other') : 
+                                                             pn.phone_type}
+                                                        </p>
+                                                    </div>
+                                                </>
+                                            )}
                                         </div>
                                     ))
                                 ) : (
-                                    <div className="flex items-center gap-2">
-                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                            {displayLead.phone || '-'}
-                                        </p>
-                                        {displayLead.phone && (
-                                            <div className="flex items-center gap-2">
-                                                <a 
-                                                    href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity"
-                                                    title={t('call') || 'Call'}
-                                                >
-                                                    <PhoneIcon className="w-5 h-5"/>
-                                                </a>
-                                                <a 
-                                                    href={`https://wa.me/${displayLead.phone.replace(/[^0-9]/g, '')}`} 
-                                                    target="_blank" 
-                                                    rel="noopener noreferrer" 
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity"
-                                                    title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                >
-                                                    <WhatsappIcon className="w-5 h-5"/>
-                                                </a>
-                                            </div>
+                                    <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-2`}>
+                                        {language === 'ar' ? (
+                                            <>
+                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                                    {displayLead.phone || '-'}
+                                                </p>
+                                                <div className="w-16"></div>
+                                                {displayLead.phone && (
+                                                    <>
+                                                        <a 
+                                                            href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
+                                                            className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            title={t('call') || 'Call'}
+                                                        >
+                                                            <PhoneIcon className="w-5 h-5"/>
+                                                        </a>
+                                                        <a 
+                                                            href={`https://wa.me/${displayLead.phone.replace(/[^0-9]/g, '')}`} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                        >
+                                                            <WhatsappIcon className="w-5 h-5"/>
+                                                        </a>
+                                                    </>
+                                                )}
+                                            </>
+                                        ) : (
+                                            <>
+                                                {displayLead.phone && (
+                                                    <>
+                                                        <a 
+                                                            href={`https://wa.me/${displayLead.phone.replace(/[^0-9]/g, '')}`} 
+                                                            target="_blank" 
+                                                            rel="noopener noreferrer" 
+                                                            className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                        >
+                                                            <WhatsappIcon className="w-5 h-5"/>
+                                                        </a>
+                                                        <a 
+                                                            href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
+                                                            className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            title={t('call') || 'Call'}
+                                                        >
+                                                            <PhoneIcon className="w-5 h-5"/>
+                                                        </a>
+                                                    </>
+                                                )}
+                                                <div className="w-16"></div>
+                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                                    {displayLead.phone || '-'}
+                                                </p>
+                                            </>
                                         )}
                                     </div>
                                 )}
@@ -654,6 +773,7 @@ export const ViewLeadPage = () => {
                                             onStatusChange={handleStatusChange}
                                             isUpdating={isUpdating}
                                             hexToRgb={hexToRgb}
+                                            theme={theme}
                                         />
                                     );
                                 })()}
@@ -663,9 +783,38 @@ export const ViewLeadPage = () => {
                             <div>
                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('lastStage')}</label>
                                 <div className="mt-1">
-                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                                        {formatStage(displayLead.lastStage)}
-                                    </span>
+                                    {(() => {
+                                        const stageName = displayLead.lastStage;
+                                        const stageConfig = stages.find(s => s.name === stageName || s.id.toString() === stageName);
+                                        const stageColor = stageConfig?.color || '#808080';
+                                        
+                                        // Convert hex to RGB for background opacity
+                                        const hexToRgb = (hex: string) => {
+                                            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                                            return result ? {
+                                                r: parseInt(result[1], 16),
+                                                g: parseInt(result[2], 16),
+                                                b: parseInt(result[3], 16)
+                                            } : null;
+                                        };
+                                        
+                                        const rgb = hexToRgb(stageColor);
+                                        const bgColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)` : undefined;
+                                        const textColor = rgb ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})` : undefined;
+                                        
+                                        return (
+                                            <span 
+                                                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                                                style={{ 
+                                                    backgroundColor: bgColor || (theme === 'dark' ? '#1e293b' : '#f1f5f9'),
+                                                    color: textColor || (theme === 'dark' ? '#e2e8f0' : '#475569'),
+                                                    border: `1px solid ${textColor || 'transparent'}`
+                                                }}
+                                            >
+                                                {formatStage(stageName)}
+                                            </span>
+                                        );
+                                    })()}
                                 </div>
                             </div>
                         )}

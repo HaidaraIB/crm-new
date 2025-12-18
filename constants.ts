@@ -136,6 +136,9 @@ export const translations = {
     reminder: "Reminder",
     view: "View",
     add_action: "Add Action",
+    statusUpdated: "Status updated",
+    leadAssigned: "Lead assigned",
+    leadEdited: "Lead edited",
     // View Lead
     unassign: "Unassign",
     addDeal: "Add Deal",
@@ -1186,6 +1189,9 @@ export const translations = {
     reminder: "تذكير",
     view: "عرض",
     add_action: "إضافة إجراء",
+    statusUpdated: "تم تحديث الحالة",
+    leadAssigned: "تم إسناد العميل",
+    leadEdited: "تم تعديل العميل",
     // View Lead
     unassign: "إلغاء الإسناد",
     addDeal: "إضافة صفقة",

@@ -21,6 +21,7 @@ export const EditStageModal = () => {
     const [formState, setFormState] = useState({
         name: '',
         description: '',
+        color: '#808080',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -50,6 +51,7 @@ export const EditStageModal = () => {
             setFormState({
                 name: editingStage.name,
                 description: editingStage.description || '',
+                color: editingStage.color || '#808080',
             });
             setErrors({});
         }
@@ -85,6 +87,7 @@ export const EditStageModal = () => {
                 data: {
                     name: formState.name,
                     description: formState.description,
+                    color: formState.color,
                     company: currentUser.company.id,
                 }
             });
@@ -150,6 +153,19 @@ export const EditStageModal = () => {
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
                         placeholder={t('enterStageDescription') || 'Enter stage description'}
                     />
+                </div>
+                <div>
+                    <Label htmlFor="color">{t('color') || 'Color'}</Label>
+                    <div className="flex items-center gap-3">
+                        <input
+                            type="color"
+                            id="color"
+                            value={formState.color}
+                            onChange={(e) => setFormState(prev => ({ ...prev, color: e.target.value }))}
+                            className="h-10 w-20 p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded cursor-pointer"
+                        />
+                        <span className="text-sm font-mono text-gray-600 dark:text-gray-400 uppercase">{formState.color}</span>
+                    </div>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

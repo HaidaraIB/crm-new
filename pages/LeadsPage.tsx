@@ -14,7 +14,8 @@ const StatusDropdown = ({
     availableStatuses, 
     onStatusChange, 
     isUpdating,
-    hexToRgb 
+    hexToRgb,
+    theme
 }: { 
     leadId: number;
     currentStatus: any;
@@ -22,6 +23,7 @@ const StatusDropdown = ({
     onStatusChange: (leadId: number, statusId: number) => void;
     isUpdating: boolean;
     hexToRgb: (hex: string) => { r: number; g: number; b: number } | null;
+    theme: 'light' | 'dark';
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [openUpward, setOpenUpward] = useState(false);
@@ -37,10 +39,8 @@ const StatusDropdown = ({
     const bgColor = rgb 
         ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
         : 'bg-gray-200 dark:bg-gray-600';
-    // Use white or very dark text for maximum readability
-    const textColor = rgb
-        ? '#ffffff' // Always use white text for colored backgrounds
-        : 'text-gray-900 dark:text-gray-50';
+    // Simple: white text in dark mode, black text in light mode - no other conditions
+    const textColor = theme === 'light' ? '#000000' : '#ffffff';
     
     // Calculate dropdown position and direction
     useEffect(() => {
@@ -113,32 +113,28 @@ const StatusDropdown = ({
                 type="button"
                 onClick={() => !isUpdating && setIsOpen(!isOpen)}
                 disabled={isUpdating}
-                className={`inline-flex items-center justify-between px-4 py-2 rounded-full text-sm font-bold whitespace-nowrap outline-none cursor-pointer transition-all duration-200 focus:ring-2 focus:ring-primary/70 focus:ring-offset-2 pr-9 min-w-[110px] ${
+                className={`inline-flex items-center justify-between px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap outline-none cursor-pointer transition-colors focus:ring-2 focus:ring-primary/70 focus:ring-offset-2 pr-9 min-w-[110px] ${
                     !rgb 
-                        ? 'bg-gray-200 text-gray-900 dark:bg-gray-600 dark:text-gray-50 border-2 border-gray-400 dark:border-gray-400' 
-                        : 'border-2'
-                } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-95 active:opacity-85 hover:shadow-lg hover:scale-[1.03]'}`}
+                        ? 'bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-500' 
+                        : 'border'
+                } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
                 style={rgb ? {
                     backgroundColor: bgColor,
                     color: textColor,
-                    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.6)`,
-                    boxShadow: `0 2px 8px rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.1)`,
-                } : undefined}
+                    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`,
+                } : {
+                    color: textColor,
+                }}
             >
                 <span 
-                    className="flex-1 text-center font-bold"
-                    style={rgb ? {
-                        color: '#ffffff',
-                        textShadow: '0 1px 2px rgba(0, 0, 0, 0.5)',
-                        WebkitFontSmoothing: 'antialiased',
-                        MozOsxFontSmoothing: 'grayscale',
-                    } : undefined}
+                    className="flex-1 text-center font-medium"
+                    style={{ color: textColor }}
                 >
                     {statusName}
                 </span>
                 <div 
                     className="absolute right-2.5 flex items-center pointer-events-none"
-                    style={rgb ? { color: '#ffffff' } : undefined}
+                    style={{ color: textColor }}
                 >
                     <ChevronDownIcon 
                         className={`w-4 h-4 transition-all duration-200 ${isUpdating ? 'opacity-50' : 'opacity-100'} ${isOpen ? (openUpward ? '' : 'rotate-180') : ''}`}
@@ -215,6 +211,8 @@ export const LeadsPage = () => {
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
         currentUser,
+        theme,
+        language,
     } = useAppContext();
     
     // Determine API filters based on current page
@@ -581,12 +579,21 @@ export const LeadsPage = () => {
                                 (l.status ? statuses.find(s => s.id.toString() === l.status.toString() || s.name === l.status)?.name : null);
                             return statusName === status;
                         }).length;
+                    
+                    const statusConfig = status === 'All' ? null : statuses.find(s => s.name === status);
+                    
                     return (
                         <button 
                             key={status}
                             onClick={() => setActiveStatusFilter(status)}
-                            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0 ${activeStatusFilter === status ? 'border-b-2 border-primary text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0 flex items-center gap-2 ${activeStatusFilter === status ? 'border-b-2 border-primary text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
                         >
+                           {statusConfig?.color && (
+                               <div 
+                                   className="w-2 h-2 rounded-full" 
+                                   style={{ backgroundColor: statusConfig.color }}
+                               />
+                           )}
                            {t(getStatusTranslationKey(status) as any) || status} <span className="hidden sm:inline">({count})</span>
                         </button>
                     )
@@ -641,60 +648,128 @@ export const LeadsPage = () => {
                                         return (
                                             <tr key={lead.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                                 <td className="p-2 sm:p-4 text-center"><input type="checkbox" checked={checkedLeadIds.has(lead.id)} onChange={(e) => handleCheckChange(lead.id, e.target.checked)} className="rounded" /></td>
-                                                <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">{lead.name}</td>
+                                                <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
+                                                    <button 
+                                                        onClick={() => handleViewLead(lead)}
+                                                        className="hover:text-primary transition-colors focus:outline-none"
+                                                    >
+                                                        {lead.name}
+                                                    </button>
+                                                </td>
                                                 <td className="px-4 sm:px-6 py-4 text-center">
                                                     <div className="flex flex-col gap-2">
                                                         {lead.phoneNumbers && lead.phoneNumbers.length > 0 ? (
                                                             lead.phoneNumbers.map((pn) => (
-                                                                <div key={pn.id} className="grid grid-cols-[1fr_auto_auto_auto] items-center gap-1">
-                                                                    <span className="text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm text-right">
-                                                                        {pn.phone_number}
-                                                                    </span>
-                                                                    {pn.is_primary ? (
-                                                                        <span className="text-xs text-primary whitespace-nowrap">
-                                                                            ({t('primary') || 'Primary'})
-                                                                        </span>
+                                                                <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-1`}>
+                                                                    {language === 'ar' ? (
+                                                                        <>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                                                                {pn.phone_number}
+                                                                            </span>
+                                                                            <div className="w-16 text-right">
+                                                                                {pn.is_primary ? (
+                                                                                    <span className="text-xs text-primary whitespace-nowrap">
+                                                                                        ({t('primary') || 'Primary'})
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <a 
+                                                                                href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={`${t('call') || 'Call'} - ${pn.phone_type}`}
+                                                                            >
+                                                                                <PhoneIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                            <a 
+                                                                                href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
+                                                                                target="_blank" 
+                                                                                rel="noopener noreferrer" 
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={`${t('openWhatsApp') || 'Open WhatsApp'} - ${pn.phone_type}`}
+                                                                            >
+                                                                                <WhatsappIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                        </>
                                                                     ) : (
-                                                                        <span className="text-xs text-primary whitespace-nowrap"></span>
+                                                                        <>
+                                                                            <a 
+                                                                                href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
+                                                                                target="_blank" 
+                                                                                rel="noopener noreferrer" 
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={`${t('openWhatsApp') || 'Open WhatsApp'} - ${pn.phone_type}`}
+                                                                            >
+                                                                                <WhatsappIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                            <a 
+                                                                                href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={`${t('call') || 'Call'} - ${pn.phone_type}`}
+                                                                            >
+                                                                                <PhoneIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                            <div className="w-16 text-left">
+                                                                                {pn.is_primary ? (
+                                                                                    <span className="text-xs text-primary whitespace-nowrap">
+                                                                                        ({t('primary') || 'Primary'})
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
+                                                                                )}
+                                                                            </div>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                                                                {pn.phone_number}
+                                                                            </span>
+                                                                        </>
                                                                     )}
-                                                                    <a 
-                                                                        href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
-                                                                        className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                        title={`${t('call') || 'Call'} - ${pn.phone_type}`}
-                                                                    >
-                                                                        <PhoneIcon className="w-5 h-5"/>
-                                                                    </a>
-                                                                    <a 
-                                                                        href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
-                                                                        target="_blank" 
-                                                                        rel="noopener noreferrer" 
-                                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                        title={`${t('openWhatsApp') || 'Open WhatsApp'} - ${pn.phone_type}`}
-                                                                    >
-                                                                        <WhatsappIcon className="w-5 h-5"/>
-                                                                    </a>
                                                                 </div>
                                                             ))
                                                         ) : (
                                                             lead.phone ? (
-                                                                <div className="grid grid-cols-[1fr_auto_auto] items-center gap-1">
-                                                                    <span className="text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm text-right">{lead.phone}</span>
-                                                                    <a 
-                                                                        href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
-                                                                        className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                        title={t('call') || 'Call'}
-                                                                    >
-                                                                        <PhoneIcon className="w-5 h-5"/>
-                                                                    </a>
-                                                                    <a 
-                                                                        href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`} 
-                                                                        target="_blank" 
-                                                                        rel="noopener noreferrer" 
-                                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                        title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                                    >
-                                                                        <WhatsappIcon className="w-5 h-5"/>
-                                                                    </a>
+                                                                <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto]' : 'grid-cols-[auto_auto_1fr]'} items-center gap-1`}>
+                                                                    {language === 'ar' ? (
+                                                                        <>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
+                                                                            <a 
+                                                                                href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('call') || 'Call'}
+                                                                            >
+                                                                                <PhoneIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                            <a 
+                                                                                href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`} 
+                                                                                target="_blank" 
+                                                                                rel="noopener noreferrer" 
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                                            >
+                                                                                <WhatsappIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                        </>
+                                                                    ) : (
+                                                                        <>
+                                                                            <a 
+                                                                                href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`} 
+                                                                                target="_blank" 
+                                                                                rel="noopener noreferrer" 
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                                            >
+                                                                                <WhatsappIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                            <a 
+                                                                                href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('call') || 'Call'}
+                                                                            >
+                                                                                <PhoneIcon className="w-5 h-5"/>
+                                                                            </a>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
+                                                                        </>
+                                                                    )}
                                                                 </div>
                                                             ) : (
                                                                 <span className="text-gray-900 dark:text-gray-100">-</span>
@@ -813,6 +888,7 @@ export const LeadsPage = () => {
                                                                     onStatusChange={handleStatusChange}
                                                                     isUpdating={isUpdating}
                                                                     hexToRgb={hexToRgb}
+                                                                    theme={theme}
                                                                 />
                                                             );
                                                         })()}

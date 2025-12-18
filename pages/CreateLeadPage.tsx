@@ -28,9 +28,15 @@ export const CreateLeadPage = () => {
     // جلب البيانات عبر React Query بدلاً من السياق
     const { data: usersResponse } = useUsers();
     const users = usersResponse?.results || [];
-    const userOptions = (users && users.length > 0)
-        ? users
-        : (currentUser ? [currentUser] : []);
+    
+    // التأكد من تضمين الأدمن (المستخدم الحالي) في القائمة حتى لو لم يكن في قائمة المستخدمين
+    const userOptions = React.useMemo(() => {
+        const options = [...users];
+        if (currentUser && !options.find(u => u.id === currentUser.id)) {
+            options.unshift(currentUser);
+        }
+        return options;
+    }, [users, currentUser]);
 
     const { data: statusesData } = useStatuses();
     const statuses = Array.isArray(statusesData)

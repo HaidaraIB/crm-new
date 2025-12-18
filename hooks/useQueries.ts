@@ -5,8 +5,9 @@
 
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
+import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI,
+  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
@@ -32,6 +33,7 @@ import {
   createChannelAPI, updateChannelAPI, deleteChannelAPI,
   createStageAPI, updateStageAPI, deleteStageAPI,
   createStatusAPI, updateStatusAPI, deleteStatusAPI,
+  bulkAssignLeadsAPI,
 } from '../services/api';
 
 // ==================== Query Keys ====================
@@ -43,6 +45,7 @@ export const queryKeys = {
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
   clientTasks: ['clientTasks'] as const,
+  clientEvents: (clientId?: number) => ['clientEvents', clientId] as const,
   developers: ['developers'] as const,
   projects: ['projects'] as const,
   units: (filters?: any) => ['units', filters] as const,
@@ -65,7 +68,10 @@ export const queryKeys = {
 export const useCurrentUser = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
   return useQuery({
     queryKey: queryKeys.currentUser,
-    queryFn: () => getCurrentUserAPI(),
+    queryFn: async () => {
+      const data = await getCurrentUserAPI();
+      return normalizeUser(data);
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     ...options,
   });
@@ -74,7 +80,16 @@ export const useCurrentUser = (options?: Omit<UseQueryOptions<any, Error>, 'quer
 export const useUsers = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
   return useQuery({
     queryKey: queryKeys.users,
-    queryFn: () => getUsersAPI(),
+    queryFn: async () => {
+      const response = await getUsersAPI();
+      if (response && response.results) {
+        return {
+          ...response,
+          results: response.results.map(user => normalizeUser(user))
+        };
+      }
+      return response;
+    },
     staleTime: 2 * 60 * 1000, // 2 minutes
     ...options,
   });
@@ -129,6 +144,15 @@ export const useClientTasks = (options?: Omit<UseQueryOptions<any, Error>, 'quer
   return useQuery({
     queryKey: queryKeys.clientTasks,
     queryFn: () => getClientTasksAPI(),
+    staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+export const useClientEvents = (clientId?: number, options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+  return useQuery({
+    queryKey: queryKeys.clientEvents(clientId),
+    queryFn: () => getClientEventsAPI(clientId),
     staleTime: 1 * 60 * 1000, // 1 minute
     ...options,
   });
@@ -353,9 +377,11 @@ export const useUpdateLead = (options?: UseMutationOptions<any, Error, { id: num
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateLeadAPI(id, data),
-    onSuccess: (data) => {
+    onSuccess: (data, variables) => {
       // Invalidate all leads queries regardless of filters
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      // Invalidate events for this specific lead to show updates in timeline
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.id) });
       // Also invalidate client tasks since they might be related
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
       // Return the updated data so components can use it
@@ -372,6 +398,23 @@ export const useDeleteLead = (options?: UseMutationOptions<void, Error, number>)
     onSuccess: () => {
       // Invalidate all leads queries regardless of filters to refresh tables without manual reload
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+    ...options,
+  });
+};
+
+export const useAssignLeads = (options?: UseMutationOptions<any, Error, { clientIds: number[]; userId: number }>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ clientIds, userId }: { clientIds: number[]; userId: number }) => bulkAssignLeadsAPI(clientIds, userId),
+    onSuccess: (_, variables) => {
+      // Invalidate all leads queries to refresh the list with new assignments
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      // Invalidate events for all affected leads
+      variables.clientIds.forEach(id => {
+        queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(id) });
+      });
+      // Clear checked IDs if needed (this might be handled in the component)
     },
     ...options,
   });
@@ -484,8 +527,12 @@ export const useCreateClientTask = (options?: UseMutationOptions<any, Error, any
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: any) => createClientTaskAPI(data),
-    onSuccess: () => {
+    onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      // Also invalidate events for this lead if task creation triggers an event
+      if (variables.client || variables.clientId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.client || variables.clientId) });
+      }
     },
     ...options,
   });

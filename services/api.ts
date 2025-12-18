@@ -893,6 +893,21 @@ export const deleteLeadAPI = async (leadId: number) => {
   });
 };
 
+/**
+ * إسناد مجموعة من العملاء لموظف معين
+ * POST /api/clients/bulk_assign/
+ * Body: { client_ids: number[], user_id: number }
+ */
+export const bulkAssignLeadsAPI = async (clientIds: number[], userId: number) => {
+  return apiRequest<any>('/clients/bulk_assign/', {
+    method: 'POST',
+    body: JSON.stringify({
+      client_ids: clientIds,
+      user_id: userId,
+    }),
+  });
+};
+
 // ==================== Deals APIs ====================
 
 /**
@@ -1616,6 +1631,14 @@ export const createActivityAPI = async (activityData: any) => {
  */
 export const getClientTasksAPI = async () => {
   return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/client-tasks/');
+};
+
+/**
+ * GET /api/client-events/
+ */
+export const getClientEventsAPI = async (clientId?: number) => {
+  const url = clientId ? `/client-events/?client=${clientId}` : '/client-events/';
+  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(url);
 };
 
 /**

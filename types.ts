@@ -37,13 +37,18 @@ export interface User {
 }
 
 export interface TimelineEntry {
-  id: number;
+  id: string | number; // Support string IDs like 'action-1' or 'event-1'
   user: string;
   avatar: string;
   action: string;
   details: string;
   date: string;
+  timestamp: number; // For sorting
+  type?: 'action' | 'event';
   stage?: string; // Optional: formatted stage name for better display
+  color?: string; // Optional: color for the stage or event
+  oldValue?: string;
+  newValue?: string;
 }
 
 export interface ClientTask {

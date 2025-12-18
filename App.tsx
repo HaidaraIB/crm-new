@@ -2,13 +2,54 @@
 
 import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
-import { getCompanyRoute } from './utils/routing';
+import { getCompanyRoute, navigateToCompanyRoute } from './utils/routing';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage } from './pages';
 
 const TheApp = () => {
     const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn } = useAppContext();
+    
+    // Track payment success message to prevent email verification message from showing
+    const [hasPaymentSuccessMessage, setHasPaymentSuccessMessage] = React.useState(() => {
+        const paymentSuccessData = localStorage.getItem('paymentSuccessMessage');
+        if (paymentSuccessData) {
+            try {
+                const data = JSON.parse(paymentSuccessData);
+                return Date.now() - data.timestamp < 10000; // Show for 10 seconds
+            } catch {
+                return false;
+            }
+        }
+        return false;
+    });
+    
+    // Monitor payment success message changes
+    React.useEffect(() => {
+        const checkPaymentSuccess = () => {
+            const paymentSuccessData = localStorage.getItem('paymentSuccessMessage');
+            if (paymentSuccessData) {
+                try {
+                    const data = JSON.parse(paymentSuccessData);
+                    const isValid = Date.now() - data.timestamp < 10000;
+                    setHasPaymentSuccessMessage(isValid);
+                    // Auto-remove after 10 seconds
+                    if (!isValid) {
+                        localStorage.removeItem('paymentSuccessMessage');
+                    }
+                } catch {
+                    setHasPaymentSuccessMessage(false);
+                }
+            } else {
+                setHasPaymentSuccessMessage(false);
+            }
+        };
+        
+        checkPaymentSuccess();
+        const interval = setInterval(checkPaymentSuccess, 1000); // Check every second
+        
+        return () => clearInterval(interval);
+    }, []);
     
     // CurrentPageContent component defined inside TheApp to have access to currentPage
     const CurrentPageContent = () => {
@@ -122,6 +163,88 @@ const TheApp = () => {
         // Check if auth was already processed in this session
         return sessionStorage.getItem('authProcessed') === 'true';
     });
+    
+    // Handle pathname-based routing for logged-in users (must be called unconditionally)
+    React.useEffect(() => {
+        // Only process routing if user is logged in
+        if (!isLoggedIn) return;
+        
+        // Decode URL-encoded pathname (e.g., /all%20leads -> /all leads)
+        const pathnameToCheck = decodeURIComponent(window.location.pathname);
+        
+        // Map pathname to page name
+        const pathToPageMap: Record<string, Page> = {
+            '/dashboard': 'Dashboard',
+            '/leads': 'Leads',
+            '/all leads': 'All Leads',
+            '/fresh leads': 'Fresh Leads',
+            '/cold leads': 'Cold Leads',
+            '/my leads': 'My Leads',
+            '/rotated leads': 'Rotated Leads',
+            '/create-lead': 'CreateLead',
+            '/edit-lead': 'EditLead',
+            '/view-lead': 'ViewLead', // Base route, will handle /view-lead/:id pattern
+            '/activities': 'Activities',
+            '/properties': 'Properties',
+            '/owners': 'Owners',
+            '/services': 'Services',
+            '/service packages': 'Service Packages',
+            '/service providers': 'Service Providers',
+            '/products': 'Products',
+            '/product categories': 'Product Categories',
+            '/suppliers': 'Suppliers',
+            '/deals': 'Deals',
+            '/create-deal': 'CreateDeal',
+            '/employees': 'Employees',
+            '/users': 'Users',
+            '/marketing': 'Marketing',
+            '/campaigns': 'Campaigns',
+            '/todos': 'Todos',
+            '/reports': 'Reports',
+            '/teams report': 'Teams Report',
+            '/employees report': 'Employees Report',
+            '/marketing report': 'Marketing Report',
+            '/integrations': 'Integrations',
+            '/meta': 'Meta',
+            '/tiktok': 'TikTok',
+            '/whatsapp': 'WhatsApp',
+            '/settings': 'Settings',
+            '/profile': 'Profile',
+        };
+        
+        // Handle root path - redirect to dashboard
+        if (pathnameToCheck === '/' || pathnameToCheck === '') {
+            window.history.replaceState({}, '', '/dashboard');
+            setCurrentPage('Dashboard');
+            return;
+        }
+        
+        // Check if pathname matches a known route
+        const normalizedPath = pathnameToCheck.toLowerCase();
+        
+        // Check for /view-lead/:id pattern
+        if (normalizedPath.startsWith('/view-lead/')) {
+            const leadIdMatch = pathnameToCheck.match(/\/view-lead\/(\d+)/);
+            if (leadIdMatch && currentPage !== 'ViewLead') {
+                setCurrentPage('ViewLead');
+            } else if (!leadIdMatch) {
+                // Invalid /view-lead URL, redirect to leads
+                window.history.replaceState({}, '', '/leads');
+                setCurrentPage('Leads');
+            }
+            return;
+        }
+        
+        const matchedPage = pathToPageMap[normalizedPath];
+        
+        if (matchedPage && currentPage !== matchedPage) {
+            setCurrentPage(matchedPage);
+        } else if (!matchedPage && pathnameToCheck !== '/' && pathnameToCheck !== '') {
+            // If pathname doesn't match any route, redirect to dashboard
+            window.history.replaceState({}, '', '/dashboard');
+            setCurrentPage('Dashboard');
+        }
+    }, [isLoggedIn, currentPage, setCurrentPage]);
     
     React.useEffect(() => {
         // Skip if already processed
@@ -260,85 +383,6 @@ const TheApp = () => {
         window.history.replaceState({}, '', '/login');
         return <LoginPage />;
     }
-
-    // Handle pathname-based routing for logged-in users
-    React.useEffect(() => {
-        // Decode URL-encoded pathname (e.g., /all%20leads -> /all leads)
-        const pathnameToCheck = decodeURIComponent(window.location.pathname);
-        
-        // Map pathname to page name
-        const pathToPageMap: Record<string, Page> = {
-            '/dashboard': 'Dashboard',
-            '/leads': 'Leads',
-            '/all leads': 'All Leads',
-            '/fresh leads': 'Fresh Leads',
-            '/cold leads': 'Cold Leads',
-            '/my leads': 'My Leads',
-            '/rotated leads': 'Rotated Leads',
-            '/create-lead': 'CreateLead',
-            '/edit-lead': 'EditLead',
-            '/view-lead': 'ViewLead', // Base route, will handle /view-lead/:id pattern
-            '/activities': 'Activities',
-            '/properties': 'Properties',
-            '/owners': 'Owners',
-            '/services': 'Services',
-            '/service packages': 'Service Packages',
-            '/service providers': 'Service Providers',
-            '/products': 'Products',
-            '/product categories': 'Product Categories',
-            '/suppliers': 'Suppliers',
-            '/deals': 'Deals',
-            '/create-deal': 'CreateDeal',
-            '/employees': 'Employees',
-            '/users': 'Users',
-            '/marketing': 'Marketing',
-            '/campaigns': 'Campaigns',
-            '/todos': 'Todos',
-            '/reports': 'Reports',
-            '/teams report': 'Teams Report',
-            '/employees report': 'Employees Report',
-            '/marketing report': 'Marketing Report',
-            '/integrations': 'Integrations',
-            '/meta': 'Meta',
-            '/tiktok': 'TikTok',
-            '/whatsapp': 'WhatsApp',
-            '/settings': 'Settings',
-            '/profile': 'Profile',
-        };
-        
-        // Handle root path - redirect to dashboard
-        if (pathnameToCheck === '/' || pathnameToCheck === '') {
-            window.history.replaceState({}, '', '/dashboard');
-            setCurrentPage('Dashboard');
-            return;
-        }
-        
-        // Check if pathname matches a known route
-        const normalizedPath = pathnameToCheck.toLowerCase();
-        
-        // Check for /view-lead/:id pattern
-        if (normalizedPath.startsWith('/view-lead/')) {
-            const leadIdMatch = pathnameToCheck.match(/\/view-lead\/(\d+)/);
-            if (leadIdMatch && currentPage !== 'ViewLead') {
-                setCurrentPage('ViewLead');
-            } else if (!leadIdMatch) {
-                // Invalid /view-lead URL, redirect to leads
-                window.history.replaceState({}, '', '/leads');
-                setCurrentPage('Leads');
-            }
-            return;
-        }
-        
-        const matchedPage = pathToPageMap[normalizedPath];
-        
-        if (matchedPage && currentPage !== matchedPage) {
-            setCurrentPage(matchedPage);
-        } else if (!matchedPage && pathnameToCheck !== '/' && pathnameToCheck !== '') {
-            // If pathname doesn't match any route, redirect to dashboard
-            window.history.replaceState({}, '', '/dashboard');
-            setCurrentPage('Dashboard');
-        }
-    }, [currentPage, setCurrentPage]);
     
     // Also check pathname on mount and when pathname might have changed
     React.useEffect(() => {
@@ -437,7 +481,8 @@ const TheApp = () => {
             )}
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header />
-                {isLoggedIn && currentUser && currentUser.emailVerified === false && (
+                {/* Check if payment success message exists - if so, don't show email verification message */}
+                {!hasPaymentSuccessMessage && isLoggedIn && currentUser && currentUser.emailVerified === false && (
                     <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 flex-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
@@ -451,8 +496,12 @@ const TheApp = () => {
                         </div>
                         <button
                             onClick={() => {
+                                navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Profile');
                                 setCurrentPage('Profile');
-                                setIsEmailVerificationModalOpen(true);
+                                // Use setTimeout to ensure page navigation happens before opening modal
+                                setTimeout(() => {
+                                    setIsEmailVerificationModalOpen(true);
+                                }, 100);
                             }}
                             className="bg-white text-red-600 px-4 py-2 rounded-md text-sm font-medium hover:bg-red-50 transition-colors whitespace-nowrap"
                         >

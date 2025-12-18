@@ -54,6 +54,8 @@ export const ProfilePage = () => {
     const [lastName, setLastName] = useState(initialLastName);
     const [email, setEmail] = useState(currentUser?.email || '');
     const [phone, setPhone] = useState(currentUser?.phone || '');
+    const [profilePhoto, setProfilePhoto] = useState<File | null>(null);
+    const [profilePhotoPreview, setProfilePhotoPreview] = useState<string>(currentUser?.profile_photo || currentUser?.avatar || '');
     const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string>('');
@@ -144,6 +146,7 @@ export const ProfilePage = () => {
             }
             setEmail(currentUser.email || '');
             setPhone(currentUser.phone || '');
+            setProfilePhotoPreview(currentUser.profile_photo || currentUser.avatar || '');
         }
     }, [currentUser]);
 
@@ -156,17 +159,24 @@ export const ProfilePage = () => {
         setSaveError('');
         
         try {
-            // API requires username, email, and role fields
-            await updateUserMutation.mutateAsync({
+            // Use FormData for profile photo upload
+            const formData = new FormData();
+            // Only send fields that are actually being updated or required by the backend
+            if (firstName.trim()) formData.append('first_name', firstName.trim());
+            if (lastName.trim()) formData.append('last_name', lastName.trim());
+            if (phone.trim()) formData.append('phone', phone.trim());
+            
+            // Map 'Owner' back to 'admin' for the backend if we were to send the role
+            // However, since it's a PATCH request and the user can't change their own role here,
+            // it's better not to send it at all to avoid validation errors.
+            
+            if (profilePhoto) {
+                formData.append('profile_photo', profilePhoto);
+            }
+            
+            const response = await updateUserMutation.mutateAsync({
                 id: currentUser.id,
-                data: {
-                    username: currentUser.username || currentUser.email?.split('@')[0] || '',
-                    email: currentUser.email || '',
-                    role: currentUser.role || 'User',
-                    first_name: firstName.trim() || null,
-                    last_name: lastName.trim() || null,
-                    phone: phone.trim() || null,
-                },
+                data: formData,
             });
             
             // Update context user with new data
@@ -175,6 +185,7 @@ export const ProfilePage = () => {
                 first_name: firstName.trim(),
                 last_name: lastName.trim(),
                 phone: phone.trim(),
+                profile_photo: response.profile_photo || profilePhotoPreview,
             });
             setCurrentUser(updatedUser);
             
@@ -291,12 +302,61 @@ export const ProfilePage = () => {
 
     const isRTL = language === 'ar';
 
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setProfilePhoto(file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfilePhotoPreview(reader.result as string);
+            };
+            reader.readAsDataURL(file);
+        }
+    };
+
     return (
         <PageWrapper title={t('profile')}>
             <div className="max-w-4xl mx-auto space-y-6">
                 <Card>
                     <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('profileSettings')}</h2>
                     <div className={`space-y-4 ${isRTL ? 'text-right' : 'text-left'}`}>
+                        <div className="flex flex-col items-center mb-6">
+                            <div className="relative group">
+                                <div className="w-24 h-24 rounded-full overflow-hidden border-2 border-primary/20 dark:border-primary/40 bg-gray-100 dark:bg-gray-800">
+                                    {profilePhotoPreview ? (
+                                        <img 
+                                            src={profilePhotoPreview} 
+                                            alt="Profile" 
+                                            className="w-full h-full object-cover"
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-gray-400">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                                            </svg>
+                                        </div>
+                                    )}
+                                </div>
+                                <label 
+                                    htmlFor="profile-photo-upload" 
+                                    className="absolute bottom-0 right-0 bg-primary text-white p-1.5 rounded-full cursor-pointer shadow-lg hover:bg-primary/90 transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                </label>
+                                <input 
+                                    id="profile-photo-upload" 
+                                    type="file" 
+                                    accept="image/*" 
+                                    className="hidden" 
+                                    onChange={handleFileChange}
+                                />
+                            </div>
+                            <p className="text-xs text-gray-500 mt-2">{t('clickToChangePhoto') || 'Click to change photo'}</p>
+                        </div>
+
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                             <div>
                                 <Label htmlFor="profile-first-name">{t('firstName') || 'First Name'}</Label>

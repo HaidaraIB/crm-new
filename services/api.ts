@@ -21,13 +21,22 @@ async function apiRequest<T>(
 ): Promise<T> {
   const token = localStorage.getItem('accessToken'); // JWT access token
   
+  const isFormData = options.body instanceof FormData;
+  
+  const headers: Record<string, string> = {
+    ...(token && { Authorization: `Bearer ${token}` }),
+    ...Object.fromEntries(
+      Object.entries(options.headers || {}).map(([k, v]) => [k, String(v)])
+    ),
+  };
+
+  if (!isFormData) {
+    headers['Content-Type'] = 'application/json';
+  }
+
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token && { Authorization: `Bearer ${token}` }),
-      ...options.headers,
-    },
+    headers,
   });
 
   // إذا كان الخطأ 401 و retryOn401 = true، حاول refresh token
@@ -824,8 +833,8 @@ export const createUserAPI = async (userData: any) => {
  */
 export const updateUserAPI = async (userId: number, userData: any) => {
   return apiRequest<any>(`/users/${userId}/`, {
-    method: 'PUT',
-    body: JSON.stringify(userData),
+    method: 'PATCH', // Use PATCH for partial updates
+    body: userData instanceof FormData ? userData : JSON.stringify(userData),
   });
 };
 

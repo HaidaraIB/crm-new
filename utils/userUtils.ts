@@ -35,7 +35,8 @@ export const normalizeUser = (userData: any): User => {
     email: userData.email,
     role: normalizeRoleInternal(userData.role),
     phone: userData.phone || '',
-    avatar: userData.avatar || getAvatarUrl(username),
+    profile_photo: userData.profile_photo,
+    avatar: userData.profile_photo || userData.avatar || getAvatarUrl(username),
     company: userData.company ? {
       id: typeof userData.company === 'object' ? userData.company.id : userData.company,
       name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),

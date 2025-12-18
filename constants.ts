@@ -805,6 +805,9 @@ export const translations = {
     saveProfile: "Save Profile",
     emailVerified: "Email verified",
     emailNotVerified: "Email not verified. Please check your inbox for verification email.",
+    clickToChangePhoto: "Click to change photo",
+    profileUpdatedSuccessfully: "Profile updated successfully!",
+    errorUpdatingProfile: "Failed to update profile. Please try again.",
     // Delete modals
     deleteChannel: "Delete Channel",
     confirmDeleteChannel: "Are you sure you want to delete",
@@ -1830,6 +1833,9 @@ export const translations = {
     saveProfile: "حفظ الملف الشخصي",
     emailVerified: "البريد الإلكتروني مُتحقق منه",
     emailNotVerified: "البريد الإلكتروني غير مُتحقق منه. يرجى التحقق من صندوق الوارد لرسالة التحقق.",
+    clickToChangePhoto: "اضغط لتغيير الصورة",
+    profileUpdatedSuccessfully: "تم تحديث الملف الشخصي بنجاح!",
+    errorUpdatingProfile: "فشل تحديث الملف الشخصي. يرجى المحاولة مرة أخرى.",
     // Delete modals
     deleteChannel: "حذف القناة",
     confirmDeleteChannel: "هل أنت متأكد أنك تريد حذف",

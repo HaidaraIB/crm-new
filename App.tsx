@@ -553,6 +553,11 @@ const TheApp = () => {
                     title={confirmDeleteConfig.title}
                     message={confirmDeleteConfig.message}
                     itemName={confirmDeleteConfig.itemName}
+                    confirmButtonText={confirmDeleteConfig.confirmButtonText}
+                    confirmButtonVariant={confirmDeleteConfig.confirmButtonVariant}
+                    showWarning={confirmDeleteConfig.showWarning}
+                    showSuccessMessage={confirmDeleteConfig.showSuccessMessage}
+                    successMessage={confirmDeleteConfig.successMessage}
                 />
             )}
             <EditProjectModal />

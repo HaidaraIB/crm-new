@@ -14,11 +14,27 @@ export type Page =
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
   | 'Meta' | 'TikTok' | 'WhatsApp';
 
+export interface Subscription {
+  id: number;
+  is_active: boolean;
+  start_date?: string;
+  end_date?: string;
+  plan?: {
+    id: number;
+    name?: string;
+    name_ar?: string;
+  };
+}
+
 export interface Company {
   id: number;
   name: string;
   domain?: string;
   specialization: 'real_estate' | 'services' | 'products';
+  auto_assign_enabled?: boolean;
+  re_assign_enabled?: boolean;
+  re_assign_hours?: number;
+  subscription?: Subscription;
 }
 
 export interface User {

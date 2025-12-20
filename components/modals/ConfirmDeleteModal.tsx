@@ -11,6 +11,11 @@ interface ConfirmDeleteModalProps {
     title: string;
     message: string;
     itemName?: string;
+    confirmButtonText?: string;
+    confirmButtonVariant?: 'danger' | 'primary';
+    showWarning?: boolean;
+    showSuccessMessage?: boolean;
+    successMessage?: string;
 }
 
 export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
@@ -20,6 +25,11 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
     title,
     message,
     itemName,
+    confirmButtonText,
+    confirmButtonVariant = 'danger',
+    showWarning = true,
+    showSuccessMessage = true,
+    successMessage,
 }) => {
     const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [isDeleting, setIsDeleting] = React.useState(false);
@@ -29,13 +39,17 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         try {
             await onConfirm();
             
-            // Close modal immediately and show success modal
+            // Close modal immediately
             onClose();
-            setSuccessMessage(t('itemDeletedSuccessfully') || 'Item deleted successfully!');
-            setIsSuccessModalOpen(true);
+            
+            // Show success message only if enabled
+            if (showSuccessMessage) {
+                setSuccessMessage(successMessage || t('itemDeletedSuccessfully') || 'Item deleted successfully!');
+                setIsSuccessModalOpen(true);
+            }
         } catch (error: any) {
-            console.error('Error deleting:', error);
-            alert(error?.message || t('errorDeletingItem') || 'Failed to delete item. Please try again.');
+            console.error('Error in confirm action:', error);
+            alert(error?.message || t('errorDeletingItem') || 'Failed to complete action. Please try again.');
         } finally {
             setIsDeleting(false);
         }
@@ -47,11 +61,11 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
                 <p className="text-gray-700 dark:text-gray-300">
                     {itemName ? (
                         <>
-                            {message} <span className="font-bold">{itemName}</span>? {t('confirmDeleteWarning') || 'This action cannot be undone.'}
+                            {message} <span className="font-bold">{itemName}</span>? {showWarning && (t('confirmDeleteWarning') || 'This action cannot be undone.')}
                         </>
                     ) : (
                         <>
-                            {message} {t('confirmDeleteWarning') || 'This action cannot be undone.'}
+                            {message} {showWarning && (t('confirmDeleteWarning') || 'This action cannot be undone.')}
                         </>
                     )}
                 </p>
@@ -59,8 +73,13 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
                     <Button variant="secondary" onClick={onClose} disabled={isDeleting}>
                         {t('cancel')}
                     </Button>
-                    <Button variant="danger" onClick={handleConfirm} disabled={isDeleting} loading={isDeleting}>
-                        {t('delete')}
+                    <Button 
+                        variant={confirmButtonVariant} 
+                        onClick={handleConfirm} 
+                        disabled={isDeleting} 
+                        loading={isDeleting}
+                    >
+                        {confirmButtonText || t('delete')}
                     </Button>
                 </div>
             </div>

@@ -168,6 +168,11 @@ export interface AppContextType {
     message: string;
     itemName?: string;
     onConfirm: () => void | Promise<void>;
+    confirmButtonText?: string;
+    confirmButtonVariant?: 'danger' | 'primary';
+    showWarning?: boolean;
+    showSuccessMessage?: boolean;
+    successMessage?: string;
   } | null;
   setConfirmDeleteConfig: React.Dispatch<React.SetStateAction<{
     title: string;
@@ -623,6 +628,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     message: string;
     itemName?: string;
     onConfirm: () => void | Promise<void>;
+    confirmButtonText?: string;
+    confirmButtonVariant?: 'danger' | 'primary';
+    showWarning?: boolean;
+    showSuccessMessage?: boolean;
+    successMessage?: string;
   } | null>(null);
   
   // Deals state

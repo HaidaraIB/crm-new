@@ -42,6 +42,10 @@ export const normalizeUser = (userData: any): User => {
       name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
       domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
       specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
+      auto_assign_enabled: typeof userData.company === 'object' ? (userData.company.auto_assign_enabled ?? false) : false,
+      re_assign_enabled: typeof userData.company === 'object' ? (userData.company.re_assign_enabled ?? false) : false,
+      re_assign_hours: typeof userData.company === 'object' ? (userData.company.re_assign_hours ?? 24) : 24,
+      subscription: typeof userData.company === 'object' ? userData.company.subscription : undefined,
     } : undefined,
     emailVerified: userData.email_verified || userData.is_email_verified || userData.emailVerified || false,
   };

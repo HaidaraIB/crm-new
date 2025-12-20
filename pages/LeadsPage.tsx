@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon } from '../components/index';
 import { TrashIcon, ChevronDownIcon } from '../components/icons';
 import { Lead } from '../types';
-import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks } from '../hooks/useQueries';
+import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks, useAssignUnassignedClients } from '../hooks/useQueries';
 
 // Status Dropdown Component
 const StatusDropdown = ({ 
@@ -213,6 +213,8 @@ export const LeadsPage = () => {
         currentUser,
         theme,
         language,
+        setIsSuccessModalOpen,
+        setSuccessMessage,
     } = useAppContext();
     
     // Determine API filters based on current page
@@ -266,6 +268,26 @@ export const LeadsPage = () => {
     
     // Update lead mutation
     const updateLeadMutation = useUpdateLead();
+    
+    // Assign unassigned clients mutation
+    const assignUnassignedMutation = useAssignUnassignedClients({
+        onSuccess: (data) => {
+            // Use translation instead of API message for proper language support
+            const assignedCount = data?.assigned_count || 0;
+            const assignedTo = data?.assigned_to || '';
+            const message = assignedCount > 0 
+                ? `${t('unassignedClientsAssigned')} (${assignedCount} ${t('clients') || 'clients'})`
+                : t('unassignedClientsAssigned') || 'Unassigned clients assigned successfully!';
+            setSuccessMessage(message);
+            setIsSuccessModalOpen(true);
+        },
+        onError: (error: any) => {
+            console.error('Error assigning unassigned clients:', error);
+            // Use translation for error message
+            setSuccessMessage(t('errorAssigningClients') || 'Failed to assign unassigned clients.');
+            setIsSuccessModalOpen(true);
+        },
+    });
     
     // Track which lead is being updated
     const [updatingLeadId, setUpdatingLeadId] = useState<number | null>(null);
@@ -564,7 +586,44 @@ export const LeadsPage = () => {
                         setCurrentPage('CreateLead');
                     }} className="w-full sm:w-auto"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
                     {isAdmin && (
-                        <Button variant="secondary" onClick={() => setIsAssignLeadModalOpen(true)} disabled={checkedLeadIds.size === 0} className="w-full sm:w-auto">{t('assignLead')}</Button>
+                        <>
+                            <Button 
+                                variant="secondary" 
+                                onClick={() => setIsAssignLeadModalOpen(true)} 
+                                disabled={checkedLeadIds.size === 0} 
+                                className="w-full sm:w-auto"
+                            >
+                                {t('assignLead')}
+                            </Button>
+                            <Button 
+                                variant="secondary" 
+                                onClick={() => {
+                                    setConfirmDeleteConfig({
+                                        title: t('assignUnassigned') || 'Assign Unassigned',
+                                        message: t('confirmAssignUnassigned') || 'Are you sure you want to assign all unassigned clients?',
+                                        itemName: '',
+                                        confirmButtonText: t('assignUnassigned') || 'Assign',
+                                        confirmButtonVariant: 'primary' as const,
+                                        showWarning: false,
+                                        showSuccessMessage: false, // Don't show default success message, mutation will handle it
+                                        onConfirm: async () => {
+                                            try {
+                                                await assignUnassignedMutation.mutateAsync();
+                                            } catch (error: any) {
+                                                console.error('Error assigning unassigned clients:', error);
+                                                throw error;
+                                            }
+                                        },
+                                    });
+                                    setIsConfirmDeleteModalOpen(true);
+                                }}
+                                disabled={assignUnassignedMutation.isPending}
+                                loading={assignUnassignedMutation.isPending}
+                                className="w-full sm:w-auto"
+                            >
+                                {t('assignUnassigned') || 'Assign Unassigned'}
+                            </Button>
+                        </>
                     )}
                 </>
             }

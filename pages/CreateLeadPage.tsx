@@ -72,7 +72,7 @@ export const CreateLeadPage = () => {
         name: '',
         phone: '',
         budget: '',
-        assignedTo: currentUser?.id ? currentUser.id.toString() : '',
+        assignedTo: '', // Don't auto-assign to current user - allow creating unassigned leads
         type: 'fresh' as 'fresh' | 'cold' | '',
         communicationWay: '',
         priority: 'medium' as 'low' | 'medium' | 'high' | '',
@@ -297,7 +297,7 @@ export const CreateLeadPage = () => {
                 name: formState.name,
                 phone_numbers: finalPhoneNumbers,
                 budget: formState.budget ? Number(formState.budget) : null,
-                assigned_to: formState.assignedTo ? Number(formState.assignedTo) : (currentUser?.id ?? null),
+                assigned_to: formState.assignedTo ? Number(formState.assignedTo) : null,
                 type: typeValue,
                 communication_way: channelId,
                 priority: priorityValue,

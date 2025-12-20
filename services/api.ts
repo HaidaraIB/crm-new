@@ -903,11 +903,11 @@ export const deleteLeadAPI = async (leadId: number) => {
 };
 
 /**
- * إسناد مجموعة من العملاء لموظف معين
+ * إسناد مجموعة من العملاء لموظف معين أو إلغاء التعيين
  * POST /api/clients/bulk_assign/
- * Body: { client_ids: number[], user_id: number }
+ * Body: { client_ids: number[], user_id: number | null }
  */
-export const bulkAssignLeadsAPI = async (clientIds: number[], userId: number) => {
+export const bulkAssignLeadsAPI = async (clientIds: number[], userId: number | null) => {
   return apiRequest<any>('/clients/bulk_assign/', {
     method: 'POST',
     body: JSON.stringify({
@@ -1815,6 +1815,40 @@ export const updateStatusAPI = async (statusId: number, statusData: any) => {
 export const deleteStatusAPI = async (statusId: number) => {
   return apiRequest<void>(`/settings/statuses/${statusId}/`, {
     method: 'DELETE',
+  });
+};
+
+// ==================== Company Assignment Settings APIs ====================
+
+/**
+ * تحديث إعدادات التوزيع التلقائي وإعادة التعيين للشركة
+ * PATCH /api/companies/:id/update_assignment_settings/
+ */
+export const updateCompanyAssignmentSettingsAPI = async (
+  companyId: number,
+  settings: {
+    auto_assign_enabled?: boolean;
+    re_assign_enabled?: boolean;
+    re_assign_hours?: number;
+  }
+) => {
+  return apiRequest<any>(`/companies/${companyId}/update_assignment_settings/`, {
+    method: 'PATCH',
+    body: JSON.stringify(settings),
+  });
+};
+
+/**
+ * تعيين العملاء غير المعينين تلقائياً
+ * POST /api/clients/assign_unassigned/
+ */
+export const assignUnassignedClientsAPI = async () => {
+  return apiRequest<{
+    message: string;
+    assigned_count: number;
+    assigned_to: string;
+  }>('/clients/assign_unassigned/', {
+    method: 'POST',
   });
 };
 

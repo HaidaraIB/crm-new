@@ -467,6 +467,14 @@ export const ViewLeadPage = () => {
             else if (ce.event_type === 'edit') actionText = t('leadEdited') || 'Lead edited';
             else actionText = ce.event_type;
 
+            // Format old_value and new_value to show "Unassigned" instead of "None"
+            const formatValue = (value: string | null | undefined) => {
+                if (!value || value === 'None') {
+                    return t('unassigned') || 'Unassigned';
+                }
+                return value;
+            };
+
             return {
                 id: `event-${ce.id}`,
                 type: 'event',
@@ -476,8 +484,8 @@ export const ViewLeadPage = () => {
                 details: ce.notes || '',
                 date: formatDateToLocal(ce.created_at),
                 timestamp: new Date(ce.created_at).getTime(),
-                oldValue: ce.old_value,
-                newValue: ce.new_value,
+                oldValue: formatValue(ce.old_value),
+                newValue: formatValue(ce.new_value),
                 color: eventColor,
             };
         });

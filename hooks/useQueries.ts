@@ -34,6 +34,7 @@ import {
   createStageAPI, updateStageAPI, deleteStageAPI,
   createStatusAPI, updateStatusAPI, deleteStatusAPI,
   bulkAssignLeadsAPI,
+  assignUnassignedClientsAPI,
 } from '../services/api';
 
 // ==================== Query Keys ====================
@@ -403,10 +404,10 @@ export const useDeleteLead = (options?: UseMutationOptions<void, Error, number>)
   });
 };
 
-export const useAssignLeads = (options?: UseMutationOptions<any, Error, { clientIds: number[]; userId: number }>) => {
+export const useAssignLeads = (options?: UseMutationOptions<any, Error, { clientIds: number[]; userId: number | null }>) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ clientIds, userId }: { clientIds: number[]; userId: number }) => bulkAssignLeadsAPI(clientIds, userId),
+    mutationFn: ({ clientIds, userId }: { clientIds: number[]; userId: number | null }) => bulkAssignLeadsAPI(clientIds, userId),
     onSuccess: (_, variables) => {
       // Invalidate all leads queries to refresh the list with new assignments
       queryClient.invalidateQueries({ queryKey: ['leads'] });
@@ -415,6 +416,38 @@ export const useAssignLeads = (options?: UseMutationOptions<any, Error, { client
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(id) });
       });
       // Clear checked IDs if needed (this might be handled in the component)
+    },
+    ...options,
+  });
+};
+
+export const useAssignUnassignedClients = (options?: UseMutationOptions<any, Error, void>) => {
+  const queryClient = useQueryClient();
+  const customOnSuccess = options?.onSuccess;
+  
+  return useMutation({
+    mutationFn: () => assignUnassignedClientsAPI(),
+    onSuccess: (data, variables, context) => {
+      // Invalidate all leads queries regardless of filters to refresh the list
+      queryClient.invalidateQueries({ 
+        queryKey: ['leads'],
+        exact: false // Invalidate all queries that start with 'leads'
+      });
+      // Also invalidate client events for all leads that might have been assigned
+      queryClient.invalidateQueries({ 
+        queryKey: ['clientEvents'],
+        exact: false
+      });
+      // Refetch all leads queries to ensure UI is updated immediately
+      queryClient.refetchQueries({ 
+        queryKey: ['leads'],
+        exact: false
+      });
+      
+      // Call custom onSuccess if provided
+      if (customOnSuccess) {
+        customOnSuccess(data, variables, context);
+      }
     },
     ...options,
   });

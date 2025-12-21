@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, Button, Input } from '../../components/index';
+import { Card, Button, NumberInput } from '../../components/index';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { useAppContext } from '../../context/AppContext';
 import { updateCompanyAssignmentSettingsAPI } from '../../services/api';
@@ -123,15 +123,16 @@ export const LeadAssignmentSettings = () => {
                                     {t('reminderDelayTime')}
                                 </Label>
                                 <div className="flex items-center gap-2 mt-1">
-                                    <Input
+                                    <NumberInput
                                         id="re-assign-hours"
-                                        type="number"
-                                        min="1"
-                                        value={reAssignHours}
+                                        min={1}
+                                        value={reAssignHours.toString()}
                                         onChange={(e) => {
                                             const value = parseInt(e.target.value, 10);
                                             if (!isNaN(value) && value >= 1) {
                                                 setReAssignHours(value);
+                                            } else if (e.target.value === '') {
+                                                setReAssignHours(1);
                                             }
                                         }}
                                         className="w-32"

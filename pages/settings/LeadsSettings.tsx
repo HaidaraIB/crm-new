@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, Input, ToggleSwitch, NumberInput } from '../../components/index';
+import { Card, Button, ToggleSwitch, NumberInput } from '../../components/index';
 import { useAppContext } from '../../context/AppContext';
 
 export const LeadsSettings = () => {

@@ -64,25 +64,23 @@ export const Timeline = ({ history }: TimelineProps) => {
                                     <p className="font-semibold text-gray-800 dark:text-gray-100">{entry.user}</p>
                                     {entry.stage ? (
                                         <span 
-                                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${!entry.color ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" : ""}`}
                                             style={entry.color ? {
                                                 backgroundColor: `${entry.color}20`, // 20 is 12.5% opacity in hex
                                                 color: entry.color,
                                                 border: `1px solid ${entry.color}40` // 40 is 25% opacity
                                             } : undefined}
-                                            className={!entry.color ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" : ""}
                                         >
                                             {entry.stage}
                                         </span>
                                     ) : entry.type === 'event' ? (
                                         <span 
-                                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium"
+                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${!entry.color ? "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200" : ""}`}
                                             style={entry.color ? {
                                                 backgroundColor: `${entry.color}20`,
                                                 color: entry.color,
                                                 border: `1px solid ${entry.color}40`
                                             } : undefined}
-                                            className={!entry.color ? "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200" : ""}
                                         >
                                             {entry.action}
                                         </span>

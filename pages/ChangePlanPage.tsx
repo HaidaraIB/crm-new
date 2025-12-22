@@ -1,8 +1,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader } from '../components/index';
-import { getPublicPlansAPI, createPaytabsPaymentSessionAPI } from '../services/api';
+import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector } from '../components/index';
+import { getPublicPlansAPI, createPaymentSessionAPI } from '../services/api';
 
 type PublicPlan = {
     id: number;
@@ -25,6 +25,7 @@ export const ChangePlanPage = () => {
     const [plansError, setPlansError] = useState<string | null>(null);
     const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+    const [selectedGateway, setSelectedGateway] = useState<number | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
 
@@ -112,6 +113,11 @@ export const ChangePlanPage = () => {
             return;
         }
 
+        if (!selectedGateway) {
+            alert(t('paymentGatewayRequired') || 'Please select a payment method');
+            return;
+        }
+
         if (!subscriptionId) {
             alert(t('paymentSubscriptionIdRequired') || 'Subscription ID is required');
             return;
@@ -121,8 +127,9 @@ export const ChangePlanPage = () => {
             setIsProcessing(true);
             // Create payment session with plan_id and billing_cycle to upgrade/downgrade plan
             // The backend should handle plan change even if subscription is active
-            const response = await createPaytabsPaymentSessionAPI(
-                parseInt(subscriptionId), 
+            const response = await createPaymentSessionAPI(
+                parseInt(subscriptionId),
+                selectedGateway,
                 selectedPlan,
                 billingCycle
             );
@@ -272,6 +279,14 @@ export const ChangePlanPage = () => {
                         </div>
                     )}
 
+                    {/* Payment Gateway Selection */}
+                    <div className="mb-6">
+                        <PaymentGatewaySelector
+                            selectedGateway={selectedGateway}
+                            onSelect={setSelectedGateway}
+                        />
+                    </div>
+
                     {/* Action Button */}
                     <div className="flex justify-end gap-4">
                         <Button
@@ -283,7 +298,7 @@ export const ChangePlanPage = () => {
                         <Button
                             onClick={handleChangePlan}
                             loading={isProcessing}
-                            disabled={!selectedPlan || isProcessing || !subscriptionId}
+                            disabled={!selectedPlan || !selectedGateway || isProcessing || !subscriptionId}
                             className="min-w-[150px]"
                         >
                             {isProcessing ? (t('loadingPaymentLink') || 'Loading...') : (t('changePlan') || 'Change Plan')}

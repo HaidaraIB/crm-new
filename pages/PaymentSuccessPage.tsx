@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Loader } from '../components/index';
-import { getCurrentUserAPI, checkPaymentStatusAPI, requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI } from '../services/api';
+import { getCurrentUserAPI, checkPaymentStatusAPI, requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI, zaincashReturnAPI } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
 
 export const PaymentSuccessPage = () => {
@@ -11,11 +11,12 @@ export const PaymentSuccessPage = () => {
     const [paymentCompleted, setPaymentCompleted] = useState(false);
     const processingRef = useRef(false);
 
-    // Get subscription_id from URL
+    // Get subscription_id and token from URL
     const urlParams = new URLSearchParams(window.location.search);
     const subscriptionIdParam = urlParams.get('subscription_id');
     const urlStatus = urlParams.get('status');
     const tranRef = urlParams.get('tranRef') || urlParams.get('tran_ref');
+    const zaincashToken = urlParams.get('token'); // Zain Cash sends token in URL
     const subscriptionId = subscriptionIdParam ? parseInt(subscriptionIdParam) : null;
 
     // Helper function to check if payment is completed
@@ -56,6 +57,23 @@ export const PaymentSuccessPage = () => {
                 if (!subscriptionId) {
                     setError(t('paymentSubscriptionIdRequired') || 'Subscription ID is required');
                     return;
+                }
+                
+                // If we have a Zain Cash token, verify it first
+                if (zaincashToken) {
+                    try {
+                        console.log('Verifying Zain Cash payment token...');
+                        await zaincashReturnAPI(zaincashToken, subscriptionId);
+                        // If verification succeeds, payment is completed
+                        setPaymentCompleted(true);
+                        // Continue to login flow below
+                    } catch (err: any) {
+                        console.error('Zain Cash payment verification failed:', err);
+                        setError(err.message || t('paymentVerificationFailed') || 'Payment verification failed. Please contact support.');
+                        setIsLoading(false);
+                        processingRef.current = false;
+                        return;
+                    }
                 }
                 
                 // Check payment status from API

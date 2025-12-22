@@ -348,6 +348,123 @@ export const paytabsReturnAPI = async (tranRef?: string, subscriptionId?: number
 
 
 /**
+ * إنشاء جلسة دفع Zain Cash
+ * POST /api/payments/create-zaincash-session/
+ * Body: { subscription_id: number, plan_id?: number }
+ * Response: { payment_id: number, redirect_url: string, transaction_id: string }
+ */
+export const createZaincashPaymentSessionAPI = async (
+  subscriptionId: number, 
+  planId?: number, 
+  billingCycle?: 'monthly' | 'yearly'
+) => {
+  // Use direct fetch instead of apiRequest to avoid token requirement
+  const token = localStorage.getItem('accessToken');
+  const body: any = { subscription_id: subscriptionId };
+  if (planId) {
+    body.plan_id = planId;
+  }
+  if (billingCycle) {
+    body.billing_cycle = billingCycle;
+  }
+  const response = await fetch(`${BASE_URL}/payments/create-zaincash-session/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error: any = new Error(
+      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
+    );
+    throw error;
+  }
+
+  return response.json();
+};
+
+
+/**
+ * Handle Zain Cash return URL - verify payment after user returns from Zain Cash
+ * POST /api/payments/zaincash-return/
+ * Body: { token?: string, subscription_id?: number }
+ */
+export const zaincashReturnAPI = async (token?: string, subscriptionId?: number) => {
+  const response = await fetch(`${BASE_URL}/payments/zaincash-return/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ 
+      ...(token && { token: token }),
+      ...(subscriptionId && { subscription_id: subscriptionId })
+    }),
+  });
+
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const error: any = new Error(
+      data?.detail || data?.message || data?.error || 'Failed to verify payment return'
+    );
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  
+  // Also check if the response indicates failure even with 200 status
+  if (data.status === 'error' || data.status === 'failed') {
+    const error: any = new Error(
+      data?.message || data?.error || 'Payment verification failed'
+    );
+    error.status = response.status;
+    error.data = data;
+    throw error;
+  }
+  
+  return data;
+};
+
+
+/**
+ * Unified payment function that routes to the correct gateway based on gateway ID
+ * @param subscriptionId - Subscription ID
+ * @param gatewayId - Payment gateway ID
+ * @param planId - Optional plan ID for plan changes
+ * @param billingCycle - Optional billing cycle
+ */
+export const createPaymentSessionAPI = async (
+  subscriptionId: number,
+  gatewayId: number,
+  planId?: number,
+  billingCycle?: 'monthly' | 'yearly'
+) => {
+  // Get gateway info to determine which API to call
+  const gateways = await getPublicPaymentGatewaysAPI();
+  const gateway = gateways.find((g: any) => g.id === gatewayId);
+  
+  if (!gateway) {
+    throw new Error('Payment gateway not found');
+  }
+
+  const gatewayName = gateway.name.toLowerCase();
+  
+  if (gatewayName.includes('paytabs')) {
+    return await createPaytabsPaymentSessionAPI(subscriptionId, planId, billingCycle);
+  } else if (gatewayName.includes('zaincash') || gatewayName.includes('zain cash')) {
+    return await createZaincashPaymentSessionAPI(subscriptionId, planId, billingCycle);
+  } else {
+    // Default to PayTabs for now, or throw error for unsupported gateways
+    throw new Error(`Payment gateway "${gateway.name}" is not yet supported`);
+  }
+};
+
+
+/**
  * Check payment status by subscription_id - for polling
  * GET /api/payments/subscription/{subscription_id}/status/
  * Returns payment status and subscription status
@@ -377,6 +494,16 @@ export const checkPaymentStatusAPI = async (subscriptionId: number) => {
  */
 export const getPublicPlansAPI = async () => {
   return apiRequest<any[]>('/public/plans/', {
+    method: 'GET',
+  });
+};
+
+/**
+ * Get available payment gateways (public endpoint)
+ * GET /api/public/payment-gateways/
+ */
+export const getPublicPaymentGatewaysAPI = async () => {
+  return apiRequest<any[]>('/public/payment-gateways/', {
     method: 'GET',
   });
 };

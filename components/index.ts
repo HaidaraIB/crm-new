@@ -80,3 +80,4 @@ export * from './modals/AddStageModal';
 export * from './modals/EditStageModal';
 export * from './modals/AddStatusModal';
 export * from './modals/EditStatusModal';
+export * from './PaymentGatewaySelector';

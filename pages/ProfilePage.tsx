@@ -4,8 +4,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
-import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal } from '../components/index';
-import { changeEmailAPI, createPaytabsPaymentSessionAPI } from '../services/api';
+import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal } from '../components/index';
+import { changeEmailAPI, createPaymentSessionAPI } from '../services/api';
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 
@@ -42,6 +42,8 @@ export const ProfilePage = () => {
         startDate?: string;
     } | null>(null);
     const [isRenewing, setIsRenewing] = useState(false);
+    const [showRenewalModal, setShowRenewalModal] = useState(false);
+    const [selectedGateway, setSelectedGateway] = useState<number | null>(null);
     
     // Get first_name and last_name from API, fallback to splitting name
     const apiFirstName = currentUser?.first_name || '';
@@ -255,6 +257,11 @@ export const ProfilePage = () => {
             return;
         }
 
+        if (!selectedGateway) {
+            alert(t('paymentGatewayRequired') || 'Please select a payment method');
+            return;
+        }
+
         try {
             setIsRenewing(true);
             // Determine billing cycle from current subscription duration
@@ -269,8 +276,9 @@ export const ProfilePage = () => {
             }
 
             // Create payment session for renewal (no plan_id change, just extend subscription)
-            const response = await createPaytabsPaymentSessionAPI(
+            const response = await createPaymentSessionAPI(
                 subscriptionInfo.id,
+                selectedGateway,
                 undefined, // No plan change
                 billingCycle
             );
@@ -286,6 +294,7 @@ export const ProfilePage = () => {
             alert(errorMessage);
         } finally {
             setIsRenewing(false);
+            setShowRenewalModal(false);
         }
     };
 
@@ -492,12 +501,11 @@ export const ProfilePage = () => {
                             {subscriptionInfo.isActive && (
                                 <div className="pt-2">
                                     <Button 
-                                        onClick={handleRenewSubscription}
-                                        loading={isRenewing}
+                                        onClick={() => setShowRenewalModal(true)}
                                         disabled={isRenewing}
                                         className="w-full sm:w-auto"
                                     >
-                                        {isRenewing ? (t('processing') || 'Processing...') : (t('renewSubscription') || 'Renew Subscription')}
+                                        {t('renewSubscription') || 'Renew Subscription'}
                                     </Button>
                                 </div>
                             )}
@@ -526,6 +534,43 @@ export const ProfilePage = () => {
                 allowEmailChange={!(currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified)}
                 onEmailChange={handleChangeEmail}
             />
+
+            <Modal
+                isOpen={showRenewalModal}
+                onClose={() => {
+                    setShowRenewalModal(false);
+                    setSelectedGateway(null);
+                }}
+                title={t('renewSubscription') || 'Renew Subscription'}
+            >
+                <div className="space-y-4">
+                    <p className="text-gray-600 dark:text-gray-400">
+                        {t('selectPaymentMethodForRenewal') || 'Select a payment method to renew your subscription'}
+                    </p>
+                    <PaymentGatewaySelector
+                        selectedGateway={selectedGateway}
+                        onSelect={setSelectedGateway}
+                    />
+                    <div className="flex justify-end gap-4 pt-4">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setShowRenewalModal(false);
+                                setSelectedGateway(null);
+                            }}
+                        >
+                            {t('cancel') || 'Cancel'}
+                        </Button>
+                        <Button
+                            onClick={handleRenewSubscription}
+                            loading={isRenewing}
+                            disabled={!selectedGateway || isRenewing}
+                        >
+                            {isRenewing ? (t('processing') || 'Processing...') : (t('proceedToPayment') || 'Proceed to Payment')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </PageWrapper>
     );
 };

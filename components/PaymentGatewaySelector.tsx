@@ -29,7 +29,39 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
       try {
         setLoading(true);
         const data = await getPublicPaymentGatewaysAPI();
-        setGateways(Array.isArray(data) ? data : []);
+        const allGateways = Array.isArray(data) ? data : [];
+        
+        // Find Paytabs and Stripe gateways
+        const paytabsGateway = allGateways.find(g => g.name.toLowerCase().includes('paytabs'));
+        const stripeGateway = allGateways.find(g => g.name.toLowerCase().includes('stripe'));
+        
+        // Filter out Paytabs and Stripe from the list
+        const otherGateways = allGateways.filter(g => {
+          const nameLower = g.name.toLowerCase();
+          return !nameLower.includes('paytabs') && !nameLower.includes('stripe');
+        });
+        
+        // Determine which card payment gateway to use
+        let cardPaymentGateway: PaymentGateway | null = null;
+        
+        if (paytabsGateway && stripeGateway) {
+          // Both active - prioritize Paytabs (shouldn't happen, but handle it)
+          cardPaymentGateway = paytabsGateway;
+        } else if (paytabsGateway) {
+          // Only Paytabs active
+          cardPaymentGateway = paytabsGateway;
+        } else if (stripeGateway) {
+          // Only Stripe active
+          cardPaymentGateway = stripeGateway;
+        }
+        // If neither is active, cardPaymentGateway remains null
+        
+        // Combine card payment (if exists) with other gateways
+        const processedGateways = cardPaymentGateway 
+          ? [cardPaymentGateway, ...otherGateways]
+          : otherGateways;
+        
+        setGateways(processedGateways);
       } catch (err: any) {
         console.error('Error loading payment gateways:', err);
         setError(err.message || 'Failed to load payment gateways');
@@ -44,11 +76,30 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
   const getGatewayLogo = (gatewayName: string) => {
     const nameLower = gatewayName.toLowerCase();
     if (nameLower.includes('paytabs')) {
-      return <img src="/paytabs_logo.png" alt="PayTabs" className="h-8 w-auto object-contain" />;
+      return <img src="/visa_master_logo.png" alt="Card Payment" className="h-10 w-auto object-contain" />;
     } else if (nameLower.includes('stripe')) {
-      return <img src="/stripe_logo.png" alt="Stripe" className="h-8 w-auto object-contain" />;
+      return <img src="/visa_master_logo.png" alt="Card Payment" className="h-10 w-auto object-contain" />;
     } else if (nameLower.includes('zaincash') || nameLower.includes('zain cash')) {
-      return <img src="/zain_cash_logo.png" alt="Zain Cash" className="h-8 w-auto object-contain" />;
+      return <img src="/zain_cash_logo.png" alt="Zain Cash" className="h-10 w-auto object-contain" />;
+    }
+    return null;
+  };
+
+  const getGatewayDisplayName = (gatewayName: string) => {
+    const nameLower = gatewayName.toLowerCase();
+    if (nameLower.includes('paytabs') || nameLower.includes('stripe')) {
+      return language === 'ar' 
+        ? 'بطاقة الدفع'
+        : 'Card Payment';
+    }
+    return gatewayName;
+  };
+
+  const getGatewayDescription = (gatewayName: string) => {
+    const nameLower = gatewayName.toLowerCase();
+    // Don't show description if it's the same as display name
+    if (nameLower.includes('paytabs') || nameLower.includes('stripe')) {
+      return null;
     }
     return null;
   };
@@ -88,37 +139,44 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
 
   return (
     <div className={`${className}`}>
-      <label className="block text-sm font-medium mb-3 text-gray-700 dark:text-gray-300">
+      <label className="block text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">
         {t('selectPaymentMethod') || 'Select Payment Method'}
       </label>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {gateways.map((gateway) => {
           const logo = getGatewayLogo(gateway.name);
+          const displayName = getGatewayDisplayName(gateway.name);
+          const isSelected = selectedGateway === gateway.id;
           return (
             <button
               key={gateway.id}
               type="button"
               onClick={() => onSelect(gateway.id)}
-              className={`flex items-center gap-3 p-4 border-2 rounded-lg transition-all text-left ${
-                selectedGateway === gateway.id
-                  ? 'border-primary bg-primary/10 dark:bg-primary/20'
-                  : 'border-gray-300 dark:border-gray-600 hover:border-primary/50 bg-white dark:bg-gray-800'
+              className={`group relative flex flex-col items-center justify-center gap-3 p-6 border-2 rounded-xl transition-all duration-200 ${
+                isSelected
+                  ? 'border-primary bg-primary/10 dark:bg-primary/20 shadow-lg shadow-primary/20 scale-[1.02]'
+                  : 'border-gray-200 dark:border-gray-700 hover:border-primary/60 hover:shadow-md bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700/50'
               }`}
             >
-              {logo && <div className="flex-shrink-0">{logo}</div>}
-              <div className="flex-1">
-                <div className="font-medium text-gray-900 dark:text-white">{gateway.name}</div>
-                {gateway.description && (
-                  <div className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                    {gateway.description}
-                  </div>
-                )}
+              {logo && (
+                <div className={`transition-transform duration-200 ${isSelected ? 'scale-110' : 'group-hover:scale-105'}`}>
+                  {logo}
+                </div>
+              )}
+              <div className={`text-sm font-medium transition-colors ${
+                isSelected
+                  ? 'text-primary dark:text-primary'
+                  : 'text-gray-700 dark:text-gray-300 group-hover:text-primary'
+              }`}>
+                {displayName}
               </div>
-              {selectedGateway === gateway.id && (
-                <div className="flex-shrink-0">
-                  <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                  </svg>
+              {isSelected && (
+                <div className="absolute top-2 right-2">
+                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary text-white shadow-sm">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
                 </div>
               )}
             </button>

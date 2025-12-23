@@ -542,6 +542,7 @@ export const ProfilePage = () => {
                     setSelectedGateway(null);
                 }}
                 title={t('renewSubscription') || 'Renew Subscription'}
+                maxWidth="lg"
             >
                 <div className="space-y-4">
                     <p className="text-gray-600 dark:text-gray-400">

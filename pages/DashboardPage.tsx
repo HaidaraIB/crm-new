@@ -8,7 +8,7 @@ import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { useLeads, useDeals, useActivities, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
 
 export const DashboardPage = () => {
-    const { t, currentUser, language } = useAppContext();
+    const { t, currentUser, language, setSelectedLead, setCurrentPage } = useAppContext();
     const isAdmin = currentUser?.role === 'Owner';
     const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
     const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
@@ -129,7 +129,35 @@ export const DashboardPage = () => {
         // Completed deals (Won)
         const completedDeals = deals.filter(deal => deal.status === 'Won').length;
         
+        // Leads to contact today (leads with reminder_date = today and assigned_to is set)
+        const leadsToContactToday = leads.filter(lead => {
+            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
+            if (!assignedToId) return false;
+            
+            // Check if there's a ClientTask with reminder_date = today for this lead
+            return clientTasks.some((ct: any) => {
+                const clientId = ct.client || ct.clientId;
+                if (clientId !== lead.id) return false;
+                
+                const reminderDate = ct.reminder_date;
+                if (!reminderDate) return false;
+                
+                const reminder = new Date(reminderDate);
+                reminder.setHours(0, 0, 0, 0);
+                return reminder.getTime() === today.getTime();
+            });
+        });
+        
         return [
+            { 
+                title: t('leadsToContactToday'), 
+                value: leadsToContactToday.length, 
+                icon: <TargetIcon className="w-6 h-6"/>, 
+                gradient: 'from-orange-500 to-red-500',
+                bgColor: 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30',
+                iconBg: 'bg-orange-100 dark:bg-orange-900/40',
+                textColor: 'text-orange-600 dark:text-orange-400'
+            },
             { 
                 title: t('todayNewLeads'), 
                 value: todayNewLeads, 
@@ -337,6 +365,64 @@ export const DashboardPage = () => {
                 };
             });
     }, [clientTasks, users, leads, t]);
+    
+    // Leads to contact today - detailed list
+    const leadsToContactTodayList = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Filter leads to contact today
+        const leadsToContactToday = leads.filter(lead => {
+            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
+            if (!assignedToId) return false;
+            
+            // Check if there's a ClientTask with reminder_date = today for this lead
+            return clientTasks.some((ct: any) => {
+                const clientId = ct.client || ct.clientId;
+                if (clientId !== lead.id) return false;
+                
+                const reminderDate = ct.reminder_date;
+                if (!reminderDate) return false;
+                
+                const reminder = new Date(reminderDate);
+                reminder.setHours(0, 0, 0, 0);
+                return reminder.getTime() === today.getTime();
+            });
+        });
+        
+        return leadsToContactToday.map(lead => {
+            // Find the ClientTask with reminder_date = today
+            const task = clientTasks.find((ct: any) => {
+                const clientId = ct.client || ct.clientId;
+                if (clientId !== lead.id) return false;
+                
+                const reminderDate = ct.reminder_date;
+                if (!reminderDate) return false;
+                
+                const reminder = new Date(reminderDate);
+                reminder.setHours(0, 0, 0, 0);
+                return reminder.getTime() === today.getTime();
+            });
+            
+            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
+            const assignedUser = users.find(u => u.id === assignedToId);
+            
+            return {
+                lead,
+                task,
+                assignedUser: assignedUser?.name || t('unknown'),
+                reminderDate: task?.reminder_date || null,
+                notes: task?.notes || '',
+                stage: task?.stage_name || task?.stage || '',
+            };
+        }).sort((a, b) => {
+            // Sort by reminder time if available, otherwise by lead name
+            if (a.reminderDate && b.reminderDate) {
+                return new Date(a.reminderDate).getTime() - new Date(b.reminderDate).getTime();
+            }
+            return (a.lead.name || '').localeCompare(b.lead.name || '');
+        });
+    }, [leads, clientTasks, users, t]);
 
 
     return (
@@ -528,6 +614,117 @@ export const DashboardPage = () => {
                     )}
                 </Card>
             </div>
+            {/* Leads to Contact Today Section */}
+            {leadsToContactTodayList.length > 0 && (
+                <Card className="mb-6 border border-orange-200/50 dark:border-orange-700/50 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-orange-50/50 to-red-50/50 dark:from-orange-950/20 dark:to-red-950/20">
+                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-orange-200 dark:border-orange-700">
+                        <div>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+                                <TargetIcon className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+                                {t('leadsToContactToday')}
+                            </h2>
+                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('leadsToContactTodayDescription')}</p>
+                        </div>
+                        <div className="px-4 py-2 bg-orange-100 dark:bg-orange-900/40 rounded-lg">
+                            <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">{leadsToContactTodayList.length}</span>
+                        </div>
+                    </div>
+                    <div className="overflow-x-auto -mx-2 px-2">
+                        <div className="min-w-full inline-block align-middle">
+                            <div className="overflow-hidden rounded-lg">
+                                <table className="w-full text-sm text-left rtl:text-right min-w-[600px]">
+                                    <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/50 dark:to-red-900/50 border-b-2 border-orange-200 dark:border-orange-700">
+                                        <tr>
+                                            <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('lead')}</th>
+                                            <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('assignedTo')}</th>
+                                            <th scope="col" className="px-4 py-3.5 hidden sm:table-cell font-bold text-center whitespace-nowrap">{t('stage')}</th>
+                                            <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('reminderTime')}</th>
+                                            <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('notes')}</th>
+                                            <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('action')}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-orange-100 dark:divide-orange-900/30">
+                                        {leadsToContactTodayList.map((item) => {
+                                            const lead = item.lead;
+                                            const reminderTime = item.reminderDate 
+                                                ? new Date(item.reminderDate).toLocaleTimeString(language === 'ar' ? 'ar-SA' : 'en-US', { 
+                                                    hour: '2-digit', 
+                                                    minute: '2-digit',
+                                                    hour12: language === 'ar' ? false : true
+                                                })
+                                                : '';
+                                            
+                                            return (
+                                                <tr 
+                                                    key={lead.id} 
+                                                    className="bg-white dark:bg-dark-card hover:bg-orange-50/50 dark:hover:bg-orange-900/20 transition-colors duration-150"
+                                                >
+                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                                            {lead.name}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+                                                            {item.assignedUser}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell text-center">
+                                                        {item.stage ? (() => {
+                                                            const stageConfig = stages.find(s => 
+                                                                s.name.toLowerCase().replace(/\s+/g, '_') === item.stage.toLowerCase().replace(/\s+/g, '_') ||
+                                                                s.name === item.stage
+                                                            );
+                                                            const stageColor = stageConfig?.color || '#3b82f6';
+                                                            
+                                                            return (
+                                                                <span 
+                                                                    className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-semibold text-white shadow-sm"
+                                                                    style={{ 
+                                                                        backgroundColor: stageColor,
+                                                                        backgroundImage: `linear-gradient(to right, ${stageColor}, ${stageColor}dd)`
+                                                                    }}
+                                                                >
+                                                                    {getStageDisplayLabel(item.stage)}
+                                                                </span>
+                                                            );
+                                                        })() : (
+                                                            <span className="text-xs text-gray-400 italic">{t('noStage')}</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                        <span className="text-sm font-semibold text-orange-600 dark:text-orange-400">
+                                                            {reminderTime || t('noTimeSet')}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                        <p className="text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">
+                                                            {item.notes || <span className="text-gray-400 italic">{t('noNotes')}</span>}
+                                                        </p>
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                        <button
+                                                            onClick={() => {
+                                                                setSelectedLead(lead);
+                                                                window.history.pushState({}, '', `/view-lead/${lead.id}`);
+                                                                setCurrentPage('ViewLead');
+                                                            }}
+                                                            className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded-md transition-colors"
+                                                        >
+                                                            {t('viewLead')}
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </Card>
+            )}
+            
             {/* Bottom Section */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-1 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
@@ -610,11 +807,11 @@ export const DashboardPage = () => {
                                     <table className="w-full text-sm text-left rtl:text-right min-w-[600px]">
                                         <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-b-2 border-gray-200 dark:border-gray-700">
                                             <tr>
-                                                <th scope="col" className="px-4 py-3.5 font-bold">{t('date')}</th>
-                                                <th scope="col" className="px-4 py-3.5 font-bold">{t('user')}</th>
-                                                <th scope="col" className="px-4 py-3.5 font-bold">{t('lead')}</th>
-                                                <th scope="col" className="px-4 py-3.5 hidden sm:table-cell font-bold">{t('stage')}</th>
-                                                <th scope="col" className="px-4 py-3.5 font-bold">{t('lastFeedback')}</th>
+                                                <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('date')}</th>
+                                                <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('user')}</th>
+                                                <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('lead')}</th>
+                                                <th scope="col" className="px-4 py-3.5 hidden sm:table-cell font-bold text-center whitespace-nowrap">{t('stage')}</th>
+                                                <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('lastFeedback')}</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
@@ -625,22 +822,22 @@ export const DashboardPage = () => {
                                                         key={feedback.id} 
                                                         className="bg-white dark:bg-dark-card hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
                                                     >
-                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                        <td className="px-4 py-4 whitespace-nowrap text-center">
                                                             <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                                                                 {feedback.date}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                        <td className="px-4 py-4 whitespace-nowrap text-center">
                                                             <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
                                                                 {feedback.user}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-4 whitespace-nowrap">
+                                                        <td className="px-4 py-4 whitespace-nowrap text-center">
                                                             <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                                                                 {feedback.lead}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell">
+                                                        <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell text-center">
                                                             {(() => {
                                                                 const stageName = feedback.stage;
                                                                 const stageConfig = stages.find(s => 
@@ -662,7 +859,7 @@ export const DashboardPage = () => {
                                                                 );
                                                             })()}
                                                         </td>
-                                                        <td className="px-4 py-4">
+                                                        <td className="px-4 py-4 whitespace-nowrap text-center">
                                                             <p className="text-sm text-gray-900 dark:text-gray-100 max-w-xs truncate">
                                                                 {feedback.notes || <span className="text-gray-400 italic">{t('noNotes')}</span>}
                                                             </p>

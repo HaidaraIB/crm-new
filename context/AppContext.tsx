@@ -710,12 +710,53 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         
         // Check subscription for all users (employees and admins)
         const isEmployee = userData.role === 'employee';
-        const hasActiveSubscription = userData.company?.subscription?.is_active === true;
         const subscriptionId = userData.company?.subscription?.id;
+        
+        // Check subscription status with end_date validation
+        let hasActiveSubscription = false;
+        let subscriptionStatus = null;
+        
+        if (subscriptionId) {
+          try {
+            const { checkPaymentStatusAPI } = await import('../services/api');
+            subscriptionStatus = await checkPaymentStatusAPI(subscriptionId);
+            hasActiveSubscription = subscriptionStatus.is_truly_active === true;
+            
+            // Update userData with latest subscription info
+            if (userData.company?.subscription) {
+              userData.company.subscription.is_active = subscriptionStatus.is_truly_active;
+              userData.company.subscription.end_date = subscriptionStatus.end_date;
+            }
+            
+            // Check if subscription is expiring soon
+            if (subscriptionStatus.is_expiring_soon && subscriptionStatus.days_until_expiry > 0) {
+              // Store subscription warning in localStorage for display
+              localStorage.setItem('subscriptionExpiringWarning', JSON.stringify({
+                days: subscriptionStatus.days_until_expiry,
+                endDate: subscriptionStatus.end_date,
+                timestamp: Date.now()
+              }));
+            } else {
+              localStorage.removeItem('subscriptionExpiringWarning');
+            }
+          } catch (error) {
+            console.error('Error checking subscription status:', error);
+            // Fallback to basic check
+            hasActiveSubscription = userData.company?.subscription?.is_active === true;
+          }
+        } else {
+          hasActiveSubscription = userData.company?.subscription?.is_active === true;
+        }
         
         // If subscription is inactive, logout the user (both employees and admins)
         if (!hasActiveSubscription) {
-          // ... logout logic ...
+          setIsLoggedIn(false);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('currentUser');
+          localStorage.removeItem('isLoggedIn');
+          localStorage.removeItem('subscriptionExpiringWarning');
+          window.location.href = '/login';
           return;
         }
         
@@ -758,7 +799,86 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     return () => window.removeEventListener('resize', handleResize);
   }, [isLoggedIn, dataLoaded, currentUser?.id]);
 
-  // Polling mechanism removed - now using React Query's refetchInterval in components
+  // Poll subscription status every 5 minutes when user is logged in
+  // Use refs to avoid triggering re-renders that could affect forms
+  const currentUserRef = React.useRef(currentUser);
+  const isLoggedInRef = React.useRef(isLoggedIn);
+  
+  // Update refs when values change
+  React.useEffect(() => {
+    currentUserRef.current = currentUser;
+    isLoggedInRef.current = isLoggedIn;
+  }, [currentUser, isLoggedIn]);
+  
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser?.company?.subscription?.id) {
+      return;
+    }
+    
+    const subscriptionId = currentUser.company.subscription.id;
+    const pollSubscriptionStatus = async () => {
+      try {
+        const { checkPaymentStatusAPI } = await import('../services/api');
+        const status = await checkPaymentStatusAPI(subscriptionId);
+        
+        // Use ref to get latest currentUser without causing dependency issues
+        const latestUser = currentUserRef.current;
+        if (!latestUser?.company?.subscription) {
+          return;
+        }
+        
+        // Only update if subscription status actually changed to minimize re-renders
+        const currentIsActive = latestUser.company.subscription.is_active;
+        const currentEndDate = latestUser.company.subscription.end_date;
+        
+        if (currentIsActive !== status.is_truly_active || currentEndDate !== status.end_date) {
+          const updatedUser = {
+            ...latestUser,
+            company: {
+              ...latestUser.company,
+              subscription: {
+                ...latestUser.company.subscription,
+                is_active: status.is_truly_active,
+                end_date: status.end_date
+              }
+            }
+          };
+          setCurrentUserState(updatedUser);
+          localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+        }
+        
+        // Check if subscription expired
+        if (!status.is_truly_active) {
+          // Subscription expired, logout user
+          setIsLoggedInState(false);
+          localStorage.removeItem('accessToken');
+          localStorage.removeItem('refreshToken');
+          localStorage.removeItem('currentUser');
+          window.location.href = '/login';
+          return;
+        }
+        
+        // Check if subscription is expiring soon
+        if (status.is_expiring_soon && status.days_until_expiry > 0) {
+          localStorage.setItem('subscriptionExpiringWarning', JSON.stringify({
+            days: status.days_until_expiry,
+            endDate: status.end_date,
+            timestamp: Date.now()
+          }));
+        } else {
+          localStorage.removeItem('subscriptionExpiringWarning');
+        }
+      } catch (error) {
+        console.error('Error polling subscription status:', error);
+      }
+    };
+    
+    // Poll immediately, then every 5 minutes
+    pollSubscriptionStatus();
+    const interval = setInterval(pollSubscriptionStatus, 5 * 60 * 1000); // 5 minutes
+    
+    return () => clearInterval(interval);
+  }, [isLoggedIn, currentUser?.company?.subscription?.id, setCurrentUserState, setIsLoggedInState]);
 
   const setIsLoggedIn = (loggedIn: boolean) => {
     setIsLoggedInState(loggedIn);

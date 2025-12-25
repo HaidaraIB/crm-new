@@ -431,6 +431,72 @@ export const zaincashReturnAPI = async (token?: string, subscriptionId?: number)
 
 
 /**
+ * إنشاء جلسة دفع Stripe
+ * POST /api/payments/create-stripe-session/
+ * Body: { subscription_id: number, plan_id?: number }
+ * Response: { payment_id: number, redirect_url: string, session_id: string }
+ */
+export const createStripePaymentSessionAPI = async (
+  subscriptionId: number, 
+  planId?: number, 
+  billingCycle?: 'monthly' | 'yearly'
+) => {
+  // Use direct fetch instead of apiRequest to avoid token requirement
+  const token = localStorage.getItem('accessToken');
+  const body: any = { subscription_id: subscriptionId };
+  if (planId) {
+    body.plan_id = planId;
+  }
+  if (billingCycle) {
+    body.billing_cycle = billingCycle;
+  }
+  const response = await fetch(`${BASE_URL}/payments/create-stripe-session/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error: any = new Error(
+      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
+    );
+    throw error;
+  }
+
+  return response.json();
+};
+
+
+/**
+ * Handle Stripe return URL - verify payment after user returns from Stripe
+ * GET /api/payments/stripe-return/?session_id=xxx&subscription_id=xxx
+ */
+export const stripeReturnAPI = async (sessionId?: string, subscriptionId?: number) => {
+  const params = new URLSearchParams();
+  if (sessionId) {
+    params.append('session_id', sessionId);
+  }
+  if (subscriptionId) {
+    params.append('subscription_id', subscriptionId.toString());
+  }
+  
+  const response = await fetch(`${BASE_URL}/payments/stripe-return/?${params.toString()}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  });
+
+  // Stripe return is a redirect, so we just return the response
+  return response;
+};
+
+
+/**
  * Unified payment function that routes to the correct gateway based on gateway ID
  * @param subscriptionId - Subscription ID
  * @param gatewayId - Payment gateway ID
@@ -457,6 +523,8 @@ export const createPaymentSessionAPI = async (
     return await createPaytabsPaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else if (gatewayName.includes('zaincash') || gatewayName.includes('zain cash')) {
     return await createZaincashPaymentSessionAPI(subscriptionId, planId, billingCycle);
+  } else if (gatewayName.includes('stripe')) {
+    return await createStripePaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else {
     // Default to PayTabs for now, or throw error for unsupported gateways
     throw new Error(`Payment gateway "${gateway.name}" is not yet supported`);

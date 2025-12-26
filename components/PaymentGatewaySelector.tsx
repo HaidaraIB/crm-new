@@ -35,7 +35,7 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
         const paytabsGateway = allGateways.find(g => g.name.toLowerCase().includes('paytabs'));
         const stripeGateway = allGateways.find(g => g.name.toLowerCase().includes('stripe'));
         
-        // Filter out Paytabs and Stripe from the list
+        // Filter out Paytabs and Stripe from the list (keep QiCard and Zain Cash as separate options)
         const otherGateways = allGateways.filter(g => {
           const nameLower = g.name.toLowerCase();
           return !nameLower.includes('paytabs') && !nameLower.includes('stripe');
@@ -81,6 +81,8 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
       return <img src="/visa_master_logo.png" alt="Card Payment" className="h-10 w-auto object-contain" />;
     } else if (nameLower.includes('zaincash') || nameLower.includes('zain cash')) {
       return <img src="/zain_cash_logo.png" alt="Zain Cash" className="h-10 w-auto object-contain" />;
+    } else if (nameLower.includes('qicard') || nameLower.includes('qi card') || nameLower.includes('qi-card')) {
+      return <img src="/q_card_logo.svg" alt="QiCard" className="h-10 w-auto object-contain" />;
     }
     return null;
   };

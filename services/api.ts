@@ -497,6 +497,47 @@ export const stripeReturnAPI = async (sessionId?: string, subscriptionId?: numbe
 
 
 /**
+ * إنشاء جلسة دفع QiCard
+ * POST /api/payments/create-qicard-session/
+ * Body: { subscription_id: number, plan_id?: number }
+ * Response: { payment_id: number, redirect_url: string, payment_id: string }
+ */
+export const createQicardPaymentSessionAPI = async (
+  subscriptionId: number, 
+  planId?: number, 
+  billingCycle?: 'monthly' | 'yearly'
+) => {
+  // Use direct fetch instead of apiRequest to avoid token requirement
+  const token = localStorage.getItem('accessToken');
+  const body: any = { subscription_id: subscriptionId };
+  if (planId) {
+    body.plan_id = planId;
+  }
+  if (billingCycle) {
+    body.billing_cycle = billingCycle;
+  }
+  const response = await fetch(`${BASE_URL}/payments/create-qicard-session/`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error: any = new Error(
+      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
+    );
+    throw error;
+  }
+
+  return response.json();
+};
+
+
+/**
  * Unified payment function that routes to the correct gateway based on gateway ID
  * @param subscriptionId - Subscription ID
  * @param gatewayId - Payment gateway ID
@@ -525,6 +566,8 @@ export const createPaymentSessionAPI = async (
     return await createZaincashPaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else if (gatewayName.includes('stripe')) {
     return await createStripePaymentSessionAPI(subscriptionId, planId, billingCycle);
+  } else if (gatewayName.includes('qicard') || gatewayName.includes('qi card') || gatewayName.includes('qi-card')) {
+    return await createQicardPaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else {
     // Default to PayTabs for now, or throw error for unsupported gateways
     throw new Error(`Payment gateway "${gateway.name}" is not yet supported`);

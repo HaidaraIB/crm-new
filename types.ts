@@ -4,7 +4,7 @@ export type Theme = 'light' | 'dark';
 export type Page = 
   | 'Dashboard' | 'Leads' | 'Activities' | 'Inventory' | 'Deals' 
   | 'Users' | 'Employees' | 'Marketing' | 'Todos' | 'Reports' | 'Integrations' 
-  | 'Settings' | 'ViewLead' | 'CreateDeal' | 'CreateLead' | 'EditLead' | 'Profile'
+  | 'Billing' | 'Settings' | 'ViewLead' | 'CreateDeal' | 'CreateLead' | 'EditLead' | 'Profile'
   // Sub-pages
   | 'All Leads' | 'Fresh Leads' | 'Cold Leads' | 'My Leads' | 'Rotated Leads'
   | 'Properties' | 'Owners'
@@ -12,7 +12,8 @@ export type Page =
   | 'Products' | 'Product Categories' | 'Suppliers'
   | 'Campaigns'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
-  | 'Meta' | 'TikTok' | 'WhatsApp';
+  | 'Meta' | 'TikTok' | 'WhatsApp'
+  | 'Change Plan' | 'Payment' | 'Subscription';
 
 export interface Subscription {
   id: number;

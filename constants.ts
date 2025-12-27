@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Page, Lead, User, Deal, Todo, Campaign, TimelineEntry, Activity, Developer, Project, Unit, Owner, Channel, Stage, Status, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier } from './types';
-import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon } from './components/index';
+import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon } from './components/index';
 
 export const SIDEBAR_ITEMS: {
   name: Page;
@@ -19,6 +19,7 @@ export const SIDEBAR_ITEMS: {
     { name: 'Todos', icon: CheckSquareIcon },
     { name: 'Reports', icon: FileTextIcon, subItems: ['Teams Report', 'Employees Report', 'Marketing Report'] },
     { name: 'Integrations', icon: ChevronsUpDownIcon, subItems: ['Meta', 'TikTok', 'WhatsApp'] },
+    { name: 'Billing', icon: CreditCardIcon, subItems: ['Change Plan', 'Payment', 'Subscription'] },
   ];
 
 export const SETTINGS_ITEM = { name: 'Settings', icon: SettingsIcon };
@@ -77,6 +78,17 @@ export const translations = {
     whatsApp: "WhatsApp",
     // FIX: Added missing translation key.
     website: "Website",
+    billing: "Billing",
+    changePlan: "Change Plan",
+    payment: "Payment",
+    subscription: "Subscription",
+    daysRemaining: "Days Remaining",
+    days: "days",
+    billingHistory: "Billing History",
+    billingHistoryComingSoon: "Billing history will be available soon",
+    noSubscriptionFound: "No active subscription found",
+    selectPlan: "Select a Plan",
+    pleaseLogin: "Please login to view billing information",
     settings: "Settings",
     channels: "Channels",
     stages: "Stages",
@@ -1098,7 +1110,7 @@ export const translations = {
     subscription: "Subscription",
     currentPlan: "Current Plan",
     subscriptionStatus: "Subscription Status",
-    changePlan: "change your plan",
+    changePlan: "Change Your Plan",
     changePlanDescription: "Click the button below to change your subscription plan",
     loadingPaymentLink: "Loading payment link...",
     errorLoadingPaymentLink: "Error loading payment link",
@@ -1164,6 +1176,17 @@ export const translations = {
     whatsApp: "واتساب",
     // FIX: Added missing translation key.
     website: "الموقع الإلكتروني",
+    billing: "الفواتير",
+    changePlan: "تغيير الخطة",
+    payment: "الدفع",
+    subscription: "الاشتراك",
+    daysRemaining: "الأيام المتبقية",
+    days: "أيام",
+    billingHistory: "سجل الفواتير",
+    billingHistoryComingSoon: "سجل الفواتير سيكون متاحاً قريباً",
+    noSubscriptionFound: "لم يتم العثور على اشتراك نشط",
+    selectPlan: "اختر خطة",
+    pleaseLogin: "يرجى تسجيل الدخول لعرض معلومات الفوترة",
     settings: "الإعدادات",
     channels: "القنوات",
     stages: "المراحل",

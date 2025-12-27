@@ -1,6 +1,6 @@
 
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './Button';
 import { Input } from './Input';
@@ -9,7 +9,8 @@ import { Dropdown, DropdownItem } from './Dropdown';
 import { navigateToCompanyRoute } from '../utils/routing';
 
 export const Header = () => {
-    const { t, theme, setTheme, language, setLanguage, setIsSidebarOpen, currentUser, setCurrentPage, setIsChangePasswordModalOpen } = useAppContext();
+    const { t, theme, setTheme, language, setLanguage, setIsSidebarOpen, currentUser, setCurrentPage, setIsChangePasswordModalOpen, setIsLoggedIn } = useAppContext();
+    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
     if (!currentUser) return null;
 
@@ -53,8 +54,49 @@ export const Header = () => {
                     <DropdownItem onClick={() => setIsChangePasswordModalOpen(true)}>
                         {t('changePassword')}
                     </DropdownItem>
+                    <DropdownItem onClick={() => setIsLogoutConfirmOpen(true)}>
+                        <span className="text-red-600 dark:text-red-400">{t('logout')}</span>
+                    </DropdownItem>
                 </Dropdown>
             </div>
+            {/* Logout Confirmation Dialog */}
+            {isLogoutConfirmOpen && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={() => setIsLogoutConfirmOpen(false)}>
+                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md transform transition-all" onClick={e => e.stopPropagation()}>
+                        <div className="p-6">
+                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                                {t('logoutConfirmTitle')}
+                            </h3>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
+                                {t('logoutConfirmMessage')}
+                            </p>
+                            <div className={`flex gap-3 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                                <button
+                                    onClick={() => setIsLogoutConfirmOpen(false)}
+                                    className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 font-medium transition-colors"
+                                >
+                                    {t('cancel')}
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        // Clear all data first
+                                        localStorage.removeItem('accessToken');
+                                        localStorage.removeItem('refreshToken');
+                                        localStorage.removeItem('isLoggedIn');
+                                        localStorage.removeItem('currentUser');
+                                        
+                                        // Then set logged in to false (this will handle redirect)
+                                        setIsLoggedIn(false);
+                                    }}
+                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium transition-colors"
+                                >
+                                    {t('logout')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </header>
     );
 };

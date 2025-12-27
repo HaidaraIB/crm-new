@@ -3,12 +3,12 @@
 
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { navigateToCompanyRoute } from '../utils/routing';
+import { navigateToCompanyRoute, getCompanyRoute } from '../utils/routing';
 // FIX: Import translations to be used for type casting.
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
 import { Button } from './Button';
-import { ChevronDownIcon, XIcon, LogOutIcon } from './icons';
+import { ChevronDownIcon, XIcon } from './icons';
 
 type SidebarItemProps = { 
     name: string; 
@@ -52,9 +52,8 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
 
 
 export const Sidebar = () => {
-    const { currentPage, setCurrentPage, setIsLoggedIn, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme } = useAppContext();
+    const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
-    const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
     
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
@@ -64,9 +63,32 @@ export const Sidebar = () => {
     };
     
     const handleNavigation = (page: PageType) => {
+        console.log('[Sidebar] handleNavigation called with page:', page);
+        console.log('[Sidebar] currentUser:', currentUser);
+        console.log('[Sidebar] subscription_id:', currentUser?.company?.subscription?.id);
+        
         setCurrentPage(page);
-        // Update URL to company route
-        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
+        
+        // For Billing pages, we need to add subscription_id to URL
+        const billingPages = ['Payment', 'Change Plan', 'Subscription'];
+        if (billingPages.includes(page)) {
+            const subscriptionId = currentUser?.company?.subscription?.id;
+            console.log('[Sidebar] Billing page detected, subscriptionId:', subscriptionId);
+            if (subscriptionId) {
+                const route = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
+                const url = `${route}?subscription_id=${subscriptionId}`;
+                console.log('[Sidebar] Navigating to URL:', url);
+                window.history.replaceState({}, '', url);
+            } else {
+                console.warn('[Sidebar] No subscription_id found, navigating without it');
+                // If no subscription_id, still navigate but page will handle the error
+                navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
+            }
+        } else {
+            // Update URL to company route for other pages
+            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
+        }
+        
         if (window.innerWidth < 1024) { // lg breakpoint
             setIsSidebarOpen(false);
         }
@@ -111,7 +133,8 @@ export const Sidebar = () => {
                     <img 
                         src={logoPath} 
                         alt="LOOP CRM Logo" 
-                        className="h-10 w-auto object-contain" 
+                        className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity" 
+                        onClick={() => handleNavigation('Dashboard')}
                     />
                 </div>
                 <button
@@ -124,6 +147,10 @@ export const Sidebar = () => {
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
                 {SIDEBAR_ITEMS.filter((item) => {
+                    // Hide Billing from main menu (it's shown in bottom section)
+                    if (item.name === 'Billing') {
+                        return false;
+                    }
                     // Hide Users item for non-admin users
                     if (item.name === 'Users' && currentUser?.role !== 'Owner') {
                         return false;
@@ -186,64 +213,23 @@ export const Sidebar = () => {
             </nav>
             <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700">
                 {currentUser?.role?.toLowerCase() !== 'employee' && (
-                    <SidebarItem
-                        name={t('settings')}
-                        icon={SETTINGS_ITEM.icon}
-                        isActive={currentPage === 'Settings'}
-                        onClick={() => handleNavigation('Settings')}
-                    />
+                    <>
+                        <SidebarItem
+                            name={t('billing')}
+                            icon={SIDEBAR_ITEMS.find(item => item.name === 'Billing')?.icon}
+                            isActive={currentPage === 'Billing'}
+                            onClick={() => handleNavigation('Billing')}
+                        />
+                        <SidebarItem
+                            name={t('settings')}
+                            icon={SETTINGS_ITEM.icon}
+                            isActive={currentPage === 'Settings'}
+                            onClick={() => handleNavigation('Settings')}
+                        />
+                    </>
                 )}
-                <a
-                    href="#"
-                    onClick={(e) => {
-                        e.preventDefault();
-                        setIsLogoutConfirmOpen(true);
-                    }}
-                    className="flex items-center px-4 py-2 mt-2 font-medium rounded-md transition-colors duration-150 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700"
-                >
-                    <LogOutIcon className={`w-5 h-5 ${language === 'ar' ? 'ml-3' : 'mr-3'}`} />
-                    {t('logout')}
-                </a>
             </div>
         </aside>
-        {/* Logout Confirmation Dialog */}
-        {isLogoutConfirmOpen && (
-            <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={() => setIsLogoutConfirmOpen(false)}>
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md transform transition-all" onClick={e => e.stopPropagation()}>
-                    <div className="p-6">
-                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                            {t('logoutConfirmTitle')}
-                        </h3>
-                        <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                            {t('logoutConfirmMessage')}
-                        </p>
-                        <div className={`flex gap-3 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                            <button
-                                onClick={() => setIsLogoutConfirmOpen(false)}
-                                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 font-medium transition-colors"
-                            >
-                                {t('cancel')}
-                            </button>
-                            <button
-                                onClick={() => {
-                                    // Clear all data first
-                                    localStorage.removeItem('accessToken');
-                                    localStorage.removeItem('refreshToken');
-                                    localStorage.removeItem('isLoggedIn');
-                                    localStorage.removeItem('currentUser');
-                                    
-                                    // Then set logged in to false (this will handle redirect)
-                                    setIsLoggedIn(false);
-                                }}
-                                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium transition-colors"
-                            >
-                                {t('logout')}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        )}
         </>
     );
 };

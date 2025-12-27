@@ -6,6 +6,7 @@ export * from './LoginPage';
 export * from './RegisterPage';
 export * from './PaymentPage';
 export * from './ChangePlanPage';
+export * from './BillingPage';
 export * from './PaymentSuccessPage';
 export * from './VerifyEmailPage';
 export * from './ForgotPasswordPage';

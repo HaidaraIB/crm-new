@@ -4,7 +4,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
-import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal } from '../components/index';
+import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal, LegalLinks } from '../components/index';
 import { changeEmailAPI, createPaymentSessionAPI } from '../services/api';
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -524,6 +524,11 @@ export const ProfilePage = () => {
                         {isSaving ? (t('saving') || 'Saving...') : t('saveProfile')}
                     </Button>
                 </div>
+                
+                {/* Legal Links Footer */}
+                <footer className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                    <LegalLinks variant="horizontal" size="sm" />
+                </footer>
             </div>
             
             <EmailVerificationModal

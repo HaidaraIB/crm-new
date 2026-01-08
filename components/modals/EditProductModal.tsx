@@ -26,6 +26,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 export const EditProductModal = () => {
     const { isEditProductModalOpen, setIsEditProductModalOpen, t, editingProduct, setEditingProduct, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
     
     // Fetch data using React Query
     const { data: categoriesResponse } = useProductCategories();
@@ -135,6 +136,12 @@ export const EditProductModal = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingProduct) return;
+        
+        // Only admins can edit products
+        if (!isAdmin) {
+            setErrors({ _general: t('adminOnly') || 'Only administrators can edit products.' });
+            return;
+        }
         
         if (!validateForm()) {
             return;

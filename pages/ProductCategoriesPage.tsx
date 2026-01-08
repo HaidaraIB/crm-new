@@ -135,7 +135,7 @@ export const ProductCategoriesPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
 
     // If not products, show message
     if (!isProducts) {

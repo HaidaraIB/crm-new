@@ -14,6 +14,7 @@ import {
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI,
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI,
+  getLeadFormsAPI, selectLeadFormAPI,
   createLeadAPI, updateLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   createDealAPI, updateDealAPI, deleteDealAPI,
@@ -665,7 +666,8 @@ export const useCreateUnit = (options?: UseMutationOptions<any, Error, any>) => 
   return useMutation({
     mutationFn: (data: any) => createUnitAPI(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.units() });
+      // Invalidate all units queries regardless of filters to refresh tables without manual reload
+      queryClient.invalidateQueries({ queryKey: ['units'] });
     },
     ...options,
   });
@@ -676,7 +678,8 @@ export const useUpdateUnit = (options?: UseMutationOptions<any, Error, { id: num
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateUnitAPI(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.units() });
+      // Invalidate all units queries regardless of filters to refresh tables without manual reload
+      queryClient.invalidateQueries({ queryKey: ['units'] });
     },
     ...options,
   });
@@ -687,7 +690,8 @@ export const useDeleteUnit = (options?: UseMutationOptions<void, Error, number>)
   return useMutation({
     mutationFn: (id: number) => deleteUnitAPI(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.units() });
+      // Invalidate all units queries regardless of filters to refresh tables without manual reload
+      queryClient.invalidateQueries({ queryKey: ['units'] });
     },
     ...options,
   });
@@ -1092,6 +1096,43 @@ export const useDeleteConnectedAccount = (options?: UseMutationOptions<void, Err
     onSuccess: () => {
       // Invalidate all connected accounts queries
       queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+    },
+    ...options,
+  });
+};
+
+/**
+ * Hook لجلب Lead Forms من Meta
+ */
+export const useLeadForms = (
+  accountId: number | null,
+  pageId: string | null,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: ['leadForms', accountId, pageId],
+    queryFn: () => {
+      if (!accountId || !pageId) {
+        throw new Error('Account ID and Page ID are required');
+      }
+      return getLeadFormsAPI(accountId, pageId);
+    },
+    enabled: !!accountId && !!pageId,
+    ...options,
+  });
+};
+
+/**
+ * Hook لربط Lead Form بكامبين
+ */
+export const useSelectLeadForm = (options?: UseMutationOptions<any, Error, { accountId: number; data: { page_id: string; form_id: string; campaign_id?: number } }>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ accountId, data }: { accountId: number; data: { page_id: string; form_id: string; campaign_id?: number } }) =>
+      selectLeadFormAPI(accountId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+      queryClient.invalidateQueries({ queryKey: ['leadForms'] });
     },
     ...options,
   });

@@ -3,10 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
 import { Service, ServicePackage, ServiceProvider } from '../types';
+import { AddServiceModal } from '../components/modals/AddServiceModal';
+import { EditServiceModal } from '../components/modals/EditServiceModal';
+import { AddServicePackageModal } from '../components/modals/AddServicePackageModal';
+import { EditServicePackageModal } from '../components/modals/EditServicePackageModal';
+import { AddServiceProviderModal } from '../components/modals/AddServiceProviderModal';
+import { EditServiceProviderModal } from '../components/modals/EditServiceProviderModal';
 
 type Tab = 'services' | 'packages' | 'providers';
 
-const ServicesTable = ({ services, onUpdate, onDelete }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void }) => {
+const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -39,12 +45,16 @@ const ServicesTable = ({ services, onUpdate, onDelete }: { services: Service[], 
                                     </td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(service)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(service.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(service)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(service.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -57,7 +67,7 @@ const ServicesTable = ({ services, onUpdate, onDelete }: { services: Service[], 
     );
 };
 
-const PackagesTable = ({ packages, onUpdate, onDelete }: { packages: ServicePackage[], onUpdate: (pkg: ServicePackage) => void, onDelete: (id: number) => void }) => {
+const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: ServicePackage[], onUpdate: (pkg: ServicePackage) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -90,12 +100,16 @@ const PackagesTable = ({ packages, onUpdate, onDelete }: { packages: ServicePack
                                     </td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(pkg)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(pkg.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(pkg)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(pkg.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -108,7 +122,7 @@ const PackagesTable = ({ packages, onUpdate, onDelete }: { packages: ServicePack
     );
 };
 
-const ProvidersTable = ({ providers, onUpdate, onDelete }: { providers: ServiceProvider[], onUpdate: (provider: ServiceProvider) => void, onDelete: (id: number) => void }) => {
+const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers: ServiceProvider[], onUpdate: (provider: ServiceProvider) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -138,12 +152,16 @@ const ProvidersTable = ({ providers, onUpdate, onDelete }: { providers: ServiceP
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.rating ? `⭐ ${provider.rating}` : '-'}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(provider)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(provider.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(provider)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(provider.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -168,6 +186,15 @@ export const ServicesInventoryPage = () => {
         deleteServiceProvider,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
+        setIsAddServiceModalOpen,
+        setIsEditServiceModalOpen,
+        setEditingService,
+        setIsAddServicePackageModalOpen,
+        setIsEditServicePackageModalOpen,
+        setEditingServicePackage,
+        setIsAddServiceProviderModalOpen,
+        setIsEditServiceProviderModalOpen,
+        setEditingServiceProvider,
     } = useAppContext();
     const [activeTab, setActiveTab] = useState<Tab>('services');
     const [loading, setLoading] = useState(true);
@@ -179,6 +206,7 @@ export const ServicesInventoryPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
+    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role?.toUpperCase() === 'ADMIN';
 
     // If not services, show message
     if (!isServices) {
@@ -209,7 +237,8 @@ export const ServicesInventoryPage = () => {
     };
 
     const handleUpdateService = (service: Service) => {
-        // TODO: Implement update modal
+        setEditingService(service);
+        setIsEditServiceModalOpen(true);
     };
 
     const handleDeletePackage = (id: number) => {
@@ -228,7 +257,8 @@ export const ServicesInventoryPage = () => {
     };
 
     const handleUpdatePackage = (pkg: ServicePackage) => {
-        // TODO: Implement update modal
+        setEditingServicePackage(pkg);
+        setIsEditServicePackageModalOpen(true);
     };
 
     const handleDeleteProvider = (id: number) => {
@@ -247,25 +277,59 @@ export const ServicesInventoryPage = () => {
     };
 
     const handleUpdateProvider = (provider: ServiceProvider) => {
-        // TODO: Implement update modal
+        setEditingServiceProvider(provider);
+        setIsEditServiceProviderModalOpen(true);
     };
 
     const renderContent = () => {
         switch (activeTab) {
             case 'services':
-                return <Card><ServicesTable services={services} onUpdate={handleUpdateService} onDelete={handleDeleteService} /></Card>;
+                return <Card><ServicesTable services={services} onUpdate={handleUpdateService} onDelete={handleDeleteService} isAdmin={isAdmin} /></Card>;
             case 'packages':
-                return <Card><PackagesTable packages={servicePackages} onUpdate={handleUpdatePackage} onDelete={handleDeletePackage} /></Card>;
+                return <Card><PackagesTable packages={servicePackages} onUpdate={handleUpdatePackage} onDelete={handleDeletePackage} isAdmin={isAdmin} /></Card>;
             case 'providers':
-                return <Card><ProvidersTable providers={serviceProviders} onUpdate={handleUpdateProvider} onDelete={handleDeleteProvider} /></Card>;
+                return <Card><ProvidersTable providers={serviceProviders} onUpdate={handleUpdateProvider} onDelete={handleDeleteProvider} isAdmin={isAdmin} /></Card>;
             default:
                 return null;
         }
     };
 
+    const getAddButtonLabel = () => {
+        switch (activeTab) {
+            case 'services': return t('addService') || 'Add Service';
+            case 'packages': return t('addServicePackage') || 'Add Package';
+            case 'providers': return t('addServiceProvider') || 'Add Provider';
+            default: return t('createNew') || 'Create New';
+        }
+    };
+
+    const handleAddClick = () => {
+        switch (activeTab) {
+            case 'services':
+                setIsAddServiceModalOpen(true);
+                break;
+            case 'packages':
+                setIsAddServicePackageModalOpen(true);
+                break;
+            case 'providers':
+                setIsAddServiceProviderModalOpen(true);
+                break;
+        }
+    };
+
+    const pageActions = (
+        <>
+            {isAdmin && (
+                <Button onClick={handleAddClick}>
+                    <PlusIcon className="w-4 h-4"/> {getAddButtonLabel()}
+                </Button>
+            )}
+        </>
+    );
+
     if (loading) {
         return (
-            <PageWrapper title={t('services')}>
+            <PageWrapper title={t('services')} actions={pageActions}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
                     <Loader variant="primary" className="h-12"/>
                 </div>
@@ -274,7 +338,7 @@ export const ServicesInventoryPage = () => {
     }
 
     return (
-        <PageWrapper title={t('services')}>
+        <PageWrapper title={t('services')} actions={pageActions}>
             <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
                 <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
                     <button onClick={() => setActiveTab('services')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'services' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('services')}</button>
@@ -283,6 +347,12 @@ export const ServicesInventoryPage = () => {
                 </nav>
             </div>
             {renderContent()}
+            <AddServiceModal />
+            <EditServiceModal />
+            <AddServicePackageModal />
+            <EditServicePackageModal />
+            <AddServiceProviderModal />
+            <EditServiceProviderModal />
         </PageWrapper>
     );
 };

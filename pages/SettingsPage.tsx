@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { PageWrapper } from '../components/index';
+import { PageWrapper, LegalLinks } from '../components/index';
 import { ChannelsSettings } from './settings/ChannelsSettings';
 import { StagesSettings } from './settings/StagesSettings';
 import { StatusesSettings } from './settings/StatusesSettings';
@@ -44,6 +44,10 @@ export const SettingsPage = () => {
                 </nav>
             </div>
             {renderContent()}
+            {/* Legal Links Footer */}
+            <footer className="mt-12 pt-6 border-t border-gray-200 dark:border-gray-700">
+                <LegalLinks variant="horizontal" size="sm" />
+            </footer>
         </PageWrapper>
     );
 };

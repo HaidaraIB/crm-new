@@ -262,6 +262,12 @@ export interface AppContextType {
   editingAccount: ConnectedAccount | null;
   setEditingAccount: React.Dispatch<React.SetStateAction<ConnectedAccount | null>>;
   
+  // Select Lead Form Modal state
+  isSelectLeadFormModalOpen: boolean;
+  setIsSelectLeadFormModalOpen: (isOpen: boolean) => void;
+  selectLeadFormConfig: { accountId: number; pageId: string; pageName: string } | null;
+  setSelectLeadFormConfig: React.Dispatch<React.SetStateAction<{ accountId: number; pageId: string; pageName: string } | null>>;
+  
   // Change Password Modal state
   isChangePasswordModalOpen: boolean;
   setIsChangePasswordModalOpen: (isOpen: boolean) => void;
@@ -666,6 +672,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
   // Integrations state
   const [isManageIntegrationAccountModalOpen, setIsManageIntegrationAccountModalOpen] = useState(false);
+  const [isSelectLeadFormModalOpen, setIsSelectLeadFormModalOpen] = useState(false);
+  const [selectLeadFormConfig, setSelectLeadFormConfig] = useState<{ accountId: number; pageId: string; pageName: string } | null>(null);
   // TODO: استدعي getConnectedAccountsAPI() عند تحميل صفحة Integrations
   // مثال: getConnectedAccountsAPI('meta').then(data => setConnectedAccounts(prev => ({ ...prev, facebook: data })));
   const [connectedAccounts, setConnectedAccounts] = useState<{ facebook: ConnectedAccount[]; tiktok: ConnectedAccount[]; whatsapp: ConnectedAccount[] }>({
@@ -1108,6 +1116,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isManageIntegrationAccountModalOpen, setIsManageIntegrationAccountModalOpen,
     connectedAccounts, setConnectedAccounts,
     editingAccount, setEditingAccount,
+    isSelectLeadFormModalOpen, setIsSelectLeadFormModalOpen,
+    selectLeadFormConfig, setSelectLeadFormConfig,
     isChangePasswordModalOpen, setIsChangePasswordModalOpen,
     isEmailVerificationModalOpen, setIsEmailVerificationModalOpen,
     isSuccessModalOpen, setIsSuccessModalOpen,

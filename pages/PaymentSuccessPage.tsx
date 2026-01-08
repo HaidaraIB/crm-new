@@ -169,8 +169,8 @@ export const PaymentSuccessPage = () => {
                     // If we have credentials and pendingUserData matches, try to login
                     if (storedUsername && storedPassword && pendingUserData?.username === storedUsername) {
                         try {
-                            // Request 2FA token first
-                            const twoFAResponse = await requestTwoFactorAuthAPI(storedUsername, language);
+                            // Request 2FA token first (password will be validated)
+                            const twoFAResponse = await requestTwoFactorAuthAPI(storedUsername, storedPassword, language);
                             
                             // For payment success, backend might allow login without 2FA code
                             // Try to verify with empty code

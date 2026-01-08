@@ -1,11 +1,13 @@
 
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { useDeleteDeveloper } from '../../hooks/useQueries';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 
 export const DeleteDeveloperModal = () => {
-    const { isDeleteDeveloperModalOpen, setIsDeleteDeveloperModalOpen, deletingDeveloper, setDeletingDeveloper, t, deleteDeveloper } = useAppContext();
+    const { isDeleteDeveloperModalOpen, setIsDeleteDeveloperModalOpen, deletingDeveloper, setDeletingDeveloper, t } = useAppContext();
+    const deleteDeveloperMutation = useDeleteDeveloper();
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
 
@@ -15,7 +17,7 @@ export const DeleteDeveloperModal = () => {
         setIsLoading(true);
         setSuccessMessage('');
         try {
-            await deleteDeveloper(deletingDeveloper.id);
+            await deleteDeveloperMutation.mutateAsync(deletingDeveloper.id);
             
             // Success - show message and close after a delay
             setSuccessMessage(t('developerDeletedSuccessfully') || 'Developer deleted successfully!');

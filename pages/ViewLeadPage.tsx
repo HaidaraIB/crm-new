@@ -301,6 +301,10 @@ export const ViewLeadPage = () => {
                     priority: apiLead.priority || '',
                     createdAt: apiLead.created_at || apiLead.createdAt || '',
                     lastFeedback: apiLead.last_feedback || apiLead.lastFeedback || '',
+                    campaign: apiLead.campaign || null,
+                    campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
+                    source: apiLead.source || 'manual',
+                    integration_account: apiLead.integration_account || null,
                 };
                 // Store assigned_to from API for display
                 (transformedLead as any).assigned_to = apiLead.assigned_to;
@@ -330,6 +334,10 @@ export const ViewLeadPage = () => {
                 createdAt: apiLead.created_at || apiLead.createdAt || '',
                 lastFeedback: apiLead.last_feedback || apiLead.lastFeedback || '',
                 notes: apiLead.notes || '',
+                campaign: apiLead.campaign || null,
+                campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
+                source: apiLead.source || 'manual',
+                integration_account: apiLead.integration_account || null,
             };
             // Store assigned_to from API for display
             (transformedLead as any).assigned_to = apiLead.assigned_to;
@@ -865,6 +873,50 @@ export const ViewLeadPage = () => {
                                 })()}
                             </div>
                         </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('source') || 'Source'}</label>
+                            <div className="mt-1">
+                                {(() => {
+                                    const source = displayLead.source || 'manual';
+                                    if (source === 'meta_lead_form') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                <FacebookIcon className="w-4 h-4" />
+                                                Meta
+                                            </span>
+                                        );
+                                    } else if (source === 'whatsapp') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                <WhatsappIcon className="w-4 h-4" />
+                                                WhatsApp
+                                            </span>
+                                        );
+                                    } else if (source === 'tiktok') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                TikTok
+                                            </span>
+                                        );
+                                    }
+                                    return (
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                            {t('manual') || 'Manual'}
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                        {displayLead.campaign && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('campaign') || 'Campaign'}</label>
+                                <div className="mt-1">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                        {(displayLead as any).campaign_name || `Campaign #${displayLead.campaign}`}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </Card>
                 <Card className="lg:col-span-1">

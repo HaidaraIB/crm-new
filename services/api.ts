@@ -5,10 +5,24 @@
  * TODO: تأكد من أن API يعمل على هذا الرابط (افتراضي: https://haidaraib.pythonanywhere.com)
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'https://haidaraib.pythonanywhere.com/api';
+const BASE_URL = import.meta.env.VITE_API_URL || '';
+const API_KEY = import.meta.env.VITE_API_KEY || '';
 
 // متغير لتتبع عملية refresh token الجارية لتجنب استدعاءات متعددة
 let refreshTokenPromise: Promise<void> | null = null;
+
+/**
+ * Helper function to add API Key to headers
+ */
+function getHeadersWithApiKey(customHeaders: Record<string, string> = {}): Record<string, string> {
+  const headers: Record<string, string> = {
+    ...customHeaders,
+  };
+  if (API_KEY) {
+    headers['X-API-Key'] = API_KEY;
+  }
+  return headers;
+}
 
 /**
  * Helper function to make API requests
@@ -29,6 +43,11 @@ async function apiRequest<T>(
       Object.entries(options.headers || {}).map(([k, v]) => [k, String(v)])
     ),
   };
+
+  // Add API Key to all requests for application authentication
+  if (API_KEY) {
+    headers['X-API-Key'] = API_KEY;
+  }
 
   if (!isFormData) {
     headers['Content-Type'] = 'application/json';
@@ -189,9 +208,9 @@ async function apiRequest<T>(
 export const loginAPI = async (username: string, password: string) => {
   const response = await fetch(`${BASE_URL}/auth/login/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ username, password }),
   });
 
@@ -233,10 +252,10 @@ export const registerCompanyAPI = async (data: {
 }, language: string = 'en') => {
   const response = await fetch(`${BASE_URL}/auth/register/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       'Accept-Language': language,
-    },
+    }),
     body: JSON.stringify(data),
   });
 
@@ -286,10 +305,10 @@ export const createPaytabsPaymentSessionAPI = async (
   }
   const response = await fetch(`${BASE_URL}/payments/create-paytabs-session/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
     body: JSON.stringify(body),
   });
 
@@ -313,9 +332,9 @@ export const createPaytabsPaymentSessionAPI = async (
 export const paytabsReturnAPI = async (tranRef?: string, subscriptionId?: number) => {
   const response = await fetch(`${BASE_URL}/payments/paytabs-return/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ 
       ...(tranRef && { tran_ref: tranRef }),
       ...(subscriptionId && { subscription_id: subscriptionId })
@@ -369,10 +388,10 @@ export const createZaincashPaymentSessionAPI = async (
   }
   const response = await fetch(`${BASE_URL}/payments/create-zaincash-session/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
     body: JSON.stringify(body),
   });
 
@@ -396,9 +415,9 @@ export const createZaincashPaymentSessionAPI = async (
 export const zaincashReturnAPI = async (token?: string, subscriptionId?: number) => {
   const response = await fetch(`${BASE_URL}/payments/zaincash-return/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ 
       ...(token && { token: token }),
       ...(subscriptionId && { subscription_id: subscriptionId })
@@ -452,10 +471,10 @@ export const createStripePaymentSessionAPI = async (
   }
   const response = await fetch(`${BASE_URL}/payments/create-stripe-session/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
     body: JSON.stringify(body),
   });
 
@@ -486,9 +505,9 @@ export const stripeReturnAPI = async (sessionId?: string, subscriptionId?: numbe
   
   const response = await fetch(`${BASE_URL}/payments/stripe-return/?${params.toString()}`, {
     method: 'GET',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
   });
 
   // Stripe return is a redirect, so we just return the response
@@ -518,10 +537,10 @@ export const createQicardPaymentSessionAPI = async (
   }
   const response = await fetch(`${BASE_URL}/payments/create-qicard-session/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
     body: JSON.stringify(body),
   });
 
@@ -583,9 +602,9 @@ export const createPaymentSessionAPI = async (
 export const checkPaymentStatusAPI = async (subscriptionId: number) => {
   const response = await fetch(`${BASE_URL}/payment-status/${subscriptionId}/`, {
     method: 'GET',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
   });
 
   const data = await response.json().catch(() => ({}));
@@ -631,9 +650,9 @@ export const checkRegistrationAvailabilityAPI = async (payload: {
 }) => {
   const response = await fetch(`${BASE_URL}/auth/check-availability/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -663,9 +682,9 @@ export const verifyEmailAPI = async (payload: {
 }) => {
   const response = await fetch(`${BASE_URL}/auth/verify-email/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -694,10 +713,10 @@ export const resendVerificationCodeAPI = async (email: string) => {
   const token = localStorage.getItem('accessToken');
   const response = await fetch(`${BASE_URL}/auth/resend-verification/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
     body: JSON.stringify({ email }),
   });
 
@@ -726,10 +745,10 @@ export const changeEmailAPI = async (email: string, newEmail: string) => {
   const token = localStorage.getItem('accessToken');
   const response = await fetch(`${BASE_URL}/auth/change-email/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
     body: JSON.stringify({ email, new_email: newEmail }),
   });
 
@@ -757,10 +776,10 @@ export const changeEmailAPI = async (email: string, newEmail: string) => {
 export const forgotPasswordAPI = async (email: string, language: string = 'en') => {
   const response = await fetch(`${BASE_URL}/auth/forgot-password/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       'Accept-Language': language,
-    },
+    }),
     body: JSON.stringify({ email }),
   });
 
@@ -794,9 +813,9 @@ export const resetPasswordAPI = async (payload: {
 }) => {
   const response = await fetch(`${BASE_URL}/auth/reset-password/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -818,20 +837,20 @@ export const resetPasswordAPI = async (payload: {
 /**
  * طلب رمز المصادقة الثنائية
  * POST /api/auth/request-2fa/
- * Body: { username: string }
+ * Body: { username: string, password: string }
  * Response: { message: string, sent: bool, token: string }
  */
-export const requestTwoFactorAuthAPI = async (username: string, language: string = 'ar') => {
+export const requestTwoFactorAuthAPI = async (username: string, password: string, language: string = 'ar') => {
   try {
     const url = `${BASE_URL}/auth/request-2fa/`;
     
     const response = await fetch(url, {
       method: 'POST',
-      headers: {
+      headers: getHeadersWithApiKey({
         'Content-Type': 'application/json',
         'Accept-Language': language,
-      },
-      body: JSON.stringify({ username }),
+      }),
+      body: JSON.stringify({ username, password }),
       credentials: 'include', // Include credentials for CORS
     });
     
@@ -935,9 +954,9 @@ export const verifyTwoFactorAuthAPI = async (payload: {
 }) => {
   const response = await fetch(`${BASE_URL}/auth/verify-2fa/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify(payload),
   });
 
@@ -993,9 +1012,9 @@ export const refreshTokenAPI = async () => {
 
   const response = await fetch(`${BASE_URL}/auth/refresh/`, {
     method: 'POST',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
-    },
+    }),
     body: JSON.stringify({ refresh: refreshToken }),
   });
 
@@ -1243,10 +1262,10 @@ export const deleteDeveloperAPI = async (developerId: number) => {
   
   const response = await fetch(`${BASE_URL}/developers/${developerId}/`, {
     method: 'DELETE',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
   });
 
   if (!response.ok) {
@@ -1297,10 +1316,10 @@ export const deleteProjectAPI = async (projectId: number) => {
   
   const response = await fetch(`${BASE_URL}/projects/${projectId}/`, {
     method: 'DELETE',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
   });
 
   if (!response.ok) {
@@ -1840,6 +1859,46 @@ export const getIntegrationLogsAPI = async (accountId?: number) => {
   return apiRequest<any[]>(`/integrations/logs/${query}`);
 };
 
+/**
+ * GET /api/integrations/accounts/:id/lead_forms/?page_id={page_id}
+ * جلب قائمة Lead Forms من صفحة Meta
+ */
+export const getLeadFormsAPI = async (accountId: number, pageId: string) => {
+  return apiRequest<{
+    page_id: string;
+    lead_forms: Array<{
+      id: string;
+      name: string;
+      status: string;
+      leads_count: number;
+      created_time: string;
+    }>;
+  }>(`/integrations/accounts/${accountId}/lead_forms/?page_id=${pageId}`);
+};
+
+/**
+ * POST /api/integrations/accounts/:id/select_lead_form/
+ * ربط Lead Form معين بكامبين
+ */
+export const selectLeadFormAPI = async (
+  accountId: number,
+  data: {
+    page_id: string;
+    form_id: string;
+    campaign_id?: number;
+  }
+) => {
+  return apiRequest<{
+    message: string;
+    page_id: string;
+    form_id: string;
+    campaign_id?: number;
+  }>(`/integrations/accounts/${accountId}/select_lead_form/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
 // ==================== Activities/Tasks APIs ====================
 
 /**
@@ -1919,10 +1978,10 @@ export const deleteClientTaskAPI = async (clientTaskId: number) => {
   const token = localStorage.getItem('accessToken');
   const response = await fetch(`${BASE_URL}/client-tasks/${clientTaskId}/`, {
     method: 'DELETE',
-    headers: {
+    headers: getHeadersWithApiKey({
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
-    },
+    }),
   });
 
   if (response.status === 401) {

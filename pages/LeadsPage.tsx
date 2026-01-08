@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon } from '../components/index';
-import { TrashIcon, ChevronDownIcon } from '../components/icons';
+import { TrashIcon, ChevronDownIcon, FacebookIcon } from '../components/icons';
 import { Lead } from '../types';
 import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks, useAssignUnassignedClients } from '../hooks/useQueries';
 
@@ -244,6 +244,10 @@ export const LeadsPage = () => {
             budget: typeof l.budget === 'number' ? l.budget : Number(l.budget) || 0,
             assignedTo: l.assigned_to ?? l.assignedTo,
             createdAt: l.created_at || l.createdAt,
+            source: l.source || 'manual',
+            campaign: l.campaign || null,
+            campaign_name: l.campaign_name || (l.campaign ? String(l.campaign) : null),
+            integration_account: l.integration_account || null,
             // Store additional fields for display
             assigned_to: l.assigned_to,
             assigned_to_username: l.assigned_to_username,
@@ -668,6 +672,7 @@ export const LeadsPage = () => {
                                         <th scope="col" className="p-2 sm:p-4 text-center whitespace-nowrap"><input type="checkbox" onChange={(e) => handleSelectAll(e.target.checked)} checked={isAllSelected} className="rounded" /></th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('name')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('phone')}</th>
+                                        <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('source') || 'Source'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('type')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('priority')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('budget')}</th>
@@ -835,6 +840,46 @@ export const LeadsPage = () => {
                                                             )
                                                         )}
                                                     </div>
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-center">
+                                                    {(() => {
+                                                        const source = (lead as any).source || 'manual';
+                                                        if (source === 'meta_lead_form') {
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                                    <FacebookIcon className="w-3 h-3" />
+                                                                    Meta
+                                                                </span>
+                                                            );
+                                                        } else if (source === 'whatsapp') {
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                                    <WhatsappIcon className="w-3 h-3" />
+                                                                    WhatsApp
+                                                                </span>
+                                                            );
+                                                        } else if (source === 'tiktok') {
+                                                            return (
+                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                                    TikTok
+                                                                </span>
+                                                            );
+                                                        }
+                                                        return (
+                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                                {t('manual') || 'Manual'}
+                                                            </span>
+                                                        );
+                                                    })()}
+                                                </td>
+                                                <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-center">
+                                                    {lead.campaign ? (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                                            {(lead as any).campaign_name || `Campaign #${lead.campaign}`}
+                                                        </span>
+                                                    ) : (
+                                                        <span className="text-gray-400 dark:text-gray-500">-</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-center">
                                                     {(() => {

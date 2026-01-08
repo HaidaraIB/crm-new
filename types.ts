@@ -13,7 +13,9 @@ export type Page =
   | 'Campaigns'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
   | 'Meta' | 'TikTok' | 'WhatsApp'
-  | 'Change Plan' | 'Payment' | 'Subscription';
+  | 'Change Plan' | 'Payment' | 'Subscription'
+  // Legal pages
+  | 'TermsOfService' | 'PrivacyPolicy' | 'DataDeletionPolicy';
 
 export interface Subscription {
   id: number;
@@ -101,6 +103,11 @@ export interface Lead {
   communicationWay: string;
   priority: 'High' | 'Medium' | 'Low';
   createdAt: string;
+  // Integration fields
+  campaign?: number | null; // Campaign ID
+  campaign_name?: string; // Campaign name (from API)
+  source?: 'meta_lead_form' | 'whatsapp' | 'tiktok' | 'manual' | 'other' | string; // Lead source
+  integration_account?: number | null; // IntegrationAccount ID
   // Computed fields (not in API, calculated from ClientTasks)
   lastFeedback?: string; // From last ClientTask notes
   notes?: string; // From last ClientTask notes

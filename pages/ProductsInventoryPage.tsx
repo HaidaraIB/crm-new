@@ -3,10 +3,16 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
 import { Product, ProductCategory, Supplier } from '../types';
+import { AddProductModal } from '../components/modals/AddProductModal';
+import { EditProductModal } from '../components/modals/EditProductModal';
+import { AddProductCategoryModal } from '../components/modals/AddProductCategoryModal';
+import { EditProductCategoryModal } from '../components/modals/EditProductCategoryModal';
+import { AddSupplierModal } from '../components/modals/AddSupplierModal';
+import { EditSupplierModal } from '../components/modals/EditSupplierModal';
 
 type Tab = 'products' | 'categories' | 'suppliers';
 
-const ProductsTable = ({ products, onUpdate, onDelete }: { products: Product[], onUpdate: (product: Product) => void, onDelete: (id: number) => void }) => {
+const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Product[], onUpdate: (product: Product) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -47,12 +53,16 @@ const ProductsTable = ({ products, onUpdate, onDelete }: { products: Product[], 
                                     </td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(product)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(product.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(product)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(product.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -65,7 +75,7 @@ const ProductsTable = ({ products, onUpdate, onDelete }: { products: Product[], 
     );
 };
 
-const CategoriesTable = ({ categories, onUpdate, onDelete }: { categories: ProductCategory[], onUpdate: (category: ProductCategory) => void, onDelete: (id: number) => void }) => {
+const CategoriesTable = ({ categories, onUpdate, onDelete, isAdmin }: { categories: ProductCategory[], onUpdate: (category: ProductCategory) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -88,12 +98,16 @@ const CategoriesTable = ({ categories, onUpdate, onDelete }: { categories: Produ
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm max-w-xs truncate">{category.description}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(category)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(category.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(category)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(category.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -106,7 +120,7 @@ const CategoriesTable = ({ categories, onUpdate, onDelete }: { categories: Produ
     );
 };
 
-const SuppliersTable = ({ suppliers, onUpdate, onDelete }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void }) => {
+const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0">
@@ -137,12 +151,16 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete }: { suppliers: Supplier
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{supplier.contactPerson}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
-                                            <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(supplier)}>
-                                                <EditIcon className="w-4 h-4" />
-                                            </Button>
-                                            <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(supplier.id)}>
-                                                <TrashIcon className="w-4 h-4" />
-                                            </Button>
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(supplier)}>
+                                                    <EditIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
+                                            {isAdmin && (
+                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(supplier.id)}>
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </Button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>
@@ -167,6 +185,15 @@ export const ProductsInventoryPage = () => {
         deleteSupplier,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
+        setIsAddProductModalOpen,
+        setIsEditProductModalOpen,
+        setEditingProduct,
+        setIsAddProductCategoryModalOpen,
+        setIsEditProductCategoryModalOpen,
+        setEditingProductCategory,
+        setIsAddSupplierModalOpen,
+        setIsEditSupplierModalOpen,
+        setEditingSupplier,
     } = useAppContext();
     const [activeTab, setActiveTab] = useState<Tab>('products');
     const [loading, setLoading] = useState(true);
@@ -178,6 +205,7 @@ export const ProductsInventoryPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
+    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role?.toUpperCase() === 'ADMIN';
 
     // If not products, show message
     if (!isProducts) {
@@ -208,7 +236,8 @@ export const ProductsInventoryPage = () => {
     };
 
     const handleUpdateProduct = (product: Product) => {
-        // TODO: Implement update modal
+        setEditingProduct(product);
+        setIsEditProductModalOpen(true);
     };
 
     const handleDeleteCategory = (id: number) => {
@@ -227,7 +256,8 @@ export const ProductsInventoryPage = () => {
     };
 
     const handleUpdateCategory = (category: ProductCategory) => {
-        // TODO: Implement update modal
+        setEditingProductCategory(category);
+        setIsEditProductCategoryModalOpen(true);
     };
 
     const handleDeleteSupplier = (id: number) => {
@@ -246,25 +276,59 @@ export const ProductsInventoryPage = () => {
     };
 
     const handleUpdateSupplier = (supplier: Supplier) => {
-        // TODO: Implement update modal
+        setEditingSupplier(supplier);
+        setIsEditSupplierModalOpen(true);
     };
 
     const renderContent = () => {
         switch (activeTab) {
             case 'products':
-                return <Card><ProductsTable products={products} onUpdate={handleUpdateProduct} onDelete={handleDeleteProduct} /></Card>;
+                return <Card><ProductsTable products={products} onUpdate={handleUpdateProduct} onDelete={handleDeleteProduct} isAdmin={isAdmin} /></Card>;
             case 'categories':
-                return <Card><CategoriesTable categories={productCategories} onUpdate={handleUpdateCategory} onDelete={handleDeleteCategory} /></Card>;
+                return <Card><CategoriesTable categories={productCategories} onUpdate={handleUpdateCategory} onDelete={handleDeleteCategory} isAdmin={isAdmin} /></Card>;
             case 'suppliers':
-                return <Card><SuppliersTable suppliers={suppliers} onUpdate={handleUpdateSupplier} onDelete={handleDeleteSupplier} /></Card>;
+                return <Card><SuppliersTable suppliers={suppliers} onUpdate={handleUpdateSupplier} onDelete={handleDeleteSupplier} isAdmin={isAdmin} /></Card>;
             default:
                 return null;
         }
     };
 
+    const getAddButtonLabel = () => {
+        switch (activeTab) {
+            case 'products': return t('addProduct') || 'Add Product';
+            case 'categories': return t('addProductCategory') || 'Add Category';
+            case 'suppliers': return t('addSupplier') || 'Add Supplier';
+            default: return t('createNew') || 'Create New';
+        }
+    };
+
+    const handleAddClick = () => {
+        switch (activeTab) {
+            case 'products':
+                setIsAddProductModalOpen(true);
+                break;
+            case 'categories':
+                setIsAddProductCategoryModalOpen(true);
+                break;
+            case 'suppliers':
+                setIsAddSupplierModalOpen(true);
+                break;
+        }
+    };
+
+    const pageActions = (
+        <>
+            {isAdmin && (
+                <Button onClick={handleAddClick}>
+                    <PlusIcon className="w-4 h-4"/> {getAddButtonLabel()}
+                </Button>
+            )}
+        </>
+    );
+
     if (loading) {
         return (
-            <PageWrapper title={t('products')}>
+            <PageWrapper title={t('products')} actions={pageActions}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
                     <Loader variant="primary" className="h-12"/>
                 </div>
@@ -273,7 +337,7 @@ export const ProductsInventoryPage = () => {
     }
 
     return (
-        <PageWrapper title={t('products')}>
+        <PageWrapper title={t('products')} actions={pageActions}>
             <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
                 <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
                     <button onClick={() => setActiveTab('products')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'products' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('products')}</button>
@@ -282,6 +346,12 @@ export const ProductsInventoryPage = () => {
                 </nav>
             </div>
             {renderContent()}
+            <AddProductModal />
+            <EditProductModal />
+            <AddProductCategoryModal />
+            <EditProductCategoryModal />
+            <AddSupplierModal />
+            <EditSupplierModal />
         </PageWrapper>
     );
 };

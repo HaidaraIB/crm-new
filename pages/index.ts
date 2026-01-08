@@ -37,3 +37,6 @@ export * from './ServiceProvidersPage';
 export * from './ProductsPage';
 export * from './ProductCategoriesPage';
 export * from './SuppliersPage';
+export * from './TermsOfServicePage';
+export * from './PrivacyPolicyPage';
+export * from './DataDeletionPolicyPage';

@@ -5,8 +5,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader } from '../components/index';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
+import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 
 type Account = { id: number; name: string; status: string; };
 
@@ -24,7 +25,18 @@ const platformConfig: Record<string, { name: string, icon: React.FC<React.SVGPro
 };
 
 export const IntegrationsPage = () => {
-    const { t, currentPage, setIsManageIntegrationAccountModalOpen, setEditingAccount, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
+    const { 
+        t, 
+        currentPage, 
+        setIsManageIntegrationAccountModalOpen, 
+        setEditingAccount, 
+        setConfirmDeleteConfig, 
+        setIsConfirmDeleteModalOpen,
+        isSelectLeadFormModalOpen,
+        setIsSelectLeadFormModalOpen,
+        selectLeadFormConfig,
+        setSelectLeadFormConfig,
+    } = useAppContext();
 
     // Get platform param based on currentPage
     const platformParam = useMemo(() => {
@@ -110,8 +122,53 @@ export const IntegrationsPage = () => {
             window.history.replaceState({}, document.title, window.location.pathname);
             // Invalidate queries to refetch accounts
             queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+            
+            // If Meta account, try to open Lead Form selection modal
+            if (platformParam === 'meta') {
+                // Fetch account details to get pages
+                getConnectedAccountsAPI(platformParam).then((accounts: any) => {
+                    const account = Array.isArray(accounts) 
+                        ? accounts.find((a: any) => a.id === parseInt(accountId))
+                        : accounts?.results?.find((a: any) => a.id === parseInt(accountId));
+                    
+                    if (account && account.metadata?.pages && account.metadata.pages.length > 0) {
+                        // Use first page for now (can be improved to let user select)
+                        const firstPage = account.metadata.pages[0];
+                        setSelectLeadFormConfig({
+                            accountId: parseInt(accountId),
+                            pageId: firstPage.id,
+                            pageName: firstPage.name,
+                        });
+                        setIsSelectLeadFormModalOpen(true);
+                    }
+                }).catch(console.error);
+            }
         }
-    }, [queryClient]);
+    }, [queryClient, platformParam]);
+    
+    const handleSelectLeadForm = (account: any) => {
+        if (account.platform === 'meta' && account.metadata?.pages) {
+            const pages = account.metadata.pages;
+            if (pages.length === 1) {
+                // If only one page, use it directly
+                setSelectLeadFormConfig({
+                    accountId: account.id,
+                    pageId: pages[0].id,
+                    pageName: pages[0].name,
+                });
+                setIsSelectLeadFormModalOpen(true);
+            } else if (pages.length > 1) {
+                // TODO: Show page selection first, then lead form selection
+                // For now, use first page
+                setSelectLeadFormConfig({
+                    accountId: account.id,
+                    pageId: pages[0].id,
+                    pageName: pages[0].name,
+                });
+                setIsSelectLeadFormModalOpen(true);
+            }
+        }
+    };
 
     const handleDelete = async (accountId: number) => {
         const account = accounts.find(acc => acc.id === accountId);
@@ -196,6 +253,11 @@ export const IntegrationsPage = () => {
                                             {t('connect') || 'Connect'}
                                         </Button>
                                     )}
+                                    {account.status === 'Connected' && account.platform === 'meta' && (
+                                        <Button variant="secondary" onClick={() => handleSelectLeadForm(account)}>
+                                            {t('selectLeadForm') || 'Select Lead Form'}
+                                        </Button>
+                                    )}
                                     <Button variant="secondary" onClick={() => handleEdit(account)}><SettingsIcon className="w-4 h-4 me-2" /> {t('edit')}</Button>
                                     <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
                                 </div>
@@ -210,6 +272,23 @@ export const IntegrationsPage = () => {
                     </div>
                 )}
             </Card>
+            
+            {/* Select Lead Form Modal */}
+            {selectLeadFormConfig && (
+                <SelectLeadFormModal
+                    isOpen={isSelectLeadFormModalOpen}
+                    onClose={() => {
+                        setIsSelectLeadFormModalOpen(false);
+                        setSelectLeadFormConfig(null);
+                    }}
+                    accountId={selectLeadFormConfig.accountId}
+                    pageId={selectLeadFormConfig.pageId}
+                    pageName={selectLeadFormConfig.pageName}
+                    onSuccess={() => {
+                        queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                    }}
+                />
+            )}
         </PageWrapper>
     );
 };

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
+import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks } from '../components/index';
 import { loginAPI, getCurrentUserAPI, requestTwoFactorAuthAPI } from '../services/api';
 
 export const LoginPage = () => {
@@ -131,8 +131,8 @@ export const LoginPage = () => {
         setIsLoading(true);
         
         try {
-            // Request 2FA code (this will verify user exists and is active)
-            const twoFAResponse = await requestTwoFactorAuthAPI(username, language);
+            // Request 2FA code (this will verify user exists, is active, and password is correct)
+            const twoFAResponse = await requestTwoFactorAuthAPI(username, password, language);
             
             // Store username, password, and token in sessionStorage for 2FA page
             sessionStorage.setItem('2fa_username', username);
@@ -326,6 +326,10 @@ export const LoginPage = () => {
                                 </button>
                             </p>
                         </div>
+                        {/* Legal Links Footer */}
+                        <footer className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
+                            <LegalLinks variant="horizontal" size="sm" className="justify-center" />
+                        </footer>
                     </div>
                 </div>
             </div>

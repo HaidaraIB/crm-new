@@ -145,7 +145,14 @@ export const TwoFactorAuthPage = () => {
         setIsRequesting(true);
         
         try {
-            const response = await requestTwoFactorAuthAPI(username, language);
+            // Get password from sessionStorage if not in state
+            const passwordToUse = password || sessionStorage.getItem('2fa_password') || '';
+            if (!passwordToUse) {
+                setError(t('passwordRequired') || 'Password is required to resend code');
+                setIsRequesting(false);
+                return;
+            }
+            const response = await requestTwoFactorAuthAPI(username, passwordToUse, language);
             setToken(response.token);
             sessionStorage.setItem('2fa_token', response.token);
             setSuccess(t('twoFactorCodeSent') || 'Two-factor authentication code has been sent to your email');

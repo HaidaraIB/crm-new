@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
+import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks } from '../components/index';
 import { registerCompanyAPI, getPublicPlansAPI, checkRegistrationAvailabilityAPI, verifyEmailAPI } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
 
@@ -1143,6 +1143,15 @@ export const RegisterPage = () => {
                                     </button>
                                 </p>
                             </div>
+                            {/* Legal Links Footer */}
+                            <footer className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-3">
+                                    {language === 'ar' 
+                                        ? 'بإنشاء حساب، فإنك توافق على'
+                                        : 'By creating an account, you agree to our'}
+                                </p>
+                                <LegalLinks variant="horizontal" size="sm" className="justify-center" />
+                            </footer>
                         </div>
                     </div>
                 </div>

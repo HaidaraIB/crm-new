@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PageWrapper, Card, Loader, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
 import { FilterIcon } from '../components/icons';
-import { useLeads, useDeals, useActivities, useUsers } from '../hooks/useQueries';
+import { useLeads, useDeals, useActivities, useUsers, useClientTasks, useClientCalls } from '../hooks/useQueries';
 import { User } from '../types';
 
 // Helper function to get user display name
@@ -35,6 +35,17 @@ export const TeamsReportPage = () => {
         ? activitiesData 
         : (activitiesData?.results || []);
     
+    // Fetch client tasks and client calls for reports
+    const { data: clientTasksData } = useClientTasks();
+    const clientTasks = Array.isArray(clientTasksData) 
+        ? clientTasksData 
+        : (clientTasksData?.results || []);
+    
+    const { data: clientCallsData } = useClientCalls();
+    const clientCalls = Array.isArray(clientCallsData) 
+        ? clientCallsData 
+        : (clientCallsData?.results || []);
+    
     const { data: usersData } = useUsers();
     const users = Array.isArray(usersData) 
         ? usersData 
@@ -47,10 +58,14 @@ export const TeamsReportPage = () => {
         const safeActivities = Array.isArray(activities) ? activities : [];
         const safeDeals = Array.isArray(deals) ? deals : [];
         const safeUsers = Array.isArray(users) ? users : [];
+        const safeClientTasks = Array.isArray(clientTasks) ? clientTasks : [];
+        const safeClientCalls = Array.isArray(clientCalls) ? clientCalls : [];
         
         let filteredLeads = safeLeads;
         let filteredActivities = safeActivities;
         let filteredDeals = safeDeals;
+        let filteredClientTasks = safeClientTasks;
+        let filteredClientCalls = safeClientCalls;
 
         // Filter by lead type
         if (leadType !== 'all') {
@@ -73,6 +88,18 @@ export const TeamsReportPage = () => {
                 const activityDate = new Date(activity.date);
                 return activityDate >= start && activityDate <= end;
             });
+            filteredClientTasks = filteredClientTasks.filter((ct: any) => {
+                const createdAt = ct.created_at || ct.createdAt;
+                if (!createdAt) return false;
+                const taskDate = new Date(createdAt);
+                return taskDate >= start && taskDate <= end;
+            });
+            filteredClientCalls = filteredClientCalls.filter((cc: any) => {
+                const createdAt = cc.created_at || cc.createdAt;
+                if (!createdAt) return false;
+                const callDate = new Date(createdAt);
+                return callDate >= start && callDate <= end;
+            });
         }
 
         // Group by team/user
@@ -85,6 +112,19 @@ export const TeamsReportPage = () => {
                 // Match by user name or user ID
                 return activity.user === userName || activity.user === user.name || activity.userId === user.id;
             });
+            
+            // Get user's client tasks
+            const userClientTasks = filteredClientTasks.filter((ct: any) => {
+                const createdById = ct.created_by || ct.createdBy;
+                return createdById === user.id;
+            });
+            
+            // Get user's client calls
+            const userClientCalls = filteredClientCalls.filter((cc: any) => {
+                const createdById = cc.created_by || cc.createdBy;
+                return createdById === user.id;
+            });
+            
             const userDeals = filteredDeals.filter(deal => {
                 const dealLead = filteredLeads.find(l => l.id === deal.leadId);
                 return dealLead?.assignedTo === user.id;
@@ -103,14 +143,16 @@ export const TeamsReportPage = () => {
                 untouchedLeads,
                 followingLeads,
                 meetingLeads,
-                totalActivities: userActivities.length,
+                totalActivities: userActivities.length + userClientTasks.length + userClientCalls.length,
+                totalClientTasks: userClientTasks.length,
+                totalClientCalls: userClientCalls.length,
                 totalDeals: userDeals.length,
                 wonDeals,
             };
         });
 
         return Object.values(teamData);
-    }, [leads, activities, deals, users, leadType, startDate, endDate]);
+    }, [leads, activities, deals, users, clientTasks, clientCalls, leadType, startDate, endDate]);
 
 
     const handleExport = () => {

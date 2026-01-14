@@ -673,6 +673,7 @@ export const LeadsPage = () => {
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('name')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('phone')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('source') || 'Source'}</th>
+                                        <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('campaign') || 'Campaign'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('type')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('priority')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('budget')}</th>
@@ -848,26 +849,26 @@ export const LeadsPage = () => {
                                                             return (
                                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                                                     <FacebookIcon className="w-3 h-3" />
-                                                                    Meta
+                                                                    {t('metaLeadForm') || 'Meta'}
                                                                 </span>
                                                             );
                                                         } else if (source === 'whatsapp') {
                                                             return (
                                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                                                     <WhatsappIcon className="w-3 h-3" />
-                                                                    WhatsApp
+                                                                    {t('whatsappSource') || 'WhatsApp'}
                                                                 </span>
                                                             );
                                                         } else if (source === 'tiktok') {
                                                             return (
                                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                                                    TikTok
+                                                                    {t('tiktokSource') || 'TikTok'}
                                                                 </span>
                                                             );
                                                         }
                                                         return (
                                                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                                                {t('manual') || 'Manual'}
+                                                                {t('manualSource') || 'Manual'}
                                                             </span>
                                                         );
                                                     })()}

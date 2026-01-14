@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { PageWrapper, Card, Loader, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
 import { FilterIcon } from '../components/icons';
-import { useLeads, useDeals, useActivities, useUsers } from '../hooks/useQueries';
+import { useLeads, useDeals, useActivities, useUsers, useClientTasks, useClientCalls } from '../hooks/useQueries';
 import { User } from '../types';
 import { translations } from '../constants';
 
@@ -54,6 +54,17 @@ export const EmployeesReportPage = () => {
         ? activitiesData 
         : (activitiesData?.results || []);
     
+    // Fetch client tasks and client calls for reports
+    const { data: clientTasksData } = useClientTasks();
+    const clientTasks = Array.isArray(clientTasksData) 
+        ? clientTasksData 
+        : (clientTasksData?.results || []);
+    
+    const { data: clientCallsData } = useClientCalls();
+    const clientCalls = Array.isArray(clientCallsData) 
+        ? clientCallsData 
+        : (clientCallsData?.results || []);
+    
     const { data: usersData } = useUsers();
     const users = Array.isArray(usersData) 
         ? usersData 
@@ -66,10 +77,14 @@ export const EmployeesReportPage = () => {
         const safeActivities = Array.isArray(activities) ? activities : [];
         const safeDeals = Array.isArray(deals) ? deals : [];
         const safeUsers = Array.isArray(users) ? users : [];
+        const safeClientTasks = Array.isArray(clientTasks) ? clientTasks : [];
+        const safeClientCalls = Array.isArray(clientCalls) ? clientCalls : [];
         
         let filteredLeads = safeLeads;
         let filteredActivities = safeActivities;
         let filteredDeals = safeDeals;
+        let filteredClientTasks = safeClientTasks;
+        let filteredClientCalls = safeClientCalls;
 
         // Filter by lead type
         if (leadType !== 'all') {
@@ -92,6 +107,18 @@ export const EmployeesReportPage = () => {
                 const activityDate = new Date(activity.date);
                 return activityDate >= start && activityDate <= end;
             });
+            filteredClientTasks = filteredClientTasks.filter((ct: any) => {
+                const createdAt = ct.created_at || ct.createdAt;
+                if (!createdAt) return false;
+                const taskDate = new Date(createdAt);
+                return taskDate >= start && taskDate <= end;
+            });
+            filteredClientCalls = filteredClientCalls.filter((cc: any) => {
+                const createdAt = cc.created_at || cc.createdAt;
+                if (!createdAt) return false;
+                const callDate = new Date(createdAt);
+                return callDate >= start && callDate <= end;
+            });
         }
 
         // Group by employee
@@ -102,6 +129,19 @@ export const EmployeesReportPage = () => {
                 // Match by user name or user ID
                 return activity.user === userName || activity.user === user.name || activity.userId === user.id;
             });
+            
+            // Get user's client tasks
+            const userClientTasks = filteredClientTasks.filter((ct: any) => {
+                const createdById = ct.created_by || ct.createdBy;
+                return createdById === user.id;
+            });
+            
+            // Get user's client calls
+            const userClientCalls = filteredClientCalls.filter((cc: any) => {
+                const createdById = cc.created_by || cc.createdBy;
+                return createdById === user.id;
+            });
+            
             const callActivities = userActivities.filter(activity => 
                 activity.stage === 'call' || activity.stage === 'following'
             );
@@ -120,14 +160,16 @@ export const EmployeesReportPage = () => {
                 meeting: userLeads.filter(lead => lead.status === 'Meeting').length,
                 noAnswer: userLeads.filter(lead => lead.status === 'No Answer').length,
                 outOfService: userLeads.filter(lead => lead.status === 'Out Of Service').length,
-                totalCalls: callActivities.length,
-                answeredCalls: callActivities.length, // Simplified - would need actual call data
+                totalCalls: callActivities.length + userClientCalls.length, // Include client calls
+                answeredCalls: callActivities.length + userClientCalls.length, // Simplified - would need actual call data
                 notAnsweredCalls: 0, // Simplified - would need actual call data
+                totalClientTasks: userClientTasks.length,
+                totalClientCalls: userClientCalls.length,
                 totalDeals: userDeals.length,
                 wonDeals: userDeals.filter(deal => deal.status === 'Won').length,
             };
         }).filter(emp => emp.totalLeads > 0 || emp.totalDeals > 0);
-    }, [leads, activities, deals, users, leadType, startDate, endDate]);
+    }, [leads, activities, deals, users, clientTasks, clientCalls, leadType, startDate, endDate]);
 
 
     const totalCalls = employeeStats.reduce((sum, emp) => sum + emp.totalCalls, 0);

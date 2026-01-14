@@ -96,6 +96,8 @@ export interface AppContextType {
   setEditingLead: React.Dispatch<React.SetStateAction<Lead | null>>;
   isAddActionModalOpen: boolean;
   setIsAddActionModalOpen: (isOpen: boolean) => void;
+  isAddCallModalOpen: boolean;
+  setIsAddCallModalOpen: (isOpen: boolean) => void;
   isAddTodoModalOpen: boolean;
   setIsAddTodoModalOpen: (isOpen: boolean) => void;
   isAssignLeadModalOpen: boolean;
@@ -337,6 +339,12 @@ export interface AppContextType {
   setEditingStage: React.Dispatch<React.SetStateAction<Stage | null>>;
   isAddStatusModalOpen: boolean;
   setIsAddStatusModalOpen: (isOpen: boolean) => void;
+  isAddCallMethodModalOpen: boolean;
+  setIsAddCallMethodModalOpen: (isOpen: boolean) => void;
+  isEditCallMethodModalOpen: boolean;
+  setIsEditCallMethodModalOpen: (isOpen: boolean) => void;
+  editingCallMethod: { id: number; name: string; description?: string; color: string; is_active: boolean } | null;
+  setEditingCallMethod: React.Dispatch<React.SetStateAction<{ id: number; name: string; description?: string; color: string; is_active: boolean } | null>>;
   isEditStatusModalOpen: boolean;
   setIsEditStatusModalOpen: (isOpen: boolean) => void;
   editingStatus: Status | null;
@@ -572,6 +580,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isEditLeadModalOpen, setIsEditLeadModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [isAddActionModalOpen, setIsAddActionModalOpen] = useState(false);
+  const [isAddCallModalOpen, setIsAddCallModalOpen] = useState(false);
   const [isAddTodoModalOpen, setIsAddTodoModalOpen] = useState(false);
   const [isAssignLeadModalOpen, setIsAssignLeadModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -667,6 +676,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isEditStageModalOpen, setIsEditStageModalOpen] = useState(false);
   const [editingStage, setEditingStage] = useState<Stage | null>(null);
   const [isAddStatusModalOpen, setIsAddStatusModalOpen] = useState(false);
+  const [isAddCallMethodModalOpen, setIsAddCallMethodModalOpen] = useState(false);
+  const [isEditCallMethodModalOpen, setIsEditCallMethodModalOpen] = useState(false);
+  const [editingCallMethod, setEditingCallMethod] = useState<{ id: number; name: string; description?: string; color: string; is_active: boolean } | null>(null);
   const [isEditStatusModalOpen, setIsEditStatusModalOpen] = useState(false);
   const [editingStatus, setEditingStatus] = useState<Status | null>(null);
 
@@ -1044,6 +1056,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isEditLeadModalOpen, setIsEditLeadModalOpen,
     editingLead, setEditingLead,
     isAddActionModalOpen, setIsAddActionModalOpen,
+    isAddCallModalOpen, setIsAddCallModalOpen,
     isAddTodoModalOpen, setIsAddTodoModalOpen,
     isAssignLeadModalOpen, setIsAssignLeadModalOpen,
     isFilterDrawerOpen, setIsFilterDrawerOpen,
@@ -1151,6 +1164,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isAddStatusModalOpen, setIsAddStatusModalOpen,
     isEditStatusModalOpen, setIsEditStatusModalOpen,
     editingStatus, setEditingStatus,
+    isAddCallMethodModalOpen, setIsAddCallMethodModalOpen,
+    isEditCallMethodModalOpen, setIsEditCallMethodModalOpen,
+    editingCallMethod, setEditingCallMethod,
     channelTypes: [], // Will be computed from React Query data in components that need it
     isCompanySubscriptionInactive, setIsCompanySubscriptionInactive,
   };

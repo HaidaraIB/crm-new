@@ -7,11 +7,11 @@ import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOpti
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientEventsAPI,
+  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
-  getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI,
+  getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI,
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI,
   getLeadFormsAPI, selectLeadFormAPI,
@@ -20,6 +20,7 @@ import {
   createDealAPI, updateDealAPI, deleteDealAPI,
   createTaskAPI, updateTaskAPI, deleteTaskAPI,
   createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI,
+  createClientCallAPI, updateClientCallAPI, deleteClientCallAPI,
   createDeveloperAPI, updateDeveloperAPI, deleteDeveloperAPI,
   createProjectAPI, updateProjectAPI, deleteProjectAPI,
   createUnitAPI, updateUnitAPI, deleteUnitAPI,
@@ -34,6 +35,7 @@ import {
   createChannelAPI, updateChannelAPI, deleteChannelAPI,
   createStageAPI, updateStageAPI, deleteStageAPI,
   createStatusAPI, updateStatusAPI, deleteStatusAPI,
+  createCallMethodAPI, updateCallMethodAPI, deleteCallMethodAPI,
   bulkAssignLeadsAPI,
   assignUnassignedClientsAPI,
 } from '../services/api';
@@ -47,6 +49,7 @@ export const queryKeys = {
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
   clientTasks: ['clientTasks'] as const,
+  clientCalls: ['clientCalls'] as const,
   clientEvents: (clientId?: number) => ['clientEvents', clientId] as const,
   developers: ['developers'] as const,
   projects: ['projects'] as const,
@@ -62,6 +65,7 @@ export const queryKeys = {
   channels: ['channels'] as const,
   stages: ['stages'] as const,
   statuses: ['statuses'] as const,
+  callMethods: ['callMethods'] as const,
   connectedAccounts: (platform?: string) => ['connectedAccounts', platform] as const,
 };
 
@@ -146,6 +150,15 @@ export const useClientTasks = (options?: Omit<UseQueryOptions<any, Error>, 'quer
   return useQuery({
     queryKey: queryKeys.clientTasks,
     queryFn: () => getClientTasksAPI(),
+    staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+export const useClientCalls = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+  return useQuery({
+    queryKey: queryKeys.clientCalls,
+    queryFn: () => getClientCallsAPI(),
     staleTime: 1 * 60 * 1000, // 1 minute
     ...options,
   });
@@ -344,6 +357,15 @@ export const useStatuses = (options?: Omit<UseQueryOptions<any, Error>, 'queryKe
   return useQuery({
     queryKey: queryKeys.statuses,
     queryFn: () => getStatusesAPI(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...options,
+  });
+};
+
+export const useCallMethods = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+  return useQuery({
+    queryKey: queryKeys.callMethods,
+    queryFn: () => getCallMethodsAPI(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     ...options,
   });
@@ -589,6 +611,43 @@ export const useDeleteClientTask = (options?: UseMutationOptions<void, Error, nu
     mutationFn: (id: number) => deleteClientTaskAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+    },
+    ...options,
+  });
+};
+
+export const useCreateClientCall = (options?: UseMutationOptions<any, Error, any>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createClientCallAPI(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+      // Also invalidate events for this lead if call creation triggers an event
+      if (variables.client || variables.clientId) {
+        queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.client || variables.clientId) });
+      }
+    },
+    ...options,
+  });
+};
+
+export const useUpdateClientCall = (options?: UseMutationOptions<any, Error, { id: number; data: any }>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateClientCallAPI(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+    },
+    ...options,
+  });
+};
+
+export const useDeleteClientCall = (options?: UseMutationOptions<void, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteClientCallAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
     },
     ...options,
   });
@@ -1058,6 +1117,39 @@ export const useDeleteStatus = (options?: UseMutationOptions<void, Error, number
     mutationFn: (id: number) => deleteStatusAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.statuses });
+    },
+    ...options,
+  });
+};
+
+export const useCreateCallMethod = (options?: UseMutationOptions<any, Error, any>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createCallMethodAPI(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.callMethods });
+    },
+    ...options,
+  });
+};
+
+export const useUpdateCallMethod = (options?: UseMutationOptions<any, Error, { id: number; data: any }>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateCallMethodAPI(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.callMethods });
+    },
+    ...options,
+  });
+};
+
+export const useDeleteCallMethod = (options?: UseMutationOptions<void, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteCallMethodAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.callMethods });
     },
     ...options,
   });

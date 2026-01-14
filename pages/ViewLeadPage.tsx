@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon } from '../components/index';
 import { formatDateToLocal } from '../utils/dateUtils';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages } from '../hooks/useQueries';
 import { ChevronDownIcon } from '../components/icons';
@@ -191,7 +191,7 @@ const StatusDropdown = ({
 };
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
     
     // Update lead mutation
     const updateLeadMutation = useUpdateLead();
@@ -457,11 +457,34 @@ export const ViewLeadPage = () => {
         });
 
         // Format Events (ClientEvents)
+        // Helper function to format values for display
+        const formatValue = (value: string | null | undefined) => {
+            if (!value || value === 'None') {
+                return t('unassigned') || 'Unassigned';
+            }
+            return value;
+        };
+        
+        // Helper function to format user values (try to get user name from ID)
+        const formatUserValue = (value: string | null | undefined) => {
+            if (!value || value === 'None') {
+                return t('unassigned') || 'Unassigned';
+            }
+            // Try to find user name if value is a user ID
+            const userId = parseInt(value);
+            if (!isNaN(userId)) {
+                const assignedUser = users.find(u => u.id === userId);
+                return assignedUser?.name || value;
+            }
+            return value;
+        };
+        
         const events = clientEvents.map(ce => {
             const user = users.find(u => u.id === ce.created_by);
             
             let actionText = '';
             let eventColor = undefined;
+            let translatedDetails = '';
             
             if (ce.event_type === 'status_change') {
                 actionText = t('statusUpdated') || 'Status updated';
@@ -470,18 +493,48 @@ export const ViewLeadPage = () => {
                 if (statusConfig) {
                     eventColor = statusConfig.color;
                 }
-            }
-            else if (ce.event_type === 'assignment') actionText = t('leadAssigned') || 'Lead assigned';
-            else if (ce.event_type === 'edit') actionText = t('leadEdited') || 'Lead edited';
-            else actionText = ce.event_type;
-
-            // Format old_value and new_value to show "Unassigned" instead of "None"
-            const formatValue = (value: string | null | undefined) => {
-                if (!value || value === 'None') {
-                    return t('unassigned') || 'Unassigned';
+                
+                // Create translated description for status change
+                const oldVal = formatValue(ce.old_value);
+                const newVal = formatValue(ce.new_value);
+                
+                if (oldVal && newVal) {
+                    translatedDetails = `${t('statusChangedFrom') || 'Status changed from'} ${oldVal} ${t('statusChangedTo') || 'to'} ${newVal}`;
+                } else if (newVal) {
+                    translatedDetails = `${t('statusChangedFrom') || 'Status changed from'} ${t('unassigned') || 'Unassigned'} ${t('statusChangedTo') || 'to'} ${newVal}`;
                 }
-                return value;
-            };
+            }
+            else if (ce.event_type === 'assignment') {
+                actionText = t('leadAssigned') || 'Lead assigned';
+                
+                // Create translated description for assignment
+                const newVal = formatUserValue(ce.new_value);
+                const oldVal = formatUserValue(ce.old_value);
+                
+                // Check if it's a bulk assignment (notes contain "Bulk assigned")
+                if (ce.notes && ce.notes.toLowerCase().includes('bulk')) {
+                    if (oldVal && oldVal !== newVal) {
+                        translatedDetails = `${t('bulkAssignedTo') || 'Bulk assigned to'} ${newVal} (${t('was') || 'was'} ${oldVal})`;
+                    } else {
+                        translatedDetails = `${t('bulkAssignedTo') || 'Bulk assigned to'} ${newVal}`;
+                    }
+                } else {
+                    if (oldVal && oldVal !== newVal) {
+                        translatedDetails = `${t('assignedToAction') || 'Assigned to'} ${newVal} (${t('was') || 'was'} ${oldVal})`;
+                    } else {
+                        translatedDetails = `${t('assignedToAction') || 'Assigned to'} ${newVal}`;
+                    }
+                }
+            }
+            else if (ce.event_type === 'edit') {
+                actionText = t('leadEdited') || 'Lead edited';
+                // For edit events, use the notes if available, otherwise create a generic description
+                translatedDetails = ce.notes || '';
+            }
+            else {
+                actionText = ce.event_type;
+                translatedDetails = ce.notes || '';
+            }
 
             return {
                 id: `event-${ce.id}`,
@@ -489,7 +542,7 @@ export const ViewLeadPage = () => {
                 user: user?.name || ce.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
                 action: actionText,
-                details: ce.notes || '',
+                details: translatedDetails || ce.notes || '',
                 date: formatDateToLocal(ce.created_at),
                 timestamp: new Date(ce.created_at).getTime(),
                 oldValue: formatValue(ce.old_value),
@@ -560,6 +613,7 @@ export const ViewLeadPage = () => {
                         <EditIcon className="w-4 h-4"/> {t('editClient')}
                     </Button>
                     <Button onClick={() => setIsAddActionModalOpen(true)}><PlusIcon className="w-4 h-4"/> {t('add_action')}</Button>
+                    <Button variant="secondary" onClick={() => setIsAddCallModalOpen(true)}><PhoneIcon className="w-4 h-4"/> {t('addCall') || 'Add Call'}</Button>
                 </div>
             }
         >
@@ -882,26 +936,26 @@ export const ViewLeadPage = () => {
                                         return (
                                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
                                                 <FacebookIcon className="w-4 h-4" />
-                                                Meta
+                                                {t('metaLeadForm') || 'Meta'}
                                             </span>
                                         );
                                     } else if (source === 'whatsapp') {
                                         return (
                                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
                                                 <WhatsappIcon className="w-4 h-4" />
-                                                WhatsApp
+                                                {t('whatsappSource') || 'WhatsApp'}
                                             </span>
                                         );
                                     } else if (source === 'tiktok') {
                                         return (
                                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                                TikTok
+                                                {t('tiktokSource') || 'TikTok'}
                                             </span>
                                         );
                                     }
                                     return (
                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                            {t('manual') || 'Manual'}
+                                            {t('manualSource') || 'Manual'}
                                         </span>
                                     );
                                 })()}

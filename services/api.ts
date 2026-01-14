@@ -1939,6 +1939,77 @@ export const getClientTasksAPI = async () => {
   return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/client-tasks/');
 };
 
+// ==================== Client Calls APIs ====================
+
+/**
+ * الحصول على جميع Client Calls
+ * GET /api/client-calls/
+ */
+export const getClientCallsAPI = async () => {
+  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/client-calls/');
+};
+
+/**
+ * إنشاء Client Call جديد
+ * POST /api/client-calls/
+ * Body: { client, call_method, notes, follow_up_date }
+ */
+export const createClientCallAPI = async (clientCallData: any) => {
+  return apiRequest<any>('/client-calls/', {
+    method: 'POST',
+    body: JSON.stringify(clientCallData),
+  });
+};
+
+/**
+ * تحديث Client Call
+ * PUT /api/client-calls/{id}/
+ */
+export const updateClientCallAPI = async (clientCallId: number, clientCallData: any) => {
+  return apiRequest<any>(`/client-calls/${clientCallId}/`, {
+    method: 'PUT',
+    body: JSON.stringify(clientCallData),
+  });
+};
+
+/**
+ * حذف Client Call
+ * DELETE /api/client-calls/{id}/
+ */
+export const deleteClientCallAPI = async (clientCallId: number) => {
+  const token = localStorage.getItem('accessToken');
+  const response = await fetch(`${BASE_URL}/client-calls/${clientCallId}/`, {
+    method: 'DELETE',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }),
+  });
+
+  if (response.status === 401) {
+    try {
+      await refreshTokenAPI();
+      return deleteClientCallAPI(clientCallId);
+    } catch (refreshError) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('currentUser');
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port ? `:${window.location.port}` : '';
+      const loginUrl = `${protocol}//${hostname}${port}/login`;
+      window.location.replace(loginUrl);
+      throw new Error('Session expired. Please login again.');
+    }
+  }
+
+  if (!response.ok && response.status !== 204) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.detail || errorData.message || `API Error: ${response.status} ${response.statusText}`);
+  }
+};
+
 /**
  * GET /api/client-events/
  */
@@ -2111,6 +2182,34 @@ export const updateStatusAPI = async (statusId: number, statusData: any) => {
 
 export const deleteStatusAPI = async (statusId: number) => {
   return apiRequest<void>(`/settings/statuses/${statusId}/`, {
+    method: 'DELETE',
+  });
+};
+
+/**
+ * Call Methods APIs
+ * GET /settings/call-methods
+ */
+export const getCallMethodsAPI = async () => {
+  return apiRequest<any[]>('/settings/call-methods/');
+};
+
+export const createCallMethodAPI = async (callMethodData: any) => {
+  return apiRequest<any>('/settings/call-methods/', {
+    method: 'POST',
+    body: JSON.stringify(callMethodData),
+  });
+};
+
+export const updateCallMethodAPI = async (callMethodId: number, callMethodData: any) => {
+  return apiRequest<any>(`/settings/call-methods/${callMethodId}/`, {
+    method: 'PUT',
+    body: JSON.stringify(callMethodData),
+  });
+};
+
+export const deleteCallMethodAPI = async (callMethodId: number) => {
+  return apiRequest<void>(`/settings/call-methods/${callMethodId}/`, {
     method: 'DELETE',
   });
 };

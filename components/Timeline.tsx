@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TimelineEntry as TimelineEntryType } from '../types';
-import { ClockIcon } from './icons';
+import { ClockIcon, PhoneIcon } from './icons';
 
 type TimelineProps = {
     history: TimelineEntryType[];
@@ -107,7 +107,35 @@ export const Timeline = ({ history }: TimelineProps) => {
                                     </div>
                                 )}
                                 {entry.details && (
-                                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">{entry.details}</p>
+                                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1.5">{entry.details}</p>
+                                )}
+                                {/* Display call datetime and follow-up date for calls */}
+                                {entry.type === 'call' && (entry.callDatetime || entry.followUpDate) && (
+                                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                                        {entry.callDatetime && (
+                                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                                                <PhoneIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                                                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">{entry.callDatetime}</span>
+                                            </div>
+                                        )}
+                                        {/* Arrow between call datetime and follow-up date */}
+                                        {entry.callDatetime && entry.followUpDate && (
+                                            <svg 
+                                                className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" 
+                                                fill="none" 
+                                                stroke="currentColor" 
+                                                viewBox="0 0 24 24"
+                                            >
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                            </svg>
+                                        )}
+                                        {entry.followUpDate && (
+                                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                                                <ClockIcon className="w-3.5 h-3.5 text-green-600 dark:text-green-400 flex-shrink-0" />
+                                                <span className="text-xs font-medium text-green-700 dark:text-green-300">{entry.followUpDate}</span>
+                                            </div>
+                                        )}
+                                    </div>
                                 )}
                             </div>
                             <div className="flex items-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap ml-4">

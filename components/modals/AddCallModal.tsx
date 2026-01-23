@@ -31,6 +31,7 @@ export const AddCallModal = () => {
     
     const [callMethod, setCallMethod] = useState(getDefaultCallMethod());
     const [notes, setNotes] = useState('');
+    const [callDatetime, setCallDatetime] = useState('');
     const [followUpDate, setFollowUpDate] = useState('');
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -76,7 +77,18 @@ export const AddCallModal = () => {
         setIsAddCallModalOpen(false);
         setCallMethod(getDefaultCallMethod());
         setNotes('');
+        setCallDatetime('');
         setFollowUpDate('');
+    };
+
+    const setCallDatetimeToNow = () => {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        setCallDatetime(`${year}-${month}-${day}T${hours}:${minutes}`);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -105,12 +117,14 @@ export const AddCallModal = () => {
                 client: selectedLead.id, // API expects 'client' not 'clientId'
                 call_method: callMethodObj.id, // API expects call_method ID (pk) not name
                 notes: notes,
+                call_datetime: callDatetime || undefined, // API expects 'call_datetime' (optional)
                 follow_up_date: followUpDate, // API expects 'follow_up_date' (required)
             });
 
             // Reset form
             setCallMethod(getDefaultCallMethod());
             setNotes('');
+            setCallDatetime('');
             setFollowUpDate('');
             setErrors({});
             
@@ -174,6 +188,32 @@ export const AddCallModal = () => {
                     />
                     {errors.notes && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.notes}</p>
+                    )}
+                </div>
+                <div>
+                    <Label htmlFor="callDatetime">{t('callDatetime') || 'Call Datetime'}</Label>
+                    <div className="flex gap-2">
+                        <input 
+                            type="datetime-local" 
+                            id="callDatetime" 
+                            value={callDatetime}
+                            onChange={(e) => {
+                                setCallDatetime(e.target.value);
+                                clearError('callDatetime');
+                            }}
+                            className={`flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.callDatetime ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
+                        />
+                        <Button 
+                            type="button" 
+                            variant="secondary" 
+                            onClick={setCallDatetimeToNow}
+                            className="whitespace-nowrap"
+                        >
+                            {t('now') || 'Now'}
+                        </Button>
+                    </div>
+                    {errors.callDatetime && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.callDatetime}</p>
                     )}
                 </div>
                 <div>

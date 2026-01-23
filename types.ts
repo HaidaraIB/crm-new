@@ -64,11 +64,13 @@ export interface TimelineEntry {
   details: string;
   date: string;
   timestamp: number; // For sorting
-  type?: 'action' | 'event';
+  type?: 'action' | 'event' | 'call';
   stage?: string; // Optional: formatted stage name for better display
   color?: string; // Optional: color for the stage or event
   oldValue?: string;
   newValue?: string;
+  callDatetime?: string; // Optional: formatted call datetime for calls
+  followUpDate?: string; // Optional: formatted follow-up date for calls
 }
 
 export interface ClientTask {

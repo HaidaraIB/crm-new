@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon } from '../components/index';
-import { formatDateToLocal } from '../utils/dateUtils';
-import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages } from '../hooks/useQueries';
+import { formatDateToLocal, formatDateTimeToLocal } from '../utils/dateUtils';
+import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useCallMethods } from '../hooks/useQueries';
 import { ChevronDownIcon } from '../components/icons';
 import { Lead } from '../types';
 
@@ -263,6 +263,14 @@ export const ViewLeadPage = () => {
     const { data: clientTasksResponse } = useClientTasks();
     const clientTasks = clientTasksResponse?.results || [];
     
+    const { data: clientCallsResponse } = useClientCalls();
+    const clientCalls = clientCallsResponse?.results || [];
+    
+    const { data: callMethodsData } = useCallMethods();
+    const callMethods = Array.isArray(callMethodsData) 
+        ? callMethodsData 
+        : (callMethodsData?.results || []);
+    
     const { data: clientEventsResponse } = useClientEvents(leadId);
     const clientEvents = clientEventsResponse?.results || [];
     
@@ -423,6 +431,12 @@ export const ViewLeadPage = () => {
         return clientId === displayLead.id;
     }) : [];
 
+    // تصفية المكالمات للعميل المحتمل المحدد
+    const leadClientCalls = displayLead ? clientCalls.filter(cc => {
+        const clientId = cc.client || cc.clientId;
+        return clientId === displayLead.id;
+    }) : [];
+
     // Get last feedback from the most recent ClientTask
     const sortedClientTasks = [...leadClientTasks].sort((a, b) => {
         const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
@@ -453,6 +467,56 @@ export const ViewLeadPage = () => {
                 timestamp: new Date(ct.created_at || ct.createdAt).getTime(),
                 stage: formattedStage,
                 color: stageConfig?.color,
+            };
+        });
+
+        // Format Calls (ClientCalls)
+        const calls = leadClientCalls.map(cc => {
+            const user = users.find(u => u.id === (cc.created_by || cc.createdBy));
+            const callMethod = callMethods.find(cm => cm.id === (cc.call_method || cc.callMethod));
+            const callMethodName = callMethod?.name || cc.call_method_name || t('call') || 'Call';
+            
+            // Use call_datetime if available, otherwise use created_at
+            const callDate = cc.call_datetime || cc.created_at || cc.createdAt;
+            const timestamp = new Date(callDate).getTime();
+            
+            // Format call datetime and follow-up date for display (clean, modern format)
+            const formatCleanDateTime = (dateString: string | null | undefined): string => {
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    if (isNaN(date.getTime())) return '';
+                    // Format as "Jan 24, 2026 at 4:58 PM" - more readable
+                    const options: Intl.DateTimeFormatOptions = {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true
+                    };
+                    return date.toLocaleString('en-US', options);
+                } catch {
+                    return '';
+                }
+            };
+            
+            const callDateTimeFormatted = formatCleanDateTime(callDate);
+            const followUpDateFormatted = formatCleanDateTime(cc.follow_up_date);
+            
+            return {
+                id: `call-${cc.id}`,
+                type: 'call',
+                user: user?.name || cc.created_by_username || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('callMade') || 'Call made',
+                details: cc.notes || '', // Keep notes separate from dates
+                date: formatDateToLocal(callDate),
+                timestamp: timestamp,
+                stage: callMethodName,
+                color: callMethod?.color,
+                callDatetime: callDateTimeFormatted, // Separate field for call datetime
+                followUpDate: followUpDateFormatted, // Separate field for follow-up date
             };
         });
 
@@ -552,8 +616,8 @@ export const ViewLeadPage = () => {
         });
 
         // Combine and sort by date descending
-        return [...actions, ...events].sort((a, b) => b.timestamp - a.timestamp);
-    }, [displayLead, leadClientTasks, clientEvents, users, t, stages, statuses]);
+        return [...actions, ...calls, ...events].sort((a, b) => b.timestamp - a.timestamp);
+    }, [displayLead, leadClientTasks, leadClientCalls, clientEvents, users, t, stages, statuses, callMethods]);
 
     if (!displayLead) {
         return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;

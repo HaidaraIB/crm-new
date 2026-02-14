@@ -1899,6 +1899,49 @@ export const selectLeadFormAPI = async (
   });
 };
 
+/**
+ * TikTok: الحصول على البروفايل الكامل (اسم، صورة، إحصائيات، رابط، بيو)
+ * GET /api/integrations/accounts/:id/tiktok-profile/
+ */
+export const getTikTokProfileAPI = async (accountId: number) => {
+  return apiRequest<{
+    profile: {
+      open_id: string;
+      display_name: string;
+      avatar_url?: string;
+      profile_web_link?: string;
+      bio_description?: string;
+      is_verified?: boolean;
+      follower_count?: number;
+      following_count?: number;
+      likes_count?: number;
+      video_count?: number;
+    };
+    account_link?: string;
+  }>(`/integrations/accounts/${accountId}/tiktok-profile/`);
+};
+
+/**
+ * TikTok: قائمة فيديوهات الحساب (مع pagination)
+ * GET /api/integrations/accounts/:id/tiktok-videos/?cursor=&max_count=20
+ */
+export const getTikTokVideosAPI = async (
+  accountId: number,
+  params?: { cursor?: string; max_count?: number }
+) => {
+  const search = new URLSearchParams();
+  if (params?.cursor) search.set('cursor', params.cursor);
+  if (params?.max_count != null) search.set('max_count', String(params.max_count));
+  const query = search.toString();
+  const url = query
+    ? `/integrations/accounts/${accountId}/tiktok-videos/?${query}`
+    : `/integrations/accounts/${accountId}/tiktok-videos/`;
+  return apiRequest<{
+    data?: { videos?: any[]; cursor?: string; has_more?: boolean };
+    error?: { message: string };
+  }>(url);
+};
+
 // ==================== Activities/Tasks APIs ====================
 
 /**

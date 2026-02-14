@@ -5,11 +5,11 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader } from '../components/index';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, syncIntegrationAccountAPI, getTikTokProfileAPI } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 
-type Account = { id: number; name: string; status: string; };
+type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
 
 type PlatformDetails = {
     name: string;
@@ -85,6 +85,7 @@ export const IntegrationsPage = () => {
             status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
             link: acc.account_link,
             phone: acc.phone_number,
+            platform: acc.platform,
         }));
     }, [accountsResponse]);
 
@@ -193,13 +194,42 @@ export const IntegrationsPage = () => {
     const handleConnect = async (accountId: number) => {
         try {
             const response = await connectIntegrationAccountAPI(accountId);
-            // توجيه المستخدم إلى صفحة OAuth
             if (response.authorization_url) {
                 window.location.href = response.authorization_url;
             }
         } catch (error: any) {
             console.error('Error connecting account:', error);
             alert(error?.message || t('errorConnectingAccount') || 'Failed to connect account');
+        }
+    };
+
+    const handleTikTokSync = async (accountId: number) => {
+        try {
+            await syncIntegrationAccountAPI(accountId);
+            queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+            alert(t('syncCompleted') || 'Sync completed');
+        } catch (error: any) {
+            console.error('TikTok sync error:', error);
+            alert(error?.message || t('syncFailed') || 'Sync failed');
+        }
+    };
+
+    const handleTikTokViewProfile = async (account: Account) => {
+        if (account.link) {
+            window.open(account.link, '_blank');
+            return;
+        }
+        try {
+            const res = await getTikTokProfileAPI(account.id);
+            const url = res?.profile?.profile_web_link || res?.account_link;
+            if (url) {
+                window.open(url, '_blank');
+            } else {
+                alert(res?.profile?.display_name || account.name);
+            }
+        } catch (e) {
+            console.error(e);
+            alert(t('errorLoadingProfile') || 'Could not load profile');
         }
     };
 
@@ -257,6 +287,16 @@ export const IntegrationsPage = () => {
                                         <Button variant="secondary" onClick={() => handleSelectLeadForm(account)}>
                                             {t('selectLeadForm') || 'Select Lead Form'}
                                         </Button>
+                                    )}
+                                    {account.status === 'Connected' && account.platform === 'tiktok' && (
+                                        <>
+                                            <Button variant="secondary" onClick={() => handleTikTokSync(account.id)}>
+                                                {t('sync') || 'Sync'}
+                                            </Button>
+                                            <Button variant="secondary" onClick={() => handleTikTokViewProfile(account)}>
+                                                {t('viewProfile') || 'View profile'}
+                                            </Button>
+                                        </>
                                     )}
                                     <Button variant="secondary" onClick={() => handleEdit(account)}><SettingsIcon className="w-4 h-4 me-2" /> {t('edit')}</Button>
                                     <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>

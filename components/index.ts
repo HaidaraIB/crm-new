@@ -19,6 +19,7 @@ export * from './modals/AddCallModal';
 export * from './modals/AddLeadModal';
 export * from './modals/EditLeadModal';
 export * from './modals/AssignLeadModal';
+export * from './modals/ImportLeadsModal';
 export * from './drawers/FilterDrawer';
 export * from './drawers/ActivitiesFilterDrawer';
 export * from './drawers/DevelopersFilterDrawer';

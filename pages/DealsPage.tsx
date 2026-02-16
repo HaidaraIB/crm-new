@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Loader, TrashIcon, EditIcon, EyeIcon } from '../components/index';
 import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
+import { exportToExcel } from '../utils/exportToExcel';
 
 const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, units }: { deals: Deal[], onDelete: (id: number) => void, onEdit: (id: number) => void, onView: (id: number) => void, isRealEstate: boolean, projects: any[], units: any[] }) => {
     const { t } = useAppContext();
@@ -400,6 +401,34 @@ export const DealsPage = () => {
         }
     };
 
+    const handleExportDeals = () => {
+        const rows = filteredDeals.map((deal: any) => ({
+            id: deal.id,
+            clientName: deal.clientName ?? '',
+            project: deal.project ?? '',
+            unit: deal.unit ?? '',
+            stage: deal.stage ?? '',
+            status: deal.status ?? '',
+            paymentMethod: deal.paymentMethod ?? '',
+            value: deal.value ?? '',
+            startDate: deal.startDate ? new Date(deal.startDate).toLocaleDateString() : '',
+            closedDate: deal.closedDate ? new Date(deal.closedDate).toLocaleDateString() : '',
+        }));
+        const columns = [
+            { key: 'id', label: t('dealId') || 'ID' },
+            { key: 'clientName', label: t('clientName') || 'Client' },
+            { key: 'project', label: t('project') || 'Project' },
+            { key: 'unit', label: t('unit') || 'Unit' },
+            { key: 'stage', label: t('stage') || 'Stage' },
+            { key: 'status', label: t('status') || 'Status' },
+            { key: 'paymentMethod', label: t('paymentMethod') || 'Payment Method' },
+            { key: 'value', label: t('value') || 'Value' },
+            { key: 'startDate', label: t('startDate') || 'Start Date' },
+            { key: 'closedDate', label: t('closedDate') || 'Closed Date' },
+        ];
+        exportToExcel(rows, columns, `deals-export-${new Date().toISOString().slice(0, 10)}`, t('deals') || 'Deals');
+    };
+
     if (dealsLoading) {
         return (
             <PageWrapper title={t('deals')}>
@@ -434,6 +463,9 @@ export const DealsPage = () => {
                 <>
                     <Button variant="secondary" onClick={() => setIsDealsFilterDrawerOpen(true)} className="w-full sm:w-auto" type="button">
                         <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
+                    </Button>
+                    <Button variant="secondary" onClick={handleExportDeals} className="w-full sm:w-auto" type="button" disabled={filteredDeals.length === 0}>
+                        <span className="hidden sm:inline">{t('exportDeals') || 'Export to Excel'}</span>
                     </Button>
                     <Button 
                         onClick={() => {

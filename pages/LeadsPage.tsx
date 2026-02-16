@@ -2,10 +2,11 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon, ImportLeadsModal } from '../components/index';
 import { TrashIcon, ChevronDownIcon, FacebookIcon } from '../components/icons';
 import { Lead } from '../types';
 import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks, useAssignUnassignedClients } from '../hooks/useQueries';
+import { exportToExcel } from '../utils/exportToExcel';
 
 // Status Dropdown Component
 const StatusDropdown = ({ 
@@ -378,6 +379,42 @@ export const LeadsPage = () => {
         return ['All'];
     }, [statuses]);
     const [activeStatusFilter, setActiveStatusFilter] = useState<Lead['status']>('All');
+    const [isImportLeadsModalOpen, setIsImportLeadsModalOpen] = useState(false);
+
+    const handleExportLeads = () => {
+        const rows = filteredLeads.map((l: Lead & { assigned_to_username?: string; campaign_name?: string }) => {
+            const phone = l.phone || (l.phoneNumbers && l.phoneNumbers.length > 0
+                ? (l.phoneNumbers.find(p => p.is_primary) || l.phoneNumbers[0]).phone_number
+                : '');
+            return {
+                name: l.name,
+                phone,
+                budget: l.budget ?? '',
+                type: l.type ?? '',
+                priority: l.priority ?? '',
+                status: ((l as any).status_name || l.status) ?? '',
+                communicationWay: ((l as any).communication_way_name || l.communicationWay) ?? '',
+                assignedToName: (l as any).assigned_to_username ?? '',
+                source: l.source ?? '',
+                campaign: (l as any).campaign_name ?? l.campaign_name ?? '',
+                createdAt: l.createdAt ? new Date(l.createdAt).toLocaleString() : '',
+            };
+        });
+        const columns = [
+            { key: 'name', label: t('name') || 'Name' },
+            { key: 'phone', label: t('phone') || 'Phone' },
+            { key: 'budget', label: t('budget') || 'Budget' },
+            { key: 'type', label: t('type') || 'Type' },
+            { key: 'priority', label: t('priority') || 'Priority' },
+            { key: 'status', label: t('status') || 'Status' },
+            { key: 'communicationWay', label: t('communicationWay') || 'Communication Way' },
+            { key: 'assignedToName', label: t('assignedTo') || 'Assigned To' },
+            { key: 'source', label: t('source') || 'Source' },
+            { key: 'campaign', label: t('campaign') || 'Campaign' },
+            { key: 'createdAt', label: t('createdAt') || 'Created At' },
+        ];
+        exportToExcel(rows, columns, `leads-export-${new Date().toISOString().slice(0, 10)}`, t('leads') || 'Leads');
+    };
 
     const handleViewLead = (lead: Lead) => {
         setSelectedLead(lead);
@@ -580,11 +617,14 @@ export const LeadsPage = () => {
     const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin';
 
     return (
+        <>
         <PageWrapper 
             title={pageTitle}
             actions={
                 <>
                     <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
+                    <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto" disabled={filteredLeads.length === 0}><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>
+                    <Button variant="secondary" onClick={() => setIsImportLeadsModalOpen(true)} className="w-full sm:w-auto"><span className="hidden sm:inline">{t('importLeads') || 'Import from Excel'}</span></Button>
                     <Button onClick={() => {
                         window.history.pushState({}, '', '/create-lead');
                         setCurrentPage('CreateLead');
@@ -1039,5 +1079,16 @@ export const LeadsPage = () => {
                 </div>
             </Card>
         </PageWrapper>
+        <ImportLeadsModal
+            isOpen={isImportLeadsModalOpen}
+            onClose={() => setIsImportLeadsModalOpen(false)}
+            onSuccess={(imported, failed) => {
+                if (imported > 0) {
+                    setSuccessMessage(t('importLeadsSuccess') || `${imported} lead(s) imported successfully.`);
+                    setIsSuccessModalOpen(true);
+                }
+            }}
+        />
+        </>
     );
 };

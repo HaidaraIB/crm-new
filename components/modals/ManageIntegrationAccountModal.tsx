@@ -31,6 +31,11 @@ const getPlatformName = (currentPage: Page): string => {
         default:
             return '';
     }
+};
+
+const getIntegrationModalTitleKey = (platformName: string, isEditMode: boolean): string => {
+    const base = platformName === 'Meta' ? 'Meta' : platformName === 'TikTok' ? 'TikTok' : 'WhatsApp';
+    return isEditMode ? `edit${base}Account` : `addNew${base}Account`;
 }
 
 export const ManageIntegrationAccountModal = () => {
@@ -42,7 +47,8 @@ export const ManageIntegrationAccountModal = () => {
         editingAccount,
         setEditingAccount,
         setIsSuccessModalOpen,
-        setSuccessMessage
+        setSuccessMessage,
+        setPendingConnectAccountId,
     } = useAppContext();
 
     const [accountName, setAccountName] = useState('');
@@ -57,6 +63,7 @@ export const ManageIntegrationAccountModal = () => {
 
     const platformName = getPlatformName(currentPage);
     const isEditMode = !!editingAccount;
+    const modalTitleKey = getIntegrationModalTitleKey(platformName, isEditMode);
 
     useEffect(() => {
         if (editingAccount) {
@@ -78,7 +85,7 @@ export const ManageIntegrationAccountModal = () => {
 
     const handleSubmit = async () => {
         if (!accountName.trim()) {
-            alert(t('accountNameRequired') || 'Account name is required');
+            alert(t('accountNameRequired'));
             return;
         }
 
@@ -112,7 +119,11 @@ export const ManageIntegrationAccountModal = () => {
                     createData.account_link = accountLink;
                 }
                 
-                await createAccountMutation.mutateAsync(createData);
+                const created = await createAccountMutation.mutateAsync(createData);
+                // Meta و WhatsApp: فتح نافذة الربط (OAuth) تلقائياً بعد إنشاء الحساب
+                if ((platformName === 'WhatsApp' || platformName === 'Meta') && created?.id) {
+                    setPendingConnectAccountId(created.id);
+                }
             }
 
             // Reset form
@@ -122,14 +133,11 @@ export const ManageIntegrationAccountModal = () => {
             
             // Close modal and show success message
             handleClose();
-            setSuccessMessage(isEditMode 
-                ? (t('accountUpdatedSuccessfully') || 'Account updated successfully!')
-                : (t('accountCreatedSuccessfully') || 'Account created successfully!')
-            );
+            setSuccessMessage(isEditMode ? t('accountUpdatedSuccessfully') : t('accountCreatedSuccessfully'));
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error saving account:', error);
-            alert(error?.message || t('errorSavingAccount') || 'Failed to save account. Please try again.');
+            alert(error?.message || t('errorSavingAccount'));
         }
     };
     
@@ -145,7 +153,7 @@ export const ManageIntegrationAccountModal = () => {
                         </div>
                         <div>
                             <Label htmlFor="account-link">{t('accountLink')}</Label>
-                            <Input id="account-link" placeholder="https://..." value={accountLink} onChange={e => setAccountLink(e.target.value)} />
+                            <Input id="account-link" placeholder={t('enterAccountLink')} value={accountLink} onChange={e => setAccountLink(e.target.value)} />
                         </div>
                     </>
                 );
@@ -171,7 +179,7 @@ export const ManageIntegrationAccountModal = () => {
         <Modal 
             isOpen={isManageIntegrationAccountModalOpen} 
             onClose={handleClose} 
-            title={`${t(isEditMode ? 'edit' : 'addNew')} ${platformName} ${t('account')}`}
+            title={t(modalTitleKey)}
         >
             <div className="space-y-4">
                 {renderPlatformFields()}

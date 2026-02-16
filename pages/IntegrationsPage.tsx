@@ -5,8 +5,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader } from '../components/index';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, syncIntegrationAccountAPI, getTikTokProfileAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getTikTokLeadgenConfigAPI } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
+import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 
 type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
@@ -36,6 +37,8 @@ export const IntegrationsPage = () => {
         setIsSelectLeadFormModalOpen,
         selectLeadFormConfig,
         setSelectLeadFormConfig,
+        pendingConnectAccountId,
+        setPendingConnectAccountId,
     } = useAppContext();
 
     // Get platform param based on currentPage
@@ -70,10 +73,13 @@ export const IntegrationsPage = () => {
         return platformConfig[platformKey]?.dataKey || null;
     }, [currentPage]);
 
-    // Fetch connected accounts using React Query
     const { data: accountsResponse, isLoading: loading } = useConnectedAccounts(platformParam);
-    
-    // Ensure accounts is always an array and format them
+    const { data: leadgenConfig, isLoading: leadgenLoading } = useQuery({
+        queryKey: ['tiktokLeadgenConfig'],
+        queryFn: getTikTokLeadgenConfigAPI,
+        enabled: currentPage === 'TikTok',
+    });
+
     const accounts = useMemo(() => {
         const accountsData = Array.isArray(accountsResponse) 
             ? accountsResponse 
@@ -104,46 +110,110 @@ export const IntegrationsPage = () => {
     if (!platform || !dataKey) {
         return <PageWrapper title={t('integrations')}><div>{t('unknownIntegration')}</div></PageWrapper>;
     }
-    
+
     const { name, icon: Icon } = platform;
     const pageTitle = `${name} ${t('integration')}`;
+
+    // TikTok = Lead Gen only (like Meta lead forms). Show webhook URL and setup steps for subscribers.
+    if (currentPage === 'TikTok') {
+        const webhookUrl = leadgenConfig?.webhook_url || '';
+        const setupSteps = [
+            { step: 1, text: t('tiktokStep1') || 'Copy the Webhook URL below (it is unique to your company).' },
+            { step: 2, text: t('tiktokStep2') || 'In TikTok Ads Manager go to Leads Center → CRM integration → TikTok Custom API with Webhooks.' },
+            { step: 3, text: t('tiktokStep3') || 'Paste the Webhook URL and save. Enable the integration if required.' },
+            { step: 4, text: t('tiktokStep4') || 'Create a Lead Gen campaign with an Instant Form. New leads will appear as clients here automatically.' },
+        ];
+        return (
+            <PageWrapper title={pageTitle}>
+                <Card>
+                    <div className="max-w-2xl space-y-6">
+                        <div className="flex items-center gap-3">
+                            <TikTokIcon className="w-10 h-10 text-primary" />
+                            <div>
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    {t('tiktokLeadGen') || 'TikTok Lead Gen'}
+                                </h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {t('tiktokLeadGenDescription') || 'Receive leads from TikTok Instant Forms instantly in your CRM. Follow the steps below to connect TikTok Ads Manager.'}
+                                </p>
+                            </div>
+                        </div>
+                        {leadgenLoading ? (
+                            <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        {t('webhookUrl') || 'Webhook URL'}
+                                    </label>
+                                    <div className="flex gap-2">
+                                        <input
+                                            readOnly
+                                            value={webhookUrl}
+                                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => { if (webhookUrl) navigator.clipboard.writeText(webhookUrl); alert(t('copied') || 'Copied'); }}
+                                        >
+                                            {t('copy') || 'Copy'}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                                        {t('tiktokSetupSteps') || 'How to integrate TikTok with your CRM'}
+                                    </h3>
+                                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                                        {setupSteps.map(({ step, text }) => (
+                                            <li key={step}>{text}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </Card>
+            </PageWrapper>
+        );
+    }
 
     // Delete account mutation
     const deleteAccountMutation = useDeleteConnectedAccount();
     const queryClient = useQueryClient();
 
-    // Handle OAuth callback
+    // Handle OAuth callback (when returning from Meta/WhatsApp in same tab or in popup)
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const connected = urlParams.get('connected');
         const accountId = urlParams.get('account_id');
-        
-        if (connected === 'true' && accountId) {
-            // Remove parameters from URL
+        if (connected !== 'true' || !accountId) return;
+        const id = parseInt(accountId, 10);
+        // If we are inside a popup opened by the integrations page, notify opener and close
+        if (window.opener) {
+            window.opener.postMessage({ type: 'oauth_connected', accountId: id }, window.location.origin);
             window.history.replaceState({}, document.title, window.location.pathname);
-            // Invalidate queries to refetch accounts
-            queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-            
-            // If Meta account, try to open Lead Form selection modal
-            if (platformParam === 'meta') {
-                // Fetch account details to get pages
-                getConnectedAccountsAPI(platformParam).then((accounts: any) => {
-                    const account = Array.isArray(accounts) 
-                        ? accounts.find((a: any) => a.id === parseInt(accountId))
-                        : accounts?.results?.find((a: any) => a.id === parseInt(accountId));
-                    
-                    if (account && account.metadata?.pages && account.metadata.pages.length > 0) {
-                        // Use first page for now (can be improved to let user select)
-                        const firstPage = account.metadata.pages[0];
-                        setSelectLeadFormConfig({
-                            accountId: parseInt(accountId),
-                            pageId: firstPage.id,
-                            pageName: firstPage.name,
-                        });
-                        setIsSelectLeadFormModalOpen(true);
-                    }
-                }).catch(console.error);
-            }
+            window.close();
+            return;
+        }
+        // Same-tab redirect: clean URL and refetch
+        window.history.replaceState({}, document.title, window.location.pathname);
+        queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+        if (platformParam === 'meta') {
+            getConnectedAccountsAPI(platformParam).then((accounts: any) => {
+                const account = Array.isArray(accounts)
+                    ? accounts.find((a: any) => a.id === id)
+                    : accounts?.results?.find((a: any) => a.id === id);
+                if (account?.metadata?.pages?.length) {
+                    const firstPage = account.metadata.pages[0];
+                    setSelectLeadFormConfig({
+                        accountId: id,
+                        pageId: firstPage.id,
+                        pageName: firstPage.name,
+                    });
+                    setIsSelectLeadFormModalOpen(true);
+                }
+            }).catch(console.error);
         }
     }, [queryClient, platformParam]);
     
@@ -191,47 +261,70 @@ export const IntegrationsPage = () => {
         }
     };
 
-    const handleConnect = async (accountId: number) => {
+    const openConnectPopup = async (accountId: number) => {
         try {
             const response = await connectIntegrationAccountAPI(accountId);
-            if (response.authorization_url) {
-                window.location.href = response.authorization_url;
+            if (!response.authorization_url) return;
+            const width = 600;
+            const height = 700;
+            const left = Math.round((window.screen.width - width) / 2);
+            const top = Math.round((window.screen.height - height) / 2);
+            const popup = window.open(
+                response.authorization_url,
+                'oauth_popup',
+                `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+            );
+            if (!popup) {
+                alert(t('popupBlocked') || 'Please allow popups for this site and try again.');
+                return;
             }
+            const handleMessage = (event: MessageEvent) => {
+                if (event.origin !== window.location.origin) return;
+                if (event.data?.type === 'oauth_connected' && event.data?.accountId != null) {
+                    window.removeEventListener('message', handleMessage);
+                    try { popup.close(); } catch (_) {}
+                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                    if (platformParam === 'meta') {
+                        getConnectedAccountsAPI(platformParam).then((accounts: any) => {
+                            const list = Array.isArray(accounts) ? accounts : accounts?.results || [];
+                            const account = list.find((a: any) => a.id === event.data.accountId);
+                            if (account?.metadata?.pages?.length) {
+                                const firstPage = account.metadata.pages[0];
+                                setSelectLeadFormConfig({
+                                    accountId: event.data.accountId,
+                                    pageId: firstPage.id,
+                                    pageName: firstPage.name,
+                                });
+                                setIsSelectLeadFormModalOpen(true);
+                            }
+                        }).catch(console.error);
+                    }
+                }
+            };
+            window.addEventListener('message', handleMessage);
+            const poll = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(poll);
+                    window.removeEventListener('message', handleMessage);
+                }
+            }, 500);
         } catch (error: any) {
             console.error('Error connecting account:', error);
             alert(error?.message || t('errorConnectingAccount') || 'Failed to connect account');
         }
     };
 
-    const handleTikTokSync = async (accountId: number) => {
-        try {
-            await syncIntegrationAccountAPI(accountId);
-            queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-            alert(t('syncCompleted') || 'Sync completed');
-        } catch (error: any) {
-            console.error('TikTok sync error:', error);
-            alert(error?.message || t('syncFailed') || 'Sync failed');
-        }
+    const handleConnect = (accountId: number) => {
+        openConnectPopup(accountId);
     };
 
-    const handleTikTokViewProfile = async (account: Account) => {
-        if (account.link) {
-            window.open(account.link, '_blank');
-            return;
-        }
-        try {
-            const res = await getTikTokProfileAPI(account.id);
-            const url = res?.profile?.profile_web_link || res?.account_link;
-            if (url) {
-                window.open(url, '_blank');
-            } else {
-                alert(res?.profile?.display_name || account.name);
-            }
-        } catch (e) {
-            console.error(e);
-            alert(t('errorLoadingProfile') || 'Could not load profile');
-        }
-    };
+    // بعد إنشاء حساب جديد (Meta/WhatsApp) من المودال، فتح نافذة الربط تلقائياً
+    useEffect(() => {
+        if (pendingConnectAccountId == null) return;
+        const id = pendingConnectAccountId;
+        setPendingConnectAccountId(null);
+        openConnectPopup(id);
+    }, [pendingConnectAccountId]);
 
     const handleEdit = (account: Account) => {
         setEditingAccount(account);
@@ -273,12 +366,12 @@ export const IntegrationsPage = () => {
                                         <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
                                         <span className={`flex items-center text-xs ${account.status === 'Connected' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                             <span className={`h-2 w-2 me-1.5 rounded-full ${account.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
-                                            {account.status}
+                                            {account.status === 'Connected' ? t('connected') : t('disconnected')}
                                         </span>
                                     </div>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    {account.status !== 'Connected' && (
+                                    {(account.status !== 'Connected') && (
                                         <Button variant="primary" onClick={() => handleConnect(account.id)}>
                                             {t('connect') || 'Connect'}
                                         </Button>
@@ -287,16 +380,6 @@ export const IntegrationsPage = () => {
                                         <Button variant="secondary" onClick={() => handleSelectLeadForm(account)}>
                                             {t('selectLeadForm') || 'Select Lead Form'}
                                         </Button>
-                                    )}
-                                    {account.status === 'Connected' && account.platform === 'tiktok' && (
-                                        <>
-                                            <Button variant="secondary" onClick={() => handleTikTokSync(account.id)}>
-                                                {t('sync') || 'Sync'}
-                                            </Button>
-                                            <Button variant="secondary" onClick={() => handleTikTokViewProfile(account)}>
-                                                {t('viewProfile') || 'View profile'}
-                                            </Button>
-                                        </>
                                     )}
                                     <Button variant="secondary" onClick={() => handleEdit(account)}><SettingsIcon className="w-4 h-4 me-2" /> {t('edit')}</Button>
                                     <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
@@ -309,6 +392,9 @@ export const IntegrationsPage = () => {
                         <Icon className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
                         <h3 className="text-lg font-semibold">{t('noAccountsConnected')}</h3>
                         <p className="text-gray-500 dark:text-gray-400 mt-1">{t('connectAccountPrompt')}</p>
+                        {(platformParam === 'whatsapp' || platformParam === 'meta') && (
+                            <p className="text-gray-400 dark:text-gray-500 mt-2 text-sm">{t('addAccountThenConnectHint')}</p>
+                        )}
                     </div>
                 )}
             </Card>

@@ -422,8 +422,10 @@ export const TwoFactorAuthPage = () => {
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                                 {t('twoFactorCodeLabel')}
                             </label>
+                            {/* حاوية الرمز LTR دائماً: أول خانة يسار، آخر خانة يمين (حتى في العربية) */}
                             <div 
                                 className="flex gap-2 justify-center"
+                                dir="ltr"
                                 onPaste={handlePaste}
                             >
                                 {[0, 1, 2, 3, 4, 5].map((index) => (
@@ -442,7 +444,9 @@ export const TwoFactorAuthPage = () => {
                                             }
                                         }}
                                         className="w-14 h-14 text-center text-2xl font-bold font-mono bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        dir="ltr"
                                         autoFocus={index === 0 && !code}
+                                        onFocus={(e) => e.target.setSelectionRange(0, 0)}
                                     />
                                 ))}
                             </div>

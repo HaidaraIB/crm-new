@@ -104,8 +104,11 @@ export const CheckIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export const FacebookIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z"></path></svg>
 );
+/** Official TikTok logo (musical note / d-shape) */
 export const TikTokIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...props}><path d="M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-2.43.05-4.86-.95-6.69-2.81-1.77-1.8-2.6-4.18-2.5-6.61a5.6 5.6 0 0 1 .1-1.06c.1-1.1.48-2.16 1.04-3.1 1.06-1.78 2.6-3.1 4.5-3.83.61-.23 1.25-.38 1.88-.48 1.33-.21 2.66-.3 4-.31.02 1.53.01 3.05.02 4.58-.93.13-1.86.3-2.79.48-.42.08-.83.2-1.25.33-.87.28-1.7.67-2.51 1.09-.5.25-.98.54-1.46.86-.09 1.08-.1 2.17-.05 3.25.04.85.28 1.68.74 2.44.75 1.23 2.05 2.16 3.57 2.44 1.29.24 2.61.12 3.82-.23.6-.18 1.17-.43 1.72-.73v-4.64c-.65.25-1.3.44-1.95.58-.29.06-.58.1-.88.13-1.12.11-2.25.08-3.37-.08a5.5 5.5 0 0 1-2.02-.45c-.63-.25-1.23-.58-1.78-.96-1-.68-1.8-1.55-2.42-2.57-1.1-1.8-1.57-3.9-1.3-6.02.21-1.73 1.08-3.33 2.37-4.52C9.48 2.49 11.02 1.86 12.525.02z"></path></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="currentColor" {...props}>
+        <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z" />
+    </svg>
 );
 export const TrashIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>

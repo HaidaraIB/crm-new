@@ -111,6 +111,7 @@ const TheApp = () => {
         case 'Meta':
         case 'TikTok':
         case 'WhatsApp':
+        case 'Twilio':
             return <IntegrationsPage key={currentPage} />;
         case 'Billing':
             return <BillingPage />;
@@ -178,7 +179,13 @@ const TheApp = () => {
         if (!isLoggedIn) return;
         
         // Decode URL-encoded pathname (e.g., /all%20leads -> /all leads)
-        const pathnameToCheck = decodeURIComponent(window.location.pathname);
+        const pathnameToCheck = decodeURIComponent(window.location.pathname).replace(/\/+$/, '') || '/';
+        // Don't rewrite URL or redirect when on public legal pages (they must stay accessible at their path)
+        const isPublicLegalPath = pathnameToCheck === '/data-deletion-policy' || pathnameToCheck === '/data-deletion' || pathnameToCheck.endsWith('/data-deletion-policy') || pathnameToCheck.endsWith('/data-deletion')
+            || pathnameToCheck === '/terms-of-service' || pathnameToCheck === '/terms' || pathnameToCheck.endsWith('/terms-of-service') || pathnameToCheck.endsWith('/terms')
+            || pathnameToCheck === '/privacy-policy' || pathnameToCheck === '/privacy' || pathnameToCheck.endsWith('/privacy-policy') || pathnameToCheck.endsWith('/privacy');
+        if (isPublicLegalPath) return;
+        
         console.log('[App] Routing effect - pathnameToCheck:', pathnameToCheck);
         console.log('[App] Routing effect - currentPage:', currentPage);
         console.log('[App] Routing effect - search:', window.location.search);
@@ -259,6 +266,7 @@ const TheApp = () => {
             'meta': 'Meta',
             'tiktok': 'TikTok',
             'whatsapp': 'WhatsApp',
+            'twilio': 'Twilio',
             'billing': 'Billing',
             'change plan': 'Change Plan',
             'change-plan': 'Change Plan',
@@ -397,10 +405,16 @@ const TheApp = () => {
     }, [isLoggedIn, authProcessed]); // Run when isLoggedIn changes or on mount
     
     // Check for verify-email route first (accessible for both logged-in and logged-out users)
-    const pathname = decodeURIComponent(window.location.pathname);
+    const pathnameRaw = decodeURIComponent(window.location.pathname);
+    const pathname = pathnameRaw.replace(/\/+$/, '') || '/'; // normalize: no trailing slash
     const urlParamsForRoutes = new URLSearchParams(window.location.search);
     const hasVerificationParams = urlParamsForRoutes.has('token') && urlParamsForRoutes.has('email');
     const hasResetParams = urlParamsForRoutes.has('token') && (urlParamsForRoutes.has('email') || pathname === '/reset-password');
+    
+    // Public routes: always accessible without login (no redirect). Check early so first load never redirects to login.
+    const isDataDeletionRoute = pathname === '/data-deletion-policy' || pathname === '/data-deletion' || pathname.endsWith('/data-deletion-policy') || pathname.endsWith('/data-deletion') || currentPage === 'DataDeletionPolicy';
+    const isTermsRoute = pathname === '/terms-of-service' || pathname === '/terms' || pathname.endsWith('/terms-of-service') || pathname.endsWith('/terms') || currentPage === 'TermsOfService';
+    const isPrivacyRoute = pathname === '/privacy-policy' || pathname === '/privacy' || pathname.endsWith('/privacy-policy') || pathname.endsWith('/privacy') || currentPage === 'PrivacyPolicy';
     
     // Prioritize verify-email route: show VerifyEmailPage if pathname matches OR if URL has verification parameters
     // This ensures verification works regardless of currentPage state
@@ -413,16 +427,14 @@ const TheApp = () => {
         return <ChangePlanPage />;
     }
     
-    // Show legal pages (available for both logged-in and logged-out users)
-    if (pathname === '/terms-of-service' || pathname === '/terms' || currentPage === 'TermsOfService') {
+    // Show legal pages (available for both logged-in and logged-out users) — must be reachable on first load without login
+    if (isTermsRoute) {
         return <TermsOfServicePage />;
     }
-    
-    if (pathname === '/privacy-policy' || pathname === '/privacy' || currentPage === 'PrivacyPolicy') {
+    if (isPrivacyRoute) {
         return <PrivacyPolicyPage />;
     }
-    
-    if (pathname === '/data-deletion-policy' || pathname === '/data-deletion' || currentPage === 'DataDeletionPolicy') {
+    if (isDataDeletionRoute) {
         return <DataDeletionPolicyPage />;
     }
     
@@ -556,6 +568,7 @@ const TheApp = () => {
                 'meta': 'Meta',
                 'tiktok': 'TikTok',
                 'whatsapp': 'WhatsApp',
+                'twilio': 'Twilio',
                 'billing': 'Billing',
                 'change plan': 'Change Plan',
                 'change-plan': 'Change Plan',

@@ -1,11 +1,12 @@
 
 
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader } from '../components/index';
+import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
+import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getTikTokLeadgenConfigAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
@@ -24,6 +25,172 @@ const platformConfig: Record<string, { name: string, icon: React.FC<React.SVGPro
     'TikTok': { name: 'TikTok', icon: TikTokIcon, dataKey: 'tiktok' },
     'WhatsApp': { name: 'WhatsApp', icon: WhatsappIcon, dataKey: 'whatsapp' },
 };
+
+function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; replaceTwilio: (str: string) => string }) {
+    const [accountSid, setAccountSid] = useState('');
+    const [twilioNumber, setTwilioNumber] = useState('');
+    const [authToken, setAuthToken] = useState('');
+    const [senderId, setSenderId] = useState('');
+    const [isEnabled, setIsEnabled] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [success, setSuccess] = useState(false);
+    const [showAccountSid, setShowAccountSid] = useState(false);
+    const [showAuthToken, setShowAuthToken] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        getTwilioSettingsAPI()
+            .then((data) => {
+                if (!cancelled) {
+                    setAccountSid(data.account_sid || '');
+                    setTwilioNumber(data.twilio_number || '');
+                    setAuthToken('');
+                    setSenderId(data.sender_id || '');
+                    setIsEnabled(!!data.is_enabled);
+                }
+            })
+            .catch(() => { if (!cancelled) setError(t('failedToLoadTwilioSettings')); })
+            .finally(() => { if (!cancelled) setLoading(false); });
+        return () => { cancelled = true; };
+    }, []);
+
+    const handleSave = () => {
+        setError(null);
+        setSuccess(false);
+        setSaving(true);
+        updateTwilioSettingsAPI({
+            account_sid: accountSid || undefined,
+            twilio_number: twilioNumber || undefined,
+            auth_token: authToken || undefined,
+            sender_id: senderId || undefined,
+            is_enabled: isEnabled,
+        })
+            .then(() => { setSuccess(true); setAuthToken(''); })
+            .catch((e: any) => setError(e?.message || t('failedToSaveTwilioSettings')))
+            .finally(() => setSaving(false));
+    };
+
+    if (loading) {
+        return (
+            <Card>
+                <div className="flex justify-center py-12"><Loader variant="primary" className="h-8" /></div>
+            </Card>
+        );
+    }
+
+    return (
+        <Card>
+            <div className="max-w-2xl space-y-6">
+                <div className="flex items-center gap-3">
+                    <SmsIcon className="w-10 h-10 text-primary" />
+                    <div>
+                        <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            {replaceTwilio(t('twilioSmsIntegration'))}
+                        </h2>
+                        <p className="text-sm text-amber-600 dark:text-amber-400 font-medium mt-1">
+                            {replaceTwilio(t('twilioOnlyNote'))}
+                        </p>
+                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setIsEnabled(!isEnabled)}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${isEnabled ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        {isEnabled && <span className="w-2 h-2 rounded-full bg-green-500" />}
+                        {t('twilioIntegrationEnabled')}
+                    </button>
+                </div>
+
+                <div className="grid gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('accountSid')}</label>
+                        <div className="relative">
+                            <input
+                                type={showAccountSid ? 'text' : 'password'}
+                                value={accountSid}
+                                onChange={(e) => setAccountSid(e.target.value)}
+                                autoComplete="off"
+                                data-form-type="other"
+                                data-lpignore="true"
+                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                placeholder={t('accountSidPlaceholder')}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowAccountSid(!showAccountSid)}
+                                className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                title={showAccountSid ? (t('hide') || 'Hide') : (t('show') || 'Show')}
+                            >
+                                {showAccountSid ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{replaceTwilio(t('twilioNumber'))}</label>
+                        <input
+                            type="text"
+                            value={twilioNumber}
+                            onChange={(e) => setTwilioNumber(e.target.value)}
+                            autoComplete="off"
+                            data-form-type="other"
+                            data-lpignore="true"
+                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                            placeholder={t('twilioNumberPlaceholder')}
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('authToken')}</label>
+                        <div className="relative">
+                            <input
+                                type={showAuthToken ? 'text' : 'password'}
+                                value={authToken}
+                                onChange={(e) => setAuthToken(e.target.value)}
+                                autoComplete="new-password"
+                                data-form-type="other"
+                                data-lpignore="true"
+                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                placeholder={t('leaveBlankToKeepCurrent')}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowAuthToken(!showAuthToken)}
+                                className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                title={showAuthToken ? (t('hide') || 'Hide') : (t('show') || 'Show')}
+                            >
+                                {showAuthToken ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('senderId')}</label>
+                        <input
+                            type="text"
+                            value={senderId}
+                            onChange={(e) => setSenderId(e.target.value)}
+                            autoComplete="off"
+                            data-form-type="other"
+                            data-lpignore="true"
+                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                            placeholder={t('senderIdPlaceholder')}
+                        />
+                    </div>
+                </div>
+
+                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+                {success && <p className="text-sm text-green-600 dark:text-green-400">{t('saveSucceeded')}</p>}
+
+                <Button onClick={handleSave} disabled={saving}>
+                    {saving ? <Loader variant="primary" className="h-4 w-4" /> : t('save')}
+                </Button>
+            </div>
+        </Card>
+    );
+}
 
 export const IntegrationsPage = () => {
     const { 
@@ -106,6 +273,16 @@ export const IntegrationsPage = () => {
             dataKey: dataKey,
         };
     }, [dataKey]);
+
+    // Twilio SMS: we only accept Twilio for SMS. Credentials form and "integration enabled" toggle.
+    const replaceTwilio = (str: string) => (str || '').replace(/\{\{twilio\}\}/g, t('twilioWord') || 'Twilio');
+    if (currentPage === 'Twilio') {
+        return (
+            <PageWrapper title={replaceTwilio(t('twilioSmsIntegration')) || 'SMS (Twilio) Notifications Integration'}>
+                <TwilioSMSForm t={t} replaceTwilio={replaceTwilio} />
+            </PageWrapper>
+        );
+    }
     
     if (!platform || !dataKey) {
         return <PageWrapper title={t('integrations')}><div>{t('unknownIntegration')}</div></PageWrapper>;

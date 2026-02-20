@@ -892,7 +892,7 @@ export const RegisterPage = () => {
                                             value={phone}
                                             onChange={handlePhoneChange}
                                             error={!!errors.phone}
-                                            defaultCountry="SY"
+                                            defaultCountry="IQ"
                                         />
                                         {errors.phone && (
                                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>

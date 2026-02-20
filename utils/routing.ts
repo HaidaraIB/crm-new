@@ -152,10 +152,11 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
   const knownRoutes = [
     'dashboard', 'leads', 'activities', 'properties', 'owners', 'services',
     'products', 'suppliers', 'deals', 'employees', 'users', 'marketing',
-    'campaigns', 'todos', 'reports', 'integrations', 'settings', 'profile',
+    'campaigns', 'todos', 'reports', 'integrations', 'twilio', 'settings', 'profile',
     'billing', 'payment', 'subscription', 'login', 'register', 'forgot-password',
     'reset-password', 'verify-email', '2fa', 'payment-success', 'change-plan',
-    'create-lead', 'edit-lead', 'view-lead', 'create-deal'
+    'create-lead', 'edit-lead', 'view-lead', 'create-deal',
+    'terms-of-service', 'terms', 'privacy-policy', 'privacy', 'data-deletion-policy', 'data-deletion'
   ];
   
   // If first part is a known route, no company in path

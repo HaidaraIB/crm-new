@@ -230,7 +230,7 @@ export const AddLeadModal = () => {
                                     placeholder={t('enterPhoneNumber')} 
                                     value={formState.phone} 
                                     onChange={(value) => setFormState(prev => ({ ...prev, phone: value }))}
-                                    defaultCountry="SY"
+                                    defaultCountry="IQ"
                                 />
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {t('orAddMultiplePhones') || 'Or add multiple phone numbers below'}
@@ -245,7 +245,7 @@ export const AddLeadModal = () => {
                                                 placeholder={t('enterPhoneNumber')}
                                                 value={pn.phone_number}
                                                 onChange={(value) => handlePhoneNumberChange(index, 'phone_number', value)}
-                                                defaultCountry="SY"
+                                                defaultCountry="IQ"
                                             />
                                         </div>
                                         <div className="col-span-6 sm:col-span-2">

@@ -176,7 +176,7 @@ export const AddSupplierModal = () => {
                             setFormState(prev => ({ ...prev, phone: value }));
                             clearError('phone');
                         }}
-                        defaultCountry="SY"
+                        defaultCountry="IQ"
                     />
                 </div>
                 <div>

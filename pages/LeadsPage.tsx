@@ -2,8 +2,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon, ImportLeadsModal } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon, ImportLeadsModal, SmsIcon } from '../components/index';
 import { TrashIcon, ChevronDownIcon, FacebookIcon } from '../components/icons';
+import SendSMSModal from '../components/modals/SendSMSModal';
 import { Lead } from '../types';
 import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks, useAssignUnassignedClients } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -296,6 +297,8 @@ export const LeadsPage = () => {
     
     // Track which lead is being updated
     const [updatingLeadId, setUpdatingLeadId] = useState<number | null>(null);
+    // Send SMS modal: { leadId, phone }
+    const [sendSMSModal, setSendSMSModal] = useState<{ leadId: number; phone: string } | null>(null);
 
     // Handle status change
     const handleStatusChange = async (leadId: number, newStatusId: number) => {
@@ -765,7 +768,7 @@ export const LeadsPage = () => {
                                                     <div className="flex flex-col gap-2">
                                                         {lead.phoneNumbers && lead.phoneNumbers.length > 0 ? (
                                                             lead.phoneNumbers.map((pn) => (
-                                                                <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-1`}>
+                                                                <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_auto_1fr]'} items-center gap-1`}>
                                                                     {language === 'ar' ? (
                                                                         <>
                                                                             <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
@@ -796,9 +799,25 @@ export const LeadsPage = () => {
                                                                             >
                                                                                 <WhatsappIcon className="w-5 h-5"/>
                                                                             </a>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number })}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('sendSms') || 'Send SMS'}
+                                                                            >
+                                                                                <SmsIcon className="w-5 h-5"/>
+                                                                            </button>
                                                                         </>
                                                                     ) : (
                                                                         <>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number })}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('sendSms') || 'Send SMS'}
+                                                                            >
+                                                                                <SmsIcon className="w-5 h-5"/>
+                                                                            </button>
                                                                             <a 
                                                                                 href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
                                                                                 target="_blank" 
@@ -833,7 +852,7 @@ export const LeadsPage = () => {
                                                             ))
                                                         ) : (
                                                             lead.phone ? (
-                                                                <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto]' : 'grid-cols-[auto_auto_1fr]'} items-center gap-1`}>
+                                                                <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-1`}>
                                                                     {language === 'ar' ? (
                                                                         <>
                                                                             <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
@@ -853,9 +872,25 @@ export const LeadsPage = () => {
                                                                             >
                                                                                 <WhatsappIcon className="w-5 h-5"/>
                                                                             </a>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone })}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('sendSms') || 'Send SMS'}
+                                                                            >
+                                                                                <SmsIcon className="w-5 h-5"/>
+                                                                            </button>
                                                                         </>
                                                                     ) : (
                                                                         <>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone })}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('sendSms') || 'Send SMS'}
+                                                                            >
+                                                                                <SmsIcon className="w-5 h-5"/>
+                                                                            </button>
                                                                             <a 
                                                                                 href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`} 
                                                                                 target="_blank" 
@@ -1089,6 +1124,14 @@ export const LeadsPage = () => {
                 }
             }}
         />
+        {sendSMSModal && (
+            <SendSMSModal
+                isOpen={true}
+                onClose={() => setSendSMSModal(null)}
+                leadId={sendSMSModal.leadId}
+                phoneNumber={sendSMSModal.phone}
+            />
+        )}
         </>
     );
 };

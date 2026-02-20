@@ -14,7 +14,7 @@ import {
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI,
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI,
-  getLeadFormsAPI, selectLeadFormAPI,
+  getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI,
   createLeadAPI, updateLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   createDealAPI, updateDealAPI, deleteDealAPI,
@@ -67,6 +67,7 @@ export const queryKeys = {
   statuses: ['statuses'] as const,
   callMethods: ['callMethods'] as const,
   connectedAccounts: (platform?: string) => ['connectedAccounts', platform] as const,
+  leadSMSMessages: (leadId?: number) => ['leadSMSMessages', leadId] as const,
 };
 
 // ==================== Query Hooks ====================
@@ -367,6 +368,19 @@ export const useCallMethods = (options?: Omit<UseQueryOptions<any, Error>, 'quer
     queryKey: queryKeys.callMethods,
     queryFn: () => getCallMethodsAPI(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    ...options,
+  });
+};
+
+export const useLeadSMSMessages = (
+  leadId: number | undefined,
+  options?: Omit<UseQueryOptions<any[], Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.leadSMSMessages(leadId),
+    queryFn: () => getLeadSMSMessagesAPI(leadId!),
+    enabled: !!leadId,
+    staleTime: 1 * 60 * 1000, // 1 minute
     ...options,
   });
 };

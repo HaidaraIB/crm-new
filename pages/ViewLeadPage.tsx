@@ -2,9 +2,10 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon } from '../components/index';
+import SendSMSModal from '../components/modals/SendSMSModal';
 import { formatDateToLocal, formatDateTimeToLocal } from '../utils/dateUtils';
-import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useCallMethods } from '../hooks/useQueries';
+import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useCallMethods, useLeadSMSMessages } from '../hooks/useQueries';
 import { ChevronDownIcon } from '../components/icons';
 import { Lead } from '../types';
 
@@ -196,6 +197,7 @@ export const ViewLeadPage = () => {
     // Update lead mutation
     const updateLeadMutation = useUpdateLead();
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
+    const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
     
     // Handle status change
     const handleStatusChange = async (leadId: number, newStatusId: number) => {
@@ -273,6 +275,8 @@ export const ViewLeadPage = () => {
     
     const { data: clientEventsResponse } = useClientEvents(leadId);
     const clientEvents = clientEventsResponse?.results || [];
+    
+    const { data: leadSMSMessages = [], refetch: refetchLeadSMS } = useLeadSMSMessages(leadId ?? undefined);
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
@@ -615,9 +619,25 @@ export const ViewLeadPage = () => {
             };
         });
 
+        // Format SMS messages (Twilio)
+        const smsEntries = (leadSMSMessages as any[]).map((sms) => {
+            const user = users.find(u => u.id === sms.created_by);
+            return {
+                id: `sms-${sms.id}`,
+                type: 'sms' as const,
+                user: user?.name || sms.created_by_username || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('smsSent') || 'SMS sent',
+                details: sms.body || '',
+                date: formatDateToLocal(sms.created_at),
+                timestamp: new Date(sms.created_at).getTime(),
+                stage: sms.phone_number,
+            };
+        });
+
         // Combine and sort by date descending
-        return [...actions, ...calls, ...events].sort((a, b) => b.timestamp - a.timestamp);
-    }, [displayLead, leadClientTasks, leadClientCalls, clientEvents, users, t, stages, statuses, callMethods]);
+        return [...actions, ...calls, ...events, ...smsEntries].sort((a, b) => b.timestamp - a.timestamp);
+    }, [displayLead, leadClientTasks, leadClientCalls, clientEvents, leadSMSMessages, users, t, stages, statuses, callMethods]);
 
     if (!displayLead) {
         return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
@@ -690,7 +710,7 @@ export const ViewLeadPage = () => {
                             <div className="mt-2 space-y-2">
                                 {displayLead.phoneNumbers && displayLead.phoneNumbers.length > 0 ? (
                                     displayLead.phoneNumbers.map((pn) => (
-                                        <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-2`}>
+                                        <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_auto_1fr]'} items-center gap-2`}>
                                             {language === 'ar' ? (
                                                 <>
                                                     <div className="min-w-0">
@@ -728,6 +748,14 @@ export const ViewLeadPage = () => {
                                                     >
                                                         <WhatsappIcon className="w-5 h-5"/>
                                                     </a>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSendSMSModal({ phone: pn.phone_number })}
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={t('sendSms') || 'Send SMS'}
+                                                    >
+                                                        <SmsIcon className="w-5 h-5"/>
+                                                    </button>
                                                 </>
                                             ) : (
                                                 <>
@@ -747,6 +775,14 @@ export const ViewLeadPage = () => {
                                                     >
                                                         <PhoneIcon className="w-5 h-5"/>
                                                     </a>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSendSMSModal({ phone: pn.phone_number })}
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={t('sendSms') || 'Send SMS'}
+                                                    >
+                                                        <SmsIcon className="w-5 h-5"/>
+                                                    </button>
                                                     <div className="w-16 text-left">
                                                         {pn.is_primary ? (
                                                             <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
@@ -771,7 +807,7 @@ export const ViewLeadPage = () => {
                                         </div>
                                     ))
                                 ) : (
-                                    <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-2`}>
+                                    <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_auto_1fr]'} items-center gap-2`}>
                                         {language === 'ar' ? (
                                             <>
                                                 <p className="text-base font-medium text-gray-900 dark:text-gray-100">
@@ -796,6 +832,14 @@ export const ViewLeadPage = () => {
                                                         >
                                                             <WhatsappIcon className="w-5 h-5"/>
                                                         </a>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
+                                                            className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            title={t('sendSms') || 'Send SMS'}
+                                                        >
+                                                            <SmsIcon className="w-5 h-5"/>
+                                                        </button>
                                                     </>
                                                 )}
                                             </>
@@ -819,6 +863,14 @@ export const ViewLeadPage = () => {
                                                         >
                                                             <PhoneIcon className="w-5 h-5"/>
                                                         </a>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
+                                                            className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            title={t('sendSms') || 'Send SMS'}
+                                                        >
+                                                            <SmsIcon className="w-5 h-5"/>
+                                                        </button>
                                                     </>
                                                 )}
                                                 <div className="w-16"></div>
@@ -1082,6 +1134,15 @@ export const ViewLeadPage = () => {
                 <Timeline history={timelineHistory} />
             </div>
 
+            {sendSMSModal && displayLead && (
+                <SendSMSModal
+                    isOpen={!!sendSMSModal}
+                    onClose={() => setSendSMSModal(null)}
+                    leadId={displayLead.id}
+                    phoneNumber={sendSMSModal.phone}
+                    onSent={() => refetchLeadSMS()}
+                />
+            )}
         </PageWrapper>
     )
 }

@@ -147,22 +147,19 @@ async function apiRequest<T>(
     
     // Create error object with fields for Django REST Framework validation errors
     const error: any = new Error(errorMessage);
-    
-    // Django REST Framework returns field errors in the response directly
     if (errorData && typeof errorData === 'object') {
+      error.data = errorData;
       // Check for field-specific errors (e.g., { email: ["error message"], username: ["error message"] })
       const fieldErrors: Record<string, any> = {};
       Object.keys(errorData).forEach(key => {
-        if (key !== 'detail' && key !== 'message' && key !== 'error') {
+        if (key !== 'detail' && key !== 'message' && key !== 'error' && key !== 'error_key') {
           fieldErrors[key] = errorData[key];
         }
       });
-      
       if (Object.keys(fieldErrors).length > 0) {
         error.fields = fieldErrors;
       }
     }
-    
     throw error;
   }
 
@@ -557,6 +554,38 @@ export const createQicardPaymentSessionAPI = async (
 
 
 /**
+ * Create FIB (First Iraqi Bank) payment session - returns QR code and app links, no redirect
+ * POST /api/payments/create-fib-session/
+ */
+export const createFibPaymentSessionAPI = async (
+  subscriptionId: number,
+  planId?: number,
+  billingCycle?: 'monthly' | 'yearly'
+) => {
+  const token = localStorage.getItem('accessToken');
+  const body: any = { subscription_id: subscriptionId };
+  if (planId) body.plan_id = planId;
+  if (billingCycle) body.billing_cycle = billingCycle;
+  const response = await fetch(`${BASE_URL}/payments/create-fib-session/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }),
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    const error: any = new Error(
+      errorData.detail || errorData.message || errorData.error || 'Failed to create FIB payment session'
+    );
+    throw error;
+  }
+  return response.json();
+};
+
+
+/**
  * Unified payment function that routes to the correct gateway based on gateway ID
  * @param subscriptionId - Subscription ID
  * @param gatewayId - Payment gateway ID
@@ -587,8 +616,9 @@ export const createPaymentSessionAPI = async (
     return await createStripePaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else if (gatewayName.includes('qicard') || gatewayName.includes('qi card') || gatewayName.includes('qi-card')) {
     return await createQicardPaymentSessionAPI(subscriptionId, planId, billingCycle);
+  } else if (gatewayName.includes('fib') || gatewayName.includes('first iraqi')) {
+    return await createFibPaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else {
-    // Default to PayTabs for now, or throw error for unsupported gateways
     throw new Error(`Payment gateway "${gateway.name}" is not yet supported`);
   }
 };
@@ -1857,6 +1887,80 @@ export const getIntegrationPlatformsAPI = async () => {
 export const getIntegrationLogsAPI = async (accountId?: number) => {
   const query = accountId ? `?account=${accountId}` : '';
   return apiRequest<any[]>(`/integrations/logs/${query}`);
+};
+
+// ==================== Twilio SMS (نقبل Twilio فقط لـ SMS) ====================
+
+export interface TwilioSettingsResponse {
+  id?: number;
+  account_sid: string;
+  twilio_number: string;
+  auth_token_masked?: string | null;
+  sender_id: string;
+  is_enabled: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * GET /api/integrations/twilio/settings/
+ */
+export const getTwilioSettingsAPI = async (): Promise<TwilioSettingsResponse> => {
+  return apiRequest<TwilioSettingsResponse>('/integrations/twilio/settings/');
+};
+
+/**
+ * PUT /api/integrations/twilio/settings/
+ */
+export const updateTwilioSettingsAPI = async (data: {
+  account_sid?: string;
+  twilio_number?: string;
+  auth_token?: string;
+  sender_id?: string;
+  is_enabled?: boolean;
+}): Promise<TwilioSettingsResponse> => {
+  return apiRequest<TwilioSettingsResponse>('/integrations/twilio/settings/', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * POST /api/integrations/twilio/send/
+ * إرسال SMS إلى رقم الليد وحفظها في التايملاين
+ */
+export const sendLeadSMSAPI = async (data: {
+  lead_id: number;
+  phone_number: string;
+  body: string;
+}): Promise<LeadSMSMessageResponse> => {
+  return apiRequest<LeadSMSMessageResponse>('/integrations/twilio/send/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export interface LeadSMSMessageResponse {
+  id: number;
+  client: number;
+  phone_number: string;
+  body: string;
+  direction: string;
+  twilio_sid: string | null;
+  created_by: number | null;
+  created_by_username: string;
+  created_at: string;
+}
+
+/**
+ * GET /api/integrations/sms/?client=:clientId
+ */
+export const getLeadSMSMessagesAPI = async (clientId: number): Promise<LeadSMSMessageResponse[]> => {
+  const res = await apiRequest<{ results?: LeadSMSMessageResponse[] } | LeadSMSMessageResponse[]>(
+    `/integrations/sms/?client=${clientId}`
+  );
+  if (Array.isArray(res)) return res;
+  return res.results ?? [];
 };
 
 /**

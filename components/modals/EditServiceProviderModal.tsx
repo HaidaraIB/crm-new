@@ -163,7 +163,7 @@ export const EditServiceProviderModal = () => {
                                 setFormState(prev => ({ ...prev, phone: value }));
                                 clearError('phone');
                             }}
-                            defaultCountry="SY"
+                            defaultCountry="IQ"
                         />
                     </div>
                 </div>

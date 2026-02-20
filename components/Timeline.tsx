@@ -84,6 +84,12 @@ export const Timeline = ({ history }: TimelineProps) => {
                                         >
                                             {entry.action}
                                         </span>
+                                    ) : entry.type === 'sms' ? (
+                                        <span 
+                                            className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
+                                        >
+                                            {entry.action}
+                                        </span>
                                     ) : (
                                         <span className="font-normal text-gray-500 dark:text-gray-400">- {entry.action}</span>
                                     )}

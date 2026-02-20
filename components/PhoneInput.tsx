@@ -102,11 +102,11 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
     placeholder,
     className = '',
     error = false,
-    defaultCountry = 'SY',
+    defaultCountry = 'IQ',
 }) => {
     const { language } = useAppContext();
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
-    const defaultCountryObj = countries.find(c => c.code === defaultCountry) || countries.find(c => c.code === 'SY') || countries[0];
+    const defaultCountryObj = countries.find(c => c.code === defaultCountry) || countries.find(c => c.code === 'IQ') || countries[0];
     const [selectedCountry, setSelectedCountry] = useState<Country>(defaultCountryObj);
     const [phoneNumber, setPhoneNumber] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);

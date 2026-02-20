@@ -43,7 +43,7 @@ export const AddUserModal = () => {
         
         // Phone should start with + (dial code)
         if (!phone.startsWith('+')) {
-            return t('invalidPhoneFormat') || 'Phone number must include country code (e.g., +966...)';
+            return t('invalidPhoneFormat') || 'Phone number must include country code (e.g., +964...)';
         }
         
         // Remove + and check if remaining digits are valid (at least 7 digits for phone number)

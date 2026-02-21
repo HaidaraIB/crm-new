@@ -1869,6 +1869,86 @@ export const syncIntegrationAccountAPI = async (accountId: number) => {
   });
 };
 
+// ==================== WhatsApp Send & Message Templates ====================
+
+/**
+ * POST /api/integrations/whatsapp/send/
+ * Body: { to: string, message: string, phone_number_id?: string }
+ */
+export const sendWhatsAppMessageAPI = async (data: {
+  to: string;
+  message: string;
+  phone_number_id?: string;
+}) => {
+  return apiRequest<any>('/integrations/whatsapp/send/', {
+    method: 'POST',
+    body: JSON.stringify({
+      to: data.to,
+      message: data.message,
+      text: data.message,
+      ...(data.phone_number_id && { phone_number_id: data.phone_number_id }),
+    }),
+  });
+};
+
+export interface MessageTemplateType {
+  id: number;
+  name: string;
+  channel_type: string;
+  channel_type_display: string;
+  content: string;
+  category: string;
+  category_display: string;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * GET /api/integrations/templates/
+ */
+export const getMessageTemplatesAPI = async (): Promise<MessageTemplateType[]> => {
+  const res = await apiRequest<{ results?: MessageTemplateType[] } | MessageTemplateType[]>(
+    '/integrations/templates/'
+  );
+  if (Array.isArray(res)) return res;
+  return res.results ?? [];
+};
+
+/**
+ * POST /api/integrations/templates/
+ */
+export const createMessageTemplateAPI = async (data: {
+  name: string;
+  channel_type: string;
+  content: string;
+  category: string;
+}) => {
+  return apiRequest<MessageTemplateType>('/integrations/templates/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * PUT /api/integrations/templates/:id/
+ */
+export const updateMessageTemplateAPI = async (
+  id: number,
+  data: { name?: string; channel_type?: string; content?: string; category?: string }
+) => {
+  return apiRequest<MessageTemplateType>(`/integrations/templates/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * DELETE /api/integrations/templates/:id/
+ */
+export const deleteMessageTemplateAPI = async (id: number) => {
+  return apiRequest<void>(`/integrations/templates/${id}/`, { method: 'DELETE' });
+};
+
 /**
  * الحصول على قائمة المنصات المدعومة
  * GET /api/integrations/accounts/platforms/

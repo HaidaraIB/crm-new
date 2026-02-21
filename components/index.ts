@@ -57,6 +57,8 @@ export * from './modals/AddCampaignModal';
 export * from './modals/EditCampaignModal';
 export * from './modals/ManageIntegrationAccountModal';
 export * from './modals/SelectLeadFormModal';
+export * from './modals/EditTemplateModal';
+export * from './modals/StartNewConversationModal';
 export * from './ToggleSwitch';
 export * from './modals/ChangePasswordModal';
 export * from './modals/AddTodoModal';

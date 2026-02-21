@@ -159,10 +159,7 @@ export const Sidebar = () => {
                     if (item.name === 'Reports' && currentUser?.role !== 'Owner') {
                         return false;
                     }
-                    // Hide Integrations item for non-admin users
-                    if (item.name === 'Integrations' && currentUser?.role !== 'Owner') {
-                        return false;
-                    }
+                    // Integrations (including WhatsApp) shown for all: employees get Chats + Template Management only
                     // Hide Employees item for employee role
                     if (item.name === 'Employees' && currentUser?.role?.toLowerCase() === 'employee') {
                         return false;
@@ -172,7 +169,11 @@ export const Sidebar = () => {
                     const isOpen = openSubMenus[item.name] ?? false;
                     const itemNameKey = toCamelCase(item.name) as keyof typeof translations.en;
                     // Override subItems for Inventory based on company specialization
-                    const subItems = item.name === 'Inventory' ? getInventorySubItems() : item.subItems;
+                    let subItems = item.name === 'Inventory' ? getInventorySubItems() : item.subItems;
+                    // Employees only see WhatsApp under Integrations (Chats + Template Management)
+                    if (item.name === 'Integrations' && currentUser?.role?.toLowerCase() === 'employee') {
+                        subItems = ['WhatsApp'];
+                    }
                     return (
                         <div key={item.name}>
                             <SidebarItem

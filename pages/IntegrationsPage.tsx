@@ -6,10 +6,14 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI } from '../services/api';
+import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
+import { EditTemplateModal } from '../components/modals/EditTemplateModal';
+import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
+import { FileTextIcon, SearchIcon, EditIcon } from '../components/icons';
 
 type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
 
@@ -195,7 +199,9 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
 export const IntegrationsPage = () => {
     const { 
         t, 
+        language,
         currentPage, 
+        currentUser,
         setIsManageIntegrationAccountModalOpen, 
         setEditingAccount, 
         setConfirmDeleteConfig, 
@@ -207,6 +213,8 @@ export const IntegrationsPage = () => {
         pendingConnectAccountId,
         setPendingConnectAccountId,
     } = useAppContext();
+
+    const isEmployee = (currentUser?.role ?? '').toLowerCase() === 'employee';
 
     // Get platform param based on currentPage
     const platformParam = useMemo(() => {
@@ -245,6 +253,35 @@ export const IntegrationsPage = () => {
         queryKey: ['tiktokLeadgenConfig'],
         queryFn: getTikTokLeadgenConfigAPI,
         enabled: currentPage === 'TikTok',
+    });
+
+    // WhatsApp Messaging Center state (hooks at top level); persist tab in localStorage (employees cannot see 'accounts')
+    const [whatsAppTab, setWhatsAppTab] = useState<'chats' | 'templates' | 'accounts'>(() => {
+        try {
+            const s = localStorage.getItem('whatsapp_messaging_tab');
+            if (s === 'chats' || s === 'templates') return s;
+            if (s === 'accounts') return 'accounts'; // will be clamped for employees in WhatsApp block
+        } catch (_) {}
+        return 'chats';
+    });
+    const setWhatsAppTabPersisted = (tab: 'chats' | 'templates' | 'accounts') => {
+        setWhatsAppTab(tab);
+        try {
+            localStorage.setItem('whatsapp_messaging_tab', tab);
+        } catch (_) {}
+    };
+    const [editingTemplate, setEditingTemplate] = useState<MessageTemplateType | null>(null);
+    const [isEditTemplateOpen, setIsEditTemplateOpen] = useState(false);
+    const [isStartNewConversationOpen, setIsStartNewConversationOpen] = useState(false);
+    const [conversations, setConversations] = useState<Array<{ client: any }>>([]);
+    const [selectedChatClient, setSelectedChatClient] = useState<any>(null);
+    const [chatMessages, setChatMessages] = useState<Record<number, Array<{ body: string; direction: 'in' | 'out'; time: string }>>>({});
+    const [messageInput, setMessageInput] = useState('');
+
+    const { data: templates = [], refetch: refetchTemplates } = useQuery({
+        queryKey: ['messageTemplates'],
+        queryFn: getMessageTemplatesAPI,
+        enabled: currentPage === 'WhatsApp',
     });
 
     const accounts = useMemo(() => {
@@ -351,6 +388,364 @@ export const IntegrationsPage = () => {
                         )}
                     </div>
                 </Card>
+            </PageWrapper>
+        );
+    }
+
+    // WhatsApp: Messaging Center (Chats | Template Management | WhatsApp Accounts)
+    if (currentPage === 'WhatsApp') {
+        const addConversation = (client: any) => {
+            setConversations((prev) => {
+                const exists = prev.some((c) => c.client.id === client.id);
+                if (exists) return prev;
+                return [{ client }, ...prev];
+            });
+            setSelectedChatClient(client);
+        };
+
+        const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '';
+
+        const handleSendMessage = async () => {
+            if (!selectedChatClient || !messageInput.trim()) return;
+            const to = getClientPhone(selectedChatClient);
+            if (!to) {
+                alert(t('sms_error_invalid_to_number') || 'No phone number for this client');
+                return;
+            }
+            try {
+                await sendWhatsAppMessageAPI({ to, message: messageInput.trim() });
+                const id = selectedChatClient.id;
+                setChatMessages((prev) => ({
+                    ...prev,
+                    [id]: [...(prev[id] || []), { body: messageInput.trim(), direction: 'out', time: new Date().toLocaleTimeString() }],
+                }));
+                setMessageInput('');
+            } catch (e: any) {
+                alert(e?.message || t('failedToSendSms'));
+            }
+        };
+
+        /** Replace template placeholders (EN and AR) with actual lead/client values; if no value, leave placeholder as-is */
+        const replaceTemplatePlaceholders = (text: string, client: any): string => {
+            if (!client) return text;
+            const customerName = (client.name || client.contact_name || (client.first_name && client.last_name ? `${client.first_name} ${client.last_name}`.trim() : '') || '').trim();
+            const company = (typeof client.company_name === 'string' ? client.company_name : (client.company && (typeof client.company === 'string' ? client.company : client.company.name)) || '').trim();
+            const amount = client.amount ?? client.last_invoice_amount ?? '';
+            const amountStr = amount !== undefined && amount !== null && String(amount).trim() !== '' ? String(amount).trim() : null;
+            const invoiceNumber = client.invoice_number ?? client.last_invoice_number ?? '';
+            const invoiceStr = invoiceNumber !== undefined && invoiceNumber !== null && String(invoiceNumber).trim() !== '' ? String(invoiceNumber).trim() : null;
+
+            const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const replacePlaceholder = (out: string, pattern: string, value: string) =>
+                value ? out.replace(new RegExp(`\\[\\s*${escapeRegex(pattern)}\\s*\\]`, 'g'), value) : out;
+
+            let out = text;
+            out = replacePlaceholder(out, 'اسم_العميل', customerName);
+            out = replacePlaceholder(out, 'اسم العميل', customerName);
+            out = replacePlaceholder(out, 'Customer Name', customerName);
+            out = replacePlaceholder(out, 'شركة', company);
+            out = replacePlaceholder(out, 'الشركة', company);
+            out = replacePlaceholder(out, 'Company', company);
+            if (amountStr !== null) {
+                out = replacePlaceholder(out, 'المبلغ', amountStr);
+                out = replacePlaceholder(out, 'Amount', amountStr);
+            }
+            if (invoiceStr !== null) {
+                out = replacePlaceholder(out, 'رقم_الفاتورة', invoiceStr);
+                out = replacePlaceholder(out, 'رقم الفاتورة', invoiceStr);
+                out = replacePlaceholder(out, 'Invoice Number', invoiceStr);
+            }
+            return out;
+        };
+
+        const handleApplyQuickTemplate = (content: string) => {
+            const resolved = selectedChatClient ? replaceTemplatePlaceholders(content, selectedChatClient) : content;
+            setMessageInput((prev) => prev + (prev ? '\n' : '') + resolved);
+        };
+
+        const handleCopyTemplate = (content: string) => {
+            navigator.clipboard.writeText(content);
+            alert(t('copied'));
+        };
+
+        const effectiveTab = isEmployee && whatsAppTab === 'accounts' ? 'chats' : whatsAppTab;
+
+        return (
+            <PageWrapper
+                title={
+                    <div>
+                        <div className="flex items-center gap-2">
+                            <WhatsappIcon className="w-8 h-8 text-primary" />
+                            <span>{t('messagingCenter')}</span>
+                        </div>
+                        <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('messagingCenterDesc')}</p>
+                    </div>
+                }
+                actions={
+                    !isEmployee && (
+                        <Button onClick={() => { setEditingAccount(null); setIsManageIntegrationAccountModalOpen(true); }}>
+                            <PlusIcon className="w-4 h-4 me-2" /> {t('addNewAccount')}
+                        </Button>
+                    )
+                }
+            >
+                <div className="flex border-b border-gray-200 dark:border-gray-700 gap-1 mb-4">
+                    <button
+                        type="button"
+                        onClick={() => setWhatsAppTabPersisted('chats')}
+                        className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'chats' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                    >
+                        <WhatsappIcon className="w-4 h-4" /> {t('chats')}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setWhatsAppTabPersisted('templates')}
+                        className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'templates' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                    >
+                        <FileTextIcon className="w-4 h-4" /> {t('templateManagement')}
+                    </button>
+                    {!isEmployee && (
+                        <button
+                            type="button"
+                            onClick={() => setWhatsAppTabPersisted('accounts')}
+                            className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'accounts' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                        >
+                            <SettingsIcon className="w-4 h-4" /> {t('whatsAppAccounts')}
+                        </button>
+                    )}
+                </div>
+
+                {effectiveTab === 'chats' && (
+                    <Card className="overflow-hidden">
+                        <div className="flex flex-col md:flex-row min-h-[500px]">
+                            <div className="w-full md:w-80 border-e border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 flex flex-col">
+                                <div className="p-3 border-b border-gray-200 dark:border-gray-700">
+                                    <Button className="w-full" onClick={() => setIsStartNewConversationOpen(true)}>
+                                        <PlusIcon className="w-4 h-4 me-2" /> {t('startNewConversation')}
+                                    </Button>
+                                </div>
+                                <div className="p-2">
+                                    <div className="relative">
+                                        <SearchIcon className="absolute top-1/2 -translate-y-1/2 start-2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                        <input
+                                            type="text"
+                                            placeholder={t('searchConversations')}
+                                            dir="auto"
+                                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-8 pe-3 py-2 text-sm"
+                                        />
+                                    </div>
+                                </div>
+                                <ul className="flex-1 overflow-y-auto">
+                                    {conversations.map(({ client }) => (
+                                        <li key={client.id}>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedChatClient(client)}
+                                                className={`w-full flex items-center gap-3 p-3 text-start ${selectedChatClient?.id === client.id ? 'bg-primary/10 dark:bg-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+                                            >
+                                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold flex-shrink-0">
+                                                    {(client.company_name || client.name || '?').charAt(0)}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{client.company_name || client.name}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.name || client.phone_number}</p>
+                                                </div>
+                                            </button>
+                                        </li>
+                                    ))}
+                                    {conversations.length === 0 && (
+                                        <li className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">{t('chooseClientFromDb')}</li>
+                                    )}
+                                </ul>
+                            </div>
+                            <div className="flex-1 flex flex-col bg-white dark:bg-gray-800">
+                                {selectedChatClient ? (
+                                    <>
+                                        <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
+                                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
+                                                {(selectedChatClient.company_name || selectedChatClient.name || '?').charAt(0)}
+                                            </div>
+                                            <div>
+                                                <p className="font-medium text-gray-900 dark:text-white">{selectedChatClient.company_name || selectedChatClient.name}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{selectedChatClient.phone_number && (t('connectedWhatsAppApi') + ' · ' + selectedChatClient.phone_number)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                                            <p className="text-center text-xs text-gray-400 py-2">{t('today')}</p>
+                                            {(chatMessages[selectedChatClient.id] || []).map((msg, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={`max-w-[85%] rounded-lg px-3 py-2 ${msg.direction === 'out' ? 'ms-auto bg-primary text-white' : 'me-auto bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'}`}
+                                                >
+                                                    <p className="text-sm">{msg.body}</p>
+                                                    <p className="text-xs opacity-80 mt-1">{msg.time}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+                                            {templates.length > 0 && (
+                                                <div className="flex flex-wrap gap-2 mb-2">
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 w-full">{t('quickTemplates')}</span>
+                                                    {templates.slice(0, 4).map((tpl) => (
+                                                        <button
+                                                            key={tpl.id}
+                                                            type="button"
+                                                            onClick={() => handleApplyQuickTemplate(tpl.content)}
+                                                            className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                        >
+                                                            {tpl.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            <div className="flex gap-2">
+                                                <input
+                                                    type="text"
+                                                    value={messageInput}
+                                                    onChange={(e) => setMessageInput(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                                                    placeholder={t('typeMessageWhatsApp')}
+                                                    className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                                                />
+                                                <Button onClick={handleSendMessage}>{t('sendSms')}</Button>
+                                            </div>
+                                        </div>
+                                    </>
+                                ) : (
+                                    <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
+                                        {t('startNewConversation')} {t('chooseClientFromDb')}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </Card>
+                )}
+
+                {effectiveTab === 'templates' && (
+                    <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                    <FileTextIcon className="w-5 h-5 text-primary" /> {t('templateManagement')}
+                                </h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">{t('templateManagementDesc')}</p>
+                            </div>
+                            <Button
+                                onClick={() => {
+                                    setEditingTemplate(null);
+                                    setIsEditTemplateOpen(true);
+                                }}
+                            >
+                                <PlusIcon className="w-4 h-4 me-2" /> {t('newTemplate')}
+                            </Button>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {templates.map((tpl) => (
+                                <Card key={tpl.id} className="flex flex-col">
+                                    <div className="flex justify-between items-start mb-2">
+                                        <span className={`text-xs px-2 py-0.5 rounded ${tpl.channel_type === 'sms' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'}`}>
+                                            {tpl.channel_type === 'sms' ? 'SMS' : 'WHATSAPP'}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setEditingTemplate(tpl);
+                                                    setIsEditTemplateOpen(true);
+                                                }}
+                                                className="text-gray-500 hover:text-primary"
+                                                title={t('edit')}
+                                            >
+                                                <EditIcon className="w-4 h-4" />
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => {
+                                                    setConfirmDeleteConfig({
+                                                        title: t('deleteTemplate'),
+                                                        message: t('deleteTemplateConfirm'),
+                                                        itemName: tpl.name,
+                                                        confirmButtonText: t('delete'),
+                                                        confirmButtonVariant: 'danger',
+                                                        onConfirm: async () => {
+                                                            await deleteMessageTemplateAPI(tpl.id);
+                                                            refetchTemplates();
+                                                        },
+                                                    });
+                                                    setIsConfirmDeleteModalOpen(true);
+                                                }}
+                                                className="text-gray-500 hover:text-red-600"
+                                                title={t('deleteTemplate')}
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{tpl.name}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 flex-1 line-clamp-3 mb-2">{tpl.content}</p>
+                                    <div className="flex justify-between items-center">
+                                        <Button variant="secondary" className="text-sm py-1.5 px-3" onClick={() => handleCopyTemplate(tpl.content)}>
+                                            {t('copyTemplate')}
+                                        </Button>
+                                        <span className="text-xs text-gray-400">{tpl.category_display || tpl.category}</span>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
+                {effectiveTab === 'accounts' && (
+                    <Card>
+                        {accounts.length > 0 ? (
+                            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                                {accounts.map((account) => (
+                                    <li key={account.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
+                                        <div className="flex items-center gap-3 mb-2 sm:mb-0">
+                                            <WhatsappIcon className="w-8 h-8 text-primary" />
+                                            <div>
+                                                <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
+                                                <span className={`flex items-center text-xs ${account.status === 'Connected' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                    <span className={`h-2 w-2 me-1.5 rounded-full ${account.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                                                    {account.status === 'Connected' ? t('connected') : t('disconnected')}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {account.status !== 'Connected' && (
+                                                <Button variant="primary" onClick={() => handleConnect(account.id)}>{t('connect')}</Button>
+                                            )}
+                                            <Button variant="secondary" onClick={() => handleEdit(account)}><SettingsIcon className="w-4 h-4 me-2" /> {t('edit')}</Button>
+                                            <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : (
+                            <div className="text-center py-16">
+                                <WhatsappIcon className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                                <h3 className="text-lg font-semibold">{t('noAccountsConnected')}</h3>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1">{t('connectAccountPrompt')}</p>
+                                <p className="text-gray-400 dark:text-gray-500 mt-2 text-sm">{t('addAccountThenConnectHint')}</p>
+                            </div>
+                        )}
+                    </Card>
+                )}
+
+                <EditTemplateModal
+                    isOpen={isEditTemplateOpen}
+                    onClose={() => { setIsEditTemplateOpen(false); setEditingTemplate(null); }}
+                    template={editingTemplate}
+                    t={t}
+                    language={language}
+                    onSuccess={() => { refetchTemplates(); }}
+                />
+                <StartNewConversationModal
+                    isOpen={isStartNewConversationOpen}
+                    onClose={() => setIsStartNewConversationOpen(false)}
+                    t={t}
+                    onSelectClient={addConversation}
+                />
             </PageWrapper>
         );
     }

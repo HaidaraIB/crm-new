@@ -40,7 +40,8 @@ const ImpersonatePage: React.FC = () => {
             .then(async (res) => {
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
-                    throw new Error(err.error || 'Invalid or expired code.');
+                    const msg = (err && typeof err.error === 'string' ? err.error : '') || (res.status === 404 ? 'الرابط غير موجود على السيرفر (404). تأكد من تحديث ونشر الـ API ثم إعادة تشغيل الخدمة.' : 'Invalid or expired code.');
+                    throw new Error(msg.trim().replace(/^\.+/, ''));
                 }
                 return res.json();
             })
@@ -72,7 +73,8 @@ const ImpersonatePage: React.FC = () => {
             })
             .catch((err) => {
                 setStatus('error');
-                setMessage(err?.message || 'Invalid or expired code.');
+                const msg = err?.message || 'Invalid or expired code.';
+                setMessage(msg.trim().replace(/^\.+/, ''));
             });
     }, [setCurrentUser, setIsLoggedIn]);
 

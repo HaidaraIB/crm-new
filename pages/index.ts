@@ -40,3 +40,4 @@ export * from './SuppliersPage';
 export * from './TermsOfServicePage';
 export * from './PrivacyPolicyPage';
 export * from './DataDeletionPolicyPage';
+export { default as ImpersonatePage } from './ImpersonatePage';

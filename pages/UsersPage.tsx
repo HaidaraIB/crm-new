@@ -158,11 +158,10 @@ export const UsersPage = () => {
     const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers();
     const allUsers = usersResponse?.results || [];
     
-    // Filter out Owner/admin users - only show Employee users
-    // Check both 'Owner' and 'admin' (case-insensitive) to handle different API responses
+    // Filter out Owner, Admin, and Supervisor - only show Employee users
     const filteredUsers = allUsers.filter(user => {
         const roleLower = (user.role || '').toLowerCase();
-        return roleLower !== 'owner' && roleLower !== 'admin';
+        return roleLower !== 'owner' && roleLower !== 'admin' && roleLower !== 'supervisor';
     });
     const userCount = filteredUsers.length;
     

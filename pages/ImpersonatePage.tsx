@@ -23,6 +23,15 @@ const ImpersonatePage: React.FC = () => {
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code')?.trim();
+
+        // Clear previous company session immediately so we never flash old content (e.g. company A when switching to B)
+        localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('isLoggedIn');
+        setCurrentUser(null);
+        setIsLoggedIn(false);
+
         if (!code) {
             setStatus('error');
             setMessage('Missing code parameter.');
@@ -82,9 +91,10 @@ const ImpersonatePage: React.FC = () => {
     if (status === 'loading') {
         return (
             <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-                <div className="text-center">
+                <div className="text-center max-w-sm px-4">
                     <div className="inline-block w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
-                    <p className="text-gray-600 dark:text-gray-400">جاري تسجيل الدخول...</p>
+                    <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">جاري تغيير الحساب</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">جاري الدخول كمالك الشركة الجديدة...</p>
                 </div>
             </div>
         );
@@ -110,7 +120,7 @@ const ImpersonatePage: React.FC = () => {
         <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
             <div className="text-center">
                 <div className="inline-block w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
-                <p className="text-gray-600 dark:text-gray-400">جاري التحويل...</p>
+                <p className="text-gray-600 dark:text-gray-400">جاري التحويل إلى لوحة التحكم...</p>
             </div>
         </div>
     );

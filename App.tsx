@@ -134,30 +134,13 @@ const TheApp = () => {
     }
     };
     
-    // Redirect from subdomain to main domain (if on subdomain)
-    React.useEffect(() => {
-        const hostname = window.location.hostname;
-        // Check if we're on a subdomain (e.g., memo.com.localhost or company.example.com)
-        const isOnSubdomain = hostname.includes('.localhost') && hostname !== 'localhost' && hostname.split('.').length > 2;
-        
-        if (isOnSubdomain) {
-            // Extract main domain
-            const parts = hostname.split('.');
-            const localhostIndex = parts.indexOf('localhost');
-            if (localhostIndex > 0) {
-                // Redirect to main domain with same path
-                const protocol = window.location.protocol;
-                const port = window.location.port ? `:${window.location.port}` : '';
-                const path = window.location.pathname;
-                const mainUrl = `${protocol}//localhost${port}${path}${window.location.search}`;
-                window.location.replace(mainUrl);
-            }
-        }
-    }, []);
-    
-    // Helper function to sanitize company name for URL
-    const sanitizeCompanyName = (name: string): string => {
-        return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    // Subdomain slug for path (company.domain used in URL folder, not company name)
+    const getCompanySubdomainSlug = (): string => {
+        const d = currentUser?.company?.domain;
+        const n = currentUser?.company?.name;
+        if (d) return d.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        if (n) return n.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-+/g, '-').replace(/^-|-$/g, '');
+        return '';
     };
     
     
@@ -190,35 +173,23 @@ const TheApp = () => {
         console.log('[App] Routing effect - currentPage:', currentPage);
         console.log('[App] Routing effect - search:', window.location.search);
         
-        // Extract company name and page from path
         const companyFromPath = extractCompanyFromPath(pathnameToCheck);
         const pageFromPath = extractPageFromPath(pathnameToCheck);
+        const subdomainSlug = getCompanySubdomainSlug();
         
-        // If we're on a company path but not logged in as that company, redirect
-        if (companyFromPath && currentUser?.company) {
-            const sanitizedCompanyName = (currentUser.company.name || currentUser.company.domain || '')
-                .toLowerCase()
-                .replace(/\s+/g, '-')
-                .replace(/[^a-z0-9-]/g, '')
-                .replace(/-+/g, '-')
-                .replace(/^-|-$/g, '');
-            
-            if (companyFromPath !== sanitizedCompanyName) {
-                // Wrong company path, redirect to correct one
-                const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
-                window.history.replaceState({}, '', correctRoute);
-                return;
-            }
+        // Path uses subdomain (company domain) in folder: /apple/dashboard. Wrong or missing segment -> correct it
+        if (companyFromPath && currentUser?.company && subdomainSlug && companyFromPath !== subdomainSlug) {
+            const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
+            window.history.replaceState({}, '', correctRoute);
+            return;
         }
-        
-        // If user is logged in but path doesn't have company name, add it
-        if (!companyFromPath && currentUser?.company && pathnameToCheck !== '/') {
+        if (!companyFromPath && currentUser?.company && pathnameToCheck !== '/' && subdomainSlug) {
             const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
             window.history.replaceState({}, '', correctRoute);
             return;
         }
         
-        // Map pathname to page name (without company prefix, without leading slash)
+        // Map pathname to page name (with company/subdomain prefix)
         // Keys can be with spaces or hyphens, we'll normalize both
         const pathToPageMap: Record<string, Page> = {
             'dashboard': 'Dashboard',
@@ -276,7 +247,7 @@ const TheApp = () => {
             'profile': 'Profile',
         };
         
-        // Handle root path - redirect to dashboard with company name
+        // Handle root path - redirect to /subdomain/dashboard
         if (pathnameToCheck === '/' || pathnameToCheck === '') {
             if (currentUser?.company) {
                 const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
@@ -496,32 +467,17 @@ const TheApp = () => {
         if (!isLoggedIn) return;
         
         const checkPathname = () => {
-            // Decode URL-encoded pathname (e.g., /all%20leads -> /all leads)
             const currentPath = decodeURIComponent(window.location.pathname);
-            
-            // Extract company name and page from path
             const companyFromPath = extractCompanyFromPath(currentPath);
             const pageFromPath = extractPageFromPath(currentPath);
+            const subdomainSlug = getCompanySubdomainSlug();
             
-            // If we're on a company path but not logged in as that company, redirect
-            if (companyFromPath && currentUser?.company) {
-                const sanitizedCompanyName = (currentUser.company.name || currentUser.company.domain || '')
-                    .toLowerCase()
-                    .replace(/\s+/g, '-')
-                    .replace(/[^a-z0-9-]/g, '')
-                    .replace(/-+/g, '-')
-                    .replace(/^-|-$/g, '');
-                
-                if (companyFromPath !== sanitizedCompanyName) {
-                    // Wrong company path, redirect to correct one
-                    const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
-                    window.history.replaceState({}, '', correctRoute);
-                    return;
-                }
+            if (companyFromPath && currentUser?.company && subdomainSlug && companyFromPath !== subdomainSlug) {
+                const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
+                window.history.replaceState({}, '', correctRoute);
+                return;
             }
-            
-            // If user is logged in but path doesn't have company name, add it
-            if (!companyFromPath && currentUser?.company && currentPath !== '/') {
+            if (!companyFromPath && currentUser?.company && currentPath !== '/' && subdomainSlug) {
                 const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
                 window.history.replaceState({}, '', correctRoute);
                 return;
@@ -592,7 +548,6 @@ const TheApp = () => {
                 if (leadIdMatch && currentPage !== 'ViewLead') {
                     setCurrentPage('ViewLead');
                 } else if (!leadIdMatch) {
-                    // Invalid view-lead URL, redirect to leads
                     if (currentUser?.company) {
                         const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
                         window.history.replaceState({}, '', leadsRoute);
@@ -613,7 +568,6 @@ const TheApp = () => {
                 console.log('[App] checkPathname - setting currentPage to:', matchedPage);
                 setCurrentPage(matchedPage);
             } else if (!matchedPage && pageFromPath && pageFromPath !== '') {
-                // If pathname doesn't match any route, redirect to dashboard
                 console.warn('[App] checkPathname - No match found, redirecting to Dashboard. currentPath:', currentPath);
                 if (currentUser?.company) {
                     const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');

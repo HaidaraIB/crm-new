@@ -1,15 +1,13 @@
 /**
- * Get the base domain (main domain without subdomain)
- * Example: company.example.com -> example.com
+ * Get the base domain (app domain; company is subdomain).
+ * For production (e.g. apple.dashboard.loop-crm.app) set VITE_BASE_DOMAIN=dashboard.loop-crm.app
+ * so getCurrentSubdomain() returns "apple".
  */
 export const getBaseDomain = (): string => {
   const hostname = window.location.hostname;
-  // If localhost or IP, return as is
   if (hostname === 'localhost' || /^\d+\.\d+\.\d+\.\d+$/.test(hostname)) {
     return hostname;
   }
-  
-  // Get base domain from environment variable or extract from hostname
   const envBaseDomain = import.meta.env.VITE_BASE_DOMAIN;
   if (envBaseDomain) {
     return envBaseDomain;
@@ -69,59 +67,49 @@ export const isOnSubdomain = (): boolean => {
 };
 
 /**
- * Get company route path with company name prefix
- * Example: /company_name/dashboard
+ * Convert page name to URL path segment (e.g. "All Leads" -> "all-leads")
  */
-export const getCompanyRoute = (companyName?: string, companyDomain?: string, page?: string): string => {
-  // Use company name or domain for the path prefix
-  const companyPath = companyName || companyDomain || '';
-  
-  // Sanitize company name for URL (remove spaces, special chars, lowercase)
-  const sanitizedCompanyPath = companyPath
+const pageToPathSegment = (page: string): string => {
+  return page.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+};
+
+/** Sanitize to subdomain-like slug (lowercase, hyphens, no spaces/special chars) */
+const toSubdomainSlug = (value: string): string => {
+  return value
     .toLowerCase()
     .replace(/\s+/g, '-')
     .replace(/[^a-z0-9-]/g, '')
     .replace(/-+/g, '-')
     .replace(/^-|-$/g, '');
-  
-  if (!page) {
-    return sanitizedCompanyPath ? `/${sanitizedCompanyPath}/dashboard` : '/dashboard';
-  }
-  
-  const pagePath = page.toLowerCase().replace(/\s+/g, '-');
-  const route = sanitizedCompanyPath ? `/${sanitizedCompanyPath}/${pagePath}` : `/${pagePath}`;
-  console.log('[routing] getCompanyRoute - company:', sanitizedCompanyPath, 'page:', page, 'route:', route);
-  return route;
 };
 
 /**
- * Get company subdomain URL
+ * Get company route path. Folder structure with subdomain (company domain) in path, not company name.
+ * Example: /apple/dashboard, /apple/leads (apple = company.domain / subdomain value)
+ */
+export const getCompanyRoute = (companyName?: string, companyDomain?: string, page?: string): string => {
+  const subdomainSlug = companyDomain ? toSubdomainSlug(companyDomain) : (companyName ? toSubdomainSlug(companyName) : '');
+  const pagePath = page ? pageToPathSegment(page) : 'dashboard';
+  if (!subdomainSlug) return `/${pagePath}`;
+  return `/${subdomainSlug}/${pagePath}`;
+};
+
+/**
+ * Get company subdomain URL (optional; for host-based subdomain if needed later)
  */
 export const getCompanySubdomainUrl = (companyDomain: string, page?: string): string => {
   const baseDomain = getBaseDomain();
   const protocol = window.location.protocol;
-  
-  // Get port from current location (only if not default port)
   let port = '';
   const currentPort = window.location.port;
-  if (currentPort && currentPort !== '80' && currentPort !== '443') {
-    port = `:${currentPort}`;
-  }
-  
-  let path = '/dashboard';
-  if (page) {
-    path = `/${page.toLowerCase()}`;
-  }
-  
-  // Build URL: protocol + companyDomain.baseDomain + port + path
-  // Example: http://memo.com.localhost:3000/Dashboard
+  if (currentPort && currentPort !== '80' && currentPort !== '443') port = `:${currentPort}`;
+  const path = page ? `/${pageToPathSegment(page)}` : '/dashboard';
   const hostname = `${companyDomain}.${baseDomain}`;
   return `${protocol}//${hostname}${port}${path}`;
 };
 
 /**
- * Navigate to company route with company name prefix
- * Example: /company_name/dashboard
+ * Navigate to company route. Path stays folder-like: /subdomain/page (e.g. /apple/dashboard).
  */
 export const navigateToCompanyRoute = (companyName?: string, companyDomain?: string, page: string = 'Dashboard'): void => {
   const route = getCompanyRoute(companyName, companyDomain, page);
@@ -138,8 +126,8 @@ export const isSubdomainMatch = (companyDomain?: string): boolean => {
 };
 
 /**
- * Extract company name from pathname
- * Example: /company_name/dashboard -> company_name
+ * Extract company subdomain/slug from pathname (first path segment)
+ * Example: /apple/dashboard -> apple
  */
 export const extractCompanyFromPath = (pathname: string): string | null => {
   const pathParts = pathname.split('/').filter(part => part.length > 0);

@@ -97,6 +97,7 @@ export const ProductCategoriesPage = () => {
         setIsAddProductCategoryModalOpen,
         setEditingProductCategory,
         setIsEditProductCategoryModalOpen,
+        hasSupervisorPermission,
     } = useAppContext();
 
     // Fetch product categories using React Query
@@ -135,7 +136,7 @@ export const ProductCategoriesPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
+    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role?.toUpperCase() === 'ADMIN' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
 
     // If not products, show message
     if (!isProducts) {

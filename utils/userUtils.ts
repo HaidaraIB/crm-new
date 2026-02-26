@@ -18,6 +18,7 @@ export const normalizeUser = (userData: any): User => {
     if (!role || typeof role !== 'string') return 'Employee';
     const roleLower = role.toLowerCase();
     if (roleLower === 'admin' || role === 'Owner') return 'Owner';
+    if (roleLower === 'supervisor' || role === 'Supervisor') return 'Supervisor';
     if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {
       return 'Employee';
     }
@@ -48,6 +49,7 @@ export const normalizeUser = (userData: any): User => {
       subscription: typeof userData.company === 'object' ? userData.company.subscription : undefined,
     } : undefined,
     emailVerified: userData.email_verified || userData.is_email_verified || userData.emailVerified || false,
+    supervisor_permissions: userData.supervisor_permissions ?? undefined,
   };
 };
 

@@ -111,6 +111,7 @@ export const ServicePackagesPage = () => {
         setIsAddServicePackageModalOpen,
         setEditingServicePackage,
         setIsEditServicePackageModalOpen,
+        hasSupervisorPermission,
     } = useAppContext();
 
     // Fetch service packages using React Query
@@ -136,7 +137,7 @@ export const ServicePackagesPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_services'));
 
     // If not services, show message
     if (!isServices) {

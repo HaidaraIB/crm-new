@@ -97,6 +97,7 @@ export const SuppliersPage = () => {
         setIsAddSupplierModalOpen,
         setEditingSupplier,
         setIsEditSupplierModalOpen,
+        hasSupervisorPermission,
     } = useAppContext();
 
     // Fetch suppliers using React Query
@@ -124,7 +125,7 @@ export const SuppliersPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
 
     // If not products, show message
     if (!isProducts) {

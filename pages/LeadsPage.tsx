@@ -213,6 +213,7 @@ export const LeadsPage = () => {
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
         currentUser,
+        hasSupervisorPermission,
         theme,
         language,
         setIsSuccessModalOpen,
@@ -442,11 +443,12 @@ export const LeadsPage = () => {
         setIsConfirmDeleteModalOpen(true);
     };
 
-    // Check if user can delete a lead (admin or assigned employee)
+    // Check if user can delete a lead (admin, supervisor with permission, or assigned employee)
     const canDeleteLead = (lead: Lead) => {
         const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin';
+        const isSupervisorWithLeads = currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_leads');
         const isAssignedEmployee = lead.assignedTo === currentUser?.id;
-        return isAdmin || isAssignedEmployee;
+        return isAdmin || isSupervisorWithLeads || isAssignedEmployee;
     };
 
     // FIX: Convert page title to camelCase to match translation keys and cast to the correct type.
@@ -616,8 +618,8 @@ export const LeadsPage = () => {
         );
     }
 
-    // Check if current user is admin (Owner role)
-    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin';
+    // Check if current user is admin or supervisor with leads permission (for assign/bulk actions)
+    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_leads'));
 
     return (
         <>

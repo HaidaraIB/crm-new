@@ -71,7 +71,7 @@ const Avatar = ({ src, alt, className }: { src: string; alt: string; className?:
 };
 
 const UserCard = ({ user }: { user: User }) => {
-    const { t, setSelectedUser, setIsViewUserModalOpen, setIsEditUserModalOpen, setIsDeleteUserModalOpen, currentUser } = useAppContext();
+    const { t, setSelectedUser, setIsViewUserModalOpen, setIsEditUserModalOpen, setIsDeleteUserModalOpen, currentUser, hasSupervisorPermission } = useAppContext();
     
     const getUserDisplayNameLocal = (user: User): string => {
         if (user.name) return user.name;
@@ -81,8 +81,8 @@ const UserCard = ({ user }: { user: User }) => {
         return user.username || user.email || t('unknown') || 'Unknown';
     };
     
-    // Check if current user is admin (Owner role)
-    const isAdmin = currentUser?.role === 'Owner';
+    // Check if current user can manage users (Owner or Supervisor with permission)
+    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
     // Check if the displayed user is admin (Owner role) - don't allow edit/delete for admins
     const isUserAdmin = user.role === 'Owner';
     
@@ -152,7 +152,7 @@ const UserCard = ({ user }: { user: User }) => {
 
 
 export const UsersPage = () => {
-    const { t, currentUser, setIsAddUserModalOpen } = useAppContext();
+    const { t, currentUser, setIsAddUserModalOpen, hasSupervisorPermission } = useAppContext();
     
     // Fetch users using React Query
     const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers();
@@ -166,8 +166,8 @@ export const UsersPage = () => {
     });
     const userCount = filteredUsers.length;
     
-    // Check if current user is admin (Owner role)
-    const isAdmin = currentUser?.role === 'Owner';
+    // Check if current user can manage users (Owner or Supervisor with permission)
+    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
 
     if (usersLoading) {
         return (

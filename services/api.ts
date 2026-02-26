@@ -1135,6 +1135,71 @@ export const deleteUserAPI = async (userId: number) => {
   });
 };
 
+// ==================== Supervisors (company-scoped, admin only) ====================
+
+/** GET /api/supervisors/ - returns paginated { count, next, previous, results } */
+export const getSupervisorsAPI = async () => {
+  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(`/supervisors/`);
+};
+
+/** POST /api/supervisors/ - create supervisor (user + permissions) */
+export const createSupervisorAPI = async (data: {
+  username: string;
+  email: string;
+  password: string;
+  first_name: string;
+  last_name: string;
+  is_active?: boolean;
+  can_manage_leads?: boolean;
+  can_manage_deals?: boolean;
+  can_manage_tasks?: boolean;
+  can_view_reports?: boolean;
+  can_manage_users?: boolean;
+  can_manage_products?: boolean;
+  can_manage_services?: boolean;
+  can_manage_real_estate?: boolean;
+  can_manage_settings?: boolean;
+}) => {
+  return apiRequest<any>('/supervisors/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/** PUT /api/supervisors/:id/ - update supervisor permissions and user fields */
+export const updateSupervisorAPI = async (id: number, data: Partial<{
+  user_id: number;
+  is_active: boolean;
+  can_manage_leads: boolean;
+  can_manage_deals: boolean;
+  can_manage_tasks: boolean;
+  can_view_reports: boolean;
+  can_manage_users: boolean;
+  can_manage_products: boolean;
+  can_manage_services: boolean;
+  can_manage_real_estate: boolean;
+  can_manage_settings: boolean;
+}>) => {
+  return apiRequest<any>(`/supervisors/${id}/`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/** DELETE /api/supervisors/:id/ */
+export const deleteSupervisorAPI = async (id: number) => {
+  return apiRequest<void>(`/supervisors/${id}/`, {
+    method: 'DELETE',
+  });
+};
+
+/** POST /api/supervisors/:id/toggle_active/ */
+export const toggleSupervisorActiveAPI = async (id: number) => {
+  return apiRequest<any>(`/supervisors/${id}/toggle_active/`, {
+    method: 'POST',
+  });
+};
+
 // ==================== Leads APIs (Clients in API) ====================
 
 /**

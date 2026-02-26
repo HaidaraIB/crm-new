@@ -52,7 +52,7 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
 
 
 export const Sidebar = () => {
-    const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme } = useAppContext();
+    const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme, canAccessPage } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
     
     // Get logo path based on theme
@@ -151,6 +151,11 @@ export const Sidebar = () => {
                     if (item.name === 'Billing') {
                         return false;
                     }
+                    // Supervisor: hide pages they don't have permission for
+                    if (currentUser?.role === 'Supervisor') {
+                        if (!canAccessPage(item.name)) return false;
+                        return true;
+                    }
                     // Hide Users item for non-admin users
                     if (item.name === 'Users' && currentUser?.role !== 'Owner') {
                         return false;
@@ -159,7 +164,6 @@ export const Sidebar = () => {
                     if (item.name === 'Reports' && currentUser?.role !== 'Owner') {
                         return false;
                     }
-                    // Integrations (including WhatsApp) shown for all: employees get Chats + Template Management only
                     // Hide Employees item for employee role
                     if (item.name === 'Employees' && currentUser?.role?.toLowerCase() === 'employee') {
                         return false;
@@ -174,17 +178,21 @@ export const Sidebar = () => {
                     if (item.name === 'Integrations' && currentUser?.role?.toLowerCase() === 'employee') {
                         subItems = ['WhatsApp'];
                     }
+                    // Supervisor: filter sub-items by permission
+                    if (currentUser?.role === 'Supervisor' && subItems) {
+                        subItems = subItems.filter((sub) => canAccessPage(sub));
+                    }
                     return (
                         <div key={item.name}>
                             <SidebarItem
                                 name={t(itemNameKey)}
                                 icon={item.icon}
                                 isActive={currentPage === item.name || (!!subItems && subItems.some(sub => sub === currentPage))}
-                                hasSubItems={!!subItems}
+                                hasSubItems={!!subItems && subItems.length > 0}
                                 isOpen={isOpen}
-                                onClick={() => subItems ? handleToggleSubMenu(item.name) : handleNavigation(item.name)}
+                                onClick={() => subItems && subItems.length ? handleToggleSubMenu(item.name) : handleNavigation(item.name)}
                             />
-                            {subItems && isOpen && (
+                            {subItems && subItems.length > 0 && isOpen && (
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>
                                     {subItems.map(sub => {
                                         const subItemNameKey = toCamelCase(sub) as keyof typeof translations.en;
@@ -215,18 +223,22 @@ export const Sidebar = () => {
             <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700">
                 {currentUser?.role?.toLowerCase() !== 'employee' && (
                     <>
-                        <SidebarItem
-                            name={t('billing')}
-                            icon={SIDEBAR_ITEMS.find(item => item.name === 'Billing')?.icon}
-                            isActive={currentPage === 'Billing'}
-                            onClick={() => handleNavigation('Billing')}
-                        />
-                        <SidebarItem
-                            name={t('settings')}
-                            icon={SETTINGS_ITEM.icon}
-                            isActive={currentPage === 'Settings'}
-                            onClick={() => handleNavigation('Settings')}
-                        />
+                        {currentUser?.role !== 'Supervisor' && (
+                            <SidebarItem
+                                name={t('billing')}
+                                icon={SIDEBAR_ITEMS.find(item => item.name === 'Billing')?.icon}
+                                isActive={currentPage === 'Billing'}
+                                onClick={() => handleNavigation('Billing')}
+                            />
+                        )}
+                        {canAccessPage('Settings') && (
+                            <SidebarItem
+                                name={t('settings')}
+                                icon={SETTINGS_ITEM.icon}
+                                isActive={currentPage === 'Settings'}
+                                onClick={() => handleNavigation('Settings')}
+                            />
+                        )}
                     </>
                 )}
             </div>

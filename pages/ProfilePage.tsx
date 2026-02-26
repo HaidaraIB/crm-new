@@ -437,7 +437,7 @@ export const ProfilePage = () => {
                     </Button>
                 </Card>
 
-                {subscriptionInfo && currentUser?.role?.toLowerCase() !== 'employee' && (
+                {subscriptionInfo && (currentUser?.role === 'Owner' || currentUser?.role?.toLowerCase() === 'admin') && (
                     <Card>
                         <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('subscription')}</h2>
                         <div className={`space-y-4 ${isRTL ? 'text-right' : 'text-left'}`}>

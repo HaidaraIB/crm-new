@@ -8,7 +8,7 @@ import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionMod
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage } from './pages';
 
 const TheApp = () => {
-    const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn } = useAppContext();
+    const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage } = useAppContext();
     
     // Track payment success message to prevent email verification message from showing
     const [hasPaymentSuccessMessage, setHasPaymentSuccessMessage] = React.useState(() => {
@@ -634,6 +634,20 @@ const TheApp = () => {
             clearTimeout(timeout);
         };
     }, [isLoggedIn, currentPage, setCurrentPage, currentUser]);
+
+    // Supervisor: redirect to Dashboard if they try to access a page they don't have permission for
+    React.useEffect(() => {
+        if (!isLoggedIn || !currentUser || currentUser.role !== 'Supervisor') return;
+        if (!canAccessPage(currentPage)) {
+            setCurrentPage('Dashboard');
+            if (currentUser?.company) {
+                const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
+                window.history.replaceState({}, '', dashboardRoute);
+            } else {
+                window.history.replaceState({}, '', '/dashboard');
+            }
+        }
+    }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
 
     return (
         <div className={`flex h-screen ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>

@@ -105,6 +105,7 @@ export const ServiceProvidersPage = () => {
         setIsAddServiceProviderModalOpen,
         setEditingServiceProvider,
         setIsEditServiceProviderModalOpen,
+        hasSupervisorPermission,
     } = useAppContext();
 
     // Fetch service providers using React Query
@@ -129,7 +130,7 @@ export const ServiceProvidersPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_services'));
 
     // If not services, show message
     if (!isServices) {

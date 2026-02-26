@@ -40,6 +40,44 @@ export interface Company {
   subscription?: Subscription;
 }
 
+/** Supervisor permissions (company CRM, granted by admin) */
+export interface SupervisorPermissionsMap {
+  can_manage_leads: boolean;
+  can_manage_deals: boolean;
+  can_manage_tasks: boolean;
+  can_view_reports: boolean;
+  can_manage_users: boolean;
+  can_manage_products: boolean;
+  can_manage_services: boolean;
+  can_manage_real_estate: boolean;
+  can_manage_settings: boolean;
+}
+
+export interface SupervisorPermissionPayload {
+  id: number;
+  is_active: boolean;
+  permissions: SupervisorPermissionsMap;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface Supervisor {
+  id: number;
+  user: { id: number; username: string; email: string; first_name: string; last_name: string };
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  can_manage_leads: boolean;
+  can_manage_deals: boolean;
+  can_manage_tasks: boolean;
+  can_view_reports: boolean;
+  can_manage_users: boolean;
+  can_manage_products: boolean;
+  can_manage_services: boolean;
+  can_manage_real_estate: boolean;
+  can_manage_settings: boolean;
+}
+
 export interface User {
   id: number;
   name?: string; // Computed from first_name + last_name, kept for backward compatibility
@@ -54,6 +92,8 @@ export interface User {
   password?: string;
   company?: Company;
   emailVerified?: boolean;
+  /** Set when role is supervisor (from /users/me/ or login) */
+  supervisor_permissions?: SupervisorPermissionPayload | null;
 }
 
 export interface TimelineEntry {

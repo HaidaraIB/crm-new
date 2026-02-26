@@ -219,7 +219,8 @@ export const PropertiesPage = () => {
         setEditingUnit,
         setIsEditUnitModalOpen,
         setConfirmDeleteConfig,
-        setIsConfirmDeleteModalOpen
+        setIsConfirmDeleteModalOpen,
+        hasSupervisorPermission
     } = useAppContext();
 
     // Fetch data using React Query
@@ -311,7 +312,7 @@ export const PropertiesPage = () => {
         );
     }
     
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_real_estate'));
     
     const handleFilterClick = () => {
         switch (activeTab) {

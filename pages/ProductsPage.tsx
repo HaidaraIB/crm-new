@@ -113,6 +113,7 @@ export const ProductsPage = () => {
     const { 
         t,
         currentUser,
+        hasSupervisorPermission,
         productFilters,
         setProductFilters,
         setIsProductFilterDrawerOpen,
@@ -178,7 +179,7 @@ export const ProductsPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
+    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role?.toUpperCase() === 'ADMIN' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
 
     // If not products, show message
     if (!isProducts) {

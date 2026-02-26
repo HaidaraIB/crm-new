@@ -355,6 +355,10 @@ export interface AppContextType {
   channelTypes: string[]; // Derived from channels (will be computed from React Query data)
   isCompanySubscriptionInactive: boolean;
   setIsCompanySubscriptionInactive: (isInactive: boolean) => void;
+  /** True if current user is supervisor and has the given permission (and is active). */
+  hasSupervisorPermission: (key: keyof import('../types').SupervisorPermissionsMap) => boolean;
+  /** True if current user is allowed to access this page (for Supervisor: by permission; Owner/Admin: always). */
+  canAccessPage: (page: Page) => boolean;
 }
 
 export const AppContext = createContext<AppContextType | null>(null);
@@ -365,17 +369,16 @@ export const useAppContext = () => {
   return context;
 };
 
-// Helper function to normalize user roles - only Owner and Employee are valid
-const normalizeRole = (role: string | undefined): 'Owner' | 'Employee' => {
+// Helper function to normalize user roles - Owner, Supervisor, Employee
+const normalizeRole = (role: string | undefined): 'Owner' | 'Supervisor' | 'Employee' => {
   if (!role || typeof role !== 'string') return 'Employee';
   const roleLower = role.toLowerCase();
   if (roleLower === 'admin' || role === 'Owner') return 'Owner';
-  // Convert any old roles (Sales Agent, Sales Manager, etc.) to Employee
+  if (roleLower === 'supervisor' || role === 'Supervisor') return 'Supervisor';
   if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {
     return 'Employee';
   }
   if (roleLower === 'employee' || role === 'Employee') return 'Employee';
-  // Default to Employee for any unknown role
   return 'Employee';
 };
 
@@ -952,6 +955,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         role: cleanedRole,
         phone: user.phone,
         avatar: user.avatar,
+        supervisor_permissions: user.supervisor_permissions ?? null,
         company: user.company ? {
           id: user.company.id,
           name: user.company.name,
@@ -961,6 +965,83 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       }));
     } else {
       localStorage.removeItem('currentUser');
+    }
+  };
+
+  const hasSupervisorPermission = (key: keyof import('../types').SupervisorPermissionsMap): boolean => {
+    if (!currentUser || currentUser.role !== 'Supervisor') return false;
+    const sp = currentUser.supervisor_permissions;
+    if (!sp || !sp.is_active || !sp.permissions) return false;
+    return Boolean((sp.permissions as any)[key]);
+  };
+
+  const canAccessPage = (page: Page): boolean => {
+    if (!currentUser) return false;
+    const role = currentUser.role;
+    if (role === 'Owner' || role?.toLowerCase() === 'admin') return true;
+    if (role !== 'Supervisor') {
+      // Employee: allow Dashboard, Leads (all), Activities, Deals(?), Todos(?), Inventory (depends), etc. - keep existing sidebar logic
+      return true;
+    }
+    // Supervisor: allow only by permission
+    const p = hasSupervisorPermission;
+    switch (page) {
+      case 'Dashboard':
+      case 'Profile':
+        return true;
+      case 'Leads':
+      case 'All Leads':
+      case 'Fresh Leads':
+      case 'Cold Leads':
+      case 'My Leads':
+      case 'Rotated Leads':
+      case 'ViewLead':
+      case 'CreateLead':
+      case 'EditLead':
+      case 'Activities':
+        return p('can_manage_leads');
+      case 'Deals':
+      case 'CreateDeal':
+        return p('can_manage_deals');
+      case 'Users':
+      case 'Employees':
+        return p('can_manage_users');
+      case 'Todos':
+        return p('can_manage_tasks');
+      case 'Reports':
+      case 'Teams Report':
+      case 'Employees Report':
+      case 'Marketing Report':
+        return p('can_view_reports');
+      case 'Properties':
+      case 'Owners':
+        return p('can_manage_real_estate');
+      case 'Products':
+      case 'Product Categories':
+      case 'Suppliers':
+        return p('can_manage_products');
+      case 'Services':
+      case 'Service Packages':
+      case 'Service Providers':
+        return p('can_manage_services');
+      case 'Inventory':
+        return p('can_manage_real_estate') || p('can_manage_products') || p('can_manage_services');
+      case 'Settings':
+        return p('can_manage_settings');
+      case 'Marketing':
+      case 'Campaigns':
+      case 'Integrations':
+      case 'Meta':
+      case 'TikTok':
+      case 'WhatsApp':
+      case 'Twilio':
+      case 'Billing':
+      case 'Change Plan':
+      case 'Payment':
+      case 'Subscription':
+        return false;
+      default:
+        return false;
     }
   };
 
@@ -1055,6 +1136,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     selectedLeadForDeal, setSelectedLeadForDeal,
     selectedUser, setSelectedUser,
     currentUser, setCurrentUser,
+    hasSupervisorPermission,
+    canAccessPage,
     isSidebarOpen, setIsSidebarOpen,
     isAddLeadModalOpen, setIsAddLeadModalOpen,
     isEditLeadModalOpen, setIsEditLeadModalOpen,

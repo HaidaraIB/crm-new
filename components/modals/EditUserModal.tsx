@@ -47,8 +47,9 @@ export const EditUserModal = () => {
     // Initialize form state when modal opens or selectedUser changes
     useEffect(() => {
         if (selectedUser && isEditUserModalOpen) {
-            // Normalize role: API returns 'admin' or 'employee', but might also return 'Owner' from old data
-            const normalizedRole = selectedUser.role?.toLowerCase() === 'admin' || selectedUser.role === 'Owner' ? 'admin' : 'employee';
+            // Normalize role: API returns 'admin', 'supervisor', or 'employee'
+            const r = selectedUser.role?.toLowerCase();
+            const normalizedRole = r === 'admin' || selectedUser.role === 'Owner' ? 'admin' : r === 'supervisor' ? 'supervisor' : 'employee';
             
             // Get name from first_name + last_name or fallback to name
             const fullName = selectedUser.first_name || selectedUser.last_name
@@ -181,10 +182,10 @@ export const EditUserModal = () => {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
             
-            // Normalize role to lowercase for API (API expects 'admin' or 'employee')
+            // Normalize role to lowercase for API (API expects 'admin', 'supervisor', or 'employee')
             const currentRole = selectedUser.role?.toLowerCase();
             const isAdmin = currentRole === 'admin' || selectedUser.role === 'Owner';
-            const roleToSend = isAdmin ? 'admin' : formState.role.toLowerCase();
+            const roleToSend = isAdmin ? 'admin' : (formState.role?.toLowerCase() || 'employee');
             
             await updateUserMutation.mutateAsync({
                 id: selectedUser.id,
@@ -312,6 +313,7 @@ export const EditUserModal = () => {
                         <Label htmlFor="edit-user-role">{t('role')}</Label>
                         <Select id="edit-user-role" value={formState.role} onChange={handleChange}>
                             <option value="employee">{t('employee')}</option>
+                            <option value="supervisor">{t('supervisor') || 'Supervisor'}</option>
                         </Select>
                         {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                     </div>

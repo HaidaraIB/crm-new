@@ -69,7 +69,8 @@ export const OwnersPage = () => {
         setEditingOwner, 
         setIsEditOwnerModalOpen, 
         setConfirmDeleteConfig, 
-        setIsConfirmDeleteModalOpen 
+        setIsConfirmDeleteModalOpen,
+        hasSupervisorPermission
     } = useAppContext();
 
     // Fetch owners using React Query
@@ -81,7 +82,7 @@ export const OwnersPage = () => {
 
     // Check if user's company specialization is real_estate
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_real_estate'));
 
     // If not real estate, show message
     if (!isRealEstate) {

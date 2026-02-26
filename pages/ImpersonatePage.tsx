@@ -2,8 +2,14 @@ import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { getCompanyRoute } from '../utils/routing';
 
-const BASE_URL = import.meta.env.VITE_API_URL || '';
+const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const API_KEY = import.meta.env.VITE_API_KEY || '';
+
+/** Build API root: ensure it ends with /api so path is correct on prod (e.g. VITE_API_URL might be domain only) */
+const getApiRoot = () => {
+    if (!BASE_URL) return '';
+    return BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
+};
 
 /**
  * Exchange one-time impersonation code for tokens and log in as that user.
@@ -23,7 +29,8 @@ const ImpersonatePage: React.FC = () => {
             return;
         }
 
-        const url = `${BASE_URL.replace(/\/$/, '')}/auth/impersonate-exchange/?code=${encodeURIComponent(code)}`;
+        const apiRoot = getApiRoot();
+        const url = `${apiRoot}/auth/impersonate-exchange/?code=${encodeURIComponent(code)}`;
         const headers: Record<string, string> = {
             'Content-Type': 'application/json',
         };

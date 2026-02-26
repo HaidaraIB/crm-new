@@ -57,11 +57,12 @@ const ImpersonatePage: React.FC = () => {
                             domain: user.company_name || '',
                         }
                         : null;
-                    setCurrentUser({
-                        ...user,
-                        company,
-                    });
+                    const userForState = { ...user, company };
+                    setCurrentUser(userForState);
+                    // Persist to localStorage so after full-page redirect the app restores session (isLoggedIn + currentUser)
+                    localStorage.setItem('currentUser', JSON.stringify(userForState));
                 }
+                localStorage.setItem('isLoggedIn', 'true');
                 setIsLoggedIn(true);
                 setStatus('success');
                 const companyName = user?.company_name;

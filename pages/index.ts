@@ -40,4 +40,5 @@ export * from './SuppliersPage';
 export * from './TermsOfServicePage';
 export * from './PrivacyPolicyPage';
 export * from './DataDeletionPolicyPage';
+export * from './OAuthCallbackPage';
 export { default as ImpersonatePage } from './ImpersonatePage';

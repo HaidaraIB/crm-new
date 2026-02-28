@@ -5,7 +5,7 @@ import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal } from './components/index';
-import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, ImpersonatePage } from './pages';
+import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage } from './pages';
 
 const TheApp = () => {
     const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage } = useAppContext();
@@ -168,6 +168,12 @@ const TheApp = () => {
             || pathnameToCheck === '/terms-of-service' || pathnameToCheck === '/terms' || pathnameToCheck.endsWith('/terms-of-service') || pathnameToCheck.endsWith('/terms')
             || pathnameToCheck === '/privacy-policy' || pathnameToCheck === '/privacy' || pathnameToCheck.endsWith('/privacy-policy') || pathnameToCheck.endsWith('/privacy');
         if (isPublicLegalPath) return;
+        if (pathnameToCheck.includes('oauth-callback')) return;
+        
+        // OAuth popup callback: preserve ?connected=true&account_id=... so IntegrationsPage can show "close window" message
+        const urlParams = new URLSearchParams(window.location.search);
+        const isOAuthPopupCallback = typeof window !== 'undefined' && !!window.opener && urlParams.get('connected') === 'true' && urlParams.get('account_id');
+        const withSearch = (path: string) => (isOAuthPopupCallback && window.location.search ? path + window.location.search : path);
         
         console.log('[App] Routing effect - pathnameToCheck:', pathnameToCheck);
         console.log('[App] Routing effect - currentPage:', currentPage);
@@ -180,12 +186,12 @@ const TheApp = () => {
         // Path uses subdomain (company domain) in folder: /apple/dashboard. Wrong or missing segment -> correct it
         if (companyFromPath && currentUser?.company && subdomainSlug && companyFromPath !== subdomainSlug) {
             const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
-            window.history.replaceState({}, '', correctRoute);
+            window.history.replaceState({}, '', withSearch(correctRoute));
             return;
         }
         if (!companyFromPath && currentUser?.company && pathnameToCheck !== '/' && subdomainSlug) {
             const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
-            window.history.replaceState({}, '', correctRoute);
+            window.history.replaceState({}, '', withSearch(correctRoute));
             return;
         }
         
@@ -251,9 +257,9 @@ const TheApp = () => {
         if (pathnameToCheck === '/' || pathnameToCheck === '') {
             if (currentUser?.company) {
                 const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                window.history.replaceState({}, '', dashboardRoute);
+                window.history.replaceState({}, '', withSearch(dashboardRoute));
             } else {
-                window.history.replaceState({}, '', '/dashboard');
+                window.history.replaceState({}, '', withSearch('/dashboard'));
             }
             setCurrentPage('Dashboard');
             return;
@@ -272,9 +278,9 @@ const TheApp = () => {
                 // Invalid view-lead URL, redirect to leads
                 if (currentUser?.company) {
                     const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
-                    window.history.replaceState({}, '', leadsRoute);
+                    window.history.replaceState({}, '', withSearch(leadsRoute));
                 } else {
-                    window.history.replaceState({}, '', '/leads');
+                    window.history.replaceState({}, '', withSearch('/leads'));
                 }
                 setCurrentPage('Leads');
             }
@@ -294,9 +300,9 @@ const TheApp = () => {
             console.warn('[App] No match found, redirecting to Dashboard. pageFromPath:', pageFromPath);
             if (currentUser?.company) {
                 const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                window.history.replaceState({}, '', dashboardRoute);
+                window.history.replaceState({}, '', withSearch(dashboardRoute));
             } else {
-                window.history.replaceState({}, '', '/dashboard');
+                window.history.replaceState({}, '', withSearch('/dashboard'));
             }
             setCurrentPage('Dashboard');
         }
@@ -401,6 +407,14 @@ const TheApp = () => {
     // Show change plan page if on /change-plan route (available for both logged-in and logged-out users)
     if (pathname === '/change-plan' || pathname.startsWith('/change-plan') || currentPage === 'ChangePlan') {
         return <ChangePlanPage />;
+    }
+    
+    // OAuth popup callback: show "Connection succeeded/failed" and ask user to close (no sidebar, no app layout)
+    const urlParamsForOAuth = new URLSearchParams(window.location.search);
+    const isOAuthCallbackPath = pathname.includes('oauth-callback');
+    const isOAuthPopupWithResult = typeof window !== 'undefined' && !!window.opener && (urlParamsForOAuth.get('connected') === 'true' || urlParamsForOAuth.get('connected') === 'false');
+    if (isOAuthCallbackPath || isOAuthPopupWithResult) {
+        return <OAuthCallbackPage />;
     }
     
     // Show legal pages (available for both logged-in and logged-out users) — must be reachable on first load without login

@@ -3,10 +3,10 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI } from '../services/api';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
@@ -277,6 +277,7 @@ export const IntegrationsPage = () => {
     const [selectedChatClient, setSelectedChatClient] = useState<any>(null);
     const [chatMessages, setChatMessages] = useState<Record<number, Array<{ body: string; direction: 'in' | 'out'; time: string }>>>({});
     const [messageInput, setMessageInput] = useState('');
+    const [infoAlert, setInfoAlert] = useState<{ title: string; message: string } | null>(null);
 
     const { data: templates = [], refetch: refetchTemplates } = useQuery({
         queryKey: ['messageTemplates'],
@@ -296,6 +297,7 @@ export const IntegrationsPage = () => {
             link: acc.account_link,
             phone: acc.phone_number,
             platform: acc.platform,
+            metadata: acc.metadata,
         }));
     }, [accountsResponse]);
 
@@ -641,7 +643,8 @@ export const IntegrationsPage = () => {
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                             {templates.map((tpl) => (
-                                <Card key={tpl.id} className="flex flex-col">
+                                <React.Fragment key={tpl.id}>
+                                <Card className="flex flex-col">
                                     <div className="flex justify-between items-start mb-2">
                                         <span className={`text-xs px-2 py-0.5 rounded ${tpl.channel_type === 'sms' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'}`}>
                                             {tpl.channel_type === 'sms' ? 'SMS' : 'WHATSAPP'}
@@ -690,6 +693,7 @@ export const IntegrationsPage = () => {
                                         <span className="text-xs text-gray-400">{tpl.category_display || tpl.category}</span>
                                     </div>
                                 </Card>
+                                </React.Fragment>
                             ))}
                         </div>
                     </div>
@@ -754,20 +758,14 @@ export const IntegrationsPage = () => {
     const deleteAccountMutation = useDeleteConnectedAccount();
     const queryClient = useQueryClient();
 
-    // Handle OAuth callback (when returning from Meta/WhatsApp in same tab or in popup)
+    // Handle OAuth callback when returning in same tab (popup uses /oauth-callback page)
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         const connected = urlParams.get('connected');
         const accountId = urlParams.get('account_id');
         if (connected !== 'true' || !accountId) return;
         const id = parseInt(accountId, 10);
-        // If we are inside a popup opened by the integrations page, notify opener and close
-        if (window.opener) {
-            window.opener.postMessage({ type: 'oauth_connected', accountId: id }, window.location.origin);
-            window.history.replaceState({}, document.title, window.location.pathname);
-            window.close();
-            return;
-        }
+        if (window.opener) return;
         // Same-tab redirect: clean URL and refetch
         window.history.replaceState({}, document.title, window.location.pathname);
         queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
@@ -789,28 +787,40 @@ export const IntegrationsPage = () => {
         }
     }, [queryClient, platformParam]);
     
-    const handleSelectLeadForm = (account: any) => {
-        if (account.platform === 'meta' && account.metadata?.pages) {
-            const pages = account.metadata.pages;
-            if (pages.length === 1) {
-                // If only one page, use it directly
-                setSelectLeadFormConfig({
-                    accountId: account.id,
-                    pageId: pages[0].id,
-                    pageName: pages[0].name,
-                });
-                setIsSelectLeadFormModalOpen(true);
-            } else if (pages.length > 1) {
-                // TODO: Show page selection first, then lead form selection
-                // For now, use first page
-                setSelectLeadFormConfig({
-                    accountId: account.id,
-                    pageId: pages[0].id,
-                    pageName: pages[0].name,
-                });
-                setIsSelectLeadFormModalOpen(true);
+    const handleSelectLeadForm = async (account: any) => {
+        if (account.platform !== 'meta') return;
+        let pages = account.metadata?.pages;
+        if (!pages?.length) {
+            try {
+                const full = await getConnectedAccountAPI(account.id);
+                pages = full?.metadata?.pages || [];
+            } catch (e) {
+                console.error('Failed to load account pages:', e);
             }
         }
+        if (!pages?.length) {
+            try {
+                const res = await syncMetaPagesAPI(account.id);
+                pages = res?.pages || [];
+                if (pages?.length) queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+            } catch (e) {
+                console.error('Failed to sync Meta pages:', e);
+            }
+        }
+        if (!pages?.length) {
+            setInfoAlert({
+                title: t('noFacebookPagesFound') || 'No Facebook pages found',
+                message: t('noFacebookPagesReconnectHint') || 'No Facebook pages were found for this account. Try disconnecting and reconnecting the account.',
+            });
+            return;
+        }
+        const first = pages[0];
+        setSelectLeadFormConfig({
+            accountId: account.id,
+            pageId: String(first.id),
+            pageName: first.name || String(first.id),
+        });
+        setIsSelectLeadFormModalOpen(true);
     };
 
     const handleDelete = async (accountId: number) => {
@@ -854,7 +864,6 @@ export const IntegrationsPage = () => {
                 if (event.origin !== window.location.origin) return;
                 if (event.data?.type === 'oauth_connected' && event.data?.accountId != null) {
                     window.removeEventListener('message', handleMessage);
-                    try { popup.close(); } catch (_) {}
                     queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
                     if (platformParam === 'meta') {
                         getConnectedAccountsAPI(platformParam).then((accounts: any) => {
@@ -872,12 +881,17 @@ export const IntegrationsPage = () => {
                         }).catch(console.error);
                     }
                 }
+                if (event.data?.type === 'oauth_failed') {
+                    window.removeEventListener('message', handleMessage);
+                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                }
             };
             window.addEventListener('message', handleMessage);
             const poll = setInterval(() => {
                 if (popup.closed) {
                     clearInterval(poll);
                     window.removeEventListener('message', handleMessage);
+                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
                 }
             }, 500);
         } catch (error: any) {
@@ -986,6 +1000,28 @@ export const IntegrationsPage = () => {
                         queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
                     }}
                 />
+            )}
+            {/* Info alert (e.g. no Facebook pages) - styled like app dialogs */}
+            {infoAlert && (
+                <Modal
+                    isOpen={true}
+                    onClose={() => setInfoAlert(null)}
+                    title={infoAlert.title}
+                >
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                                <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                                </svg>
+                            </div>
+                            <p className="text-gray-700 dark:text-gray-300">{infoAlert.message}</p>
+                        </div>
+                        <div className="flex justify-end pt-2">
+                            <Button onClick={() => setInfoAlert(null)}>{t('ok') || 'OK'}</Button>
+                        </div>
+                    </div>
+                </Modal>
             )}
         </PageWrapper>
     );

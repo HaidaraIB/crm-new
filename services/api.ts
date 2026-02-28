@@ -1934,6 +1934,18 @@ export const syncIntegrationAccountAPI = async (accountId: number) => {
   });
 };
 
+/**
+ * جلب صفحات فيسبوك لحساب Meta وحفظها (عند عدم وجود صفحات محفوظة)
+ * POST /api/integrations/accounts/:id/sync-pages/
+ * Response: { pages: Array<{ id, name, access_token?, category? }> }
+ */
+export const syncMetaPagesAPI = async (accountId: number) => {
+  return apiRequest<{ pages: Array<{ id: string; name: string; access_token?: string; category?: string }> }>(
+    `/integrations/accounts/${accountId}/sync-pages/`,
+    { method: 'POST' }
+  );
+};
+
 // ==================== WhatsApp Send & Message Templates ====================
 
 /**

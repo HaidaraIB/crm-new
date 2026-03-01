@@ -8,7 +8,7 @@ import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
 import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI } from '../services/api';
 import type { MessageTemplateType } from '../services/api';
-import { useConnectedAccounts, useDeleteConnectedAccount } from '../hooks/useQueries';
+import { useConnectedAccounts, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
@@ -212,6 +212,8 @@ export const IntegrationsPage = () => {
         setSelectLeadFormConfig,
         pendingConnectAccountId,
         setPendingConnectAccountId,
+        setSuccessMessage,
+        setIsSuccessModalOpen,
     } = useAppContext();
 
     const isEmployee = (currentUser?.role ?? '').toLowerCase() === 'employee';
@@ -756,6 +758,7 @@ export const IntegrationsPage = () => {
 
     // Delete account mutation
     const deleteAccountMutation = useDeleteConnectedAccount();
+    const testConnectionMutation = useTestConnection();
     const queryClient = useQueryClient();
 
     // Handle OAuth callback when returning in same tab (popup uses /oauth-callback page)
@@ -776,10 +779,17 @@ export const IntegrationsPage = () => {
                     : accounts?.results?.find((a: any) => a.id === id);
                 if (account?.metadata?.pages?.length) {
                     const firstPage = account.metadata.pages[0];
+                    const pageIdStr = String(firstPage.id);
+                    const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
+                    const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
+                    const mapping = account.metadata?.form_campaign_mapping || {};
+                    const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
                     setSelectLeadFormConfig({
                         accountId: id,
-                        pageId: firstPage.id,
-                        pageName: firstPage.name,
+                        pageId: pageIdStr,
+                        pageName: firstPage.name || pageIdStr,
+                        linkedFormId: formId || undefined,
+                        linkedCampaignId: campaignId || undefined,
                     });
                     setIsSelectLeadFormModalOpen(true);
                 }
@@ -815,12 +825,37 @@ export const IntegrationsPage = () => {
             return;
         }
         const first = pages[0];
+        const pageIdStr = String(first.id);
+        const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
+        const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
+        const mapping = account.metadata?.form_campaign_mapping || {};
+        const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
         setSelectLeadFormConfig({
             accountId: account.id,
-            pageId: String(first.id),
-            pageName: first.name || String(first.id),
+            pageId: pageIdStr,
+            pageName: first.name || pageIdStr,
+            linkedFormId: formId || undefined,
+            linkedCampaignId: campaignId || undefined,
         });
         setIsSelectLeadFormModalOpen(true);
+    };
+
+    const handleTestConnection = async (accountId: number) => {
+        try {
+            const result = await testConnectionMutation.mutateAsync(accountId);
+            if (result.valid) {
+                setSuccessMessage(t('connectionValid') || result.message || 'Connection is valid.');
+                setIsSuccessModalOpen(true);
+            } else {
+                setInfoAlert({
+                    title: t('connectionInvalid') || 'Connection check',
+                    message: result.message || (t('connectionInvalidPleaseReconnect') || 'Token is no longer valid. Please disconnect and connect again.'),
+                });
+            }
+        } catch (error: any) {
+            const msg = error?.message || error?.data?.error || t('errorTestingConnection') || 'Failed to test connection.';
+            setInfoAlert({ title: t('connectionCheck') || 'Connection check', message: msg });
+        }
     };
 
     const handleDelete = async (accountId: number) => {
@@ -871,10 +906,17 @@ export const IntegrationsPage = () => {
                             const account = list.find((a: any) => a.id === event.data.accountId);
                             if (account?.metadata?.pages?.length) {
                                 const firstPage = account.metadata.pages[0];
+                                const pageIdStr = String(firstPage.id);
+                                const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
+                                const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
+                                const mapping = account.metadata?.form_campaign_mapping || {};
+                                const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
                                 setSelectLeadFormConfig({
                                     accountId: event.data.accountId,
-                                    pageId: firstPage.id,
-                                    pageName: firstPage.name,
+                                    pageId: pageIdStr,
+                                    pageName: firstPage.name || pageIdStr,
+                                    linkedFormId: formId || undefined,
+                                    linkedCampaignId: campaignId || undefined,
                                 });
                                 setIsSelectLeadFormModalOpen(true);
                             }
@@ -941,45 +983,76 @@ export const IntegrationsPage = () => {
                 </Button>
             }
         >
-            <Card>
+            <Card className="overflow-hidden p-0">
                 {accounts.length > 0 ? (
-                    <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                    <ul className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
                         {accounts.map(account => (
-                            <li key={account.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
-                                <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                                    <Icon className="w-8 h-8 text-primary" />
-                                    <div>
-                                        <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
-                                        <span className={`flex items-center text-xs ${account.status === 'Connected' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
-                                            <span className={`h-2 w-2 me-1.5 rounded-full ${account.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
+                            <li
+                                key={account.id}
+                                className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/80 transition-colors duration-200 first:rounded-t-lg last:rounded-b-lg"
+                            >
+                                <div className="flex items-center gap-4 min-w-0">
+                                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center ring-1 ring-primary/20 dark:ring-primary/30">
+                                        <Icon className="w-6 h-6 text-primary" />
+                                    </div>
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-gray-900 dark:text-white truncate">{account.name}</p>
+                                        <span
+                                            className={`inline-flex items-center gap-1.5 mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
+                                                account.status === 'Connected'
+                                                    ? 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-500/20'
+                                                    : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/80'
+                                            }`}
+                                        >
+                                            <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${account.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`} />
                                             {account.status === 'Connected' ? t('connected') : t('disconnected')}
                                         </span>
                                     </div>
                                 </div>
-                                <div className="flex items-center gap-2">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-2">
                                     {(account.status !== 'Connected') && (
-                                        <Button variant="primary" onClick={() => handleConnect(account.id)}>
+                                        <Button variant="primary" onClick={() => handleConnect(account.id)} className="rounded-lg shadow-sm">
                                             {t('connect') || 'Connect'}
                                         </Button>
                                     )}
                                     {account.status === 'Connected' && account.platform === 'meta' && (
-                                        <Button variant="secondary" onClick={() => handleSelectLeadForm(account)}>
-                                            {t('selectLeadForm') || 'Select Lead Form'}
-                                        </Button>
+                                        <>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => handleTestConnection(account.id)}
+                                                disabled={testConnectionMutation.isPending}
+                                                className="rounded-lg text-sm"
+                                            >
+                                                {testConnectionMutation.isPending ? (t('testing') || 'Testing...') : (t('testConnection') || 'Test connection')}
+                                            </Button>
+                                            <Button variant="secondary" onClick={() => handleSelectLeadForm(account)} className="rounded-lg text-sm">
+                                                {t('selectLeadForm') || 'Select Lead Form'}
+                                            </Button>
+                                        </>
                                     )}
-                                    <Button variant="secondary" onClick={() => handleEdit(account)}><SettingsIcon className="w-4 h-4 me-2" /> {t('edit')}</Button>
-                                    <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
+                                    <Button variant="ghost" onClick={() => handleEdit(account)} className="rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                        <SettingsIcon className="w-4 h-4" /> <span className="sm:inline">{t('edit')}</span>
+                                    </Button>
+                                    <Button
+                                        variant="danger"
+                                        onClick={() => handleDelete(account.id)}
+                                        className="rounded-lg ml-auto sm:ml-0 border border-transparent hover:border-red-500/30"
+                                    >
+                                        <TrashIcon className="w-4 h-4" /> <span className="sm:inline">{t('disconnect')}</span>
+                                    </Button>
                                 </div>
                             </li>
                         ))}
                     </ul>
                 ) : (
-                    <div className="text-center py-16">
-                        <Icon className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
-                        <h3 className="text-lg font-semibold">{t('noAccountsConnected')}</h3>
-                        <p className="text-gray-500 dark:text-gray-400 mt-1">{t('connectAccountPrompt')}</p>
+                    <div className="text-center py-16 px-6">
+                        <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center">
+                            <Icon className="w-10 h-10 text-gray-400 dark:text-gray-500" />
+                        </div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('noAccountsConnected')}</h3>
+                        <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-sm mx-auto">{t('connectAccountPrompt')}</p>
                         {(platformParam === 'whatsapp' || platformParam === 'meta') && (
-                            <p className="text-gray-400 dark:text-gray-500 mt-2 text-sm">{t('addAccountThenConnectHint')}</p>
+                            <p className="text-gray-400 dark:text-gray-500 mt-3 text-sm">{t('addAccountThenConnectHint')}</p>
                         )}
                     </div>
                 )}
@@ -996,6 +1069,8 @@ export const IntegrationsPage = () => {
                     accountId={selectLeadFormConfig.accountId}
                     pageId={selectLeadFormConfig.pageId}
                     pageName={selectLeadFormConfig.pageName}
+                    linkedFormId={selectLeadFormConfig.linkedFormId}
+                    linkedCampaignId={selectLeadFormConfig.linkedCampaignId}
                     onSuccess={() => {
                         queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
                     }}

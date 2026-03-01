@@ -11,6 +11,10 @@ interface SelectLeadFormModalProps {
   accountId: number;
   pageId: string;
   pageName: string;
+  /** Pre-select this form when modal opens (currently linked for this page) */
+  linkedFormId?: string;
+  /** Pre-select this campaign when modal opens (currently linked for this form) */
+  linkedCampaignId?: string;
   onSuccess?: () => void;
 }
 
@@ -50,6 +54,8 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
   accountId,
   pageId,
   pageName,
+  linkedFormId: initialFormId,
+  linkedCampaignId: initialCampaignId,
   onSuccess,
 }) => {
   const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
@@ -57,8 +63,9 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
 
   // Fetch lead forms
-  const { data: leadFormsData, isLoading: loadingForms } = useLeadForms(accountId, pageId);
+  const { data: leadFormsData, isLoading: loadingForms, isError: leadFormsError, error: leadFormsErrorObj } = useLeadForms(accountId, pageId);
   const leadForms = leadFormsData?.lead_forms || [];
+  const errorMessage = leadFormsErrorObj && (leadFormsErrorObj as any)?.message;
 
   // Fetch campaigns
   const { data: campaignsData } = useCampaigns();
@@ -67,12 +74,13 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
   // Select lead form mutation
   const selectFormMutation = useSelectLeadForm();
 
+  // When modal opens, pre-select currently linked form and campaign (if any)
   useEffect(() => {
     if (isOpen) {
-      setSelectedFormId('');
-      setSelectedCampaignId('');
+      setSelectedFormId(initialFormId ?? '');
+      setSelectedCampaignId(initialCampaignId ?? '');
     }
-  }, [isOpen]);
+  }, [isOpen, initialFormId, initialCampaignId]);
 
   const handleSubmit = async () => {
     if (!selectedFormId) {
@@ -116,6 +124,10 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
         {loadingForms ? (
           <div className="flex items-center justify-center py-8">
             <Loader variant="primary" className="h-8" />
+          </div>
+        ) : leadFormsError && errorMessage ? (
+          <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
+            {errorMessage}
           </div>
         ) : leadForms.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">

@@ -13,7 +13,7 @@ import {
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI,
   getCurrentUserAPI, getActivitiesAPI,
-  getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI,
+  getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI,
   createLeadAPI, updateLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
@@ -1201,6 +1201,20 @@ export const useDeleteConnectedAccount = (options?: UseMutationOptions<void, Err
     mutationFn: (id: number) => deleteConnectedAccountAPI(id),
     onSuccess: () => {
       // Invalidate all connected accounts queries
+      queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+    },
+    ...options,
+  });
+};
+
+/**
+ * Test Meta connection (validates token, refreshes pages).
+ */
+export const useTestConnection = (options?: UseMutationOptions<{ valid: boolean; message?: string }, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (accountId: number) => testConnectionAPI(accountId),
+    onSuccess: (_, __, ___) => {
       queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
     },
     ...options,

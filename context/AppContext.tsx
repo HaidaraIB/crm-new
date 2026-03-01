@@ -270,8 +270,22 @@ export interface AppContextType {
   // Select Lead Form Modal state
   isSelectLeadFormModalOpen: boolean;
   setIsSelectLeadFormModalOpen: (isOpen: boolean) => void;
-  selectLeadFormConfig: { accountId: number; pageId: string; pageName: string } | null;
-  setSelectLeadFormConfig: React.Dispatch<React.SetStateAction<{ accountId: number; pageId: string; pageName: string } | null>>;
+  selectLeadFormConfig: {
+    accountId: number;
+    pageId: string;
+    pageName: string;
+    /** Currently linked form id for this page (so modal can pre-select it) */
+    linkedFormId?: string;
+    /** Currently linked campaign id for this form (so modal can pre-select it) */
+    linkedCampaignId?: string;
+  } | null;
+  setSelectLeadFormConfig: React.Dispatch<React.SetStateAction<{
+    accountId: number;
+    pageId: string;
+    pageName: string;
+    linkedFormId?: string;
+    linkedCampaignId?: string;
+  } | null>>;
   
   // Change Password Modal state
   isChangePasswordModalOpen: boolean;
@@ -691,7 +705,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // Integrations state
   const [isManageIntegrationAccountModalOpen, setIsManageIntegrationAccountModalOpen] = useState(false);
   const [isSelectLeadFormModalOpen, setIsSelectLeadFormModalOpen] = useState(false);
-  const [selectLeadFormConfig, setSelectLeadFormConfig] = useState<{ accountId: number; pageId: string; pageName: string } | null>(null);
+  const [selectLeadFormConfig, setSelectLeadFormConfig] = useState<{
+    accountId: number;
+    pageId: string;
+    pageName: string;
+    linkedFormId?: string;
+    linkedCampaignId?: string;
+  } | null>(null);
   // TODO: استدعي getConnectedAccountsAPI() عند تحميل صفحة Integrations
   // مثال: getConnectedAccountsAPI('meta').then(data => setConnectedAccounts(prev => ({ ...prev, facebook: data })));
   const [connectedAccounts, setConnectedAccounts] = useState<{ facebook: ConnectedAccount[]; tiktok: ConnectedAccount[]; whatsapp: ConnectedAccount[] }>({

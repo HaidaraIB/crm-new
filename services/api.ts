@@ -1901,6 +1901,17 @@ export const deleteConnectedAccountAPI = async (accountId: number) => {
 };
 
 /**
+ * Test Meta connection (validates token, optionally refreshes pages).
+ * POST /api/integrations/accounts/:id/test-connection/
+ */
+export const testConnectionAPI = async (accountId: number) => {
+  return apiRequest<{ valid: boolean; message?: string; expires_at?: number }>(
+    `/integrations/accounts/${accountId}/test-connection/`,
+    { method: 'POST' }
+  );
+};
+
+/**
  * بدء عملية OAuth لربط الحساب
  * POST /api/integrations/accounts/:id/connect/
  * Response: { authorization_url: string, state: string }

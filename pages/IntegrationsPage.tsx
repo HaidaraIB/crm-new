@@ -214,7 +214,16 @@ export const IntegrationsPage = () => {
         setPendingConnectAccountId,
         setSuccessMessage,
         setIsSuccessModalOpen,
+        setAlertMessage,
+        setAlertVariant,
+        setIsAlertModalOpen,
     } = useAppContext();
+
+    const showAlert = (message: string, variant: 'info' | 'warning' | 'error' = 'info') => {
+        setAlertMessage(message);
+        setAlertVariant(variant);
+        setIsAlertModalOpen(true);
+    };
 
     const isEmployee = (currentUser?.role ?? '').toLowerCase() === 'employee';
 
@@ -332,6 +341,211 @@ export const IntegrationsPage = () => {
     const { name, icon: Icon } = platform;
     const pageTitle = `${name} ${t('integration')}`;
 
+    // Handlers for Connect / Edit / Disconnect (must be defined before any early return so WhatsApp "accounts" tab can use them)
+    const deleteAccountMutation = useDeleteConnectedAccount();
+    const testConnectionMutation = useTestConnection();
+    const queryClient = useQueryClient();
+
+    useEffect(() => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const connected = urlParams.get('connected');
+        const accountId = urlParams.get('account_id');
+        if (connected !== 'true' || !accountId) return;
+        const id = parseInt(accountId, 10);
+        if (window.opener) return;
+        window.history.replaceState({}, document.title, window.location.pathname);
+        queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+        if (platformParam === 'meta') {
+            getConnectedAccountsAPI(platformParam).then((accounts: any) => {
+                const account = Array.isArray(accounts)
+                    ? accounts.find((a: any) => a.id === id)
+                    : accounts?.results?.find((a: any) => a.id === id);
+                if (account?.metadata?.pages?.length) {
+                    const firstPage = account.metadata.pages[0];
+                    const pageIdStr = String(firstPage.id);
+                    const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
+                    const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
+                    const mapping = account.metadata?.form_campaign_mapping || {};
+                    const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
+                    setSelectLeadFormConfig({
+                        accountId: id,
+                        pageId: pageIdStr,
+                        pageName: firstPage.name || pageIdStr,
+                        linkedFormId: formId || undefined,
+                        linkedCampaignId: campaignId || undefined,
+                    });
+                    setIsSelectLeadFormModalOpen(true);
+                }
+            }).catch(console.error);
+        }
+    }, [queryClient, platformParam]);
+
+    const handleSelectLeadForm = async (account: any) => {
+        if (account.platform !== 'meta') return;
+        let pages = account.metadata?.pages;
+        if (!pages?.length) {
+            try {
+                const full = await getConnectedAccountAPI(account.id);
+                pages = full?.metadata?.pages || [];
+            } catch (e) {
+                console.error('Failed to load account pages:', e);
+            }
+        }
+        if (!pages?.length) {
+            try {
+                const res = await syncMetaPagesAPI(account.id);
+                pages = res?.pages || [];
+                if (pages?.length) queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+            } catch (e) {
+                console.error('Failed to sync Meta pages:', e);
+            }
+        }
+        if (!pages?.length) {
+            setInfoAlert({
+                title: t('noFacebookPagesFound') || 'No Facebook pages found',
+                message: t('noFacebookPagesReconnectHint') || 'No Facebook pages were found for this account. Try disconnecting and reconnecting the account.',
+            });
+            return;
+        }
+        const first = pages[0];
+        const pageIdStr = String(first.id);
+        const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
+        const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
+        const mapping = account.metadata?.form_campaign_mapping || {};
+        const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
+        setSelectLeadFormConfig({
+            accountId: account.id,
+            pageId: pageIdStr,
+            pageName: first.name || pageIdStr,
+            linkedFormId: formId || undefined,
+            linkedCampaignId: campaignId || undefined,
+        });
+        setIsSelectLeadFormModalOpen(true);
+    };
+
+    const handleTestConnection = async (accountId: number) => {
+        try {
+            const result = await testConnectionMutation.mutateAsync(accountId);
+            if (result.valid) {
+                setSuccessMessage(t('connectionValid') || result.message || 'Connection is valid.');
+                setIsSuccessModalOpen(true);
+            } else {
+                setInfoAlert({
+                    title: t('connectionInvalid') || 'Connection check',
+                    message: result.message || (t('connectionInvalidPleaseReconnect') || 'Token is no longer valid. Please disconnect and connect again.'),
+                });
+            }
+        } catch (error: any) {
+            const msg = error?.message || error?.data?.error || t('errorTestingConnection') || 'Failed to test connection.';
+            setInfoAlert({ title: t('connectionCheck') || 'Connection check', message: msg });
+        }
+    };
+
+    const handleDelete = (accountId: number) => {
+        const account = accounts.find(acc => acc.id === accountId);
+        if (account) {
+            setConfirmDeleteConfig({
+                title: t('disconnect') || 'Disconnect Account',
+                message: t('confirmDisconnectAccount') || 'Are you sure you want to disconnect',
+                itemName: account.name,
+                onConfirm: async () => {
+                    try {
+                        await deleteAccountMutation.mutateAsync(accountId);
+                    } catch (error: any) {
+                        console.error('Error deleting account:', error);
+                        showAlert(error?.message || t('errorDeletingAccount') || 'Failed to delete account', 'error');
+                    }
+                },
+            });
+            setIsConfirmDeleteModalOpen(true);
+        }
+    };
+
+    const openConnectPopup = async (accountId: number) => {
+        try {
+            const response = await connectIntegrationAccountAPI(accountId);
+            if (!response.authorization_url) return;
+            const width = 600;
+            const height = 700;
+            const left = Math.round((window.screen.width - width) / 2);
+            const top = Math.round((window.screen.height - height) / 2);
+            const popup = window.open(
+                response.authorization_url,
+                'oauth_popup',
+                `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
+            );
+            if (!popup) {
+                showAlert(t('popupBlocked') || 'Please allow popups for this site and try again.', 'warning');
+                return;
+            }
+            const handleMessage = (event: MessageEvent) => {
+                if (event.origin !== window.location.origin) return;
+                if (event.data?.type === 'oauth_connected' && event.data?.accountId != null) {
+                    window.removeEventListener('message', handleMessage);
+                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                    if (platformParam === 'meta') {
+                        getConnectedAccountsAPI(platformParam).then((accounts: any) => {
+                            const list = Array.isArray(accounts) ? accounts : accounts?.results || [];
+                            const account = list.find((a: any) => a.id === event.data.accountId);
+                            if (account?.metadata?.pages?.length) {
+                                const firstPage = account.metadata.pages[0];
+                                const pageIdStr = String(firstPage.id);
+                                const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
+                                const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
+                                const mapping = account.metadata?.form_campaign_mapping || {};
+                                const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
+                                setSelectLeadFormConfig({
+                                    accountId: event.data.accountId,
+                                    pageId: pageIdStr,
+                                    pageName: firstPage.name || pageIdStr,
+                                    linkedFormId: formId || undefined,
+                                    linkedCampaignId: campaignId || undefined,
+                                });
+                                setIsSelectLeadFormModalOpen(true);
+                            }
+                        }).catch(console.error);
+                    }
+                }
+                if (event.data?.type === 'oauth_failed') {
+                    window.removeEventListener('message', handleMessage);
+                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                }
+            };
+            window.addEventListener('message', handleMessage);
+            const poll = setInterval(() => {
+                if (popup.closed) {
+                    clearInterval(poll);
+                    window.removeEventListener('message', handleMessage);
+                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                }
+            }, 500);
+        } catch (error: any) {
+            console.error('Error connecting account:', error);
+            showAlert(error?.message || t('errorConnectingAccount') || 'Failed to connect account', 'error');
+        }
+    };
+
+    const handleConnect = (accountId: number) => {
+        openConnectPopup(accountId);
+    };
+
+    useEffect(() => {
+        if (pendingConnectAccountId == null) return;
+        const id = pendingConnectAccountId;
+        setPendingConnectAccountId(null);
+        openConnectPopup(id);
+    }, [pendingConnectAccountId]);
+
+    const handleEdit = (account: Account) => {
+        setEditingAccount(account);
+        setIsManageIntegrationAccountModalOpen(true);
+    };
+
+    const handleAddNew = () => {
+        setEditingAccount(null);
+        setIsManageIntegrationAccountModalOpen(true);
+    };
+
     // TikTok = Lead Gen only (like Meta lead forms). Show webhook URL and setup steps for subscribers.
     if (currentPage === 'TikTok') {
         const webhookUrl = leadgenConfig?.webhook_url || '';
@@ -372,7 +586,7 @@ export const IntegrationsPage = () => {
                                         />
                                         <Button
                                             variant="secondary"
-                                            onClick={() => { if (webhookUrl) navigator.clipboard.writeText(webhookUrl); alert(t('copied') || 'Copied'); }}
+                                            onClick={() => { if (webhookUrl) navigator.clipboard.writeText(webhookUrl); showAlert(t('copied') || 'Copied', 'info'); }}
                                         >
                                             {t('copy') || 'Copy'}
                                         </Button>
@@ -413,7 +627,7 @@ export const IntegrationsPage = () => {
             if (!selectedChatClient || !messageInput.trim()) return;
             const to = getClientPhone(selectedChatClient);
             if (!to) {
-                alert(t('sms_error_invalid_to_number') || 'No phone number for this client');
+                showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
                 return;
             }
             try {
@@ -425,7 +639,7 @@ export const IntegrationsPage = () => {
                 }));
                 setMessageInput('');
             } catch (e: any) {
-                alert(e?.message || t('failedToSendSms'));
+                showAlert(e?.message || t('failedToSendSms'), 'error');
             }
         };
 
@@ -469,7 +683,7 @@ export const IntegrationsPage = () => {
 
         const handleCopyTemplate = (content: string) => {
             navigator.clipboard.writeText(content);
-            alert(t('copied'));
+            showAlert(t('copied'), 'info');
         };
 
         const effectiveTab = isEmployee && whatsAppTab === 'accounts' ? 'chats' : whatsAppTab;
@@ -755,214 +969,6 @@ export const IntegrationsPage = () => {
             </PageWrapper>
         );
     }
-
-    // Delete account mutation
-    const deleteAccountMutation = useDeleteConnectedAccount();
-    const testConnectionMutation = useTestConnection();
-    const queryClient = useQueryClient();
-
-    // Handle OAuth callback when returning in same tab (popup uses /oauth-callback page)
-    useEffect(() => {
-        const urlParams = new URLSearchParams(window.location.search);
-        const connected = urlParams.get('connected');
-        const accountId = urlParams.get('account_id');
-        if (connected !== 'true' || !accountId) return;
-        const id = parseInt(accountId, 10);
-        if (window.opener) return;
-        // Same-tab redirect: clean URL and refetch
-        window.history.replaceState({}, document.title, window.location.pathname);
-        queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-        if (platformParam === 'meta') {
-            getConnectedAccountsAPI(platformParam).then((accounts: any) => {
-                const account = Array.isArray(accounts)
-                    ? accounts.find((a: any) => a.id === id)
-                    : accounts?.results?.find((a: any) => a.id === id);
-                if (account?.metadata?.pages?.length) {
-                    const firstPage = account.metadata.pages[0];
-                    const pageIdStr = String(firstPage.id);
-                    const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
-                    const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
-                    const mapping = account.metadata?.form_campaign_mapping || {};
-                    const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
-                    setSelectLeadFormConfig({
-                        accountId: id,
-                        pageId: pageIdStr,
-                        pageName: firstPage.name || pageIdStr,
-                        linkedFormId: formId || undefined,
-                        linkedCampaignId: campaignId || undefined,
-                    });
-                    setIsSelectLeadFormModalOpen(true);
-                }
-            }).catch(console.error);
-        }
-    }, [queryClient, platformParam]);
-    
-    const handleSelectLeadForm = async (account: any) => {
-        if (account.platform !== 'meta') return;
-        let pages = account.metadata?.pages;
-        if (!pages?.length) {
-            try {
-                const full = await getConnectedAccountAPI(account.id);
-                pages = full?.metadata?.pages || [];
-            } catch (e) {
-                console.error('Failed to load account pages:', e);
-            }
-        }
-        if (!pages?.length) {
-            try {
-                const res = await syncMetaPagesAPI(account.id);
-                pages = res?.pages || [];
-                if (pages?.length) queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-            } catch (e) {
-                console.error('Failed to sync Meta pages:', e);
-            }
-        }
-        if (!pages?.length) {
-            setInfoAlert({
-                title: t('noFacebookPagesFound') || 'No Facebook pages found',
-                message: t('noFacebookPagesReconnectHint') || 'No Facebook pages were found for this account. Try disconnecting and reconnecting the account.',
-            });
-            return;
-        }
-        const first = pages[0];
-        const pageIdStr = String(first.id);
-        const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
-        const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
-        const mapping = account.metadata?.form_campaign_mapping || {};
-        const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
-        setSelectLeadFormConfig({
-            accountId: account.id,
-            pageId: pageIdStr,
-            pageName: first.name || pageIdStr,
-            linkedFormId: formId || undefined,
-            linkedCampaignId: campaignId || undefined,
-        });
-        setIsSelectLeadFormModalOpen(true);
-    };
-
-    const handleTestConnection = async (accountId: number) => {
-        try {
-            const result = await testConnectionMutation.mutateAsync(accountId);
-            if (result.valid) {
-                setSuccessMessage(t('connectionValid') || result.message || 'Connection is valid.');
-                setIsSuccessModalOpen(true);
-            } else {
-                setInfoAlert({
-                    title: t('connectionInvalid') || 'Connection check',
-                    message: result.message || (t('connectionInvalidPleaseReconnect') || 'Token is no longer valid. Please disconnect and connect again.'),
-                });
-            }
-        } catch (error: any) {
-            const msg = error?.message || error?.data?.error || t('errorTestingConnection') || 'Failed to test connection.';
-            setInfoAlert({ title: t('connectionCheck') || 'Connection check', message: msg });
-        }
-    };
-
-    const handleDelete = async (accountId: number) => {
-        const account = accounts.find(acc => acc.id === accountId);
-        if (account) {
-            setConfirmDeleteConfig({
-                title: t('disconnect') || 'Disconnect Account',
-                message: t('confirmDisconnectAccount') || 'Are you sure you want to disconnect',
-                itemName: account.name,
-                onConfirm: async () => {
-                    try {
-                        await deleteAccountMutation.mutateAsync(accountId);
-                    } catch (error: any) {
-                        console.error('Error deleting account:', error);
-                        alert(error?.message || t('errorDeletingAccount') || 'Failed to delete account');
-                    }
-                },
-            });
-            setIsConfirmDeleteModalOpen(true);
-        }
-    };
-
-    const openConnectPopup = async (accountId: number) => {
-        try {
-            const response = await connectIntegrationAccountAPI(accountId);
-            if (!response.authorization_url) return;
-            const width = 600;
-            const height = 700;
-            const left = Math.round((window.screen.width - width) / 2);
-            const top = Math.round((window.screen.height - height) / 2);
-            const popup = window.open(
-                response.authorization_url,
-                'oauth_popup',
-                `width=${width},height=${height},left=${left},top=${top},scrollbars=yes,resizable=yes`
-            );
-            if (!popup) {
-                alert(t('popupBlocked') || 'Please allow popups for this site and try again.');
-                return;
-            }
-            const handleMessage = (event: MessageEvent) => {
-                if (event.origin !== window.location.origin) return;
-                if (event.data?.type === 'oauth_connected' && event.data?.accountId != null) {
-                    window.removeEventListener('message', handleMessage);
-                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-                    if (platformParam === 'meta') {
-                        getConnectedAccountsAPI(platformParam).then((accounts: any) => {
-                            const list = Array.isArray(accounts) ? accounts : accounts?.results || [];
-                            const account = list.find((a: any) => a.id === event.data.accountId);
-                            if (account?.metadata?.pages?.length) {
-                                const firstPage = account.metadata.pages[0];
-                                const pageIdStr = String(firstPage.id);
-                                const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
-                                const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
-                                const mapping = account.metadata?.form_campaign_mapping || {};
-                                const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
-                                setSelectLeadFormConfig({
-                                    accountId: event.data.accountId,
-                                    pageId: pageIdStr,
-                                    pageName: firstPage.name || pageIdStr,
-                                    linkedFormId: formId || undefined,
-                                    linkedCampaignId: campaignId || undefined,
-                                });
-                                setIsSelectLeadFormModalOpen(true);
-                            }
-                        }).catch(console.error);
-                    }
-                }
-                if (event.data?.type === 'oauth_failed') {
-                    window.removeEventListener('message', handleMessage);
-                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-                }
-            };
-            window.addEventListener('message', handleMessage);
-            const poll = setInterval(() => {
-                if (popup.closed) {
-                    clearInterval(poll);
-                    window.removeEventListener('message', handleMessage);
-                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-                }
-            }, 500);
-        } catch (error: any) {
-            console.error('Error connecting account:', error);
-            alert(error?.message || t('errorConnectingAccount') || 'Failed to connect account');
-        }
-    };
-
-    const handleConnect = (accountId: number) => {
-        openConnectPopup(accountId);
-    };
-
-    // بعد إنشاء حساب جديد (Meta/WhatsApp) من المودال، فتح نافذة الربط تلقائياً
-    useEffect(() => {
-        if (pendingConnectAccountId == null) return;
-        const id = pendingConnectAccountId;
-        setPendingConnectAccountId(null);
-        openConnectPopup(id);
-    }, [pendingConnectAccountId]);
-
-    const handleEdit = (account: Account) => {
-        setEditingAccount(account);
-        setIsManageIntegrationAccountModalOpen(true);
-    };
-
-    const handleAddNew = () => {
-        setEditingAccount(null); // Ensure we are in "add" mode
-        setIsManageIntegrationAccountModalOpen(true);
-    };
 
     if (loading) {
         return (

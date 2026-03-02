@@ -301,6 +301,14 @@ export interface AppContextType {
   successMessage: string;
   setSuccessMessage: (message: string) => void;
 
+  // Alert Modal state (info / warning / error messages instead of browser alert)
+  isAlertModalOpen: boolean;
+  setIsAlertModalOpen: (isOpen: boolean) => void;
+  alertMessage: string;
+  setAlertMessage: (message: string) => void;
+  alertVariant: 'info' | 'warning' | 'error';
+  setAlertVariant: (v: 'info' | 'warning' | 'error') => void;
+
   // Filters (UI state only)
   leadFilters: LeadFilters;
   setLeadFilters: React.Dispatch<React.SetStateAction<LeadFilters>>;
@@ -731,6 +739,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // Success Modal state
   const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+
+  // Alert Modal state (replaces browser alert for app-styled messages)
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertVariant, setAlertVariant] = useState<'info' | 'warning' | 'error'>('info');
 
 
   useEffect(() => {
@@ -1243,6 +1256,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isEmailVerificationModalOpen, setIsEmailVerificationModalOpen,
     isSuccessModalOpen, setIsSuccessModalOpen,
     successMessage, setSuccessMessage,
+    isAlertModalOpen, setIsAlertModalOpen,
+    alertMessage, setAlertMessage,
+    alertVariant, setAlertVariant,
     // Filters (UI state only)
     leadFilters, setLeadFilters,
     dealFilters, setDealFilters,

@@ -1010,6 +1010,9 @@ export const translations = {
     connectionCheck: "Connection check",
     errorTestingConnection: "Failed to test connection. Please try again.",
     ok: "OK",
+    notice: "Notice",
+    warning: "Warning",
+    error: "Error",
     // OAuth callback popup
     connectionSuccessful: "Connection succeeded",
     closePopupToSeeIntegrations: "You can close this window. The integrations page will update to show your connected account.",
@@ -2285,6 +2288,9 @@ export const translations = {
     connectionCheck: "فحص الاتصال",
     errorTestingConnection: "فشل اختبار الاتصال. يرجى المحاولة مرة أخرى.",
     ok: "موافق",
+    notice: "تنبيه",
+    warning: "تحذير",
+    error: "خطأ",
     // OAuth callback popup
     connectionSuccessful: "تم الاتصال بنجاح",
     closePopupToSeeIntegrations: "يمكنك إغلاق هذه النافذة. ستتحدّث صفحة التكاملات لتعرض الحساب المتصل.",

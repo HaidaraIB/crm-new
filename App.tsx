@@ -384,7 +384,19 @@ const TheApp = () => {
             sessionStorage.setItem('authProcessed', 'true');
         }
     }, [isLoggedIn, authProcessed]); // Run when isLoggedIn changes or on mount
-    
+
+    // Strip impersonate cache-bust param (_=) from URL so the bar shows a clean path (e.g. /memocom/dashboard)
+    React.useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const params = new URLSearchParams(window.location.search);
+        if (params.has('_')) {
+            params.delete('_');
+            const cleanSearch = params.toString();
+            const clean = window.location.pathname + (cleanSearch ? '?' + cleanSearch : '') + (window.location.hash || '');
+            window.history.replaceState({}, '', clean);
+        }
+    }, []);
+
     // Check for verify-email route first (accessible for both logged-in and logged-out users)
     const pathnameRaw = decodeURIComponent(window.location.pathname);
     const pathname = pathnameRaw.replace(/\/+$/, '') || '/'; // normalize: no trailing slash

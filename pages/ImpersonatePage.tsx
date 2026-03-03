@@ -85,9 +85,11 @@ const ImpersonatePage: React.FC = () => {
                 const dashboardPath = companyName
                     ? getCompanyRoute(companyName, companyDomain, 'Dashboard')
                     : '/dashboard';
-                // Brief delay so all localStorage writes are committed before full-page navigation
+                // Force full document load so URL and context (profile corner) reflect the new company
+                const sep = dashboardPath.includes('?') ? '&' : '?';
+                const urlWithReload = `${dashboardPath}${sep}_=${Date.now()}`;
                 requestAnimationFrame(() => {
-                    window.location.replace(dashboardPath);
+                    window.location.href = urlWithReload;
                 });
             })
             .catch((err) => {

@@ -72,10 +72,9 @@ const ImpersonatePage: React.FC = () => {
 
         const apiRoot = getApiRoot();
         const exchangeUrl = `${apiRoot}/auth/impersonate-exchange/?code=${encodeURIComponent(code)}`;
-        const headers: Record<string, string> = {
-            'Content-Type': 'application/json',
-        };
+        const headers: Record<string, string> = {};
         if (API_KEY) headers['X-API-Key'] = API_KEY;
+        // No Content-Type for GET (no body) to avoid unnecessary CORS preflight complexity
 
         log('fetch_start', {
             VITE_API_URL: import.meta.env.VITE_API_URL ?? '(empty)',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { getCompanyRoute } from '../utils/routing';
 
@@ -19,8 +19,13 @@ const ImpersonatePage: React.FC = () => {
     const { setCurrentUser, setIsLoggedIn } = useAppContext();
     const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
     const [message, setMessage] = useState<string>('');
+    const exchangeStartedRef = useRef(false);
+    const successHandledRef = useRef(false);
 
     useEffect(() => {
+        if (exchangeStartedRef.current) return;
+        exchangeStartedRef.current = true;
+
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code')?.trim();
 
@@ -45,12 +50,16 @@ const ImpersonatePage: React.FC = () => {
             .then(async (res) => {
                 if (!res.ok) {
                     const err = await res.json().catch(() => ({}));
-                    const msg = (err && typeof err.error === 'string' ? err.error : '') || (res.status === 404 ? 'الرابط غير موجود على السيرفر (404). تأكد من تحديث ونشر الـ API ثم إعادة تشغيل الخدمة.' : 'Invalid or expired code.');
+                    let msg = (err && typeof err.error === 'string' ? err.error : '') || 'Invalid or expired code.';
+                    if (res.status === 404 && err?.hint) msg += ` (${err.hint})`;
+                    else if (res.status === 404) msg = 'الرمز غير صالح أو منتهي. تأكد أن لوحة التحكم تستخدم نفس عنوان الـ API الذي تستخدمه لوحة الإدارة.';
                     throw new Error(msg.trim().replace(/^\.+/, ''));
                 }
                 return res.json();
             })
             .then((data) => {
+                if (successHandledRef.current) return;
+                successHandledRef.current = true;
                 // Replace previous session only after we have the new tokens (avoids triggering logout redirect)
                 if (data.access) localStorage.setItem('accessToken', data.access);
                 if (data.refresh) localStorage.setItem('refreshToken', data.refresh);
@@ -81,6 +90,7 @@ const ImpersonatePage: React.FC = () => {
                 });
             })
             .catch((err) => {
+                if (successHandledRef.current) return;
                 setStatus('error');
                 const msg = err?.message || 'Invalid or expired code.';
                 setMessage(msg.trim().replace(/^\.+/, ''));

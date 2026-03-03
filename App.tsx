@@ -385,9 +385,14 @@ const TheApp = () => {
         }
     }, [isLoggedIn, authProcessed]); // Run when isLoggedIn changes or on mount
 
-    // Strip impersonate cache-bust param (_=) from URL so the bar shows a clean path (e.g. /memocom/dashboard)
+    // After impersonate: one quick reload so URL + profile always match (needed for correct UI)
     React.useEffect(() => {
         if (typeof window === 'undefined') return;
+        if (sessionStorage.getItem('impersonate_just_done') === '1') {
+            sessionStorage.removeItem('impersonate_just_done');
+            window.location.reload();
+            return;
+        }
         const params = new URLSearchParams(window.location.search);
         if (params.has('_')) {
             params.delete('_');

@@ -56,23 +56,6 @@ export const LoginPage = () => {
             }
         }
     }, []);
-
-    // Show banner if impersonation debug log was saved (e.g. after redirect from /impersonate)
-    useEffect(() => {
-        setImpersonateLogAvailable(!!localStorage.getItem('impersonate_debug_log'));
-    }, []);
-
-    const handleCopyImpersonateLog = () => {
-        const raw = localStorage.getItem('impersonate_debug_log');
-        if (!raw) return;
-        navigator.clipboard.writeText(raw).then(() => {
-            setImpersonateLogCopied(true);
-            localStorage.removeItem('impersonate_debug_log');
-            setImpersonateLogAvailable(false);
-            setTimeout(() => setImpersonateLogCopied(false), 2000);
-        });
-    };
-
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
@@ -80,8 +63,6 @@ export const LoginPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
-    const [impersonateLogAvailable, setImpersonateLogAvailable] = useState(false);
-    const [impersonateLogCopied, setImpersonateLogCopied] = useState(false);
 
     // Check for pending subscription ID and error message on mount
     useEffect(() => {
@@ -239,24 +220,6 @@ export const LoginPage = () => {
                         <p className="mt-2 text-center text-sm text-secondary">{t('signInToContinue')}</p>
                     </div>
                     <div className="space-y-6">
-                        {(impersonateLogAvailable || impersonateLogCopied) && (
-                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-md text-sm flex items-center justify-between gap-2">
-                                <span>
-                                    {impersonateLogCopied
-                                        ? (language === 'ar' ? 'تم نسخ السجل إلى الحافظة.' : 'Log copied to clipboard.')
-                                        : (language === 'ar' ? 'سجل تشخيص التظاهر متوفر (بعد إعادة التوجيه).' : 'Impersonation debug log available (after redirect).')}
-                                </span>
-                                {impersonateLogAvailable && (
-                                    <button
-                                        type="button"
-                                        onClick={handleCopyImpersonateLog}
-                                        className="shrink-0 px-3 py-1.5 rounded bg-amber-200 dark:bg-amber-800 hover:bg-amber-300 dark:hover:bg-amber-700 text-amber-900 dark:text-amber-100 text-xs font-medium"
-                                    >
-                                        {language === 'ar' ? 'نسخ السجل' : 'Copy log'}
-                                    </button>
-                                )}
-                            </div>
-                        )}
                         {paymentSuccessMessage && (
                             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
                                 <div>

@@ -95,6 +95,17 @@ export const getCompanyRoute = (companyName?: string, companyDomain?: string, pa
 };
 
 /**
+ * Get route for view-lead page (preserves view-lead/:id pattern; getCompanyRoute would turn it into view-lead123).
+ * Example: /apple/view-lead/123 or /view-lead/123
+ */
+export const getCompanyViewLeadRoute = (companyName?: string, companyDomain?: string, leadId?: number): string => {
+  const subdomainSlug = companyDomain ? toSubdomainSlug(companyDomain) : (companyName ? toSubdomainSlug(companyName) : '');
+  const path = `view-lead/${leadId ?? ''}`;
+  if (!subdomainSlug) return `/${path}`;
+  return `/${subdomainSlug}/${path}`;
+};
+
+/**
  * Get company subdomain URL (optional; for host-based subdomain if needed later)
  */
 export const getCompanySubdomainUrl = (companyDomain: string, page?: string): string => {

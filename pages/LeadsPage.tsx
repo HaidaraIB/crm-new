@@ -8,6 +8,7 @@ import SendSMSModal from '../components/modals/SendSMSModal';
 import { Lead } from '../types';
 import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks, useAssignUnassignedClients } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
+import { getCompanyViewLeadRoute } from '../utils/routing';
 
 // Status Dropdown Component
 const StatusDropdown = ({ 
@@ -422,7 +423,10 @@ export const LeadsPage = () => {
 
     const handleViewLead = (lead: Lead) => {
         setSelectedLead(lead);
-        window.history.pushState({}, '', `/view-lead/${lead.id}`);
+        const viewLeadPath = currentUser?.company
+            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, lead.id)
+            : `/view-lead/${lead.id}`;
+        window.history.pushState({}, '', viewLeadPath);
         setCurrentPage('ViewLead');
     };
 
@@ -770,7 +774,7 @@ export const LeadsPage = () => {
                                                     <div className="flex flex-col gap-2">
                                                         {lead.phoneNumbers && lead.phoneNumbers.length > 0 ? (
                                                             lead.phoneNumbers.map((pn) => (
-                                                                <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_auto_1fr]'} items-center gap-1`}>
+                                                                <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto_auto]'} items-center gap-1`}>
                                                                     {language === 'ar' ? (
                                                                         <>
                                                                             <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
@@ -812,6 +816,18 @@ export const LeadsPage = () => {
                                                                         </>
                                                                     ) : (
                                                                         <>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                                                                {pn.phone_number}
+                                                                            </span>
+                                                                            <div className="w-16 text-left">
+                                                                                {pn.is_primary ? (
+                                                                                    <span className="text-xs text-primary whitespace-nowrap">
+                                                                                        ({t('primary') || 'Primary'})
+                                                                                    </span>
+                                                                                ) : (
+                                                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
+                                                                                )}
+                                                                            </div>
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number })}
@@ -836,25 +852,13 @@ export const LeadsPage = () => {
                                                                             >
                                                                                 <PhoneIcon className="w-5 h-5"/>
                                                                             </a>
-                                                                            <div className="w-16 text-left">
-                                                                                {pn.is_primary ? (
-                                                                                    <span className="text-xs text-primary whitespace-nowrap">
-                                                                                        ({t('primary') || 'Primary'})
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                                                                                {pn.phone_number}
-                                                                            </span>
                                                                         </>
                                                                     )}
                                                                 </div>
                                                             ))
                                                         ) : (
                                                             lead.phone ? (
-                                                                <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_1fr]'} items-center gap-1`}>
+                                                                <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} items-center gap-1`}>
                                                                     {language === 'ar' ? (
                                                                         <>
                                                                             <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
@@ -885,6 +889,7 @@ export const LeadsPage = () => {
                                                                         </>
                                                                     ) : (
                                                                         <>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone })}
@@ -909,7 +914,6 @@ export const LeadsPage = () => {
                                                                             >
                                                                                 <PhoneIcon className="w-5 h-5"/>
                                                                             </a>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
                                                                         </>
                                                                     )}
                                                                 </div>

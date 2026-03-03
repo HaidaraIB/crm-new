@@ -710,7 +710,7 @@ export const ViewLeadPage = () => {
                             <div className="mt-2 space-y-2">
                                 {displayLead.phoneNumbers && displayLead.phoneNumbers.length > 0 ? (
                                     displayLead.phoneNumbers.map((pn) => (
-                                        <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_auto_1fr]'} items-center gap-2`}>
+                                        <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto_auto]'} items-center gap-2`}>
                                             {language === 'ar' ? (
                                                 <>
                                                     <div className="min-w-0">
@@ -759,6 +759,33 @@ export const ViewLeadPage = () => {
                                                 </>
                                             ) : (
                                                 <>
+                                                    <div className="min-w-0">
+                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                            {pn.phone_number}
+                                                        </p>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {pn.phone_type === 'mobile' ? t('mobile') : 
+                                                             pn.phone_type === 'home' ? t('home') : 
+                                                             pn.phone_type === 'work' ? t('work') : 
+                                                             pn.phone_type === 'other' ? t('other') : 
+                                                             pn.phone_type}
+                                                        </p>
+                                                    </div>
+                                                    <div className="w-16 text-left">
+                                                        {pn.is_primary ? (
+                                                            <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
+                                                        ) : (
+                                                            <span className="text-xs whitespace-nowrap">&nbsp;</span>
+                                                        )}
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setSendSMSModal({ phone: pn.phone_number })}
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={t('sendSms') || 'Send SMS'}
+                                                    >
+                                                        <SmsIcon className="w-5 h-5"/>
+                                                    </button>
                                                     <a 
                                                         href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
                                                         target="_blank" 
@@ -775,39 +802,12 @@ export const ViewLeadPage = () => {
                                                     >
                                                         <PhoneIcon className="w-5 h-5"/>
                                                     </a>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setSendSMSModal({ phone: pn.phone_number })}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('sendSms') || 'Send SMS'}
-                                                    >
-                                                        <SmsIcon className="w-5 h-5"/>
-                                                    </button>
-                                                    <div className="w-16 text-left">
-                                                        {pn.is_primary ? (
-                                                            <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
-                                                        ) : (
-                                                            <span className="text-xs whitespace-nowrap">&nbsp;</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate">
-                                                            {pn.phone_number}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            {pn.phone_type === 'mobile' ? t('mobile') : 
-                                                             pn.phone_type === 'home' ? t('home') : 
-                                                             pn.phone_type === 'work' ? t('work') : 
-                                                             pn.phone_type === 'other' ? t('other') : 
-                                                             pn.phone_type}
-                                                        </p>
-                                                    </div>
                                                 </>
                                             )}
                                         </div>
                                     ))
                                 ) : (
-                                    <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[auto_auto_auto_auto_1fr]'} items-center gap-2`}>
+                                    <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto_auto]'} items-center gap-2`}>
                                         {language === 'ar' ? (
                                             <>
                                                 <p className="text-base font-medium text-gray-900 dark:text-gray-100">
@@ -845,8 +845,20 @@ export const ViewLeadPage = () => {
                                             </>
                                         ) : (
                                             <>
+                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
+                                                    {displayLead.phone || '-'}
+                                                </p>
+                                                <div className="w-16"></div>
                                                 {displayLead.phone && (
                                                     <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
+                                                            className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                            title={t('sendSms') || 'Send SMS'}
+                                                        >
+                                                            <SmsIcon className="w-5 h-5"/>
+                                                        </button>
                                                         <a 
                                                             href={`https://wa.me/${displayLead.phone.replace(/[^0-9]/g, '')}`} 
                                                             target="_blank" 
@@ -863,20 +875,8 @@ export const ViewLeadPage = () => {
                                                         >
                                                             <PhoneIcon className="w-5 h-5"/>
                                                         </a>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('sendSms') || 'Send SMS'}
-                                                        >
-                                                            <SmsIcon className="w-5 h-5"/>
-                                                        </button>
                                                     </>
                                                 )}
-                                                <div className="w-16"></div>
-                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                                    {displayLead.phone || '-'}
-                                                </p>
                                             </>
                                         )}
                                     </div>

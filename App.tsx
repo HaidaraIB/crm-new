@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
-import { getCompanyRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
+import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage } from './pages';
@@ -190,7 +190,11 @@ const TheApp = () => {
             return;
         }
         if (!companyFromPath && currentUser?.company && pathnameToCheck !== '/' && subdomainSlug) {
-            const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
+            // Preserve view-lead/:id pattern (getCompanyRoute would mangle it to view-lead123)
+            const viewLeadMatch = pageFromPath.match(/^view-lead\/(\d+)$/i);
+            const correctRoute = viewLeadMatch
+                ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10))
+                : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
             window.history.replaceState({}, '', withSearch(correctRoute));
             return;
         }
@@ -492,7 +496,10 @@ const TheApp = () => {
                 return;
             }
             if (!companyFromPath && currentUser?.company && currentPath !== '/' && subdomainSlug) {
-                const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
+                const viewLeadMatch = pageFromPath.match(/^view-lead\/(\d+)$/i);
+                const correctRoute = viewLeadMatch
+                    ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10))
+                    : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
                 window.history.replaceState({}, '', correctRoute);
                 return;
             }

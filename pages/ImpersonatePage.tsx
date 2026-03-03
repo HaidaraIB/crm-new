@@ -63,53 +63,19 @@ const ImpersonatePage: React.FC = () => {
         setIsLoggedIn(false);
         log('session_cleared');
 
-        if (!code) {
-            log('error', { reason: 'missing_code' });
-            setStatus('error');
-            setMessage('Missing code parameter.');
-            return;
-        }
-
-        const apiRoot = getApiRoot();
-        const exchangeUrl = `${apiRoot}/auth/impersonate-exchange/?code=${encodeURIComponent(code)}`;
-        const headers: Record<string, string> = {};
-        if (API_KEY) headers['X-API-Key'] = API_KEY;
-        // No Content-Type for GET (no body) to avoid unnecessary CORS preflight complexity
-
-        log('fetch_start', {
-            VITE_API_URL: import.meta.env.VITE_API_URL ?? '(empty)',
-            apiRoot: apiRoot || '(empty)',
-            exchangeUrl,
-            hasApiKey: !!API_KEY,
-        });
-
-        fetch(exchangeUrl, { method: 'GET', headers })
-            .then(async (res) => {
-                const contentType = res.headers.get('content-type');
-                let body: unknown = null;
-                try {
-                    body = contentType?.includes('application/json') ? await res.json() : await res.text();
-                } catch {
-                    body = '(parse failed)';
-                }
-                log('fetch_response', {
-                    status: res.status,
-                    ok: res.ok,
-                    contentType: contentType ?? '(none)',
-                    body: typeof body === 'object' && body && 'error' in body ? (body as { error?: string }).error : body,
-                });
-                if (!res.ok) {
-                    const err = typeof body === 'object' && body && 'error' in body ? (body as { error?: string }) : {};
-                    const msg = (err && typeof err.error === 'string' ? err.error : '') || (res.status === 404 ? 'الرابط غير موجود على السيرفر (404). تأكد من تحديث ونشر الـ API ثم إعادة تشغيل الخدمة.' : 'Invalid or expired code.');
-                    throw new Error(msg.trim().replace(/^\.+/, ''));
-                }
-                return body as { access?: string; refresh?: string; user?: Record<string, unknown> };
-            })
-            .then((data) => {
+        // 1) Tokens in hash (redirect flow from API – no CORS): decode and apply
+        const hash = window.location.hash?.replace(/^#/, '') || '';
+        const hashParams = new URLSearchParams(hash);
+        const tokensB64 = hashParams.get('tokens');
+        if (tokensB64) {
+            try {
+                const padded = tokensB64 + '=='.slice(0, (4 - (tokensB64.length % 4)) % 4);
+                const jsonStr = atob(padded.replace(/-/g, '+').replace(/_/g, '/'));
+                const data = JSON.parse(jsonStr) as { access?: string; refresh?: string; user?: Record<string, unknown> };
                 const hasAccess = !!data.access;
                 const hasRefresh = !!data.refresh;
                 const hasUser = !!data.user;
-                log('exchange_ok', { hasAccess, hasRefresh, hasUser, userId: (data.user as { id?: number })?.id });
+                log('tokens_from_hash', { hasAccess, hasRefresh, hasUser });
 
                 if (data.access) localStorage.setItem('accessToken', data.access);
                 if (data.refresh) localStorage.setItem('refreshToken', data.refresh);
@@ -131,19 +97,29 @@ const ImpersonatePage: React.FC = () => {
                 const dashboardPath = companyName
                     ? getCompanyRoute(companyName, companyDomain, 'Dashboard')
                     : '/dashboard';
-
                 log('redirect', { dashboardPath, companyName });
                 window.location.replace(dashboardPath);
-            })
-            .catch((err) => {
-                log('error', {
-                    message: err?.message,
-                    name: err?.name,
-                });
+            } catch (e) {
+                log('error', { reason: 'tokens_decode_failed', message: String(e) });
                 setStatus('error');
-                const msg = err?.message || 'Invalid or expired code.';
-                setMessage(msg.trim().replace(/^\.+/, ''));
-            });
+                setMessage('Invalid tokens in URL.');
+            }
+            return;
+        }
+
+        if (!code) {
+            log('error', { reason: 'missing_code' });
+            setStatus('error');
+            setMessage('Missing code parameter.');
+            return;
+        }
+
+        // 2) Code in query: use redirect flow (no fetch = no CORS). Send user to API with redirect_uri; API will 302 back with #tokens=...
+        const apiRoot = getApiRoot();
+        const redirectUri = `${window.location.origin}/impersonate`;
+        const exchangeUrl = `${apiRoot}/auth/impersonate-exchange/?code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
+        log('redirect_to_api', { exchangeUrl, redirectUri });
+        window.location.replace(exchangeUrl);
     }, [setCurrentUser, setIsLoggedIn]);
 
     if (status === 'loading') {

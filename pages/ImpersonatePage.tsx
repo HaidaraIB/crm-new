@@ -78,6 +78,7 @@ const ImpersonatePage: React.FC = () => {
                 }
                 localStorage.setItem('isLoggedIn', 'true');
                 setIsLoggedIn(true);
+                try { sessionStorage.setItem('impersonate_just_done', '1'); } catch { /* ignore */ }
                 setStatus('success');
                 const companyName = user?.company_name;
                 const companyDomain = user?.company_name;

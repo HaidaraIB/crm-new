@@ -747,6 +747,25 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [alertVariant, setAlertVariant] = useState<'info' | 'warning' | 'error'>('info');
 
 
+  // Rehydrate from localStorage once on mount (e.g. after impersonate redirect) so we don't flash login
+  useEffect(() => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('accessToken') : null;
+    const storedUser = typeof window !== 'undefined' ? localStorage.getItem('currentUser') : null;
+    if (token && storedUser && (!isLoggedIn || !currentUser)) {
+      try {
+        const parsed = JSON.parse(storedUser);
+        if (parsed && (parsed.id || parsed.email)) {
+          parsed.role = normalizeRole(parsed.role);
+          setCurrentUserState(parsed);
+          setIsLoggedInState(true);
+          setDataLoaded(true);
+        }
+      } catch {
+        // ignore parse error
+      }
+    }
+  }, []); // run once on mount
+
   useEffect(() => {
     const storedTheme = localStorage.getItem('theme') as Theme;
     if (storedTheme) setThemeState(storedTheme);
@@ -769,6 +788,25 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       }
       if (!isLoggedIn || !localStorage.getItem('accessToken')) {
         return;
+      }
+
+      // Right after impersonate redirect we have valid user in localStorage; use it and skip API to avoid 401/refresh race
+      try {
+        if (typeof window !== 'undefined' && sessionStorage.getItem('impersonate_just_done') === '1') {
+          sessionStorage.removeItem('impersonate_just_done');
+          const raw = localStorage.getItem('currentUser');
+          if (raw) {
+            const u = JSON.parse(raw);
+            if (u && (u.id || u.email)) {
+              u.role = normalizeRole(u.role);
+              setCurrentUserState(u);
+              setDataLoaded(true);
+              return;
+            }
+          }
+        }
+      } catch {
+        // fall through to API
       }
 
       try {
@@ -844,6 +882,24 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         setDataLoaded(true);
       } catch (error) {
         console.error('Error checking user authentication:', error);
+        // After impersonate we have valid tokens + user in localStorage; don't clear on first API failure (e.g. network/CORS)
+        const hasStored = localStorage.getItem('accessToken') && localStorage.getItem('currentUser');
+        if (hasStored) {
+          try {
+            const stored = localStorage.getItem('currentUser');
+            if (stored) {
+              const u = JSON.parse(stored);
+              if (u && (u.id || u.email)) {
+                u.role = normalizeRole(u.role);
+                setCurrentUserState(u);
+                setDataLoaded(true);
+                return;
+              }
+            }
+          } catch {
+            // fall through to clear
+          }
+        }
         setIsLoggedIn(false);
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');

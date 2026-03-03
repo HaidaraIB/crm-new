@@ -761,6 +761,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
     // Check user authentication and subscription status
     const checkUserAuth = async () => {
+      // Don't run auth/subscription check on impersonate page (we're exchanging code for a new session)
+      const path = typeof window !== 'undefined' ? window.location.pathname : '';
+      if (path === '/impersonate' || path.startsWith('/impersonate')) {
+        return;
+      }
       if (!isLoggedIn || !localStorage.getItem('accessToken')) {
         return;
       }

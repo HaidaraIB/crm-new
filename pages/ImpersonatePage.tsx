@@ -24,13 +24,9 @@ const ImpersonatePage: React.FC = () => {
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code')?.trim();
 
-        // Clear previous company session immediately so we never flash old content (e.g. company A when switching to B)
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
-        localStorage.removeItem('currentUser');
-        localStorage.removeItem('isLoggedIn');
-        setCurrentUser(null);
-        setIsLoggedIn(false);
+        // Do NOT clear session here: clearing + setCurrentUser(null)/setIsLoggedIn(false) triggers
+        // logout logic elsewhere (e.g. subscription check or !isLoggedIn redirect) and redirects to /login
+        // before the exchange request completes. We clear and set new session only after we get the new tokens.
 
         if (!code) {
             setStatus('error');
@@ -55,6 +51,7 @@ const ImpersonatePage: React.FC = () => {
                 return res.json();
             })
             .then((data) => {
+                // Replace previous session only after we have the new tokens (avoids triggering logout redirect)
                 if (data.access) localStorage.setItem('accessToken', data.access);
                 if (data.refresh) localStorage.setItem('refreshToken', data.refresh);
                 const user = data.user;
@@ -68,7 +65,6 @@ const ImpersonatePage: React.FC = () => {
                         : null;
                     const userForState = { ...user, company };
                     setCurrentUser(userForState);
-                    // Persist to localStorage so after full-page redirect the app restores session (isLoggedIn + currentUser)
                     localStorage.setItem('currentUser', JSON.stringify(userForState));
                 }
                 localStorage.setItem('isLoggedIn', 'true');

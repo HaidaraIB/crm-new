@@ -85,12 +85,10 @@ const ImpersonatePage: React.FC = () => {
                 const dashboardPath = companyName
                     ? getCompanyRoute(companyName, companyDomain, 'Dashboard')
                     : '/dashboard';
-                // Force full document load so URL and context (profile corner) reflect the new company
+                // Redirect immediately (no rAF) so no re-render runs; full URL + cache-bust forces fresh load
                 const sep = dashboardPath.includes('?') ? '&' : '?';
-                const urlWithReload = `${dashboardPath}${sep}_=${Date.now()}`;
-                requestAnimationFrame(() => {
-                    window.location.href = urlWithReload;
-                });
+                const fullUrl = window.location.origin + dashboardPath + sep + '_=' + Date.now();
+                window.location.replace(fullUrl);
             })
             .catch((err) => {
                 if (successHandledRef.current) return;

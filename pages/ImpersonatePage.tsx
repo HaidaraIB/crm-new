@@ -75,7 +75,10 @@ const ImpersonatePage: React.FC = () => {
                 const dashboardPath = companyName
                     ? getCompanyRoute(companyName, companyDomain, 'Dashboard')
                     : '/dashboard';
-                window.location.replace(dashboardPath);
+                // Brief delay so all localStorage writes are committed before full-page navigation
+                requestAnimationFrame(() => {
+                    window.location.replace(dashboardPath);
+                });
             })
             .catch((err) => {
                 setStatus('error');

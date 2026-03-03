@@ -431,10 +431,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     return 'en';
   });
   const [isLoggedIn, setIsLoggedInState] = useState(() => {
-    // Simply load login state from localStorage
+    // Load login state from localStorage; also treat as logged in if accessToken exists
+    // (e.g. after impersonate exchange + redirect, so we don't flash login on full page load)
     const stored = localStorage.getItem('isLoggedIn');
-    
-    return stored === 'true';
+    const hasToken = typeof window !== 'undefined' && !!localStorage.getItem('accessToken');
+    return stored === 'true' || hasToken;
   });
   const [dataLoaded, setDataLoaded] = useState(false); // لتتبع ما إذا تم تحميل البيانات بالفعل
   const [currentPage, setCurrentPage] = useState<Page>('Dashboard');

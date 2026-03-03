@@ -5,11 +5,24 @@ import { getCompanyRoute } from '../utils/routing';
 const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 const API_KEY = import.meta.env.VITE_API_KEY || '';
 
-/** Diagnostic logs – open DevTools (F12) → Console, filter by [Impersonate], then copy/paste to share */
-const log = (label: string, detail?: Record<string, unknown>) => {
+const IMPERSONATE_DEBUG_KEY = 'impersonate_debug_log';
+const MAX_LOG_CHARS = 30000;
+
+/** Persist log to localStorage so it survives redirect to login; also log to console */
+function persistLog(label: string, detail?: Record<string, unknown>) {
     const payload = detail ? { ...detail } : {};
+    const line = `[${new Date().toISOString()}] [Impersonate] ${label} ${Object.keys(payload).length ? JSON.stringify(payload) : ''}\n`;
     console.log('[Impersonate]', label, Object.keys(payload).length ? payload : '');
-};
+    try {
+        const prev = localStorage.getItem(IMPERSONATE_DEBUG_KEY) || '';
+        const next = (prev + line).slice(-MAX_LOG_CHARS);
+        localStorage.setItem(IMPERSONATE_DEBUG_KEY, next);
+    } catch {
+        // ignore quota or other errors
+    }
+}
+
+const log = persistLog;
 
 /** Build API root: ensure it ends with /api so path is correct on prod (e.g. VITE_API_URL might be domain only) */
 const getApiRoot = () => {
@@ -30,6 +43,9 @@ const ImpersonatePage: React.FC = () => {
         const fullUrl = window.location.href;
         const params = new URLSearchParams(window.location.search);
         const code = params.get('code')?.trim();
+
+        // Start fresh log for this run (survives redirect so you can copy from login page)
+        localStorage.setItem(IMPERSONATE_DEBUG_KEY, '');
 
         log('page_load', {
             fullUrl,

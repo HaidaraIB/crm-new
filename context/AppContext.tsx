@@ -6,7 +6,7 @@ import { translations } from '../constants';
 import { formatStageName, getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
-import { getCurrentUserAPI } from '../services/api';
+import { getCurrentUserAPI, checkPaymentStatusAPI } from '../services/api';
 
 // --- Helper Functions ---
 /**
@@ -822,7 +822,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         
         if (subscriptionId) {
           try {
-            const { checkPaymentStatusAPI } = await import('../services/api');
             subscriptionStatus = await checkPaymentStatusAPI(subscriptionId);
             hasActiveSubscription = subscriptionStatus.is_truly_active === true;
             
@@ -940,7 +939,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     const subscriptionId = currentUser.company.subscription.id;
     const pollSubscriptionStatus = async () => {
       try {
-        const { checkPaymentStatusAPI } = await import('../services/api');
         const status = await checkPaymentStatusAPI(subscriptionId);
         
         // Use ref to get latest currentUser without causing dependency issues

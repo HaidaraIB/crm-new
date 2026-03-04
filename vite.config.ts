@@ -18,6 +18,23 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
-      }
+      },
+      build: {
+        rollupOptions: {
+          output: {
+            manualChunks(id) {
+              if (id.includes('node_modules')) {
+                if (id.includes('react-dom') || id.includes('/react/')) return 'vendor-react';
+                if (id.includes('@tanstack/react-query')) return 'vendor-query';
+                if (id.includes('recharts')) return 'vendor-ui';
+              }
+            },
+            chunkFileNames: 'assets/[name]-[hash].js',
+            entryFileNames: 'assets/[name]-[hash].js',
+            assetFileNames: 'assets/[name]-[hash][extname]',
+          },
+        },
+        chunkSizeWarningLimit: 600,
+      },
     };
 });

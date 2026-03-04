@@ -245,6 +245,7 @@ nano /var/www/crm-project/update.sh
 cd /var/www/crm-project
 git pull origin main
 npm install
+npm audit fix --no-fund --no-audit 2>/dev/null || true
 npm run build
 sudo systemctl reload nginx
 echo "تم تحديث المشروع بنجاح"

@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector } from '../components/index';
-import { getPublicPlansAPI, createPaymentSessionAPI } from '../services/api';
+import { getPublicPlansAPI, createPaymentSessionAPI, getCurrentUserAPI } from '../services/api';
 
 type PublicPlan = {
     id: number;
@@ -41,7 +41,6 @@ export const ChangePlanPage = () => {
                 // Try to get subscription ID from API
                 const loadSubscriptionId = async () => {
                     try {
-                        const { getCurrentUserAPI } = await import('../services/api');
                         const userData = await getCurrentUserAPI();
                         if (userData?.company?.subscription?.id) {
                             setSubscriptionId(userData.company.subscription.id.toString());

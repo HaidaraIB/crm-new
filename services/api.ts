@@ -1961,12 +1961,13 @@ export const syncMetaPagesAPI = async (accountId: number) => {
 
 /**
  * POST /api/integrations/whatsapp/send/
- * Body: { to: string, message: string, phone_number_id?: string }
+ * Body: { to: string, message: string, phone_number_id?: string, client_id?: number }
  */
 export const sendWhatsAppMessageAPI = async (data: {
   to: string;
   message: string;
   phone_number_id?: string;
+  client_id?: number;
 }) => {
   return apiRequest<any>('/integrations/whatsapp/send/', {
     method: 'POST',
@@ -1975,8 +1976,44 @@ export const sendWhatsAppMessageAPI = async (data: {
       message: data.message,
       text: data.message,
       ...(data.phone_number_id && { phone_number_id: data.phone_number_id }),
+      ...(data.client_id != null && { client_id: data.client_id }),
     }),
   });
+};
+
+export interface LeadWhatsAppMessageResponse {
+  id: number;
+  client: number;
+  phone_number: string;
+  body: string;
+  direction: 'inbound' | 'outbound';
+  whatsapp_message_id: string | null;
+  created_by: number | null;
+  created_by_username: string;
+  created_at: string;
+}
+
+/**
+ * GET /api/integrations/whatsapp/messages/?client=:clientId
+ */
+export const getLeadWhatsAppMessagesAPI = async (
+  clientId: number
+): Promise<LeadWhatsAppMessageResponse[]> => {
+  const res = await apiRequest<
+    { results?: LeadWhatsAppMessageResponse[] } | LeadWhatsAppMessageResponse[]
+  >(`/integrations/whatsapp/messages/?client=${clientId}`);
+  if (Array.isArray(res)) return res;
+  return res.results ?? [];
+};
+
+/**
+ * GET /api/integrations/whatsapp/conversations/
+ * قائمة العملاء الذين لديهم محادثات واتساب (مركز المراسلات)
+ */
+export const getWhatsAppConversationsAPI = async (): Promise<
+  Array<{ id: number; name: string; phone_number: string; company_name: string }>
+> => {
+  return apiRequest<any[]>(`/integrations/whatsapp/conversations/`);
 };
 
 export interface MessageTemplateType {

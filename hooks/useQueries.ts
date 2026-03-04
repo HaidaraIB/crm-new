@@ -14,7 +14,7 @@ import {
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI,
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, testConnectionAPI,
-  getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI,
+  getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
   createLeadAPI, updateLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   createDealAPI, updateDealAPI, deleteDealAPI,
@@ -68,6 +68,8 @@ export const queryKeys = {
   callMethods: ['callMethods'] as const,
   connectedAccounts: (platform?: string) => ['connectedAccounts', platform] as const,
   leadSMSMessages: (leadId?: number) => ['leadSMSMessages', leadId] as const,
+  leadWhatsAppMessages: (leadId?: number) => ['leadWhatsAppMessages', leadId] as const,
+  whatsAppConversations: ['whatsAppConversations'] as const,
 };
 
 // ==================== Query Hooks ====================
@@ -380,6 +382,30 @@ export const useLeadSMSMessages = (
     queryKey: queryKeys.leadSMSMessages(leadId),
     queryFn: () => getLeadSMSMessagesAPI(leadId!),
     enabled: !!leadId,
+    staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+export const useLeadWhatsAppMessages = (
+  leadId: number | undefined,
+  options?: Omit<UseQueryOptions<any[], Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.leadWhatsAppMessages(leadId),
+    queryFn: () => getLeadWhatsAppMessagesAPI(leadId!),
+    enabled: !!leadId,
+    staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+export const useWhatsAppConversations = (
+  options?: Omit<UseQueryOptions<any[], Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.whatsAppConversations,
+    queryFn: getWhatsAppConversationsAPI,
     staleTime: 1 * 60 * 1000, // 1 minute
     ...options,
   });

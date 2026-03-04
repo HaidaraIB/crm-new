@@ -7,6 +7,7 @@ import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, W
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
 import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI } from '../services/api';
+import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
@@ -284,9 +285,27 @@ export const IntegrationsPage = () => {
     const [editingTemplate, setEditingTemplate] = useState<MessageTemplateType | null>(null);
     const [isEditTemplateOpen, setIsEditTemplateOpen] = useState(false);
     const [isStartNewConversationOpen, setIsStartNewConversationOpen] = useState(false);
-    const [conversations, setConversations] = useState<Array<{ client: any }>>([]);
+    const [extraConversations, setExtraConversations] = useState<Array<{ client: any }>>([]);
     const [selectedChatClient, setSelectedChatClient] = useState<any>(null);
-    const [chatMessages, setChatMessages] = useState<Record<number, Array<{ body: string; direction: 'in' | 'out'; time: string }>>>({});
+    const [optimisticMessages, setOptimisticMessages] = useState<Array<{ body: string; direction: 'in' | 'out'; time: string }>>([]);
+
+    const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations();
+    const { data: leadWhatsAppMessages = [], refetch: refetchLeadWhatsApp } = useLeadWhatsAppMessages(
+        currentPage === 'WhatsApp' && selectedChatClient?.id ? selectedChatClient.id : undefined
+    );
+
+    const conversations = useMemo(() => {
+        const fromApi = (conversationsList as any[]).map((c: any) => ({
+            client: {
+                id: c.id,
+                name: c.name,
+                phone_number: c.phone_number || '',
+                company_name: c.company_name || c.name,
+            },
+        }));
+        const extra = extraConversations.filter((e) => !fromApi.some((a: any) => a.client.id === e.client.id));
+        return [...fromApi, ...extra];
+    }, [conversationsList, extraConversations]);
     const [messageInput, setMessageInput] = useState('');
     const [infoAlert, setInfoAlert] = useState<{ title: string; message: string } | null>(null);
 
@@ -613,12 +632,12 @@ export const IntegrationsPage = () => {
     // WhatsApp: Messaging Center (Chats | Template Management | WhatsApp Accounts)
     if (currentPage === 'WhatsApp') {
         const addConversation = (client: any) => {
-            setConversations((prev) => {
-                const exists = prev.some((c) => c.client.id === client.id);
-                if (exists) return prev;
+            setExtraConversations((prev) => {
+                if (prev.some((c) => c.client.id === client.id)) return prev;
                 return [{ client }, ...prev];
             });
             setSelectedChatClient(client);
+            setOptimisticMessages([]);
         };
 
         const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '';
@@ -630,15 +649,16 @@ export const IntegrationsPage = () => {
                 showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
                 return;
             }
+            const body = messageInput.trim();
+            setMessageInput('');
+            setOptimisticMessages((prev) => [...prev, { body, direction: 'out' as const, time: new Date().toLocaleTimeString() }]);
             try {
-                await sendWhatsAppMessageAPI({ to, message: messageInput.trim() });
-                const id = selectedChatClient.id;
-                setChatMessages((prev) => ({
-                    ...prev,
-                    [id]: [...(prev[id] || []), { body: messageInput.trim(), direction: 'out', time: new Date().toLocaleTimeString() }],
-                }));
-                setMessageInput('');
+                await sendWhatsAppMessageAPI({ to, message: body, client_id: selectedChatClient.id });
+                refetchLeadWhatsApp();
+                setOptimisticMessages([]);
             } catch (e: any) {
+                setOptimisticMessages((prev) => prev.slice(0, -1));
+                setMessageInput(body);
                 showAlert(e?.message || t('failedToSendSms'), 'error');
             }
         };
@@ -758,7 +778,7 @@ export const IntegrationsPage = () => {
                                         <li key={client.id}>
                                             <button
                                                 type="button"
-                                                onClick={() => setSelectedChatClient(client)}
+                                                onClick={() => { setSelectedChatClient(client); setOptimisticMessages([]); }}
                                                 className={`w-full flex items-center gap-3 p-3 text-start ${selectedChatClient?.id === client.id ? 'bg-primary/10 dark:bg-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
                                             >
                                                 <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold flex-shrink-0">
@@ -790,7 +810,16 @@ export const IntegrationsPage = () => {
                                         </div>
                                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                                             <p className="text-center text-xs text-gray-400 py-2">{t('today')}</p>
-                                            {(chatMessages[selectedChatClient.id] || []).map((msg, i) => (
+                                            {[
+                                                ...(leadWhatsAppMessages as any[])
+                                                    .map((wa: any) => ({
+                                                        body: wa.body,
+                                                        direction: (wa.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
+                                                        time: new Date(wa.created_at).toLocaleTimeString(),
+                                                    }))
+                                                    .reverse(),
+                                                ...optimisticMessages,
+                                            ].map((msg, i) => (
                                                 <div
                                                     key={i}
                                                     className={`max-w-[85%] rounded-lg px-3 py-2 ${msg.direction === 'out' ? 'ms-auto bg-primary text-white' : 'me-auto bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'}`}

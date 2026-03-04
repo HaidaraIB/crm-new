@@ -890,7 +890,6 @@ export const translations = {
     was: "was",
     assignedToAction: "Assigned to",
     // AssignLeadModal
-    leadsCount: "Leads Count",
     selectEmployee: "Select Employee",
     // FilterDrawer
     filterLeads: "Filter Leads",
@@ -2215,7 +2214,6 @@ export const translations = {
     was: "كان",
     assignedToAction: "تم الإسناد إلى",
     // AssignLeadModal
-    leadsCount: "عدد العملاء",
     selectEmployee: "اختر موظف",
     // FilterDrawer
     filterLeads: "تصفية العملاء",

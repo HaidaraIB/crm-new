@@ -102,7 +102,8 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
             handleClose();
         } catch (e: any) {
             const fallback = stripAnsi(e?.message || '') || t('failedToSendSms');
-            setError(e?.data?.error || fallback);
+            const errKey = e?.data?.error_key;
+            setError((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || fallback));
         } finally {
             setSending(false);
         }

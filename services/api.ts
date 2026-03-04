@@ -2024,6 +2024,8 @@ export interface MessageTemplateType {
   content: string;
   category: string;
   category_display: string;
+  meta_template_id?: string | null;
+  meta_status?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -2072,6 +2074,31 @@ export const updateMessageTemplateAPI = async (
  */
 export const deleteMessageTemplateAPI = async (id: number) => {
   return apiRequest<void>(`/integrations/templates/${id}/`, { method: 'DELETE' });
+};
+
+/**
+ * إرسال قالب واتساب إلى Meta للمراجعة (يظهر في حساب واتساب عند ميتا)
+ * POST /api/integrations/templates/:id/submit-to-whatsapp/
+ */
+export const submitMessageTemplateToWhatsAppAPI = async (
+  templateId: number,
+  options?: { language?: string }
+): Promise<{ meta_template_id?: string; status?: string; message?: string }> => {
+  return apiRequest(`/integrations/templates/${templateId}/submit-to-whatsapp/`, {
+    method: 'POST',
+    body: JSON.stringify(options || {}),
+  });
+};
+
+/**
+ * جلب حد رسائل واتساب (التير) وجودة الحساب من Meta (٢٥٠/١٠٠٠/... رسالة جماعية يومياً)
+ * GET /api/integrations/whatsapp/limits/
+ */
+export const getWhatsAppLimitsAPI = async (): Promise<{
+  messaging_limit_tier?: string;
+  quality_rating?: string;
+}> => {
+  return apiRequest('/integrations/whatsapp/limits/');
 };
 
 /**

@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI, getLeadsAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI } from '../services/api';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
@@ -24,6 +24,8 @@ type PlatformDetails = {
     accounts: Account[];
     dataKey: keyof ReturnType<typeof useAppContext>['connectedAccounts'];
 };
+
+const templateCategoryKey: Record<string, string> = { auth: 'categoryAuth', marketing: 'categoryMarketing', utility: 'categoryUtility' };
 
 const platformConfig: Record<string, { name: string, icon: React.FC<React.SVGProps<SVGSVGElement>>, dataKey: keyof ReturnType<typeof useAppContext>['connectedAccounts'] }> = {
     'Meta': { name: 'Meta', icon: FacebookIcon, dataKey: 'facebook' },
@@ -283,6 +285,7 @@ export const IntegrationsPage = () => {
         } catch (_) {}
     };
     const [editingTemplate, setEditingTemplate] = useState<MessageTemplateType | null>(null);
+    const [submittingTemplateId, setSubmittingTemplateId] = useState<number | null>(null);
     const [isEditTemplateOpen, setIsEditTemplateOpen] = useState(false);
     const [isStartNewConversationOpen, setIsStartNewConversationOpen] = useState(false);
     const [extraConversations, setExtraConversations] = useState<Array<{ client: any }>>([]);
@@ -313,6 +316,7 @@ export const IntegrationsPage = () => {
     const [campaignLeadSearch, setCampaignLeadSearch] = useState('');
     const [campaignLeadSearchApplied, setCampaignLeadSearchApplied] = useState('');
     const [campaignSelectedIds, setCampaignSelectedIds] = useState<Set<number>>(new Set());
+    const [campaignChannel, setCampaignChannel] = useState<'whatsapp' | 'sms'>('whatsapp');
     const [campaignMessage, setCampaignMessage] = useState('');
     const [campaignSending, setCampaignSending] = useState(false);
     const [campaignProgress, setCampaignProgress] = useState<{ sent: number; failed: number } | null>(null);
@@ -327,6 +331,11 @@ export const IntegrationsPage = () => {
         queryKey: ['campaignLeads', campaignLeadSearchApplied],
         queryFn: () => getLeadsAPI({ search: campaignLeadSearchApplied.trim() || undefined }),
         enabled: currentPage === 'WhatsApp' && whatsAppTab === 'campaigns',
+    });
+    const { data: whatsAppLimits } = useQuery({
+        queryKey: ['whatsAppLimits'],
+        queryFn: getWhatsAppLimitsAPI,
+        enabled: currentPage === 'WhatsApp' && whatsAppTab === 'campaigns' && campaignChannel === 'whatsapp',
     });
     const campaignLeads = useMemo(() => {
         const res = campaignLeadsData;
@@ -920,7 +929,7 @@ export const IntegrationsPage = () => {
                                         <span className={`text-xs px-2 py-0.5 rounded ${tpl.channel_type === 'sms' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'}`}>
                                             {tpl.channel_type === 'sms' ? 'SMS' : 'WHATSAPP'}
                                         </span>
-                                        <div className="flex items-center gap-1">
+                                        <div className="flex items-center gap-2">
                                             <button
                                                 type="button"
                                                 onClick={() => {
@@ -956,12 +965,41 @@ export const IntegrationsPage = () => {
                                         </div>
                                     </div>
                                     <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{tpl.name}</h3>
+                                    {(tpl as any).meta_status && (
+                                        <span className={`text-xs px-2 py-0.5 rounded mb-2 inline-block ${(tpl as any).meta_status === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : (tpl as any).meta_status === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'}`}>
+                                            {(tpl as any).meta_status === 'APPROVED' ? (t('templateApproved') || 'Approved') : (tpl as any).meta_status === 'REJECTED' ? (t('templateRejected') || 'Rejected') : (t('templatePending') || 'Pending review')}
+                                        </span>
+                                    )}
                                     <p className="text-sm text-gray-600 dark:text-gray-400 flex-1 line-clamp-3 mb-2">{tpl.content}</p>
-                                    <div className="flex justify-between items-center">
-                                        <Button variant="secondary" className="text-sm py-1.5 px-3" onClick={() => handleCopyTemplate(tpl.content)}>
-                                            {t('copyTemplate')}
-                                        </Button>
-                                        <span className="text-xs text-gray-400">{tpl.category_display || tpl.category}</span>
+                                    <div className="flex flex-wrap gap-2 items-center justify-between">
+                                        <div className="flex gap-1">
+                                            <Button variant="secondary" className="text-sm py-1.5 px-3" onClick={() => handleCopyTemplate(tpl.content)}>
+                                                {t('copyTemplate')}
+                                            </Button>
+                                            {((tpl.channel_type || '').toLowerCase() === 'whatsapp' || (tpl.channel_type || '').toLowerCase() === 'whatsapp_api') && (
+                                                <Button
+                                                    variant="secondary"
+                                                    className="text-sm py-1.5 px-3 text-green-600 dark:text-green-400 border-green-300 dark:border-green-600"
+                                                    disabled={submittingTemplateId === tpl.id}
+                                                    onClick={async () => {
+                                                        setSubmittingTemplateId(tpl.id);
+                                                        try {
+                                                            await submitMessageTemplateToWhatsAppAPI(tpl.id);
+                                                            showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info');
+                                                            refetchTemplates();
+                                                        } catch (e: any) {
+                                                            const errKey = e?.data?.error_key;
+                                                            showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')), 'error');
+                                                        } finally {
+                                                            setSubmittingTemplateId(null);
+                                                        }
+                                                    }}
+                                                >
+                                                    {submittingTemplateId === tpl.id ? <Loader variant="primary" className="w-4 h-4" /> : (t('submitToWhatsApp') || 'Submit to WhatsApp')}
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <span className="text-xs text-gray-400">{templateCategoryKey[(tpl.category || '').toLowerCase()] ? t(templateCategoryKey[(tpl.category || '').toLowerCase()]) : (tpl.category_display || tpl.category)}</span>
                                     </div>
                                 </Card>
                                 </React.Fragment>
@@ -1082,17 +1120,42 @@ export const IntegrationsPage = () => {
                                     </div>
                                 </div>
                                 <div className="flex flex-col">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia') || 'Send via'}</label>
+                                    <div className="flex gap-2 mb-3">
+                                        <button
+                                            type="button"
+                                            onClick={() => setCampaignChannel('whatsapp')}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                                        >
+                                            <WhatsappIcon className="w-4 h-4" />
+                                            {t('campaignViaWhatsApp') || 'WhatsApp'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCampaignChannel('sms')}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                                        >
+                                            <SmsIcon className="w-4 h-4" />
+                                            {t('campaignViaSms') || 'SMS'}
+                                        </button>
+                                    </div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('quickTemplates')}</label>
                                     {(() => {
-                                        const whatsappTemplates = (templates as any[]).filter((tpl: any) => tpl.channel_type !== 'sms');
-                                        if (whatsappTemplates.length === 0) {
+                                        const isSms = campaignChannel === 'sms';
+                                        const campaignTemplates = (templates as any[]).filter((tpl: any) => {
+                                            const ch = (tpl.channel_type || '').toLowerCase();
+                                            return isSms ? ch === 'sms' : (ch === 'whatsapp' || ch === 'whatsapp_api');
+                                        });
+                                        if (campaignTemplates.length === 0) {
                                             return (
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{t('noWhatsAppTemplatesYet')}</p>
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
+                                                    {isSms ? (t('noSmsTemplatesYet') || 'No SMS templates yet. Create one in Template Management.') : t('noWhatsAppTemplatesYet')}
+                                                </p>
                                             );
                                         }
                                         return (
                                             <div className="flex flex-wrap gap-2 mb-3">
-                                                {whatsappTemplates.map((tpl: any) => (
+                                                {campaignTemplates.map((tpl: any) => (
                                                     <button
                                                         key={tpl.id}
                                                         type="button"
@@ -1116,6 +1179,13 @@ export const IntegrationsPage = () => {
                                         placeholder={t('messageContent')}
                                         className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y"
                                     />
+                                    {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && (
+                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                                            {t('whatsAppMessagingLimit') || 'WhatsApp limit'}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier}
+                                            {t('conversationsPerDay') || ' conversations/day'}
+                                            {whatsAppLimits.quality_rating && ` · ${t('quality') || 'Quality'}: ${whatsAppLimits.quality_rating}`}
+                                        </p>
+                                    )}
                                     {campaignProgress !== null && (
                                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                                             {t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}
@@ -1140,11 +1210,16 @@ export const IntegrationsPage = () => {
                                             let sent = 0;
                                             let failed = 0;
                                             const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '';
+                                            const isSmsCampaign = campaignChannel === 'sms';
                                             for (const lead of withPhone) {
                                                 try {
-                                                    const to = getClientPhone(lead);
+                                                    const phone = getClientPhone(lead);
                                                     const body = replaceTemplatePlaceholders(message, lead);
-                                                    await sendWhatsAppMessageAPI({ to, message: body, client_id: lead.id });
+                                                    if (isSmsCampaign) {
+                                                        await sendLeadSMSAPI({ lead_id: lead.id, phone_number: lead.phone_number || lead.phone || '', body });
+                                                    } else {
+                                                        await sendWhatsAppMessageAPI({ to: phone, message: body, client_id: lead.id });
+                                                    }
                                                     sent++;
                                                 } catch (_) {
                                                     failed++;

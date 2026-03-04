@@ -133,15 +133,15 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
           />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('status')} / Category</label>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('category')}</label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
             className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
           >
-            <option value="auth">{t('categoryAuth') || 'Auth'}</option>
-            <option value="marketing">{t('categoryMarketing') || 'Marketing'}</option>
-            <option value="utility">{t('categoryUtility') || 'Utility'}</option>
+            <option value="auth">{t('categoryAuth')}</option>
+            <option value="marketing">{t('categoryMarketing')}</option>
+            <option value="utility">{t('categoryUtility')}</option>
           </select>
         </div>
         {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}

@@ -136,6 +136,7 @@ export const translations = {
     dashboardSectionToday: "Today",
     dashboardSectionPipeline: "Pipeline",
     dashboardSectionOverview: "Overview",
+    leadsCount: "Leads Count",
     // Leads
     filter: "Filter",
     addLead: "Add Lead",
@@ -1497,6 +1498,7 @@ export const translations = {
     dashboardSectionToday: "اليوم",
     dashboardSectionPipeline: "خط الأنابيب",
     dashboardSectionOverview: "نظرة عامة",
+    leadsCount: "عدد العملاء",
     // Leads
     filter: "تصفية",
     addLead: "إضافة عميل",

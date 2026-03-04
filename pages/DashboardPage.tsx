@@ -460,6 +460,13 @@ export const DashboardPage = () => {
     }, [t]);
     const todayDateStr = useMemo(() => new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), [language]);
 
+    const isDark = theme === 'dark';
+    const tooltipContentStyle = isDark
+      ? { backgroundColor: 'rgba(31, 41, 55, 0.95)', border: 'none', borderRadius: '8px', padding: '12px', color: '#f3f4f6' as const, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
+      : { backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px', color: '#111827' as const, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' };
+    const tooltipLabelStyle = isDark ? { color: '#9ca3af', marginBottom: '4px' } : { color: '#6b7280', marginBottom: '4px' };
+    const tooltipItemStyle = isDark ? { color: '#f3f4f6' } : { color: '#111827' };
+
     return (
         <PageWrapper title={t('dashboard')}>
             {/* Welcome & Quick Actions */}
@@ -628,18 +635,13 @@ export const DashboardPage = () => {
                                          axisLine={{ stroke: theme === 'dark' ? '#4b5563' : '#e5e7eb' }}
                                      />
                                      <Tooltip
-                                         contentStyle={{
-                                             backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                                             border: 'none',
-                                             borderRadius: '8px',
-                                             padding: '12px',
-                                             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                         }}
-                                         labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
-                                         itemStyle={{ color: '#fff' }}
+                                         contentStyle={tooltipContentStyle}
+                                         labelStyle={tooltipLabelStyle}
+                                         itemStyle={tooltipItemStyle}
                                      />
                                      <Area 
                                          type="monotone" 
+                                         name={t('leadsCount')}
                                          dataKey="Leads Count" 
                                          stroke="#3b82f6" 
                                          strokeWidth={3}
@@ -685,15 +687,9 @@ export const DashboardPage = () => {
                                   ))}
                                 </Pie>
                                 <Tooltip 
-                                  contentStyle={{
-                                      backgroundColor: 'rgba(17, 24, 39, 0.95)',
-                                      border: 'none',
-                                      borderRadius: '8px',
-                                      padding: '12px',
-                                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-                                  }}
-                                  labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
-                                  itemStyle={{ color: '#fff' }}
+                                  contentStyle={tooltipContentStyle}
+                                  labelStyle={tooltipLabelStyle}
+                                  itemStyle={tooltipItemStyle}
                                 />
                               </PieChart>
                             </ResponsiveContainer>

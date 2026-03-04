@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, deleteMessageTemplateAPI, getLeadsAPI } from '../services/api';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
@@ -14,7 +14,7 @@ import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
-import { FileTextIcon, SearchIcon, EditIcon } from '../components/icons';
+import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components/icons';
 
 type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
 
@@ -268,15 +268,15 @@ export const IntegrationsPage = () => {
     });
 
     // WhatsApp Messaging Center state (hooks at top level); persist tab in localStorage (employees cannot see 'accounts')
-    const [whatsAppTab, setWhatsAppTab] = useState<'chats' | 'templates' | 'accounts'>(() => {
+    const [whatsAppTab, setWhatsAppTab] = useState<'chats' | 'templates' | 'accounts' | 'campaigns'>(() => {
         try {
             const s = localStorage.getItem('whatsapp_messaging_tab');
-            if (s === 'chats' || s === 'templates') return s;
+            if (s === 'chats' || s === 'templates' || s === 'campaigns') return s;
             if (s === 'accounts') return 'accounts'; // will be clamped for employees in WhatsApp block
         } catch (_) {}
         return 'chats';
     });
-    const setWhatsAppTabPersisted = (tab: 'chats' | 'templates' | 'accounts') => {
+    const setWhatsAppTabPersisted = (tab: 'chats' | 'templates' | 'accounts' | 'campaigns') => {
         setWhatsAppTab(tab);
         try {
             localStorage.setItem('whatsapp_messaging_tab', tab);
@@ -309,11 +309,30 @@ export const IntegrationsPage = () => {
     const [messageInput, setMessageInput] = useState('');
     const [infoAlert, setInfoAlert] = useState<{ title: string; message: string } | null>(null);
 
+    // Message campaign state (WhatsApp tab: campaigns)
+    const [campaignLeadSearch, setCampaignLeadSearch] = useState('');
+    const [campaignLeadSearchApplied, setCampaignLeadSearchApplied] = useState('');
+    const [campaignSelectedIds, setCampaignSelectedIds] = useState<Set<number>>(new Set());
+    const [campaignMessage, setCampaignMessage] = useState('');
+    const [campaignSending, setCampaignSending] = useState(false);
+    const [campaignProgress, setCampaignProgress] = useState<{ sent: number; failed: number } | null>(null);
+
     const { data: templates = [], refetch: refetchTemplates } = useQuery({
         queryKey: ['messageTemplates'],
         queryFn: getMessageTemplatesAPI,
         enabled: currentPage === 'WhatsApp',
     });
+
+    const { data: campaignLeadsData, isLoading: campaignLeadsLoading } = useQuery({
+        queryKey: ['campaignLeads', campaignLeadSearchApplied],
+        queryFn: () => getLeadsAPI({ search: campaignLeadSearchApplied.trim() || undefined }),
+        enabled: currentPage === 'WhatsApp' && whatsAppTab === 'campaigns',
+    });
+    const campaignLeads = useMemo(() => {
+        const res = campaignLeadsData;
+        const list = res?.results ?? (Array.isArray(res) ? res : []);
+        return list as any[];
+    }, [campaignLeadsData]);
 
     const accounts = useMemo(() => {
         const accountsData = Array.isArray(accountsResponse) 
@@ -742,6 +761,13 @@ export const IntegrationsPage = () => {
                     >
                         <FileTextIcon className="w-4 h-4" /> {t('templateManagement')}
                     </button>
+                    <button
+                        type="button"
+                        onClick={() => setWhatsAppTabPersisted('campaigns')}
+                        className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'campaigns' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                    >
+                        <MegaphoneIcon className="w-4 h-4" /> {t('messageCampaign')}
+                    </button>
                     {!isEmployee && (
                         <button
                             type="button"
@@ -941,6 +967,204 @@ export const IntegrationsPage = () => {
                                 </React.Fragment>
                             ))}
                         </div>
+                    </div>
+                )}
+
+                {effectiveTab === 'campaigns' && (
+                    <div className="space-y-4">
+                        <div>
+                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+                                <MegaphoneIcon className="w-5 h-5 text-primary" /> {t('messageCampaign')}
+                            </h2>
+                            <p className="text-sm text-gray-500 dark:text-gray-400">{t('messageCampaignDesc')}</p>
+                        </div>
+                        <Card className="overflow-hidden">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+                                <div className="lg:col-span-2 flex flex-col">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('selectLeadsToSend')}</label>
+                                    <div className="mb-1">
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <SearchIcon className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                                <input
+                                                    type="text"
+                                                    value={campaignLeadSearch}
+                                                    onChange={(e) => setCampaignLeadSearch(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && setCampaignLeadSearchApplied(campaignLeadSearch.trim())}
+                                                    placeholder={t('campaignSearchPlaceholder')}
+                                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-9 pe-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                />
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                onClick={() => setCampaignLeadSearchApplied(campaignLeadSearch.trim())}
+                                            >
+                                                {t('search') || 'Search'}
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{t('campaignSearchHint')}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const allIds = new Set(campaignLeads.map((l: any) => l.id));
+                                                setCampaignSelectedIds(allIds);
+                                            }}
+                                            className="text-sm text-primary hover:underline"
+                                        >
+                                            {t('selectAll') || 'Select all'}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => setCampaignSelectedIds(new Set())}
+                                            className="text-sm text-gray-500 hover:underline"
+                                        >
+                                            {t('deselectAll') || 'Deselect all'}
+                                        </button>
+                                    </div>
+                                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
+                                        {campaignLeadsLoading ? (
+                                            <div className="flex justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                                        ) : campaignLeads.length === 0 ? (
+                                            <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">{t('noAccountsConnected') || 'No leads'}</p>
+                                        ) : (
+                                            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                {campaignLeads.map((lead: any) => {
+                                                    const hasPhone = ((lead.phone_number || lead.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0;
+                                                    const checked = campaignSelectedIds.has(lead.id);
+                                                    const leadName = lead.name ?? '';
+                                                    const companyName = lead.company_name ?? '';
+                                                    const displayTitle = leadName || companyName || `#${lead.id}`;
+                                                    const phone = lead.phone_number || lead.phone || '';
+                                                    const statusName = lead.status_name ?? lead.status?.name ?? '';
+                                                    const typeVal = lead.type ?? '';
+                                                    const priorityVal = lead.priority ?? '';
+                                                    const assignedTo = lead.assigned_to_username ?? lead.assigned_to?.username ?? '';
+                                                    return (
+                                                        <li key={lead.id}>
+                                                            <label className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg ${!hasPhone ? 'opacity-60' : ''}`}>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={checked}
+                                                                    disabled={!hasPhone}
+                                                                    onChange={() => {
+                                                                        setCampaignSelectedIds((prev) => {
+                                                                            const next = new Set(prev);
+                                                                            if (next.has(lead.id)) next.delete(lead.id);
+                                                                            else next.add(lead.id);
+                                                                            return next;
+                                                                        });
+                                                                    }}
+                                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary shrink-0"
+                                                                />
+                                                                <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                                                                    {displayTitle.charAt(0)}
+                                                                </div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{displayTitle}</p>
+                                                                    {phone && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{phone}</p>}
+                                                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                                                        {statusName && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{statusName}</span>}
+                                                                        {typeVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{typeVal}</span>}
+                                                                        {priorityVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{priorityVal}</span>}
+                                                                    </div>
+                                                                    {assignedTo && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{t('assignedTo')}: {assignedTo}</p>}
+                                                                    {!hasPhone && <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{t('sms_error_invalid_to_number')}</p>}
+                                                                </div>
+                                                            </label>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('quickTemplates')}</label>
+                                    {(() => {
+                                        const whatsappTemplates = (templates as any[]).filter((tpl: any) => tpl.channel_type !== 'sms');
+                                        if (whatsappTemplates.length === 0) {
+                                            return (
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{t('noWhatsAppTemplatesYet')}</p>
+                                            );
+                                        }
+                                        return (
+                                            <div className="flex flex-wrap gap-2 mb-3">
+                                                {whatsappTemplates.map((tpl: any) => (
+                                                    <button
+                                                        key={tpl.id}
+                                                        type="button"
+                                                        onClick={() => {
+                                                            const content = tpl.content || '';
+                                                            setCampaignMessage((prev) => (prev ? prev + '\n' + content : content));
+                                                        }}
+                                                        className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+                                                    >
+                                                        {tpl.name}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 mt-1">{t('messageContent')}</label>
+                                    <textarea
+                                        value={campaignMessage}
+                                        onChange={(e) => setCampaignMessage(e.target.value)}
+                                        rows={6}
+                                        placeholder={t('messageContent')}
+                                        className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y"
+                                    />
+                                    {campaignProgress !== null && (
+                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                                            {t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}
+                                        </p>
+                                    )}
+                                    <Button
+                                        className="mt-3"
+                                        onClick={async () => {
+                                            const selected = campaignLeads.filter((l: any) => campaignSelectedIds.has(l.id));
+                                            const withPhone = selected.filter((l: any) => ((l.phone_number || l.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0);
+                                            if (withPhone.length === 0) {
+                                                showAlert(t('selectAtLeastOneLead'), 'warning');
+                                                return;
+                                            }
+                                            const message = campaignMessage.trim();
+                                            if (!message) {
+                                                showAlert(t('enterMessageOrSelectTemplate'), 'warning');
+                                                return;
+                                            }
+                                            setCampaignSending(true);
+                                            setCampaignProgress({ sent: 0, failed: 0 });
+                                            let sent = 0;
+                                            let failed = 0;
+                                            const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '';
+                                            for (const lead of withPhone) {
+                                                try {
+                                                    const to = getClientPhone(lead);
+                                                    const body = replaceTemplatePlaceholders(message, lead);
+                                                    await sendWhatsAppMessageAPI({ to, message: body, client_id: lead.id });
+                                                    sent++;
+                                                } catch (_) {
+                                                    failed++;
+                                                }
+                                                setCampaignProgress({ sent, failed });
+                                            }
+                                            setCampaignSending(false);
+                                            showAlert(t('campaignComplete') + ' — ' + t('campaignSentCount').replace('{sent}', String(sent)).replace('{failed}', String(failed)), 'info');
+                                        }}
+                                        disabled={campaignSending}
+                                    >
+                                        {campaignSending ? (
+                                            <><Loader variant="primary" className="w-4 h-4 me-2" /> {t('campaignSending')}</>
+                                        ) : (
+                                            <>{t('sendToSelected')} ({campaignSelectedIds.size})</>
+                                        )}
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
                     </div>
                 )}
 

@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon, ImportLeadsModal, SmsIcon } from '../components/index';
 import { TrashIcon, ChevronDownIcon, FacebookIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
+import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead } from '../types';
 import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks, useAssignUnassignedClients } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -299,8 +300,10 @@ export const LeadsPage = () => {
     
     // Track which lead is being updated
     const [updatingLeadId, setUpdatingLeadId] = useState<number | null>(null);
-    // Send SMS modal: { leadId, phone }
-    const [sendSMSModal, setSendSMSModal] = useState<{ leadId: number; phone: string } | null>(null);
+    // Send SMS modal: { leadId, phone, lead? }
+    const [sendSMSModal, setSendSMSModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
+    // Send WhatsApp modal (opens from table like lead details page)
+    const [sendWhatsAppModal, setSendWhatsAppModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
 
     // Handle status change
     const handleStatusChange = async (leadId: number, newStatusId: number) => {
@@ -796,18 +799,17 @@ export const LeadsPage = () => {
                                                                             >
                                                                                 <PhoneIcon className="w-5 h-5"/>
                                                                             </a>
-                                                                            <a 
-                                                                                href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
-                                                                                target="_blank" 
-                                                                                rel="noopener noreferrer" 
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={`${t('openWhatsApp') || 'Open WhatsApp'} - ${pn.phone_type}`}
-                                                                            >
-                                                                                <WhatsappIcon className="w-5 h-5"/>
-                                                                            </a>
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number })}
+                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: pn.phone_number, lead })}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
+                                                                            >
+                                                                                <WhatsappIcon className="w-5 h-5"/>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number, lead })}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
                                                                                 title={t('sendSms') || 'Send SMS'}
                                                                             >
@@ -830,21 +832,20 @@ export const LeadsPage = () => {
                                                                             </div>
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number })}
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number, lead })}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
                                                                                 title={t('sendSms') || 'Send SMS'}
                                                                             >
                                                                                 <SmsIcon className="w-5 h-5"/>
                                                                             </button>
-                                                                            <a 
-                                                                                href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
-                                                                                target="_blank" 
-                                                                                rel="noopener noreferrer" 
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: pn.phone_number, lead })}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={`${t('openWhatsApp') || 'Open WhatsApp'} - ${pn.phone_type}`}
+                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
                                                                             >
                                                                                 <WhatsappIcon className="w-5 h-5"/>
-                                                                            </a>
+                                                                            </button>
                                                                             <a 
                                                                                 href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
@@ -869,18 +870,17 @@ export const LeadsPage = () => {
                                                                             >
                                                                                 <PhoneIcon className="w-5 h-5"/>
                                                                             </a>
-                                                                            <a 
-                                                                                href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`} 
-                                                                                target="_blank" 
-                                                                                rel="noopener noreferrer" 
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                                            >
-                                                                                <WhatsappIcon className="w-5 h-5"/>
-                                                                            </a>
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone })}
+                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: lead.phone, lead })}
+                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
+                                                                            >
+                                                                                <WhatsappIcon className="w-5 h-5"/>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone, lead })}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
                                                                                 title={t('sendSms') || 'Send SMS'}
                                                                             >
@@ -892,21 +892,20 @@ export const LeadsPage = () => {
                                                                             <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
                                                                             <button
                                                                                 type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone })}
+                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone, lead })}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
                                                                                 title={t('sendSms') || 'Send SMS'}
                                                                             >
                                                                                 <SmsIcon className="w-5 h-5"/>
                                                                             </button>
-                                                                            <a 
-                                                                                href={`https://wa.me/${lead.phone.replace(/[^0-9]/g, '')}`} 
-                                                                                target="_blank" 
-                                                                                rel="noopener noreferrer" 
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: lead.phone, lead })}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('openWhatsApp') || 'Open WhatsApp'}
+                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
                                                                             >
                                                                                 <WhatsappIcon className="w-5 h-5"/>
-                                                                            </a>
+                                                                            </button>
                                                                             <a 
                                                                                 href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
                                                                                 className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
@@ -1136,6 +1135,16 @@ export const LeadsPage = () => {
                 onClose={() => setSendSMSModal(null)}
                 leadId={sendSMSModal.leadId}
                 phoneNumber={sendSMSModal.phone}
+                lead={sendSMSModal.lead}
+            />
+        )}
+        {sendWhatsAppModal && (
+            <SendWhatsAppModal
+                isOpen={true}
+                onClose={() => setSendWhatsAppModal(null)}
+                leadId={sendWhatsAppModal.leadId}
+                phoneNumber={sendWhatsAppModal.phone}
+                lead={sendWhatsAppModal.lead}
             />
         )}
         </>

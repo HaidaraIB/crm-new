@@ -759,15 +759,6 @@ export const ViewLeadPage = () => {
                                                     >
                                                         <PhoneIcon className="w-5 h-5"/>
                                                     </a>
-                                                    <a 
-                                                        href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer" 
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                    >
-                                                        <WhatsappIcon className="w-5 h-5"/>
-                                                    </a>
                                                     <button
                                                         type="button"
                                                         onClick={() => setSendSMSModal({ phone: pn.phone_number })}
@@ -780,7 +771,7 @@ export const ViewLeadPage = () => {
                                                         type="button"
                                                         onClick={() => setSendWhatsAppModal({ phone: pn.phone_number })}
                                                         className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('sendWhatsApp') || 'Send WhatsApp (CRM)'}
+                                                        title={t('sendWhatsApp') || 'Send WhatsApp'}
                                                     >
                                                         <WhatsappIcon className="w-5 h-5"/>
                                                     </button>
@@ -818,19 +809,10 @@ export const ViewLeadPage = () => {
                                                         type="button"
                                                         onClick={() => setSendWhatsAppModal({ phone: pn.phone_number })}
                                                         className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('sendWhatsApp') || 'Send WhatsApp (CRM)'}
+                                                        title={t('sendWhatsApp') || 'Send WhatsApp'}
                                                     >
                                                         <WhatsappIcon className="w-5 h-5"/>
                                                     </button>
-                                                    <a 
-                                                        href={`https://wa.me/${pn.phone_number.replace(/[^0-9]/g, '')}`} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer" 
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                    >
-                                                        <WhatsappIcon className="w-5 h-5"/>
-                                                    </a>
                                                     <a 
                                                         href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
                                                         className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
@@ -859,15 +841,6 @@ export const ViewLeadPage = () => {
                                                         >
                                                             <PhoneIcon className="w-5 h-5"/>
                                                         </a>
-                                                        <a 
-                                                            href={`https://wa.me/${displayLead.phone.replace(/[^0-9]/g, '')}`} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer" 
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                        >
-                                                            <WhatsappIcon className="w-5 h-5"/>
-                                                        </a>
                                                         <button
                                                             type="button"
                                                             onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
@@ -880,7 +853,7 @@ export const ViewLeadPage = () => {
                                                             type="button"
                                                             onClick={() => setSendWhatsAppModal({ phone: displayLead.phone! })}
                                                             className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('sendWhatsApp') || 'Send WhatsApp (CRM)'}
+                                                            title={t('sendWhatsApp') || 'Send WhatsApp'}
                                                         >
                                                             <WhatsappIcon className="w-5 h-5"/>
                                                         </button>
@@ -907,19 +880,10 @@ export const ViewLeadPage = () => {
                                                             type="button"
                                                             onClick={() => setSendWhatsAppModal({ phone: displayLead.phone! })}
                                                             className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('sendWhatsApp') || 'Send WhatsApp (CRM)'}
+                                                            title={t('sendWhatsApp') || 'Send WhatsApp'}
                                                         >
                                                             <WhatsappIcon className="w-5 h-5"/>
                                                         </button>
-                                                        <a 
-                                                            href={`https://wa.me/${displayLead.phone.replace(/[^0-9]/g, '')}`} 
-                                                            target="_blank" 
-                                                            rel="noopener noreferrer" 
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('openWhatsApp') || 'Open WhatsApp'}
-                                                        >
-                                                            <WhatsappIcon className="w-5 h-5"/>
-                                                        </a>
                                                         <a 
                                                             href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
                                                             className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
@@ -1192,6 +1156,7 @@ export const ViewLeadPage = () => {
                     onClose={() => setSendSMSModal(null)}
                     leadId={displayLead.id}
                     phoneNumber={sendSMSModal.phone}
+                    lead={displayLead}
                     onSent={() => refetchLeadSMS()}
                 />
             )}
@@ -1201,6 +1166,7 @@ export const ViewLeadPage = () => {
                     onClose={() => setSendWhatsAppModal(null)}
                     leadId={displayLead.id}
                     phoneNumber={sendWhatsAppModal.phone}
+                    lead={displayLead}
                     onSent={() => { refetchLeadWhatsApp(); refetchLeadSMS(); }}
                 />
             )}

@@ -2,40 +2,40 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Card, PageWrapper, TargetIcon, UsersIcon, Loader, DealIcon, CheckIcon } from '../components/index';
-import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, Area, AreaChart } from 'recharts';
+import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon } from '../components/index';
+import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
-import { useLeads, useDeals, useActivities, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
+import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
 
 export const DashboardPage = () => {
-    const { t, currentUser, language, setSelectedLead, setCurrentPage } = useAppContext();
+    const { t, currentUser, language, setSelectedLead, setCurrentPage, theme } = useAppContext();
     const isAdmin = currentUser?.role === 'Owner';
     const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
     const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
+    const [chartDaysRange, setChartDaysRange] = useState<7 | 14 | 30>(7);
 
     // Fetch all data using React Query
-    const { data: leadsResponse } = useLeads();
+    const { data: leadsResponse, isLoading: isLeadsLoading } = useLeads();
     const leads = leadsResponse?.results || [];
 
-    const { data: dealsResponse } = useDeals();
+    const { data: dealsResponse, isLoading: isDealsLoading } = useDeals();
     const deals = dealsResponse?.results || [];
 
-    const { data: activitiesResponse } = useActivities();
-    const activities = activitiesResponse?.results || [];
-
-    const { data: tasksResponse } = useTasks();
+    const { data: tasksResponse, isLoading: isTasksLoading } = useTasks();
     const todos = tasksResponse?.results || [];
 
-    const { data: usersResponse } = useUsers();
+    const { data: usersResponse, isLoading: isUsersLoading } = useUsers();
     const users = usersResponse?.results || [];
     
-    const { data: clientTasksResponse } = useClientTasks();
+    const { data: clientTasksResponse, isLoading: isClientTasksLoading } = useClientTasks();
     const clientTasks = clientTasksResponse?.results || [];
 
-    const { data: stagesResponse } = useStages();
+    const { data: stagesResponse, isLoading: isStagesLoading } = useStages();
     const stages = Array.isArray(stagesResponse) 
         ? stagesResponse 
         : (stagesResponse?.results || []);
+
+    const isDashboardLoading = isLeadsLoading || isDealsLoading || isTasksLoading || isUsersLoading || isClientTasksLoading || isStagesLoading;
 
     // Check for payment success message on mount
     useEffect(() => {
@@ -128,6 +128,14 @@ export const DashboardPage = () => {
         
         // Completed deals (Won)
         const completedDeals = deals.filter(deal => deal.status === 'Won').length;
+        
+        // Pipeline value (sum of deal.value for open deals, i.e. status !== 'Won')
+        const openDeals = deals.filter(deal => (deal as any).status !== 'Won');
+        const pipelineValueSum = openDeals.reduce((sum, d) => sum + (Number((d as any).value) || 0), 0);
+        const formatPipelineValue = (n: number) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(n);
+        
+        // Win rate (Won / total * 100)
+        const winRate = totalDeals > 0 ? Math.round((completedDeals / totalDeals) * 100) : 0;
         
         // Leads to contact today (leads with reminder_date = today and assigned_to is set)
         const leadsToContactToday = leads.filter(lead => {
@@ -230,6 +238,24 @@ export const DashboardPage = () => {
                 iconBg: 'bg-emerald-100 dark:bg-emerald-900/40',
                 textColor: 'text-emerald-600 dark:text-emerald-400'
             },
+            { 
+                title: t('pipelineValue'), 
+                value: formatPipelineValue(pipelineValueSum), 
+                icon: <DealIcon className="w-6 h-6"/>, 
+                gradient: 'from-indigo-500 to-violet-500',
+                bgColor: 'bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30',
+                iconBg: 'bg-indigo-100 dark:bg-indigo-900/40',
+                textColor: 'text-indigo-600 dark:text-indigo-400'
+            },
+            { 
+                title: t('winRate'), 
+                value: `${winRate}%`, 
+                icon: <CheckIcon className="w-6 h-6"/>, 
+                gradient: 'from-teal-500 to-cyan-500',
+                bgColor: 'bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30',
+                iconBg: 'bg-teal-100 dark:bg-teal-900/40',
+                textColor: 'text-teal-600 dark:text-teal-400'
+            },
         ];
     }, [leads, clientTasks, deals, todos, t]);
     
@@ -262,20 +288,21 @@ export const DashboardPage = () => {
             );
             
             return {
-                name: getStageDisplayLabel(name.toLowerCase().replace(/\s+/g, '_') as any) || name,
+                name: getStageDisplayLabel(name.toLowerCase().replace(/\s+/g, '_') as any, t) || name,
                 value,
                 fill: stageConfig?.color || fallbackColors[index % fallbackColors.length],
             };
         });
-    }, [leads, clientTasks, stages]);
+    }, [leads, clientTasks, stages, t]);
     
-    // Week leads chart data (last 7 days)
+    // Week leads chart data (last 7, 14, or 30 days)
     const weekLeadsData = useMemo(() => {
         const data: { name: string; "Leads Count": number }[] = [];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
+        const days = chartDaysRange;
         
-        for (let i = 6; i >= 0; i--) {
+        for (let i = days - 1; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const locale = language === 'ar' ? 'ar-SA' : 'en-US';
@@ -293,7 +320,7 @@ export const DashboardPage = () => {
         }
         
         return data;
-    }, [leads, language]);
+    }, [leads, language, chartDaysRange]);
     
     // Top users (users with most activities) - only from the same company
     const topUsers = useMemo(() => {
@@ -362,6 +389,7 @@ export const DashboardPage = () => {
                     lead: ct.client_name || lead?.name || '',
                     stage: ct.stage_name || ct.stage || '',
                     notes: ct.notes || '',
+                    leadObj: lead ?? null,
                 };
             });
     }, [clientTasks, users, leads, t]);
@@ -425,8 +453,69 @@ export const DashboardPage = () => {
     }, [leads, clientTasks, users, t]);
 
 
+    const greeting = useMemo(() => {
+        const hour = new Date().getHours();
+        const isMorning = hour >= 5 && hour < 12;
+        return isMorning ? t('goodMorning') : t('goodAfternoon');
+    }, [t]);
+    const todayDateStr = useMemo(() => new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), [language]);
+
     return (
         <PageWrapper title={t('dashboard')}>
+            {/* Welcome & Quick Actions */}
+            {!isDashboardLoading && (
+                <div className="mb-6 space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <div className={`text-sm text-gray-600 dark:text-gray-400 ${language === 'ar' ? 'font-arabic' : ''}`}>
+                            <span className="font-medium text-gray-800 dark:text-gray-200">{greeting}, {currentUser?.name || t('user')}</span>
+                            <span className="mx-2">·</span>
+                            <span>{todayDateStr}</span>
+                        </div>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => { window.history.pushState({}, '', '/leads'); setCurrentPage('All Leads'); }}
+                                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                {t('viewAllLeads')}
+                            </button>
+                            <button
+                                onClick={() => { window.history.pushState({}, '', '/deals'); setCurrentPage('Deals'); }}
+                                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                {t('deals')}
+                            </button>
+                            <button
+                                onClick={() => { window.history.pushState({}, '', '/todos'); setCurrentPage('Todos'); }}
+                                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                            >
+                                {t('todos')}
+                            </button>
+                            <button
+                                onClick={() => { window.history.pushState({}, '', '/create-lead'); setCurrentPage('CreateLead'); }}
+                                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                            >
+                                {t('addLead')}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {/* Loading skeleton */}
+            {isDashboardLoading && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
+                    {[...Array(10)].map((_, i) => (
+                        <Card key={i} className="h-24 border border-gray-200/50 dark:border-gray-700/50 animate-pulse">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 rounded-xl bg-gray-200 dark:bg-gray-700" />
+                                <div className="flex-1 space-y-2">
+                                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
+                                    <div className="h-8 w-14 bg-gray-200 dark:bg-gray-700 rounded" />
+                                </div>
+                            </div>
+                        </Card>
+                    ))}
+                </div>
+            )}
             {/* Payment Success Notification */}
             {showPaymentSuccess && (
                 <div className={`mb-6 p-4 rounded-lg border-2 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-500/50 shadow-lg animate-slide-down ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
@@ -459,59 +548,84 @@ export const DashboardPage = () => {
                 </div>
             )}
             
-            {/* Stats Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
-                {stats.map(stat => (
-                    <div key={stat.title} className="group">
-                        <Card className={`h-full ${stat.bgColor} border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:border-gray-300 dark:hover:border-gray-600 relative overflow-hidden`}>
-                            {/* Decorative gradient overlay */}
-                            <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.gradient} opacity-5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:opacity-10 transition-opacity`}></div>
-                            
-                            <div className="relative flex items-center gap-4">
-                                <div className={`p-3 ${stat.iconBg} rounded-xl flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
-                                    <div className={stat.textColor}>
-                                        {stat.icon}
-                                    </div>
+            {/* Stats Cards - grouped by section */}
+            {!isDashboardLoading && (
+            <div className="space-y-6 mb-6">
+                {[
+                    { sectionKey: 'dashboardSectionToday' as const, indices: [0, 1, 2, 3, 4] },
+                    { sectionKey: 'dashboardSectionPipeline' as const, indices: [6, 8, 9, 10] },
+                    { sectionKey: 'dashboardSectionOverview' as const, indices: [5, 7] },
+                ].map(({ sectionKey, indices }) => (
+                    <div key={sectionKey}>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">{t(sectionKey)}</h3>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                            {indices.map(i => stats[i]).filter(Boolean).map(stat => (
+                                <div key={stat.title} className="group">
+                                    <Card className={`h-full ${stat.bgColor} border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:border-gray-300 dark:hover:border-gray-600 relative overflow-hidden`}>
+                                        <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.gradient} opacity-5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:opacity-10 transition-opacity`}></div>
+                                        <div className="relative flex items-center gap-4">
+                                            <div className={`p-3 ${stat.iconBg} rounded-xl flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
+                                                <div className={stat.textColor}>{stat.icon}</div>
+                                            </div>
+                                            <div className="min-w-0 flex-1">
+                                                <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium truncate mb-1.5">{stat.title}</p>
+                                                <p className={`text-3xl sm:text-4xl font-bold ${stat.textColor} leading-tight`}>{stat.value}</p>
+                                            </div>
+                                        </div>
+                                    </Card>
                                 </div>
-                                <div className="min-w-0 flex-1">
-                                    <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium truncate mb-1.5">{stat.title}</p>
-                                    <p className={`text-3xl sm:text-4xl font-bold ${stat.textColor} leading-tight`}>{stat.value}</p>
-                                </div>
-                            </div>
-                        </Card>
+                            ))}
+                        </div>
                     </div>
                 ))}
             </div>
+            )}
             {/* Charts Section */}
+            {!isDashboardLoading && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                 <Card className="lg:col-span-2 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
-                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+                     <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
                          <div>
                              <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('weekLeadsReport')}</h2>
                              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('last7DaysPerformance')}</p>
+                         </div>
+                         <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 p-0.5 bg-gray-100 dark:bg-gray-800">
+                             {([7, 14, 30] as const).map((days) => (
+                                 <button
+                                     key={days}
+                                     onClick={() => setChartDaysRange(days)}
+                                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                         chartDaysRange === days
+                                             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                     }`}
+                                 >
+                                     {days === 7 ? t('last7Days') : days === 14 ? t('last14Days') : t('last30Days')}
+                                 </button>
+                             ))}
                          </div>
                      </div>
                      <div className="overflow-x-auto -mx-2 px-2">
                          <div className="min-w-[300px]">
                              <ResponsiveContainer width="100%" height={320}>
-                                 <AreaChart data={weekLeadsData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
+                                 <AreaChart data={weekLeadsData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }} isAnimationActive>
                                      <defs>
                                          <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
                                              <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
                                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                                          </linearGradient>
                                      </defs>
-                                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" strokeOpacity={0.3} />
+                                     <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#4b5563' : '#e5e7eb'} strokeOpacity={0.3} />
                                      <XAxis 
                                          dataKey="name" 
-                                         stroke="#6b7280" 
-                                         tick={{ fill: '#6b7280', fontSize: 12 }}
-                                         axisLine={{ stroke: '#e5e7eb' }}
+                                         stroke={theme === 'dark' ? '#9ca3af' : '#6b7280'}
+                                         tick={{ fill: theme === 'dark' ? '#9ca3af' : '#6b7280', fontSize: 12 }}
+                                         axisLine={{ stroke: theme === 'dark' ? '#4b5563' : '#e5e7eb' }}
                                      />
                                      <YAxis 
-                                         stroke="#6b7280" 
-                                         tick={{ fill: '#6b7280', fontSize: 12 }}
-                                         axisLine={{ stroke: '#e5e7eb' }}
+                                         stroke={theme === 'dark' ? '#9ca3af' : '#6b7280'}
+                                         tick={{ fill: theme === 'dark' ? '#9ca3af' : '#6b7280', fontSize: 12 }}
+                                         axisLine={{ stroke: theme === 'dark' ? '#4b5563' : '#e5e7eb' }}
                                      />
                                      <Tooltip
                                          contentStyle={{
@@ -614,8 +728,9 @@ export const DashboardPage = () => {
                     )}
                 </Card>
             </div>
+            )}
             {/* Leads to Contact Today Section */}
-            {leadsToContactTodayList.length > 0 && (
+            {!isDashboardLoading && leadsToContactTodayList.length > 0 && (
                 <Card className="mb-6 border border-orange-200/50 dark:border-orange-700/50 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-orange-50/50 to-red-50/50 dark:from-orange-950/20 dark:to-red-950/20">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-orange-200 dark:border-orange-700">
                         <div>
@@ -685,7 +800,7 @@ export const DashboardPage = () => {
                                                                         backgroundImage: `linear-gradient(to right, ${stageColor}, ${stageColor}dd)`
                                                                     }}
                                                                 >
-                                                                    {getStageDisplayLabel(item.stage)}
+                                                                    {getStageDisplayLabel(item.stage, t)}
                                                                 </span>
                                                             );
                                                         })() : (
@@ -724,8 +839,30 @@ export const DashboardPage = () => {
                     </div>
                 </Card>
             )}
+            {!isDashboardLoading && leadsToContactTodayList.length === 0 && (
+                <Card className="mb-6 border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-6 px-4">
+                        <div className="flex items-center gap-3">
+                            <div className="p-3 bg-orange-100 dark:bg-orange-900/40 rounded-xl">
+                                <TargetIcon className="w-8 h-8 text-orange-600 dark:text-orange-400" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('leadsToContactToday')}</h3>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{t('noLeadsToContactToday')}</p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => { window.history.pushState({}, '', '/leads'); setCurrentPage('All Leads'); }}
+                            className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                        >
+                            {t('viewAllLeads')}
+                        </button>
+                    </div>
+                </Card>
+            )}
             
             {/* Bottom Section */}
+            {!isDashboardLoading && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-1 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
@@ -812,12 +949,11 @@ export const DashboardPage = () => {
                                                 <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('lead')}</th>
                                                 <th scope="col" className="px-4 py-3.5 hidden sm:table-cell font-bold text-center whitespace-nowrap">{t('stage')}</th>
                                                 <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('lastFeedback')}</th>
+                                                <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('action')}</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                            {latestFeedbacks.map((feedback, index) => {
-                                                const lead = leads.find(l => l.name === feedback.lead);
-                                                return (
+                                            {latestFeedbacks.map((feedback) => (
                                                     <tr 
                                                         key={feedback.id} 
                                                         className="bg-white dark:bg-dark-card hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
@@ -854,7 +990,7 @@ export const DashboardPage = () => {
                                                                             backgroundImage: `linear-gradient(to right, ${stageColor}, ${stageColor}dd)`
                                                                         }}
                                                                     >
-                                                                        {getStageDisplayLabel(stageName)}
+                                                                        {getStageDisplayLabel(stageName, t)}
                                                                     </span>
                                                                 );
                                                             })()}
@@ -864,9 +1000,24 @@ export const DashboardPage = () => {
                                                                 {feedback.notes || <span className="text-gray-400 italic">{t('noNotes')}</span>}
                                                             </p>
                                                         </td>
+                                                        <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                            {feedback.leadObj ? (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        setSelectedLead(feedback.leadObj);
+                                                                        window.history.pushState({}, '', `/view-lead/${(feedback.leadObj as any).id}`);
+                                                                        setCurrentPage('ViewLead');
+                                                                    }}
+                                                                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors"
+                                                                >
+                                                                    {t('viewLead')}
+                                                                </button>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-400">—</span>
+                                                            )}
+                                                        </td>
                                                     </tr>
-                                                );
-                                            })}
+                                            ))}
                                         </tbody>
                                     </table>
                                 ) : (
@@ -883,6 +1034,7 @@ export const DashboardPage = () => {
                     </div>
                 </Card>
             </div>
+            )}
         </PageWrapper>
     );
 };

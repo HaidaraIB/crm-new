@@ -60,11 +60,16 @@
             },
             animation: {
               'bounce-loader': 'bounce-loader 1.2s infinite ease-in-out',
+              'slide-down': 'slide-down 0.3s ease-out',
             },
             keyframes: {
               'bounce-loader': {
                 '0%, 40%, 100%': { transform: 'scaleY(0.4)' },
                 '20%': { transform: 'scaleY(1.0)' },
+              },
+              'slide-down': {
+                '0%': { opacity: '0', transform: 'translateY(-10px)' },
+                '100%': { opacity: '1', transform: 'translateY(0)' },
               },
             },
           }

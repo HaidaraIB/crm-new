@@ -780,7 +780,7 @@ export const LeadsPage = () => {
                                                                 <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto_auto]'} items-center gap-1`}>
                                                                     {language === 'ar' ? (
                                                                         <>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
                                                                                 {pn.phone_number}
                                                                             </span>
                                                                             <div className="w-16 text-right">
@@ -818,7 +818,7 @@ export const LeadsPage = () => {
                                                                         </>
                                                                     ) : (
                                                                         <>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
                                                                                 {pn.phone_number}
                                                                             </span>
                                                                             <div className="w-16 text-left">

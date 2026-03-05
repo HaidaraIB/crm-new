@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI } from '../services/api';
+import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI } from '../services/api';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
@@ -15,6 +15,7 @@ import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components/icons';
+import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 
 type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
 
@@ -236,7 +237,7 @@ export const IntegrationsPage = () => {
             return 'meta';
         } else if (currentPage === 'TikTok') {
             return 'tiktok';
-        } else if (currentPage === 'WhatsApp') {
+        } else if (currentPage === 'WhatsApp' || currentPage === 'Messaging Center') {
             return 'whatsapp';
         }
         return undefined;
@@ -254,6 +255,7 @@ export const IntegrationsPage = () => {
                 platformKey = 'TikTok';
                 break;
             case 'WhatsApp':
+            case 'Messaging Center':
                 platformKey = 'WhatsApp';
                 break;
             default:
@@ -286,15 +288,18 @@ export const IntegrationsPage = () => {
     };
     const [editingTemplate, setEditingTemplate] = useState<MessageTemplateType | null>(null);
     const [submittingTemplateId, setSubmittingTemplateId] = useState<number | null>(null);
+    const [syncingTemplates, setSyncingTemplates] = useState(false);
     const [isEditTemplateOpen, setIsEditTemplateOpen] = useState(false);
+    const [templateSearch, setTemplateSearch] = useState('');
     const [isStartNewConversationOpen, setIsStartNewConversationOpen] = useState(false);
     const [extraConversations, setExtraConversations] = useState<Array<{ client: any }>>([]);
     const [selectedChatClient, setSelectedChatClient] = useState<any>(null);
     const [optimisticMessages, setOptimisticMessages] = useState<Array<{ body: string; direction: 'in' | 'out'; time: string }>>([]);
 
     const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations();
+    const isWhatsAppOrMessagingCenter = currentPage === 'WhatsApp' || currentPage === 'Messaging Center';
     const { data: leadWhatsAppMessages = [], refetch: refetchLeadWhatsApp } = useLeadWhatsAppMessages(
-        currentPage === 'WhatsApp' && selectedChatClient?.id ? selectedChatClient.id : undefined
+        isWhatsAppOrMessagingCenter && selectedChatClient?.id ? selectedChatClient.id : undefined
     );
 
     const conversations = useMemo(() => {
@@ -320,22 +325,35 @@ export const IntegrationsPage = () => {
     const [campaignMessage, setCampaignMessage] = useState('');
     const [campaignSending, setCampaignSending] = useState(false);
     const [campaignProgress, setCampaignProgress] = useState<{ sent: number; failed: number } | null>(null);
+    const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template'>(() => {
+        try {
+            const s = localStorage.getItem('messaging_center_tab');
+            if (s === 'campaign' || s === 'template') return s;
+        } catch (_) {}
+        return 'campaign';
+    });
+    const setMessagingCenterTabPersisted = (tab: 'campaign' | 'template') => {
+        setMessagingCenterTab(tab);
+        try {
+            localStorage.setItem('messaging_center_tab', tab);
+        } catch (_) {}
+    };
 
     const { data: templates = [], refetch: refetchTemplates } = useQuery({
         queryKey: ['messageTemplates'],
         queryFn: getMessageTemplatesAPI,
-        enabled: currentPage === 'WhatsApp',
+        enabled: isWhatsAppOrMessagingCenter,
     });
 
     const { data: campaignLeadsData, isLoading: campaignLeadsLoading } = useQuery({
         queryKey: ['campaignLeads', campaignLeadSearchApplied],
         queryFn: () => getLeadsAPI({ search: campaignLeadSearchApplied.trim() || undefined }),
-        enabled: currentPage === 'WhatsApp' && whatsAppTab === 'campaigns',
+        enabled: (currentPage === 'WhatsApp' && whatsAppTab === 'campaigns') || currentPage === 'Messaging Center',
     });
     const { data: whatsAppLimits } = useQuery({
         queryKey: ['whatsAppLimits'],
         queryFn: getWhatsAppLimitsAPI,
-        enabled: currentPage === 'WhatsApp' && whatsAppTab === 'campaigns' && campaignChannel === 'whatsapp',
+        enabled: ((currentPage === 'WhatsApp' && whatsAppTab === 'campaigns') || currentPage === 'Messaging Center') && campaignChannel === 'whatsapp',
     });
     const campaignLeads = useMemo(() => {
         const res = campaignLeadsData;
@@ -657,8 +675,9 @@ export const IntegrationsPage = () => {
         );
     }
 
-    // WhatsApp: Messaging Center (Chats | Template Management | WhatsApp Accounts)
-    if (currentPage === 'WhatsApp') {
+    // WhatsApp (Integrations) or Messaging Center (Marketing): Chats | Template Management (WhatsApp only) | Message Campaign | Accounts (WhatsApp only)
+    const isMessagingCenterPage = currentPage === 'Messaging Center';
+    if (currentPage === 'WhatsApp' || isMessagingCenterPage) {
         const addConversation = (client: any) => {
             setExtraConversations((prev) => {
                 if (prev.some((c) => c.client.id === client.id)) return prev;
@@ -734,7 +753,137 @@ export const IntegrationsPage = () => {
             showAlert(t('copied'), 'info');
         };
 
-        const effectiveTab = isEmployee && whatsAppTab === 'accounts' ? 'chats' : whatsAppTab;
+        // Messaging Center (Marketing): Message Campaign + Template tabs
+        if (isMessagingCenterPage) {
+            return (
+                <PageWrapper
+                    title={
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <MegaphoneIcon className="w-8 h-8 text-primary" />
+                                <span>{t('messagingCenter')}</span>
+                            </div>
+                            <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('messagingCenterDesc')}</p>
+                        </div>
+                    }
+                >
+                    <div className="flex border-b border-gray-200 dark:border-gray-700 gap-1 mb-4">
+                        <button
+                            type="button"
+                            onClick={() => setMessagingCenterTabPersisted('campaign')}
+                            className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${messagingCenterTab === 'campaign' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                        >
+                            <MegaphoneIcon className="w-4 h-4" /> {t('messageCampaign')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMessagingCenterTabPersisted('template')}
+                            className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${messagingCenterTab === 'template' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                        >
+                            <FileTextIcon className="w-4 h-4" /> {t('template') || 'Template'}
+                        </button>
+                    </div>
+                    {messagingCenterTab === 'template' ? (
+                        <TemplateManagementSettings />
+                    ) : (
+                    <div className="space-y-4">
+                        <Card className="overflow-hidden">
+                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
+                                <div className="lg:col-span-2 flex flex-col">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('selectLeadsToSend')}</label>
+                                    <div className="mb-1">
+                                        <div className="flex gap-2">
+                                            <div className="relative flex-1">
+                                                <SearchIcon className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                                                <input
+                                                    type="text"
+                                                    value={campaignLeadSearch}
+                                                    onChange={(e) => setCampaignLeadSearch(e.target.value)}
+                                                    onKeyDown={(e) => e.key === 'Enter' && setCampaignLeadSearchApplied(campaignLeadSearch.trim())}
+                                                    placeholder={t('campaignSearchPlaceholder')}
+                                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-9 pe-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                                                />
+                                            </div>
+                                            <Button type="button" variant="secondary" onClick={() => setCampaignLeadSearchApplied(campaignLeadSearch.trim())}>
+                                                {t('search') || 'Search'}
+                                            </Button>
+                                        </div>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{t('campaignSearchHint')}</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <button type="button" onClick={() => { const allIds = new Set(campaignLeads.map((l: any) => l.id)); setCampaignSelectedIds(allIds); }} className="text-sm text-primary hover:underline">{t('selectAll') || 'Select all'}</button>
+                                        <button type="button" onClick={() => setCampaignSelectedIds(new Set())} className="text-sm text-gray-500 hover:underline">{t('deselectAll') || 'Deselect all'}</button>
+                                    </div>
+                                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
+                                        {campaignLeadsLoading ? (
+                                            <div className="flex justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                                        ) : campaignLeads.length === 0 ? (
+                                            <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">{t('noAccountsConnected') || 'No leads'}</p>
+                                        ) : (
+                                            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
+                                                {campaignLeads.map((lead: any) => {
+                                                    const hasPhone = ((lead.phone_number || lead.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0;
+                                                    const checked = campaignSelectedIds.has(lead.id);
+                                                    const displayTitle = (lead.name ?? '') || (lead.company_name ?? '') || `#${lead.id}`;
+                                                    const statusName = lead.status_name ?? lead.status?.name ?? '';
+                                                    const typeVal = lead.type ?? '';
+                                                    const priorityVal = lead.priority ?? '';
+                                                    const assignedTo = lead.assigned_to_username ?? lead.assigned_to?.username ?? '';
+                                                    return (
+                                                        <li key={lead.id}>
+                                                            <label className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg ${!hasPhone ? 'opacity-60' : ''}`}>
+                                                                <input type="checkbox" checked={checked} disabled={!hasPhone} onChange={() => { setCampaignSelectedIds((prev) => { const next = new Set(prev); if (next.has(lead.id)) next.delete(lead.id); else next.add(lead.id); return next; }); }} className="rounded border-gray-300 dark:border-gray-600 text-primary shrink-0" />
+                                                                <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">{displayTitle.charAt(0)}</div>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{displayTitle}</p>
+                                                                    {(lead.phone_number || lead.phone) && <p className="text-xs text-gray-500 dark:text-gray-400 truncate" dir="ltr">{lead.phone_number || lead.phone}</p>}
+                                                                    <div className="flex flex-wrap gap-1.5 mt-1">
+                                                                        {statusName && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{statusName}</span>}
+                                                                        {typeVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{typeVal}</span>}
+                                                                        {priorityVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{priorityVal}</span>}
+                                                                    </div>
+                                                                    {assignedTo && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{t('assignedTo')}: {assignedTo}</p>}
+                                                                    {!hasPhone && <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{t('sms_error_invalid_to_number')}</p>}
+                                                                </div>
+                                                            </label>
+                                                        </li>
+                                                    );
+                                                })}
+                                            </ul>
+                                        )}
+                                    </div>
+                                </div>
+                                <div className="flex flex-col">
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia') || 'Send via'}</label>
+                                    <div className="flex gap-2 mb-3">
+                                        <button type="button" onClick={() => setCampaignChannel('whatsapp')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><WhatsappIcon className="w-4 h-4" /> {t('campaignViaWhatsApp') || 'WhatsApp'}</button>
+                                        <button type="button" onClick={() => setCampaignChannel('sms')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><SmsIcon className="w-4 h-4" /> {t('campaignViaSms') || 'SMS'}</button>
+                                    </div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('quickTemplates')}</label>
+                                    {(() => {
+                                        const isSms = campaignChannel === 'sms';
+                                        const campaignTemplates = (templates as any[]).filter((tpl: any) => { const ch = (tpl.channel_type || '').toLowerCase(); return isSms ? ch === 'sms' : (ch === 'whatsapp' || ch === 'whatsapp_api'); });
+                                        if (campaignTemplates.length === 0) return <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{isSms ? (t('noSmsTemplatesYet') || 'No SMS templates yet. Create one in Template Management.') : t('noWhatsAppTemplatesYet')}</p>;
+                                        return <div className="flex flex-wrap gap-2 mb-3">{campaignTemplates.map((tpl: any) => (<button key={tpl.id} type="button" onClick={() => { const content = tpl.content || ''; setCampaignMessage((prev) => (prev ? prev + '\n' + content : content)); }} className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">{tpl.name}</button>))}</div>;
+                                    })()}
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 mt-1">{t('messageContent')}</label>
+                                    <textarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={6} placeholder={t('messageContent')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y" />
+                                    {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppMessagingLimit') || 'WhatsApp limit'}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier} {t('conversationsPerDay') || ' conversations/day'}{whatsAppLimits.quality_rating && ` · ${t('quality') || 'Quality'}: ${whatsAppLimits.quality_rating}`}</p>}
+                                    {campaignProgress !== null && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}</p>}
+                                    <Button className="mt-3" onClick={async () => { const selected = campaignLeads.filter((l: any) => campaignSelectedIds.has(l.id)); const withPhone = selected.filter((l: any) => ((l.phone_number || l.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0); if (withPhone.length === 0) { showAlert(t('selectAtLeastOneLead'), 'warning'); return; } const message = campaignMessage.trim(); if (!message) { showAlert(t('enterMessageOrSelectTemplate'), 'warning'); return; } setCampaignSending(true); setCampaignProgress({ sent: 0, failed: 0 }); let sent = 0, failed = 0; const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || ''; const isSmsCampaign = campaignChannel === 'sms'; for (const lead of withPhone) { try { const phone = getClientPhone(lead); const body = replaceTemplatePlaceholders(message, lead); if (isSmsCampaign) await sendLeadSMSAPI({ lead_id: lead.id, phone_number: lead.phone_number || lead.phone || '', body }); else await sendWhatsAppMessageAPI({ to: phone, message: body, client_id: lead.id }); sent++; } catch (_) { failed++; } setCampaignProgress({ sent, failed }); } setCampaignSending(false); showAlert(t('campaignComplete') + ' — ' + t('campaignSentCount').replace('{sent}', String(sent)).replace('{failed}', String(failed)), 'info'); }} disabled={campaignSending}>
+                                        {campaignSending ? <><Loader variant="primary" className="w-4 h-4 me-2" /> {t('campaignSending')}</> : <>{t('sendToSelected')} ({campaignSelectedIds.size})</>}
+                                    </Button>
+                                </div>
+                            </div>
+                        </Card>
+                    </div>
+                    )}
+                </PageWrapper>
+            );
+        }
+
+        // WhatsApp (Integrations): only Chats and Accounts tabs
+        const effectiveTab = (whatsAppTab === 'templates' || whatsAppTab === 'campaigns') ? 'chats' : (isEmployee && whatsAppTab === 'accounts' ? 'chats' : whatsAppTab);
 
         return (
             <PageWrapper
@@ -762,20 +911,6 @@ export const IntegrationsPage = () => {
                         className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'chats' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                     >
                         <WhatsappIcon className="w-4 h-4" /> {t('chats')}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setWhatsAppTabPersisted('templates')}
-                        className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'templates' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-                    >
-                        <FileTextIcon className="w-4 h-4" /> {t('templateManagement')}
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setWhatsAppTabPersisted('campaigns')}
-                        className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'campaigns' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-                    >
-                        <MegaphoneIcon className="w-4 h-4" /> {t('messageCampaign')}
                     </button>
                     {!isEmployee && (
                         <button
@@ -821,7 +956,7 @@ export const IntegrationsPage = () => {
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <p className="font-medium text-gray-900 dark:text-white truncate">{client.company_name || client.name}</p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.name || client.phone_number}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.name ? client.name : <span dir="ltr">{client.phone_number}</span>}</p>
                                                 </div>
                                             </button>
                                         </li>
@@ -840,7 +975,7 @@ export const IntegrationsPage = () => {
                                             </div>
                                             <div>
                                                 <p className="font-medium text-gray-900 dark:text-white">{selectedChatClient.company_name || selectedChatClient.name}</p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">{selectedChatClient.phone_number && (t('connectedWhatsAppApi') + ' · ' + selectedChatClient.phone_number)}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">{selectedChatClient.phone_number && <>{t('connectedWhatsAppApi')} · <span dir="ltr">{selectedChatClient.phone_number}</span></>}</p>
                                             </div>
                                         </div>
                                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
@@ -905,106 +1040,140 @@ export const IntegrationsPage = () => {
 
                 {effectiveTab === 'templates' && (
                     <div className="space-y-4">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                    <FileTextIcon className="w-5 h-5 text-primary" /> {t('templateManagement')}
-                                </h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">{t('templateManagementDesc')}</p>
-                            </div>
-                            <Button
-                                onClick={() => {
-                                    setEditingTemplate(null);
-                                    setIsEditTemplateOpen(true);
-                                }}
-                            >
-                                <PlusIcon className="w-4 h-4 me-2" /> {t('newTemplate')}
-                            </Button>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {templates.map((tpl) => (
-                                <React.Fragment key={tpl.id}>
-                                <Card className="flex flex-col">
-                                    <div className="flex justify-between items-start mb-2">
-                                        <span className={`text-xs px-2 py-0.5 rounded ${tpl.channel_type === 'sms' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300' : 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'}`}>
-                                            {tpl.channel_type === 'sms' ? 'SMS' : 'WHATSAPP'}
-                                        </span>
-                                        <div className="flex items-center gap-2">
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setEditingTemplate(tpl);
-                                                    setIsEditTemplateOpen(true);
-                                                }}
-                                                className="text-gray-500 hover:text-primary"
-                                                title={t('edit')}
-                                            >
-                                                <EditIcon className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    setConfirmDeleteConfig({
-                                                        title: t('deleteTemplate'),
-                                                        message: t('deleteTemplateConfirm'),
-                                                        itemName: tpl.name,
-                                                        confirmButtonText: t('delete'),
-                                                        confirmButtonVariant: 'danger',
-                                                        onConfirm: async () => {
-                                                            await deleteMessageTemplateAPI(tpl.id);
-                                                            refetchTemplates();
-                                                        },
-                                                    });
-                                                    setIsConfirmDeleteModalOpen(true);
-                                                }}
-                                                className="text-gray-500 hover:text-red-600"
-                                                title={t('deleteTemplate')}
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <h3 className="font-semibold text-gray-900 dark:text-white mb-2">{tpl.name}</h3>
-                                    {(tpl as any).meta_status && (
-                                        <span className={`text-xs px-2 py-0.5 rounded mb-2 inline-block ${(tpl as any).meta_status === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : (tpl as any).meta_status === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'}`}>
-                                            {(tpl as any).meta_status === 'APPROVED' ? (t('templateApproved') || 'Approved') : (tpl as any).meta_status === 'REJECTED' ? (t('templateRejected') || 'Rejected') : (t('templatePending') || 'Pending review')}
-                                        </span>
+                        <div className="flex items-center justify-end flex-wrap gap-3">
+                            <div className="flex items-center gap-2">
+                                <Button
+                                    variant="secondary"
+                                    disabled={syncingTemplates}
+                                    onClick={async () => {
+                                        setSyncingTemplates(true);
+                                        try {
+                                            await syncWhatsAppTemplatesAPI();
+                                            await refetchTemplates();
+                                            showAlert(t('templatesSynced') || 'Templates synced.', 'info');
+                                        } catch (e: any) {
+                                            const errKey = e?.data?.error_key;
+                                            showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || 'Sync failed'), 'error');
+                                        } finally {
+                                            setSyncingTemplates(false);
+                                        }
+                                    }}
+                                    className="min-w-[5rem]"
+                                >
+                                    {syncingTemplates ? (
+                                        <>
+                                            <svg className="w-4 h-4 me-2 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                            </svg>
+                                            {t('syncing')}
+                                        </>
+                                    ) : (
+                                        t('sync') || 'Sync'
                                     )}
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 flex-1 line-clamp-3 mb-2">{tpl.content}</p>
-                                    <div className="flex flex-wrap gap-2 items-center justify-between">
-                                        <div className="flex gap-1">
-                                            <Button variant="secondary" className="text-sm py-1.5 px-3" onClick={() => handleCopyTemplate(tpl.content)}>
-                                                {t('copyTemplate')}
-                                            </Button>
-                                            {((tpl.channel_type || '').toLowerCase() === 'whatsapp' || (tpl.channel_type || '').toLowerCase() === 'whatsapp_api') && (
-                                                <Button
-                                                    variant="secondary"
-                                                    className="text-sm py-1.5 px-3 text-green-600 dark:text-green-400 border-green-300 dark:border-green-600"
-                                                    disabled={submittingTemplateId === tpl.id}
-                                                    onClick={async () => {
-                                                        setSubmittingTemplateId(tpl.id);
-                                                        try {
-                                                            await submitMessageTemplateToWhatsAppAPI(tpl.id);
-                                                            showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info');
-                                                            refetchTemplates();
-                                                        } catch (e: any) {
-                                                            const errKey = e?.data?.error_key;
-                                                            showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')), 'error');
-                                                        } finally {
-                                                            setSubmittingTemplateId(null);
-                                                        }
-                                                    }}
-                                                >
-                                                    {submittingTemplateId === tpl.id ? <Loader variant="primary" className="w-4 h-4" /> : (t('submitToWhatsApp') || 'Submit to WhatsApp')}
-                                                </Button>
-                                            )}
-                                        </div>
-                                        <span className="text-xs text-gray-400">{templateCategoryKey[(tpl.category || '').toLowerCase()] ? t(templateCategoryKey[(tpl.category || '').toLowerCase()]) : (tpl.category_display || tpl.category)}</span>
-                                    </div>
-                                </Card>
-                                </React.Fragment>
-                            ))}
+                                </Button>
+                                <Button
+                                    onClick={() => {
+                                        setEditingTemplate(null);
+                                        setIsEditTemplateOpen(true);
+                                    }}
+                                >
+                                    <PlusIcon className="w-4 h-4 me-2" /> {t('addTemplate') || '+ Template'}
+                                </Button>
+                            </div>
                         </div>
+                        <div className="relative">
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
+                            <input
+                                type="text"
+                                value={templateSearch}
+                                onChange={(e) => setTemplateSearch(e.target.value)}
+                                placeholder={t('search') || 'Search'}
+                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 pl-9 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                            />
+                        </div>
+                        <Card className="overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full min-w-[700px]">
+                                    <thead>
+                                        <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
+                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('templateLanguage') || 'Language'}</th>
+                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('name') || 'Name'}</th>
+                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('category')}</th>
+                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('status')}</th>
+                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 w-[180px]">{t('actions') || 'Actions'}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                                        {(() => {
+                                            const filtered = templateSearch.trim()
+                                                ? templates.filter((t) => (t.name || '').toLowerCase().includes(templateSearch.trim().toLowerCase()) || ((t as any).language || '').toLowerCase().includes(templateSearch.trim().toLowerCase()))
+                                                : templates;
+                                            if (filtered.length === 0) {
+                                                return (
+                                                    <tr>
+                                                        <td colSpan={5} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                            {templates.length === 0
+                                                                ? (t('noTemplates') || 'No templates yet. Create one with + Template.')
+                                                                : (t('search') || 'Search') + ' — ' + (t('noResultsFound') || 'No results found')}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            }
+                                            return filtered.map((tpl) => {
+                                                const isWa = (tpl.channel_type || '').toLowerCase() === 'whatsapp' || (tpl.channel_type || '').toLowerCase() === 'whatsapp_api';
+                                                const metaStatus = (tpl as MessageTemplateType).meta_status || 'PENDING';
+                                                const isApproved = metaStatus === 'APPROVED';
+                                                const isPending = metaStatus === 'PENDING';
+                                                const cat = (tpl.category || '').toLowerCase();
+const categoryLabelKey = cat === 'marketing' ? 'categoryMarketingLabel' : cat === 'auth' ? 'categoryAuthLabel' : cat === 'utility' ? 'categoryUtilityLabel' : cat === 'carousel' ? 'categoryCarouselLabel' : cat === 'single_product' ? 'categorySingleProductLabel' : cat === 'multi_product' ? 'categoryMultiProductLabel' : cat === 'product_card_carousel' ? 'categoryProductCardCarouselLabel' : cat === 'limited_time_offer' ? 'categoryLimitedTimeOfferLabel' : null;
+const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_display || tpl.category || '').toUpperCase();
+                                                return (
+                                                    <tr key={tpl.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 even:bg-gray-50/50 dark:even:bg-gray-800/20">
+                                                        <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{(tpl as any).language || 'AR'}</td>
+                                                        <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white font-medium">{tpl.name}</td>
+                                                        <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{categoryDisplay || '—'}</td>
+                                                        <td className="py-3 px-4 text-center">
+                                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
+                                                                {metaStatus === 'APPROVED' ? (t('templateApproved') || 'APPROVED') : metaStatus === 'REJECTED' ? (t('templateRejected') || 'REJECTED') : (t('templatePending') || 'PENDING')}
+                                                            </span>
+                                                        </td>
+                                                        <td className="py-3 px-4">
+                                                            <div className="flex justify-center items-center">
+                                                                <div className="inline-flex items-center gap-2 flex-nowrap">
+                                                                    <div className="w-[150px] min-w-[150px] flex justify-end items-center">
+                                                                        {isWa && (
+                                                                            <Button variant="secondary" size="sm" className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem]" disabled={submittingTemplateId === tpl.id} onClick={async () => { setSubmittingTemplateId(tpl.id); try { await submitMessageTemplateToWhatsAppAPI(tpl.id); showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info'); refetchTemplates(); } catch (e: any) { const errKey = e?.data?.error_key; showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')), 'error'); } finally { setSubmittingTemplateId(null); } }}>
+                                                                                {submittingTemplateId === tpl.id ? (
+                                                                                    <>
+                                                                                        <svg className="w-4 h-4 me-1.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                                                        </svg>
+                                                                                        {t('submittingToWhatsApp')}
+                                                                                    </>
+                                                                                ) : (
+                                                                                    t('submitToWhatsApp') || 'Submit to WhatsApp'
+                                                                                )}
+                                                                            </Button>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="inline-flex items-center gap-0.5 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shrink-0">
+                                                                        <button type="button" onClick={() => { setConfirmDeleteConfig({ title: t('deleteTemplate'), message: t('deleteTemplateConfirm'), itemName: tpl.name, confirmButtonText: t('delete'), confirmButtonVariant: 'danger', onConfirm: async () => { await deleteMessageTemplateAPI(tpl.id); refetchTemplates(); } }); setIsConfirmDeleteModalOpen(true); }} className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-red-600" title={t('deleteTemplate')}><TrashIcon className="w-4 h-4" /></button>
+                                                                        <button type="button" onClick={() => handleCopyTemplate(tpl.content)} className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary" title={t('copyTemplate')}><FileTextIcon className="w-4 h-4" /></button>
+                                                                        <button type="button" onClick={() => { setEditingTemplate(tpl); setIsEditTemplateOpen(true); }} className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary" title={t('edit')}><EditIcon className="w-4 h-4" /></button>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            });
+                                        })()}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </Card>
                     </div>
                 )}
 
@@ -1102,7 +1271,7 @@ export const IntegrationsPage = () => {
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
                                                                     <p className="font-medium text-gray-900 dark:text-white truncate">{displayTitle}</p>
-                                                                    {phone && <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{phone}</p>}
+                                                                    {phone && <p className="text-xs text-gray-500 dark:text-gray-400 truncate" dir="ltr">{phone}</p>}
                                                                     <div className="flex flex-wrap gap-1.5 mt-1">
                                                                         {statusName && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{statusName}</span>}
                                                                         {typeVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{typeVal}</span>}
@@ -1287,6 +1456,27 @@ export const IntegrationsPage = () => {
                     t={t}
                     language={language}
                     onSuccess={() => { refetchTemplates(); }}
+                    onSendToReview={editingTemplate ? async (templateId, lang) => {
+                        await submitMessageTemplateToWhatsAppAPI(templateId, { language: lang });
+                        showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info');
+                        refetchTemplates();
+                    } : undefined}
+                    onRequestDelete={(tpl) => {
+                        setConfirmDeleteConfig({
+                            title: t('deleteTemplate'),
+                            message: t('deleteTemplateConfirm'),
+                            itemName: tpl.name,
+                            confirmButtonText: t('delete'),
+                            confirmButtonVariant: 'danger',
+                            onConfirm: async () => {
+                                await deleteMessageTemplateAPI(tpl.id);
+                                refetchTemplates();
+                                setIsEditTemplateOpen(false);
+                                setEditingTemplate(null);
+                            },
+                        });
+                        setIsConfirmDeleteModalOpen(true);
+                    }}
                 />
                 <StartNewConversationModal
                     isOpen={isStartNewConversationOpen}

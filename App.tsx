@@ -98,6 +98,8 @@ const TheApp = () => {
         case 'Marketing':
         case 'Campaigns':
             return <CampaignsPage />;
+        case 'Messaging Center':
+            return <IntegrationsPage key="MessagingCenter" />;
         case 'Todos':
             return <TodosPage />;
         case 'Reports':
@@ -235,6 +237,8 @@ const TheApp = () => {
             'users': 'Users',
             'marketing': 'Marketing',
             'campaigns': 'Campaigns',
+            'messaging-center': 'Messaging Center',
+            'messaging center': 'Messaging Center',
             'todos': 'Todos',
             'reports': 'Reports',
             'teams report': 'Teams Report',
@@ -554,8 +558,10 @@ const TheApp = () => {
                 'employees': 'Employees',
                 'users': 'Users',
                 'marketing': 'Marketing',
-                'campaigns': 'Campaigns',
-                'todos': 'Todos',
+'campaigns': 'Campaigns',
+            'messaging-center': 'Messaging Center',
+            'messaging center': 'Messaging Center',
+            'todos': 'Todos',
                 'reports': 'Reports',
                 'teams report': 'Teams Report',
                 'teams-report': 'Teams Report',

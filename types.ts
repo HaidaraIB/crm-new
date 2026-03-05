@@ -11,6 +11,7 @@ export type Page =
   | 'Services' | 'Service Packages' | 'Service Providers'
   | 'Products' | 'Product Categories' | 'Suppliers'
   | 'Campaigns'
+  | 'Messaging Center'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
   | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio'
   | 'Change Plan' | 'Payment' | 'Subscription'

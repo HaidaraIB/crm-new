@@ -734,7 +734,7 @@ export const ViewLeadPage = () => {
                                             {language === 'ar' ? (
                                                 <>
                                                     <div className="min-w-0">
-                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate" dir="ltr">
                                                             {pn.phone_number}
                                                         </p>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -779,7 +779,7 @@ export const ViewLeadPage = () => {
                                             ) : (
                                                 <>
                                                     <div className="min-w-0">
-                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate">
+                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate" dir="ltr">
                                                             {pn.phone_number}
                                                         </p>
                                                         <p className="text-xs text-gray-500 dark:text-gray-400">

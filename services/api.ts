@@ -2016,6 +2016,13 @@ export const getWhatsAppConversationsAPI = async (): Promise<
   return apiRequest<any[]>(`/integrations/whatsapp/conversations/`);
 };
 
+export type TemplateButtonPayload = {
+  type: 'phone' | 'url' | 'reply';
+  button_text: string;
+  phone?: string;
+  url?: string;
+};
+
 export interface MessageTemplateType {
   id: number;
   name: string;
@@ -2024,6 +2031,11 @@ export interface MessageTemplateType {
   content: string;
   category: string;
   category_display: string;
+  language?: string | null;
+  header_type?: string | null;
+  header_text?: string | null;
+  footer?: string | null;
+  buttons?: TemplateButtonPayload[] | null;
   meta_template_id?: string | null;
   meta_status?: string | null;
   created_at: string;
@@ -2049,6 +2061,11 @@ export const createMessageTemplateAPI = async (data: {
   channel_type: string;
   content: string;
   category: string;
+  language?: string;
+  header_type?: string;
+  header_text?: string;
+  footer?: string;
+  buttons?: TemplateButtonPayload[];
 }) => {
   return apiRequest<MessageTemplateType>('/integrations/templates/', {
     method: 'POST',
@@ -2061,7 +2078,17 @@ export const createMessageTemplateAPI = async (data: {
  */
 export const updateMessageTemplateAPI = async (
   id: number,
-  data: { name?: string; channel_type?: string; content?: string; category?: string }
+  data: {
+    name?: string;
+    channel_type?: string;
+    content?: string;
+    category?: string;
+    language?: string;
+    header_type?: string;
+    header_text?: string;
+    footer?: string;
+    buttons?: TemplateButtonPayload[];
+  }
 ) => {
   return apiRequest<MessageTemplateType>(`/integrations/templates/${id}/`, {
     method: 'PUT',
@@ -2088,6 +2115,18 @@ export const submitMessageTemplateToWhatsAppAPI = async (
     method: 'POST',
     body: JSON.stringify(options || {}),
   });
+};
+
+/**
+ * مزامنة حالات قوالب واتساب من Meta (تتبع المعالجة والموافقة والرفض).
+ * POST /api/integrations/templates/sync-whatsapp/
+ */
+export const syncWhatsAppTemplatesAPI = async (): Promise<{
+  message?: string;
+  updated?: number;
+  total_meta?: number;
+}> => {
+  return apiRequest('/integrations/templates/sync-whatsapp/', { method: 'POST' });
 };
 
 /**

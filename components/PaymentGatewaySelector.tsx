@@ -84,7 +84,7 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
     } else if (nameLower.includes('qicard') || nameLower.includes('qi card') || nameLower.includes('qi-card')) {
       return <img src="/q_card_logo.svg" alt="QiCard" className="h-10 w-auto object-contain" />;
     } else if (nameLower.includes('fib') || nameLower.includes('first iraqi')) {
-      return <span className="text-xl font-bold text-blue-700 dark:text-blue-400">FIB</span>;
+      return <img src="/fib_logo.png" alt="FIB" className="h-10 w-auto object-contain" />;
     }
     return null;
   };

@@ -179,9 +179,12 @@ export const PaymentPage = () => {
         return (
             <div className={`min-h-screen flex items-center justify-center p-4 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
                 <Card className="max-w-lg w-full">
-                    <h2 className="text-xl font-semibold mb-2 border-b pb-2 dark:border-gray-700">
-                        {language === 'ar' ? 'الدفع عبر FIB (البنك العراقي الأول)' : 'Pay with FIB (First Iraqi Bank)'}
-                    </h2>
+                    <div className="flex items-center gap-3 mb-2 border-b pb-2 dark:border-gray-700">
+                        <img src="/fib_logo.png" alt="FIB" className="h-10 w-auto object-contain" />
+                        <h2 className="text-xl font-semibold">
+                            {language === 'ar' ? 'الدفع عبر FIB (البنك العراقي الأول)' : 'Pay with FIB (First Iraqi Bank)'}
+                        </h2>
+                    </div>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
                         {language === 'ar' ? 'امسح رمز QR بتطبيق FIB أو استخدم الرابط أدناه للدفع.' : 'Scan the QR code with the FIB app or use the link below to pay.'}
                     </p>

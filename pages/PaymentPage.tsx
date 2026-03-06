@@ -48,12 +48,20 @@ export const PaymentPage = () => {
         
         setSubscriptionId(subId);
         
-        // If gateway_id is provided in URL, use it and proceed
+        // If gateway_id is provided in URL, use it and skip to payment (will auto-proceed in effect)
         if (gatewayId) {
-            setSelectedGateway(parseInt(gatewayId));
+            setSelectedGateway(parseInt(gatewayId, 10));
             setShowGatewaySelection(false);
         }
     }, [t]);
+
+    // When we have subscriptionId + selectedGateway and came with gateway_id, auto-proceed to payment
+    const hasAutoProceeded = useRef(false);
+    useEffect(() => {
+        if (!subscriptionId || !selectedGateway || showGatewaySelection || hasAutoProceeded.current) return;
+        hasAutoProceeded.current = true;
+        handleProceedToPayment();
+    }, [subscriptionId, selectedGateway, showGatewaySelection]);
 
     // Poll payment status when FIB payment is showing
     useEffect(() => {

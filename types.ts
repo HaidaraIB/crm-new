@@ -15,6 +15,7 @@ export type Page =
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
   | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio'
   | 'Change Plan' | 'Payment' | 'Subscription'
+  | 'Support Center'
   // Legal pages
   | 'TermsOfService' | 'PrivacyPolicy' | 'DataDeletionPolicy';
 

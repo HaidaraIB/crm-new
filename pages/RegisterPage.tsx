@@ -225,9 +225,7 @@ export const RegisterPage = () => {
                 if (userData) {
                     // Check if payment is required after email verification
                     if (userData.requiresPayment && userData.subscriptionId) {
-                        // Save user data temporarily and redirect to payment
                         localStorage.setItem('pendingUserData', JSON.stringify(userData));
-                        // Redirect to payment page
                         window.location.href = `/payment?subscription_id=${userData.subscriptionId}`;
                     } else {
                         // No payment required - go to dashboard
@@ -265,9 +263,7 @@ export const RegisterPage = () => {
         if (pendingUserData) {
             // Check if payment is required after skipping verification
             if (pendingUserData.requiresPayment && pendingUserData.subscriptionId) {
-                // Save user data temporarily and redirect to payment
                 localStorage.setItem('pendingUserData', JSON.stringify(pendingUserData));
-                // Redirect to payment page
                 window.location.href = `/payment?subscription_id=${pendingUserData.subscriptionId}`;
             } else {
                 // No payment required - go to dashboard
@@ -536,8 +532,8 @@ export const RegisterPage = () => {
             localStorage.removeItem('accessToken');
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('isLoggedIn');
-            
-            // Auto login after registration
+            localStorage.removeItem('pendingUserData');
+
             const frontendUser = {
                 id: response.user.id,
                 name: `${response.user.first_name || ''} ${response.user.last_name || ''}`.trim() || response.user.username,
@@ -549,48 +545,37 @@ export const RegisterPage = () => {
                 company: {
                     id: response.company.id,
                     name: response.company.name,
-                    domain: response.company.domain || companyDomain, // Include domain from response or form
+                    domain: response.company.domain || companyDomain,
                     specialization: response.company.specialization as 'real_estate' | 'services' | 'products',
                 },
             };
 
-            // Store tokens and user data
+            const subscription = response.subscription;
+            const subscriptionId = subscription?.id ?? response.subscription_id ?? null;
+
+            // Store in DB is done. Always go to payment with subscription_id when we have one (do not log in yet).
+            if (subscriptionId) {
+                const pendingData = {
+                    ...frontendUser,
+                    requiresPayment: true,
+                    subscriptionId,
+                    accessToken: response.access,
+                    refreshToken: response.refresh,
+                };
+                localStorage.setItem('pendingUserData', JSON.stringify(pendingData));
+                window.location.href = `/payment?subscription_id=${subscriptionId}`;
+                return;
+            }
+
+            // No subscription (e.g. free) – log in and go to dashboard
             localStorage.setItem('accessToken', response.access);
             localStorage.setItem('refreshToken', response.refresh);
-            
-            // Check if payment is required
-            const requiresPayment = response.requires_payment === true;
-            const subscription = response.subscription;
-            
-            // Store payment info in pendingUserData for later use
-            const userDataWithPayment = {
-                ...frontendUser,
-                requiresPayment,
-                subscriptionId: subscription?.id,
-            };
-            
-            // No automatic email verification - user can verify later from profile
-            // Proceed directly to payment or dashboard
-            if (requiresPayment && subscription) {
-                // Save user data temporarily and redirect to payment
-                localStorage.setItem('pendingUserData', JSON.stringify(userDataWithPayment));
-                // Redirect to payment page
-                window.location.href = `/payment?subscription_id=${subscription.id}`;
-            } else {
-                // Clear old user data before setting new user
-                localStorage.removeItem('currentUser');
-                localStorage.removeItem('accessToken');
-                localStorage.removeItem('refreshToken');
-                
-                setCurrentUser(frontendUser);
-                setIsLoggedIn(true);
-                
-                // Navigate to dashboard
-                setTimeout(() => {
-                    navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
-                    setCurrentPage('Dashboard');
-                }, 100);
-            }
+            setCurrentUser(frontendUser);
+            setIsLoggedIn(true);
+            setTimeout(() => {
+                navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
+                setCurrentPage('Dashboard');
+            }, 100);
         } catch (error: any) {
             const backendFieldErrors = mapBackendErrorsToFields(error.fields || {});
             if (Object.keys(backendFieldErrors).length > 0) {
@@ -991,9 +976,6 @@ export const RegisterPage = () => {
                                     <h3 className="text-lg font-semibold text-primary">
                                         {t('selectPlan') || 'Select a Plan'}
                                     </h3>
-                                    <p className="text-sm text-secondary">
-                                        {t('planSelectionHint') || 'Choose the plan that fits your team. You can switch later and no payment details are required now.'}
-                                    </p>
 
                                     <div className="flex items-center justify-between gap-3">
                                         <span className="text-sm font-medium text-secondary">
@@ -1099,10 +1081,6 @@ export const RegisterPage = () => {
                                             {errors.plan}
                                         </p>
                                     )}
-
-                                    <p className="text-xs text-tertiary">
-                                        {t('planNoteNoPayment') || 'We activate your chosen plan immediately—upgrade or downgrade anytime from settings.'}
-                                    </p>
                                 </div>
                             )}
 

@@ -49,6 +49,12 @@ async function apiRequest<T>(
     headers['X-API-Key'] = API_KEY;
   }
 
+  // Send current UI language so backend can use it for emails and responses
+  const uiLanguage = typeof window !== 'undefined' ? localStorage.getItem('language') : null;
+  if (uiLanguage === 'ar' || uiLanguage === 'en') {
+    headers['X-Language'] = uiLanguage;
+  }
+
   if (!isFormData) {
     headers['Content-Type'] = 'application/json';
   }
@@ -2631,6 +2637,41 @@ export const assignUnassignedClientsAPI = async () => {
   }>('/clients/assign_unassigned/', {
     method: 'POST',
   });
+};
+
+/** GET /api/support-tickets/ - list current user's support tickets (paginated) */
+export const getSupportTicketsAPI = async (params?: { page?: number; page_size?: number }) => {
+  const queryString = params
+    ? new URLSearchParams(
+        Object.fromEntries(
+          Object.entries(params).filter(([, v]) => v != null) as [string, string][]
+        )
+      ).toString()
+    : '';
+  return apiRequest<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: Array<{
+      id: number;
+      title: string;
+      description: string;
+      status: string;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }>(`/support-tickets/${queryString ? `?${queryString}` : ''}`);
+};
+
+/** POST /api/support-tickets/ - create a support ticket */
+export const createSupportTicketAPI = async (data: { title: string; description: string }) => {
+  return apiRequest<{ id: number; title: string; description: string; status: string; created_at: string }>(
+    '/support-tickets/',
+    {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }
+  );
 };
 
 

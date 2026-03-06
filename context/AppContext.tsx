@@ -1081,6 +1081,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     switch (page) {
       case 'Dashboard':
       case 'Profile':
+      case 'Support Center':
         return true;
       case 'Leads':
       case 'All Leads':

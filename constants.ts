@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Page, Lead, User, Deal, Todo, Campaign, TimelineEntry, Activity, Developer, Project, Unit, Owner, Channel, Stage, Status, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier } from './types';
-import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon } from './components/index';
+import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon } from './components/index';
 
 export const SIDEBAR_ITEMS: {
   name: Page;
@@ -20,6 +20,7 @@ export const SIDEBAR_ITEMS: {
     { name: 'Reports', icon: FileTextIcon, subItems: ['Teams Report', 'Employees Report', 'Marketing Report'] },
     { name: 'Integrations', icon: ChevronsUpDownIcon, subItems: ['Meta', 'TikTok', 'WhatsApp', 'Twilio'] },
     { name: 'Billing', icon: CreditCardIcon, subItems: ['Change Plan', 'Payment', 'Subscription'] },
+    { name: 'Support Center', icon: HeadphonesIcon },
   ];
 
 export const SETTINGS_ITEM = { name: 'Settings', icon: SettingsIcon };
@@ -94,6 +95,15 @@ export const translations = {
     selectPlan: "Select a Plan",
     pleaseLogin: "Please login to view billing information",
     settings: "Settings",
+    supportCenter: "Support Center",
+    supportTicketTitle: "Subject",
+    supportTicketDescription: "Description",
+    submitTicket: "Submit",
+    myTickets: "My Tickets",
+    statusOpen: "Open",
+    statusInProgress: "In Progress",
+    statusClosed: "Closed",
+    ticketSubmittedSuccess: "Your request has been submitted successfully.",
     channels: "Channels",
     stages: "Stages",
     statuses: "Statuses",
@@ -167,6 +177,8 @@ export const translations = {
     lastStage: "Last Stage",
     reminder: "Reminder",
     view: "View",
+    viewDetails: "View details",
+    refresh: "Refresh",
     add_action: "Add Action",
     statusUpdated: "Status updated",
     leadAssigned: "Lead assigned",
@@ -1416,11 +1428,11 @@ export const translations = {
     paymentSuccessNoData: "Payment successful but user data not found. Please login.",
     paymentSuccessError: "Error processing payment success",
     paymentPending: "Payment is still being processed. Please wait a moment and refresh.",
-    noActiveSubscription: "Your subscription is not active. Please contact support or complete your payment to access the system.",
+    noActiveSubscription: "Your subscription is not active. Please contact support or Complete Your Payment to access the system.",
     noActiveSubscriptionBeforeLink: "Your subscription is not active. Please contact support, ",
     noActiveSubscriptionMiddleLink: " or ",
     noActiveSubscriptionAfterLink: " to access the system.",
-    completePayment: "complete your payment",
+    completePayment: "Complete Your Payment",
     completePaymentViaPaytabs: "Complete Payment via Paytabs",
     currentPlan: "Current Plan",
     subscriptionStatus: "Subscription Status",
@@ -1505,6 +1517,15 @@ export const translations = {
     selectPlan: "اختر خطة",
     pleaseLogin: "يرجى تسجيل الدخول لعرض معلومات الفوترة",
     settings: "الإعدادات",
+    supportCenter: "مركز الدعم",
+    supportTicketTitle: "الموضوع",
+    supportTicketDescription: "الوصف",
+    submitTicket: "إرسال",
+    myTickets: "تذاكري",
+    statusOpen: "مفتوح",
+    statusInProgress: "قيد المعالجة",
+    statusClosed: "مغلق",
+    ticketSubmittedSuccess: "تم إرسال طلبك بنجاح.",
     channels: "القنوات",
     stages: "المراحل",
     statuses: "الحالات",
@@ -1573,6 +1594,8 @@ export const translations = {
     lastStage: "آخر مرحلة",
     reminder: "تذكير",
     view: "عرض",
+    viewDetails: "عرض التفاصيل",
+    refresh: "تحديث",
     add_action: "إضافة إجراء",
     statusUpdated: "تم تحديث الحالة",
     leadAssigned: "تم إسناد العميل",

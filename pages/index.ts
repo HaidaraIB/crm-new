@@ -28,6 +28,7 @@ export * from './EmployeesReportPage';
 export * from './MarketingReportPage';
 export * from './IntegrationsPage';
 export * from './SettingsPage';
+export * from './SupportCenterPage';
 export * from './ProfilePage';
 export * from './ServicesInventoryPage';
 export * from './ProductsInventoryPage';

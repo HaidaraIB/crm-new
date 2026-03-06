@@ -155,12 +155,17 @@ export const PaymentSuccessPage = () => {
                 
                 const pendingUserData = JSON.parse(pendingUserDataStr);
                 
-                // Check if we have tokens - if not, try to get them from pendingUserData or redirect to login
                 let accessToken = localStorage.getItem('accessToken');
                 let refreshToken = localStorage.getItem('refreshToken');
                 
-                // If no tokens, check if we can use pendingUserData to login
-                // If pendingUserData has username/password, we can try to login automatically
+                // Use tokens from pendingUserData (stored at registration before redirect to payment)
+                if ((!accessToken || !refreshToken) && pendingUserData?.accessToken && pendingUserData?.refreshToken) {
+                    accessToken = pendingUserData.accessToken;
+                    refreshToken = pendingUserData.refreshToken;
+                    localStorage.setItem('accessToken', accessToken);
+                    localStorage.setItem('refreshToken', refreshToken);
+                }
+                
                 if (!accessToken || !refreshToken) {
                     // Check if we have credentials in sessionStorage from previous login attempt
                     const storedUsername = sessionStorage.getItem('2fa_username');

@@ -75,6 +75,29 @@ function getRowValue(row: Record<string, unknown>, colIndex: number, headers: st
   return s;
 }
 
+// Empty Excel template with accepted CRM columns (first row = headers)
+async function downloadLeadsTemplate(): Promise<void> {
+  const workbook = new ExcelJS.Workbook();
+  const sheet = workbook.addWorksheet('Leads', { headerRow: true });
+  const headers = ['Name', 'Phone', 'Budget', 'Type', 'Priority'];
+  const headerRow = sheet.getRow(1);
+  headers.forEach((h, i) => {
+    headerRow.getCell(i + 1).value = h;
+  });
+  headerRow.font = { bold: true };
+  headers.forEach((_, i) => {
+    sheet.getColumn(i + 1).width = 14;
+  });
+  const buffer = await workbook.xlsx.writeBuffer();
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'leads-import-template.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export interface ImportLeadsModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -250,13 +273,36 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {t('importLeadsDescription') || 'Upload an Excel file (.xlsx) with columns: Name and Phone. Optional: Budget, Type (fresh/cold), Priority (low/medium/high). The first row should be headers.'}
             </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              className="block w-full text-sm text-gray-700 dark:text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-primary file:text-white file:font-medium"
-            />
+            <div className="flex flex-wrap items-center gap-3">
+              <Button variant="secondary" onClick={downloadLeadsTemplate} type="button">
+                {t('importLeadsDownloadTemplate') || 'Download template'}
+              </Button>
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {t('importLeadsDownloadTemplateHint') || 'Empty template to fill and upload'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                ref={fileInputRef}
+                id="import-leads-file"
+                type="file"
+                accept=".xlsx,.xls"
+                onChange={handleFileChange}
+                className="sr-only"
+                tabIndex={-1}
+                aria-label={t('chooseFiles') || 'Choose File'}
+              />
+              <span className="text-sm text-gray-500 dark:text-gray-400">
+                {!file ? (t('noFileChosen') || 'No file chosen') : file.name}
+              </span>
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="px-4 py-2 rounded text-sm font-medium bg-primary text-white hover:opacity-90 transition-opacity"
+              >
+                {t('chooseFiles') || 'Choose File'}
+              </button>
+            </div>
             {parseError && (
               <p className="text-sm text-red-600 dark:text-red-400">{parseError}</p>
             )}

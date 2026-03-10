@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Input, Button, Modal } from '../components/index';
 import { EyeIcon, RefreshIcon } from '../components/icons';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
+
+type TicketAttachment = { id: number; file: string; url: string; created_at: string };
 
 type TicketItem = {
   id: number;
@@ -12,6 +14,7 @@ type TicketItem = {
   status: string;
   created_at: string;
   updated_at?: string;
+  attachments?: TicketAttachment[];
 };
 
 const Label = ({
@@ -38,10 +41,12 @@ const statusLabelKey: Record<string, string> = {
 export const SupportCenterPage = () => {
   const { t } = useAppContext();
   const [formData, setFormData] = useState({ title: '', description: '' });
+  const [screenshots, setScreenshots] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<TicketItem | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: ticketsData, isLoading: ticketsLoading, isFetching: ticketsFetching, refetch: refetchTickets } = useQuery({
     queryKey: ['support-tickets'],
@@ -69,8 +74,11 @@ export const SupportCenterPage = () => {
       await createSupportTicketAPI({
         title: formData.title.trim(),
         description: formData.description.trim(),
+        screenshots: screenshots.length ? screenshots : undefined,
       });
       setFormData({ title: '', description: '' });
+      setScreenshots([]);
+      if (fileInputRef.current) fileInputRef.current.value = '';
       setErrors({});
       setSuccessMessage(t('ticketSubmittedSuccess') || 'Your request has been submitted successfully.');
       refetchTickets();
@@ -115,6 +123,62 @@ export const SupportCenterPage = () => {
               />
               {errors.description && (
                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description}</p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="support-screenshots">{t('screenshots') || 'Screenshots (optional)'}</Label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('screenshotsHint') || 'You can select multiple images.'}</p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <input
+                  ref={fileInputRef}
+                  id="support-screenshots"
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={(e) => {
+                    const newFiles = e.target.files ? Array.from(e.target.files) : [];
+                    setScreenshots((prev) => {
+                      const combined = [...prev];
+                      newFiles.forEach((f) => {
+                        if (!combined.some((ex) => ex.name === f.name && ex.size === f.size)) combined.push(f);
+                      });
+                      return combined;
+                    });
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                  }}
+                  className="sr-only"
+                  tabIndex={-1}
+                  aria-label={t('chooseFiles') || 'Choose Files'}
+                />
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {screenshots.length === 0
+                    ? (t('noFileChosen') || 'No file chosen')
+                    : (t('filesChosen') || '{count} file(s) chosen').replace('{count}', String(screenshots.length))}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-3 py-2 rounded-md text-sm font-medium bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-500 transition-colors"
+                >
+                  {t('chooseFiles') || 'Choose Files'}
+                </button>
+              </div>
+              {screenshots.length > 0 && (
+                <ul className="mt-2 flex flex-wrap gap-2">
+                  {screenshots.map((f, i) => (
+                    <li key={`${f.name}-${f.size}-${i}`} className="inline-flex items-center gap-1 px-2 py-1 rounded bg-gray-100 dark:bg-gray-600 text-sm text-gray-700 dark:text-gray-200">
+                      <span className="truncate max-w-[120px]">{f.name}</span>
+                      <button
+                        type="button"
+                        onClick={() => setScreenshots((prev) => prev.filter((_, j) => j !== i))}
+                        className="text-red-600 dark:text-red-400 hover:underline"
+                        aria-label={t('remove') || 'Remove'}
+                      >
+                        ×
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
             {errors.submit && (
@@ -190,10 +254,10 @@ export const SupportCenterPage = () => {
                         <span
                           className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
                             ticket.status === 'closed'
-                              ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200'
                               : ticket.status === 'in_progress'
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
-                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200'
+                              : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
                           }`}
                         >
                           {t(statusLabelKey[ticket.status] || 'statusOpen') || ticket.status}
@@ -252,7 +316,7 @@ export const SupportCenterPage = () => {
                   <span
                     className={`inline-block px-2.5 py-1 text-xs font-semibold rounded-lg ${
                       selectedTicket.status === 'closed'
-                        ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-200'
+                        ? 'bg-green-100 text-green-800 dark:bg-green-900/50 dark:text-green-200'
                         : selectedTicket.status === 'in_progress'
                         ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/50 dark:text-blue-200'
                         : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
@@ -277,6 +341,30 @@ export const SupportCenterPage = () => {
                 )}
               </div>
             </section>
+            {selectedTicket.attachments && selectedTicket.attachments.length > 0 && (
+              <section>
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">
+                  {t('screenshots') || 'Screenshots'}
+                </h3>
+                <div className="flex flex-wrap gap-3">
+                  {selectedTicket.attachments.map((att) => (
+                    <a
+                      key={att.id}
+                      href={att.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block rounded-lg border border-gray-200 dark:border-gray-600 overflow-hidden bg-gray-50 dark:bg-gray-700/50 hover:opacity-90 focus:ring-2 focus:ring-offset-2 focus:ring-gray-400"
+                    >
+                      <img
+                        src={att.url}
+                        alt=""
+                        className="h-24 w-auto object-cover max-w-[180px]"
+                      />
+                    </a>
+                  ))}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </Modal>

@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Service } from '../types';
-import { ServicesFilterDrawer } from '../components/drawers/ServicesFilterDrawer';
 import { useServices, useDeleteService } from '../hooks/useQueries';
 
 const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
@@ -257,7 +256,6 @@ export const ServicesPage = () => {
             <Card>
                 <ServicesTable services={filteredServices} onUpdate={handleUpdateService} onDelete={handleDeleteService} isAdmin={isAdmin} />
             </Card>
-            <ServicesFilterDrawer />
         </PageWrapper>
     );
 };

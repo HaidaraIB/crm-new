@@ -4,9 +4,6 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon } from '../components/index';
 import { Developer, Project, Unit } from '../types';
-import { DevelopersFilterDrawer } from '../components/drawers/DevelopersFilterDrawer';
-import { ProjectsFilterDrawer } from '../components/drawers/ProjectsFilterDrawer';
-import { UnitsFilterDrawer } from '../components/drawers/UnitsFilterDrawer';
 import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
 
 type Tab = 'units' | 'projects' | 'developers';
@@ -598,9 +595,6 @@ export const PropertiesPage = () => {
                 </nav>
             </div>
             {renderContent()}
-            <DevelopersFilterDrawer />
-            <ProjectsFilterDrawer />
-            <UnitsFilterDrawer />
         </PageWrapper>
     );
 };

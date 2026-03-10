@@ -391,6 +391,9 @@ export interface Unit {
   city: string;
   district: string;
   zone: string;
+  lounge?: number;
+  area?: number;
+  currency?: string;
   isSold: boolean;
 }
 

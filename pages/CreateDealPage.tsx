@@ -32,7 +32,7 @@ const Select = ({ id, children, value, onChange, className, disabled }: { id: st
 
 
 export const CreateDealPage = () => {
-    const { t, setCurrentPage, setIsAddLeadModalOpen, currentUser, selectedLeadForDeal, setSelectedLeadForDeal } = useAppContext();
+    const { t, setCurrentPage, currentUser, selectedLeadForDeal, setSelectedLeadForDeal } = useAppContext();
     
     // Fetch data using React Query hooks
     const { data: projectsResponse } = useProjects();
@@ -100,16 +100,19 @@ export const CreateDealPage = () => {
         if (defaultLeadId > 0 && formState.leadId === 0) {
             setFormState(prev => ({ ...prev, leadId: defaultLeadId }));
         }
-        // Set default employee, startedBy and closedBy if users are loaded and current values are invalid
+        // Set default employee, startedBy and closedBy only if users are loaded and current values are invalid (compare as numbers)
         if (userOptions.length > 0 && currentUser?.id) {
             const currentUserInList = userOptions.find(u => u.id === currentUser.id);
-            if (currentUserInList && (formState.employee === 0 || !userOptions.find(u => u.id === formState.employee))) {
+            const startedById = Number(formState.startedBy);
+            const closedById = Number(formState.closedBy);
+            const employeeId = Number(formState.employee);
+            if (currentUserInList && (employeeId === 0 || !userOptions.find(u => u.id === employeeId))) {
                 setFormState(prev => ({ ...prev, employee: currentUser.id }));
             }
-            if (currentUserInList && (formState.startedBy === 0 || !userOptions.find(u => u.id === formState.startedBy))) {
+            if (currentUserInList && (startedById === 0 || !userOptions.find(u => u.id === startedById))) {
                 setFormState(prev => ({ ...prev, startedBy: currentUser.id }));
             }
-            if (currentUserInList && (formState.closedBy === 0 || !userOptions.find(u => u.id === formState.closedBy))) {
+            if (currentUserInList && (closedById === 0 || !userOptions.find(u => u.id === closedById))) {
                 setFormState(prev => ({ ...prev, closedBy: currentUser.id }));
             }
         }
@@ -182,7 +185,10 @@ export const CreateDealPage = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => {
-            const newState = { ...prev, [id]: value };
+            // Keep startedBy, closedBy, employee, leadId as numbers so useEffect doesn't overwrite user selection
+            const numericFields = ['startedBy', 'closedBy', 'employee', 'leadId'];
+            const resolvedValue = numericFields.includes(id) ? (Number(value) || 0) : value;
+            const newState = { ...prev, [id]: resolvedValue };
 
             if (id === 'value' || id === 'discountPercentage') {
                 const val = parseFloat(newState.value) || 0;
@@ -408,7 +414,7 @@ export const CreateDealPage = () => {
                                     <option disabled value={0}>{t('selectLead')}</option>
                                     {(leads || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
                                 </Select>
-                                <Button type="button" variant="secondary" className="px-3" onClick={() => setIsAddLeadModalOpen(true)}>
+                                <Button type="button" variant="secondary" className="px-3" onClick={() => { window.history.pushState({}, '', '/create-lead'); setCurrentPage('CreateLead'); }}>
                                     <PlusIcon className="w-4 h-4"/>
                                 </Button>
                             </div>

@@ -2659,17 +2659,43 @@ export const getSupportTicketsAPI = async (params?: { page?: number; page_size?:
       status: string;
       created_at: string;
       updated_at: string;
+      attachments?: Array<{ id: number; file: string; url: string; created_at: string }>;
     }>;
   }>(`/support-tickets/${queryString ? `?${queryString}` : ''}`);
 };
 
-/** POST /api/support-tickets/ - create a support ticket */
-export const createSupportTicketAPI = async (data: { title: string; description: string }) => {
+/** POST /api/support-tickets/ - create a support ticket (optionally with screenshot files) */
+export const createSupportTicketAPI = async (payload: {
+  title: string;
+  description: string;
+  screenshots?: File[];
+}) => {
+  const { title, description, screenshots = [] } = payload;
+  const hasFiles = screenshots.length > 0;
+
+  if (hasFiles) {
+    const form = new FormData();
+    form.append('title', title);
+    form.append('description', description);
+    screenshots.forEach((file) => form.append('screenshots', file));
+    return apiRequest<{
+      id: number;
+      title: string;
+      description: string;
+      status: string;
+      created_at: string;
+      attachments?: Array<{ id: number; file: string; url: string; created_at: string }>;
+    }>('/support-tickets/', {
+      method: 'POST',
+      body: form,
+    });
+  }
+
   return apiRequest<{ id: number; title: string; description: string; status: string; created_at: string }>(
     '/support-tickets/',
     {
       method: 'POST',
-      body: JSON.stringify(data),
+      body: JSON.stringify({ title, description }),
     }
   );
 };

@@ -46,6 +46,9 @@ export const EditUnitModal = () => {
         city: '',
         district: '',
         zone: '',
+        lounge: '',
+        area: '',
+        currency: 'SAR',
         isSold: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -100,6 +103,9 @@ export const EditUnitModal = () => {
                 city: editingUnit.city || '',
                 district: editingUnit.district || '',
                 zone: editingUnit.zone || '',
+                lounge: editingUnit.lounge?.toString() ?? '0',
+                area: editingUnit.area?.toString() ?? '',
+                currency: editingUnit.currency || 'SAR',
                 isSold: editingUnit.isSold || false,
             });
         }
@@ -145,6 +151,9 @@ export const EditUnitModal = () => {
                 city: formState.city || '',
                 district: formState.district || '',
                 zone: formState.zone || '',
+                lounge: formState.lounge ? Number(formState.lounge) : null,
+                area: formState.area ? Number(formState.area) : null,
+                currency: formState.currency || null,
                 isSold: formState.isSold, // Send boolean value directly
                 is_sold: formState.isSold, // Also send in snake_case format (API might expect this)
                 company: currentUser?.company?.id,
@@ -186,7 +195,7 @@ export const EditUnitModal = () => {
                         <Label htmlFor="name">{t('name')}</Label>
                         <Input 
                             id="name" 
-                            placeholder={t('enterUnitName') || 'Enter unit name'} 
+                            placeholder={t('enterUnitName')} 
                             value={formState.name} 
                             onChange={handleChange}
                         />
@@ -214,7 +223,7 @@ export const EditUnitModal = () => {
                             onChange={handleChange}
                             className={errors.project ? 'border-red-500 dark:border-red-500' : ''}
                         >
-                            <option value="">{t('selectProject') || 'Select Project'}</option>
+                            <option value="">{t('chooseProject')}</option>
                             {projects.map(p => <option key={p.id} value={p.id.toString()}>{p.name}</option>)}
                         </Select>
                         {errors.project && (
@@ -228,7 +237,7 @@ export const EditUnitModal = () => {
                             name="price" 
                             value={formState.price} 
                             onChange={handleChange} 
-                            placeholder="e.g. 1,000,000" 
+                            placeholder={t('egPrice')} 
                             min={0} 
                             step={1}
                             className={errors.price ? 'border-red-500 dark:border-red-500' : ''}
@@ -250,6 +259,30 @@ export const EditUnitModal = () => {
                         <Select id="type" value={formState.type} onChange={handleChange}>
                             <option value="Apartment">{t('apartment')}</option>
                             <option value="Villa">{t('villa')}</option>
+                            <option value="House">{t('house')}</option>
+                        </Select>
+                    </div>
+                    <div>
+                        <Label htmlFor="lounge">{t('lounge')}</Label>
+                        <NumberInput id="lounge" name="lounge" value={formState.lounge} onChange={handleChange} min={0} step={1} />
+                    </div>
+                    <div>
+                        <Label htmlFor="area">{t('area')}</Label>
+                        <NumberInput id="area" name="area" value={formState.area} onChange={handleChange} placeholder={t('enterArea')} min={0} step={0.01} />
+                    </div>
+                    <div>
+                        <Label htmlFor="currency">{t('currencyLabel')}</Label>
+                        <Select id="currency" value={formState.currency} onChange={handleChange}>
+                            <option value="">{t('selectCurrency')}</option>
+                            <option value="SAR">{t('currencySAR')}</option>
+                            <option value="USD">{t('currencyUSD')}</option>
+                            <option value="IQD">{t('currencyIQD')}</option>
+                            <option value="AED">{t('currencyAED')}</option>
+                            <option value="EGP">{t('currencyEGP')}</option>
+                            <option value="KWD">{t('currencyKWD')}</option>
+                            <option value="BHD">{t('currencyBHD')}</option>
+                            <option value="QAR">{t('currencyQAR')}</option>
+                            <option value="OMR">{t('currencyOMR')}</option>
                         </Select>
                     </div>
                     <div>
@@ -261,15 +294,15 @@ export const EditUnitModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="city">{t('city')}</Label>
-                        <Input id="city" placeholder="e.g. Dubai" value={formState.city} onChange={handleChange} />
+                        <Input id="city" placeholder={t('egDubai')} value={formState.city} onChange={handleChange} />
                     </div>
                     <div>
                         <Label htmlFor="district">{t('district')}</Label>
-                        <Input id="district" placeholder="e.g. Downtown" value={formState.district} onChange={handleChange} />
+                        <Input id="district" placeholder={t('egDowntown')} value={formState.district} onChange={handleChange} />
                     </div>
                     <div>
                         <Label htmlFor="zone">{t('zone')}</Label>
-                        <Input id="zone" placeholder="e.g. Zone 1" value={formState.zone} onChange={handleChange} />
+                        <Input id="zone" placeholder={t('egZone1')} value={formState.zone} onChange={handleChange} />
                     </div>
                     <div className="flex items-center">
                         <input

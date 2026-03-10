@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { ServicePackage } from '../types';
-import { ServicePackagesFilterDrawer } from '../components/drawers/ServicePackagesFilterDrawer';
 import { useServicePackages, useDeleteServicePackage } from '../hooks/useQueries';
 
 const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: ServicePackage[], onUpdate: (pkg: ServicePackage) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
@@ -105,7 +104,7 @@ export const ServicePackagesPage = () => {
         currentUser,
         servicePackageFilters,
         setServicePackageFilters,
-        setIsServicePackagesFilterDrawerOpen,
+        setIsServicePackageFilterDrawerOpen,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
         setIsAddServicePackageModalOpen,
@@ -244,7 +243,7 @@ export const ServicePackagesPage = () => {
             title={t('servicePackages')}
             actions={
                 <>
-                    <Button variant="secondary" onClick={() => setIsServicePackagesFilterDrawerOpen(true)}>
+                    <Button variant="secondary" onClick={() => setIsServicePackageFilterDrawerOpen(true)}>
                         <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
                     </Button>
                     {isAdmin && (
@@ -258,7 +257,6 @@ export const ServicePackagesPage = () => {
             <Card>
                 <PackagesTable packages={filteredPackages} onUpdate={handleUpdatePackage} onDelete={handleDeletePackage} isAdmin={isAdmin} />
             </Card>
-            <ServicePackagesFilterDrawer />
         </PageWrapper>
     );
 };

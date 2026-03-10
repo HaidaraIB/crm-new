@@ -272,7 +272,10 @@ export const EditDealModal = () => {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => {
-            const newState = { ...prev, [id]: value };
+            // Keep employee, startedBy, closedBy, leadId as numbers for consistent select behavior
+            const numericFields = ['startedBy', 'closedBy', 'employee', 'leadId'];
+            const resolvedValue = numericFields.includes(id) ? (Number(value) || 0) : value;
+            const newState = { ...prev, [id]: resolvedValue };
 
             if (id === 'value' || id === 'discountPercentage') {
                 const val = parseFloat(newState.value) || 0;

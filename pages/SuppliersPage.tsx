@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Supplier } from '../types';
-import { SuppliersFilterDrawer } from '../components/drawers/SuppliersFilterDrawer';
 import { useSuppliers, useDeleteSupplier } from '../hooks/useQueries';
 
 const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
@@ -234,7 +233,6 @@ export const SuppliersPage = () => {
             <Card>
                 <SuppliersTable suppliers={filteredSuppliers} onUpdate={handleUpdateSupplier} onDelete={handleDeleteSupplier} isAdmin={isAdmin} />
             </Card>
-            <SuppliersFilterDrawer />
         </PageWrapper>
     );
 };

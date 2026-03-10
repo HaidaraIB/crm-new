@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { ProductCategory } from '../types';
-import { ProductCategoriesFilterDrawer } from '../components/drawers/ProductCategoriesFilterDrawer';
 import { useProductCategories, useDeleteProductCategory } from '../hooks/useQueries';
 
 const CategoriesTable = ({ categories, onUpdate, onDelete, isAdmin, allCategories }: { categories: ProductCategory[], onUpdate: (category: ProductCategory) => void, onDelete: (id: number) => void, isAdmin: boolean, allCategories: ProductCategory[] }) => {
@@ -238,7 +237,6 @@ export const ProductCategoriesPage = () => {
             <Card>
                 <CategoriesTable categories={filteredCategories} onUpdate={handleUpdateCategory} onDelete={handleDeleteCategory} isAdmin={isAdmin} allCategories={allCategories} />
             </Card>
-            <ProductCategoriesFilterDrawer />
         </PageWrapper>
     );
 };

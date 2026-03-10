@@ -180,7 +180,7 @@ export const AddProjectModal = () => {
                         onChange={handleChange}
                         className={errors.developer ? 'border-red-500 dark:border-red-500' : ''}
                     >
-                        <option value="">{t('selectDeveloper') || 'Select Developer'}</option>
+                        <option value="">{t('selectDeveloper')}</option>
                         {developers.map(dev => <option key={dev.id} value={dev.id.toString()}>{dev.name}</option>)}
                     </Select>
                     {errors.developer && (
@@ -193,7 +193,7 @@ export const AddProjectModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="city">{t('city')}</Label>
-                    <Input id="city" placeholder="e.g. Dubai" value={formState.city} onChange={handleChange} />
+                    <Input id="city" placeholder={t('egDubai')} value={formState.city} onChange={handleChange} />
                 </div>
                  <div>
                     <Label htmlFor="paymentMethod">{t('paymentMethod')}</Label>

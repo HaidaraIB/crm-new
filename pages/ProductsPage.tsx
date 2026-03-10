@@ -3,7 +3,6 @@ import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Product } from '../types';
-import { ProductsFilterDrawer } from '../components/drawers/ProductsFilterDrawer';
 import { useProducts, useDeleteProduct } from '../hooks/useQueries';
 
 const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Product[], onUpdate: (product: Product) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
@@ -311,7 +310,6 @@ export const ProductsPage = () => {
             <Card>
                 <ProductsTable products={filteredProducts} onUpdate={handleUpdateProduct} onDelete={handleDeleteProduct} isAdmin={isAdmin} />
             </Card>
-            <ProductsFilterDrawer />
         </PageWrapper>
     );
 };

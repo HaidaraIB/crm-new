@@ -5,7 +5,6 @@ import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Owner } from '../types';
-import { OwnersFilterDrawer } from '../components/drawers/OwnersFilterDrawer';
 import { useOwners, useDeleteOwner } from '../hooks/useQueries';
 
 const OwnersTable = ({ owners, onEdit, onDelete, isAdmin }: { owners: Owner[], onEdit: (owner: Owner) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
@@ -187,7 +186,6 @@ export const OwnersPage = () => {
             <Card>
                 <OwnersTable owners={filteredOwners} onEdit={handleEdit} onDelete={handleDelete} isAdmin={isAdmin} />
             </Card>
-            <OwnersFilterDrawer />
         </PageWrapper>
     );
 };

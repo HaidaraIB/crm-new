@@ -482,6 +482,7 @@ export interface Channel {
     name: string;
     type: string;
     priority: 'High' | 'Medium' | 'Low';
+    isDefault?: boolean;
 }
 
 export interface Stage {
@@ -491,6 +492,7 @@ export interface Stage {
     color: string;
     required: boolean;
     autoAdvance: boolean;
+    isDefault?: boolean;
 }
 
 export interface Status {

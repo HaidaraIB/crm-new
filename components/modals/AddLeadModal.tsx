@@ -56,16 +56,16 @@ export const AddLeadModal = () => {
     // Get default status from settings (first non-hidden status or first status)
     const getDefaultStatus = () => {
         if (!Array.isArray(statuses) || statuses.length === 0) return undefined;
-        const defaultStatus = statuses.find(s => s.isDefault && !s.isHidden) || 
-                             statuses.find(s => !s.isHidden) || 
+        const defaultStatus = statuses.find((s: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (s.isDefault ?? s.is_default) && !s.isHidden) || 
+                             statuses.find((s: { isHidden?: boolean }) => !s.isHidden) || 
                              statuses[0];
         return defaultStatus ? defaultStatus.name as Lead['status'] : undefined;
     };
     
-    // Get default channel from settings (first channel)
+    // Get default channel from settings (first default or first channel)
     const getDefaultChannel = () => {
         if (!Array.isArray(channels) || channels.length === 0) return undefined;
-        const defaultChannel = channels[0];
+        const defaultChannel = channels.find((c: { isDefault?: boolean; is_default?: boolean }) => c.isDefault ?? c.is_default) || channels[0];
         return defaultChannel ? defaultChannel.name : undefined;
     };
     

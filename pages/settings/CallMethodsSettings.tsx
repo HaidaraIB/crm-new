@@ -3,7 +3,7 @@ import React from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/index';
 import { useAppContext } from '../../context/AppContext';
-import { useCallMethods, useDeleteCallMethod } from '../../hooks/useQueries';
+import { useCallMethods, useDeleteCallMethod, useUpdateCallMethod } from '../../hooks/useQueries';
 
 export interface CallMethod {
   id: number;
@@ -11,6 +11,8 @@ export interface CallMethod {
   description?: string;
   color: string;
   is_active: boolean;
+  isDefault?: boolean;
+  is_default?: boolean;
 }
 
 export const CallMethodsSettings = () => {
@@ -30,8 +32,24 @@ export const CallMethodsSettings = () => {
         ? callMethodsData 
         : (callMethodsData?.results || []);
     
-    // Delete mutation
+    // Delete and update mutations
     const deleteCallMethodMutation = useDeleteCallMethod();
+    const updateCallMethodMutation = useUpdateCallMethod();
+
+    const handleSetDefaultCallMethod = (callMethod: CallMethod & { company?: number }) => {
+        if (callMethod.isDefault ?? callMethod.is_default) return;
+        updateCallMethodMutation.mutate({
+            id: callMethod.id,
+            data: {
+                name: callMethod.name,
+                description: callMethod.description ?? '',
+                color: callMethod.color ?? '#808080',
+                company: callMethod.company ?? (callMethod as any).company,
+                is_active: callMethod.is_active ?? true,
+                is_default: true,
+            },
+        });
+    };
 
     const handleEditCallMethod = (callMethod: CallMethod) => {
         setEditingCallMethod(callMethod);
@@ -84,13 +102,18 @@ export const CallMethodsSettings = () => {
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[250px]">
                                     {t('description')}
                                 </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[90px]">
+                                    {t('default') || 'Default'}
+                                </th>
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[120px]">
                                     {t('actions')}
                                 </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                            {callMethods && callMethods.length > 0 ? callMethods.map(callMethod => (
+                            {callMethods && callMethods.length > 0 ? callMethods.map(callMethod => {
+                                const isDefault = callMethod.isDefault ?? callMethod.is_default;
+                                return (
                                 <tr 
                                     key={callMethod.id} 
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
@@ -115,6 +138,22 @@ export const CallMethodsSettings = () => {
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        {isDefault ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/20 text-primary dark:bg-primary-900 dark:text-primary-200">
+                                                {t('default')}
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="text-xs text-primary hover:underline"
+                                                onClick={() => handleSetDefaultCallMethod(callMethod)}
+                                                disabled={updateCallMethodMutation.isPending}
+                                            >
+                                                {t('setAsDefault') || 'Set as default'}
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="flex items-center justify-center gap-1">
                                             <button
                                                 type="button"
@@ -135,9 +174,9 @@ export const CallMethodsSettings = () => {
                                         </div>
                                     </td>
                                 </tr>
-                            )) : (
+                            );}) : (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center">
+                                    <td colSpan={5} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noCallMethodsFound') || 'No call methods found'}
                                         </div>

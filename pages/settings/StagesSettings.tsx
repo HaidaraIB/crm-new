@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/index';
 import { Stage } from '../../types';
 import { useAppContext } from '../../context/AppContext';
-import { useStages, useDeleteStage } from '../../hooks/useQueries';
+import { useStages, useDeleteStage, useUpdateStage } from '../../hooks/useQueries';
 
 export const StagesSettings = () => {
     const { 
@@ -22,8 +22,27 @@ export const StagesSettings = () => {
         ? stagesData 
         : (stagesData?.results || []);
     
-    // Delete mutation
+    // Delete and update mutations
     const deleteStageMutation = useDeleteStage();
+    const updateStageMutation = useUpdateStage();
+
+    const handleSetDefaultStage = (stage: Stage & { order?: number; company?: number; is_default?: boolean }) => {
+        if (stage.isDefault ?? stage.is_default) return;
+        updateStageMutation.mutate({
+            id: stage.id,
+            data: {
+                name: stage.name,
+                description: stage.description ?? '',
+                color: stage.color ?? '#808080',
+                required: stage.required ?? false,
+                auto_advance: stage.autoAdvance ?? (stage as any).auto_advance ?? false,
+                order: stage.order ?? 0,
+                company: stage.company ?? (stage as any).company,
+                is_active: (stage as any).is_active ?? true,
+                is_default: true,
+            },
+        });
+    };
 
     const handleEditStage = (stage: Stage) => {
         setEditingStage(stage);
@@ -67,45 +86,66 @@ export const StagesSettings = () => {
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[100px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[100px]">
                                     {t('color') || 'Color'}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
                                     {t('stageName')}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[250px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[250px]">
                                     {t('description')}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[120px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[90px]">
+                                    {t('default') || 'Default'}
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[120px]">
                                     {t('actions')}
                                 </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                            {stages && stages.length > 0 ? stages.map(stage => (
+                            {stages && stages.length > 0 ? stages.map(stage => {
+                                const isDefault = (stage as any).isDefault ?? (stage as any).is_default;
+                                return (
                                 <tr 
                                     key={stage.id} 
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
                                 >
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div 
-                                            className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700" 
+                                            className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 mx-auto" 
                                             style={{ backgroundColor: stage.color || '#808080' }}
                                             title={stage.color}
                                         />
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                             {stage.name}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-sm text-gray-700 dark:text-gray-300 max-w-md">
+                                    <td className="px-6 py-4 text-center">
+                                        <div className="text-sm text-gray-700 dark:text-gray-300 max-w-md mx-auto">
                                             {stage.description || <span className="text-gray-400 dark:text-gray-500 italic">-</span>}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className={`flex items-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        {isDefault ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/20 text-primary dark:bg-primary-900 dark:text-primary-200">
+                                                {t('default')}
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="text-xs text-primary hover:underline"
+                                                onClick={() => handleSetDefaultStage(stage as any)}
+                                                disabled={updateStageMutation.isPending}
+                                            >
+                                                {t('setAsDefault') || 'Set as default'}
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                                             <button
                                                 type="button"
                                                 className="p-2 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-600 dark:text-gray-400"
@@ -125,9 +165,9 @@ export const StagesSettings = () => {
                                         </div>
                                     </td>
                                 </tr>
-                            )) : (
+                            );}) : (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center">
+                                    <td colSpan={5} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noStagesFound') || 'No stages found'}
                                         </div>

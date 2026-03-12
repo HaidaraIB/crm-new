@@ -33,6 +33,7 @@ export const AddStatusModal = () => {
         description: '',
         category: 'active' as 'active' | 'inactive' | 'follow_up' | 'closed',
         color: '#808080',
+        isDefault: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -72,6 +73,7 @@ export const AddStatusModal = () => {
                 description: '',
                 category: 'active',
                 color: '#808080',
+                isDefault: false,
             });
             setErrors({});
         }
@@ -90,6 +92,7 @@ export const AddStatusModal = () => {
             description: '',
             category: 'active',
             color: '#808080',
+            isDefault: false,
         });
         setErrors({});
     };
@@ -107,8 +110,8 @@ export const AddStatusModal = () => {
                 description: formState.description,
                 category: formState.category,
                 color: formState.color,
-                isDefault: false,
-                isHidden: false,
+                is_default: formState.isDefault,
+                is_hidden: false,
                 company: currentUser?.company?.id,
             });
 
@@ -204,6 +207,16 @@ export const AddStatusModal = () => {
                         />
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-400 uppercase">{formState.color}</span>
                     </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="isDefault"
+                        checked={formState.isDefault}
+                        onChange={(e) => setFormState(prev => ({ ...prev, isDefault: e.target.checked }))}
+                        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary bg-white dark:bg-gray-800"
+                    />
+                    <Label htmlFor="isDefault">{t('setAsDefault') || 'Set as default'}</Label>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

@@ -815,6 +815,7 @@ export const translations = {
     leadStages: "Lead Stages",
     addStage: "Add Stage",
     stageName: "Stage Name",
+    color: "Color",
     required: "Required",
     autoAdvance: "Auto Advance",
     statusConfiguration: "Status Configuration",
@@ -1252,6 +1253,8 @@ export const translations = {
     show: "Show",
     hide: "Hide",
     noChannelsAvailable: "No channels available",
+    applyToAll: "Apply to all",
+    setAsDefault: "Set as default",
     // Success messages
     itemDeletedSuccessfully: "Item deleted successfully!",
     itemCreatedSuccessfully: "Item created successfully!",
@@ -2221,6 +2224,7 @@ export const translations = {
     leadStages: "مراحل العملاء",
     addStage: "إضافة مرحلة",
     stageName: "اسم المرحلة",
+    color: "اللون",
     required: "مطلوب",
     autoAdvance: "تقدم تلقائي",
     statusConfiguration: "تكوين الحالة",
@@ -2670,6 +2674,8 @@ export const translations = {
     show: "إظهار",
     hide: "إخفاء",
     noChannelsAvailable: "لا توجد قنوات متاحة",
+    applyToAll: "تطبيق على الكل",
+    setAsDefault: "تعيين كافتراضي",
     // Success messages
     itemDeletedSuccessfully: "تم حذف العنصر بنجاح!",
     itemCreatedSuccessfully: "تم إنشاء العنصر بنجاح!",

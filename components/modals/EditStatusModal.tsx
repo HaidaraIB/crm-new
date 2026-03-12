@@ -34,6 +34,7 @@ export const EditStatusModal = () => {
         description: '',
         category: 'active' as 'active' | 'inactive' | 'follow_up' | 'closed',
         color: '#808080',
+        isDefault: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -80,6 +81,7 @@ export const EditStatusModal = () => {
                 description: editingStatus.description || '',
                 category: categoryValue as 'active' | 'inactive' | 'follow_up' | 'closed',
                 color: editingStatus.color || '#808080',
+                isDefault: (editingStatus as any).isDefault ?? (editingStatus as any).is_default ?? false,
             });
             setErrors({});
         }
@@ -113,6 +115,7 @@ export const EditStatusModal = () => {
                     category: formState.category,
                     color: formState.color,
                     company: currentUser?.company?.id,
+                    is_default: formState.isDefault,
                 }
             });
 
@@ -210,6 +213,16 @@ export const EditStatusModal = () => {
                         />
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-400 uppercase">{formState.color}</span>
                     </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="isDefault"
+                        checked={formState.isDefault}
+                        onChange={(e) => setFormState(prev => ({ ...prev, isDefault: e.target.checked }))}
+                        className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary bg-white dark:bg-gray-800"
+                    />
+                    <Label htmlFor="isDefault">{t('setAsDefault') || 'Set as default'}</Label>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

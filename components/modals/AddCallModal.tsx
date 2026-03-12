@@ -24,9 +24,11 @@ export const AddCallModal = () => {
     const createClientCallMutation = useCreateClientCall();
     const loading = createClientCallMutation.isPending;
 
-    // Get default call method (first one from settings)
+    // Get default call method (current default from settings, or first)
     const getDefaultCallMethod = () => {
-        return callMethods.length > 0 ? callMethods[0].name : '';
+        if (callMethods.length === 0) return '';
+        const defaultCm = callMethods.find((c: { isDefault?: boolean; is_default?: boolean }) => c.isDefault ?? c.is_default) ?? callMethods[0];
+        return defaultCm.name;
     };
     
     const [callMethod, setCallMethod] = useState(getDefaultCallMethod());

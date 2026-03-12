@@ -49,6 +49,19 @@ export const EditLeadModal = () => {
 
     const { data: channelsData } = useChannels();
     const channels = channelsData || [];
+    const chList = Array.isArray(channels) ? channels : (channels?.results || []);
+    const stList = Array.isArray(statuses) ? statuses : (statuses?.results || []);
+    const defaultChannelName = React.useMemo(() => {
+        if (!chList.length) return '';
+        const c = chList.find((x: { isDefault?: boolean; is_default?: boolean }) => x.isDefault ?? x.is_default) || chList[0];
+        return c?.name ?? '';
+    }, [chList]);
+    const defaultStatusName = React.useMemo(() => {
+        if (!stList.length) return '';
+        const s = stList.find((x: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (x.isDefault ?? x.is_default) && !x.isHidden)
+            || stList.find((x: { isHidden?: boolean }) => !x.isHidden) || stList[0];
+        return s?.name ?? '';
+    }, [stList]);
 
     // Update lead mutation
     const updateLeadMutation = useUpdateLead();
@@ -75,9 +88,9 @@ export const EditLeadModal = () => {
                 budget: editingLead.budget?.toString() || '0',
                 assignedTo: editingLead.assignedTo?.toString() || '0',
                 type: editingLead.type || '',
-                communicationWay: editingLead.communicationWay || '',
+                communicationWay: editingLead.communicationWay || defaultChannelName,
                 priority: editingLead.priority || '',
-                status: editingLead.status || '',
+                status: editingLead.status || defaultStatusName,
             });
             // Initialize phone numbers from editingLead
             if (editingLead.phoneNumbers && editingLead.phoneNumbers.length > 0) {
@@ -97,7 +110,7 @@ export const EditLeadModal = () => {
                 setPhoneNumbers([]);
             }
         }
-    }, [editingLead]);
+    }, [editingLead, defaultChannelName, defaultStatusName]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value } = e.target;

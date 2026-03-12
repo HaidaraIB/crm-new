@@ -3,7 +3,7 @@ import React from 'react';
 import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/index';
 import { Status } from '../../types';
 import { useAppContext } from '../../context/AppContext';
-import { useStatuses, useDeleteStatus } from '../../hooks/useQueries';
+import { useStatuses, useDeleteStatus, useUpdateStatus } from '../../hooks/useQueries';
 
 export const StatusesSettings = () => {
     const { 
@@ -13,7 +13,8 @@ export const StatusesSettings = () => {
         setIsConfirmDeleteModalOpen,
         setIsAddStatusModalOpen,
         setIsEditStatusModalOpen,
-        setEditingStatus
+        setEditingStatus,
+        currentUser
     } = useAppContext();
     
     // Fetch statuses using React Query
@@ -22,8 +23,9 @@ export const StatusesSettings = () => {
         ? statusesData 
         : (statusesData?.results || []);
     
-    // Delete mutation
+    // Delete and update mutations
     const deleteStatusMutation = useDeleteStatus();
+    const updateStatusMutation = useUpdateStatus();
 
     const handleEditStatus = (status: Status) => {
         setEditingStatus(status);
@@ -55,6 +57,21 @@ export const StatusesSettings = () => {
         setIsConfirmDeleteModalOpen(true);
     };
 
+    const handleSetDefaultStatus = (status: Status) => {
+        if (status.isDefault) return;
+        updateStatusMutation.mutate({
+            id: status.id,
+            data: {
+                name: status.name,
+                description: status.description ?? '',
+                category: (status as any).category ?? 'active',
+                color: status.color ?? '#808080',
+                company: currentUser?.company?.id ?? (status as any).company,
+                is_default: true,
+            },
+        });
+    };
+
     return (
         <div className="space-y-6">
             <Card>
@@ -72,17 +89,20 @@ export const StatusesSettings = () => {
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[100px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[100px]">
                                     {t('color') || 'Color'}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
                                     {t('name')}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[250px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[250px]">
                                     {t('description')}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
                                     {t('category')}
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[90px]">
+                                    {t('default') || 'Default'}
                                 </th>
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[140px]">
                                     {t('actions')}
@@ -90,36 +110,31 @@ export const StatusesSettings = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                            {statuses.length > 0 ? statuses.map(status => (
+                            {statuses.length > 0 ? statuses.map(status => {
+                                const isDefault = (status as any).isDefault ?? (status as any).is_default;
+                                return (
                                 <tr 
                                     key={status.id} 
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
                                 >
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div 
-                                            className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700" 
+                                            className="w-6 h-6 rounded-full border border-gray-200 dark:border-gray-700 mx-auto" 
                                             style={{ backgroundColor: status.color || '#808080' }}
                                             title={status.color}
                                         />
                                     </td>
-                                    <td className={`px-6 py-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                                        <div className={`flex items-center gap-2 ${language === 'ar' ? 'flex-row-reverse' : ''} ${language === 'ar' ? 'justify-end' : ''}`}>
-                                            <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                                {status.name}
-                                            </span>
-                                            {status.isDefault && (
-                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-200 flex-shrink-0">
-                                                    {t('default')}
-                                                </span>
-                                            )}
+                                    <td className="px-6 py-4 text-center">
+                                        <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                            {status.name}
                                         </div>
                                     </td>
-                                    <td className={`px-6 py-4 ${language === 'ar' ? 'text-right' : 'text-left'}`}>
-                                        <div className="text-sm text-gray-700 dark:text-gray-300 max-w-md">
+                                    <td className="px-6 py-4 text-center">
+                                        <div className="text-sm text-gray-700 dark:text-gray-300 max-w-md mx-auto">
                                             {status.description || <span className="text-gray-400 dark:text-gray-500 italic">-</span>}
                                         </div>
                                     </td>
-                                    <td className={`px-6 py-4 whitespace-nowrap ${language === 'ar' ? 'text-right' : 'text-left'}`}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         {(() => {
                                             const categoryLower = status.category?.toLowerCase() || '';
                                             const isFollowUp = categoryLower === 'follow up' || categoryLower === 'follow_up' || categoryLower === 'followup';
@@ -143,8 +158,24 @@ export const StatusesSettings = () => {
                                             );
                                         })()}
                                     </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center justify-center gap-1">
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        {isDefault ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/20 text-primary dark:bg-primary-900 dark:text-primary-200">
+                                                {t('default')}
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="text-xs text-primary hover:underline"
+                                                onClick={() => handleSetDefaultStatus(status)}
+                                                disabled={updateStatusMutation.isPending}
+                                            >
+                                                {t('setAsDefault') || 'Set as default'}
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                                             <button
                                                 type="button"
                                                 className="p-2 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-600 dark:text-gray-400"
@@ -156,24 +187,24 @@ export const StatusesSettings = () => {
                                             <button
                                                 type="button"
                                                 className="p-2 h-auto hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-red-600 dark:text-red-400"
-                                                disabled={status.isDefault} 
+                                                disabled={isDefault} 
                                                 onClick={() => handleDeleteStatus(status.id)}
-                                                title={status.isDefault ? t('cannotDeleteDefault') || 'Cannot delete default' : t('delete') || 'Delete'}
+                                                title={isDefault ? t('cannotDeleteDefault') || 'Cannot delete default' : t('delete') || 'Delete'}
                                             >
                                                 <TrashIcon className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </td>
                                 </tr>
-                            )) : (
+                            ); }) : (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-12 text-center">
+                                    <td colSpan={6} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noStatusesFound') || 'No statuses found'}
                                         </div>
                                     </td>
                                 </tr>
-                            )}
+                            ) }
                         </tbody>
                     </table>
                 </div>

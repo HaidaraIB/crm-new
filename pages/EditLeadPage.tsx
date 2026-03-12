@@ -50,6 +50,19 @@ export const EditLeadPage = () => {
         ? channelsData 
         : (channelsData?.results || []);
     
+    // Default channel and status for fallback when lead has none
+    const defaultChannel = React.useMemo(() => {
+        if (!Array.isArray(channels) || channels.length === 0) return undefined;
+        const c = channels.find((x: { isDefault?: boolean; is_default?: boolean }) => x.isDefault ?? x.is_default) || channels[0];
+        return c?.id;
+    }, [channels]);
+    const defaultStatus = React.useMemo(() => {
+        if (!Array.isArray(statuses) || statuses.length === 0) return undefined;
+        const s = statuses.find((x: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (x.isDefault ?? x.is_default) && !x.isHidden) 
+            || statuses.find((x: { isHidden?: boolean }) => !x.isHidden) || statuses[0];
+        return s?.id;
+    }, [statuses]);
+    
     // Use React Query mutation for updating lead
     const updateLeadMutation = useUpdateLead();
     
@@ -169,9 +182,9 @@ export const EditLeadPage = () => {
                 budget: editingLead.budget?.toString() || '',
                 assignedTo: editingLead.assignedTo?.toString() || (currentUser?.id ? currentUser.id.toString() : ''),
                 type: typeValue,
-                communicationWay: channelId,
+                communicationWay: channelId || (defaultChannel != null ? defaultChannel.toString() : ''),
                 priority: priorityValue,
-                status: statusId,
+                status: statusId || (defaultStatus != null ? defaultStatus.toString() : ''),
             });
             
             // Initialize phone numbers from editingLead
@@ -192,7 +205,7 @@ export const EditLeadPage = () => {
                 setPhoneNumbers([]);
             }
         }
-    }, [editingLead, setSelectedLead, channels, statuses, currentUser]);
+    }, [editingLead, setSelectedLead, channels, statuses, currentUser, defaultChannel, defaultStatus]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value } = e.target;

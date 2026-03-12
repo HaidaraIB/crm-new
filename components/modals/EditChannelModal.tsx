@@ -48,6 +48,7 @@ export const EditChannelModal = () => {
         name: '',
         type: '',
         priority: 'medium' as 'high' | 'medium' | 'low',
+        isDefault: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -78,18 +79,21 @@ export const EditChannelModal = () => {
 
     useEffect(() => {
         if (editingChannel) {
+            const ch = editingChannel as Channel & { is_default?: boolean };
             setFormState({
                 name: editingChannel.name,
                 type: editingChannel.type,
                 priority: (editingChannel.priority?.toLowerCase() || 'medium') as 'high' | 'medium' | 'low',
+                isDefault: ch.isDefault ?? ch.is_default ?? false,
             });
             setErrors({});
         }
     }, [editingChannel]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { id, value } = e.target;
-        setFormState(prev => ({ ...prev, [id]: value }));
+        const { id, value, type } = e.target;
+        const checked = (e.target as HTMLInputElement).checked;
+        setFormState(prev => ({ ...prev, [id]: type === 'checkbox' ? checked : value }));
         clearError(id);
     };
 
@@ -119,6 +123,7 @@ export const EditChannelModal = () => {
                     type: formState.type,
                     priority: formState.priority,
                     company: currentUser.company.id,
+                    is_default: formState.isDefault,
                 }
             });
 
@@ -231,6 +236,16 @@ export const EditChannelModal = () => {
                     {errors.priority && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>
                     )}
+                </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="isDefault"
+                        checked={formState.isDefault}
+                        onChange={handleChange}
+                        className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="isDefault">{t('default') || 'Default'}</Label>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

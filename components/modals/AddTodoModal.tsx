@@ -41,12 +41,11 @@ export const AddTodoModal = () => {
     const createTaskMutation = useCreateTask();
     const loading = createTaskMutation.isPending;
 
-    // Get default stage ID from settings (first stage)
+    // Get default stage ID from settings (current default stage, or first)
     const getDefaultStageId = () => {
-        if (stages.length > 0) {
-            return stages[0].id.toString();
-        }
-        return '';
+        if (stages.length === 0) return '';
+        const defaultStage = stages.find((s: { isDefault?: boolean; is_default?: boolean }) => (s as any).isDefault ?? (s as any).is_default) ?? stages[0];
+        return defaultStage.id.toString();
     };
     
     const [formState, setFormState] = useState({

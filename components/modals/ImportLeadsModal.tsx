@@ -8,6 +8,17 @@ import ExcelJS from 'exceljs';
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'done';
 
+export interface PreviewRow {
+  name: string;
+  phone: string;
+  budget: number | null;
+  type: 'fresh' | 'cold';
+  priority: 'low' | 'medium' | 'high';
+  assigned_to: number | null;
+  status_id: number | null;
+  channel_id: number | null;
+}
+
 const normalizeHeader = (val: unknown): string =>
   String(val ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
 
@@ -75,6 +86,42 @@ function getRowValue(row: Record<string, unknown>, colIndex: number, headers: st
   return s;
 }
 
+function buildPreviewRows(
+  rawRows: Record<string, unknown>[],
+  headers: string[],
+  defaultStatusId: number | undefined,
+  defaultChannelId: number | undefined,
+  defaultAssignedTo: number | null,
+): PreviewRow[] {
+  const nameIdx = findColumnIndex(headers, NAME_KEYS);
+  const phoneIdx = findColumnIndex(headers, PHONE_KEYS);
+  const budgetIdx = findColumnIndex(headers, BUDGET_KEYS);
+  const typeIdx = findColumnIndex(headers, TYPE_KEYS);
+  const priorityIdx = findColumnIndex(headers, PRIORITY_KEYS);
+  return rawRows.map((row) => {
+    const name = getRowValue(row, nameIdx, headers).trim();
+    const phone = getRowValue(row, phoneIdx, headers).trim();
+    const budgetVal = getRowValue(row, budgetIdx, headers);
+    const budget = budgetVal ? Number(budgetVal) || null : null;
+    let typeVal = getRowValue(row, typeIdx, headers).toLowerCase();
+    if (typeVal && typeVal !== 'fresh' && typeVal !== 'cold') typeVal = 'fresh';
+    if (!typeVal) typeVal = 'fresh';
+    let priorityVal = getRowValue(row, priorityIdx, headers).toLowerCase();
+    if (priorityVal && !['low', 'medium', 'high'].includes(priorityVal)) priorityVal = 'medium';
+    if (!priorityVal) priorityVal = 'medium';
+    return {
+      name,
+      phone,
+      budget,
+      type: typeVal as 'fresh' | 'cold',
+      priority: priorityVal as 'low' | 'medium' | 'high',
+      assigned_to: defaultAssignedTo,
+      status_id: defaultStatusId ?? null,
+      channel_id: defaultChannelId ?? null,
+    };
+  });
+}
+
 // Empty Excel template with accepted CRM columns (first row = headers)
 async function downloadLeadsTemplate(): Promise<void> {
   const workbook = new ExcelJS.Workbook();
@@ -111,6 +158,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<Record<string, unknown>[]>([]);
   const [headers, setHeaders] = useState<string[]>([]);
+  const [previewRows, setPreviewRows] = useState<PreviewRow[]>([]);
   const [parseError, setParseError] = useState<string | null>(null);
   const [importedCount, setImportedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
@@ -124,10 +172,10 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
   const { data: channelsData } = useChannels();
   const channels = Array.isArray(channelsData) ? channelsData : (channelsData?.results || []);
 
-  const defaultStatusId = statuses.find((s: { isDefault?: boolean; isHidden?: boolean }) => s.isDefault && !s.isHidden)?.id
+  const defaultStatusId = statuses.find((s: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (s.isDefault ?? s.is_default) && !s.isHidden)?.id
     || statuses.find((s: { isHidden?: boolean }) => !s.isHidden)?.id
     || statuses[0]?.id;
-  const defaultChannelId = channels[0]?.id;
+  const defaultChannelId = (channels.find((c: { isDefault?: boolean; is_default?: boolean }) => c.isDefault ?? c.is_default) ?? channels[0])?.id;
   const defaultAssignedTo = currentUser?.id ?? users[0]?.id ?? null;
   const companyId = currentUser?.company?.id ?? null;
 
@@ -164,7 +212,15 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
         return;
       }
 
+      const initialPreview = buildPreviewRows(
+        rawRows,
+        headerKeys,
+        defaultStatusId,
+        defaultChannelId,
+        defaultAssignedTo,
+      );
       setRows(rawRows);
+      setPreviewRows(initialPreview);
       setFile(selectedFile);
       setStep('preview');
     } catch (err: unknown) {
@@ -173,37 +229,21 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
   };
 
   const handleImport = async () => {
-    if (rows.length === 0) return;
-
-    const nameIdx = findColumnIndex(headers, NAME_KEYS);
-    const phoneIdx = findColumnIndex(headers, PHONE_KEYS);
-    const budgetIdx = findColumnIndex(headers, BUDGET_KEYS);
-    const typeIdx = findColumnIndex(headers, TYPE_KEYS);
-    const priorityIdx = findColumnIndex(headers, PRIORITY_KEYS);
+    if (previewRows.length === 0) return;
 
     setStep('importing');
     let ok = 0;
     let fail = 0;
     const errors: string[] = [];
 
-    for (let i = 0; i < rows.length; i++) {
-      const row = rows[i];
-      const name = getRowValue(row as Record<string, unknown>, nameIdx, headers);
-      const phone = getRowValue(row as Record<string, unknown>, phoneIdx, headers);
+    for (let i = 0; i < previewRows.length; i++) {
+      const row = previewRows[i];
+      const { name, phone, budget, type, priority, assigned_to, status_id, channel_id } = row;
       if (!name.trim() || !phone.trim()) {
         fail++;
         errors.push(`Row ${i + 1}: ${t('importLeadsNamePhoneRequired') || 'Name and phone are required.'}`);
         continue;
       }
-
-      const budgetVal = getRowValue(row as Record<string, unknown>, budgetIdx, headers);
-      const budget = budgetVal ? Number(budgetVal) || null : null;
-      let typeVal = getRowValue(row as Record<string, unknown>, typeIdx, headers).toLowerCase();
-      if (typeVal && typeVal !== 'fresh' && typeVal !== 'cold') typeVal = 'fresh';
-      if (!typeVal) typeVal = 'fresh';
-      let priorityVal = getRowValue(row as Record<string, unknown>, priorityIdx, headers).toLowerCase();
-      if (priorityVal && !['low', 'medium', 'high'].includes(priorityVal)) priorityVal = 'medium';
-      if (!priorityVal) priorityVal = 'medium';
 
       const phoneNumbers = [{
         phone_number: phone.trim(),
@@ -217,11 +257,11 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
         phone_numbers: phoneNumbers,
         phone_number: phone.trim(),
         budget,
-        assigned_to: defaultAssignedTo,
-        type: typeVal,
-        communication_way: defaultChannelId ?? undefined,
-        priority: priorityVal,
-        status: defaultStatusId ?? undefined,
+        assigned_to: assigned_to ?? undefined,
+        type,
+        communication_way: channel_id ?? undefined,
+        priority,
+        status: status_id ?? undefined,
         company: companyId,
       };
 
@@ -245,11 +285,16 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
     onSuccess?.(ok, fail);
   };
 
+  const applyToAll = (field: 'assigned_to' | 'status_id' | 'channel_id', value: number | null) => {
+    setPreviewRows((prev) => prev.map((r) => ({ ...r, [field]: value })));
+  };
+
   const handleClose = () => {
     setStep('upload');
     setFile(null);
     setRows([]);
     setHeaders([]);
+    setPreviewRows([]);
     setParseError(null);
     setImportedCount(0);
     setFailedCount(0);
@@ -309,13 +354,147 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
           </>
         )}
 
-        {step === 'preview' && file && (
+        {step === 'preview' && file && previewRows.length > 0 && (
           <>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              {t('importLeadsPreview') || 'Found'} <strong>{rows.length}</strong> {t('importLeadsRows') || 'row(s)'}. {t('importLeadsPreviewConfirm') || 'Click Import to add them as leads.'}
+              {t('importLeadsPreview') || 'Found'} <strong>{previewRows.length}</strong> {t('importLeadsRows') || 'row(s)'}. {t('importLeadsPreviewConfirm') || 'Review and assign below, then click Import.'}
             </p>
-            <div className="flex gap-2">
-              <Button onClick={() => { setStep('upload'); setFile(null); setRows([]); setHeaders([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}>
+            <div className="overflow-x-auto max-h-[60vh] rounded-lg border border-gray-200 dark:border-gray-700">
+              <table className="w-full text-sm">
+                <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
+                  <tr>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 w-8">#</th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('name') || 'Name'}</th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('phone') || 'Phone'}</th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[70px]">{t('budget') || 'Budget'}</th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[60px]">{t('type') || 'Type'}</th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[70px]">{t('priority') || 'Priority'}</th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[140px]">
+                      {t('assignedTo') || 'Assigned to'}
+                      <select
+                        className="ml-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          applyToAll('assigned_to', v === '' ? null : Number(v));
+                        }}
+                        title={t('applyToAll') || 'Apply to all'}
+                      >
+                        <option value="">{t('applyToAll') || 'Apply to all'}</option>
+                        {users.map((u: { id: number; email?: string; first_name?: string }) => (
+                          <option key={u.id} value={u.id}>{u.email || (u as any).first_name || `#${u.id}`}</option>
+                        ))}
+                      </select>
+                    </th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[120px]">
+                      {t('status') || 'Status'}
+                      <select
+                        className="ml-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          applyToAll('status_id', v === '' ? null : Number(v));
+                        }}
+                        title={t('applyToAll') || 'Apply to all'}
+                      >
+                        <option value="">{t('applyToAll') || 'Apply to all'}</option>
+                        {statuses.map((s: { id: number; name: string }) => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </th>
+                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[120px]">
+                      {t('channel') || 'Channel'}
+                      <select
+                        className="ml-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        value=""
+                        onChange={(e) => {
+                          const v = e.target.value;
+                          applyToAll('channel_id', v === '' ? null : Number(v));
+                        }}
+                        title={t('applyToAll') || 'Apply to all'}
+                      >
+                        <option value="">{t('applyToAll') || 'Apply to all'}</option>
+                        {channels.map((c: { id: number; name: string }) => (
+                          <option key={c.id} value={c.id}>{c.name}</option>
+                        ))}
+                      </select>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                  {previewRows.map((row, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                      <td className="px-2 py-1.5 text-gray-500">{idx + 1}</td>
+                      <td className="px-2 py-1.5">{row.name}</td>
+                      <td className="px-2 py-1.5">{row.phone}</td>
+                      <td className="px-2 py-1.5">{row.budget != null ? String(row.budget) : '-'}</td>
+                      <td className="px-2 py-1.5">{row.type}</td>
+                      <td className="px-2 py-1.5">{row.priority}</td>
+                      <td className="px-2 py-1.5">
+                        <select
+                          className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                          value={row.assigned_to ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPreviewRows((prev) => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], assigned_to: v === '' ? null : Number(v) };
+                              return next;
+                            });
+                          }}
+                        >
+                          <option value="">-</option>
+                          {users.map((u: { id: number; email?: string; first_name?: string }) => (
+                            <option key={u.id} value={u.id}>{u.email || (u as any).first_name || `#${u.id}`}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <select
+                          className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                          value={row.status_id ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPreviewRows((prev) => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], status_id: v === '' ? null : Number(v) };
+                              return next;
+                            });
+                          }}
+                        >
+                          <option value="">-</option>
+                          {statuses.map((s: { id: number; name: string }) => (
+                            <option key={s.id} value={s.id}>{s.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-2 py-1.5">
+                        <select
+                          className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                          value={row.channel_id ?? ''}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setPreviewRows((prev) => {
+                              const next = [...prev];
+                              next[idx] = { ...next[idx], channel_id: v === '' ? null : Number(v) };
+                              return next;
+                            });
+                          }}
+                        >
+                          <option value="">-</option>
+                          {channels.map((c: { id: number; name: string }) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex gap-2 pt-2">
+              <Button variant="secondary" onClick={() => { setStep('upload'); setFile(null); setRows([]); setHeaders([]); setPreviewRows([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}>
                 {t('back') || 'Back'}
               </Button>
               <Button onClick={handleImport}>

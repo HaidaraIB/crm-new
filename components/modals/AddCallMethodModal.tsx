@@ -21,6 +21,7 @@ export const AddCallMethodModal = () => {
         name: '',
         description: '',
         color: '#808080',
+        isDefault: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -51,14 +52,16 @@ export const AddCallMethodModal = () => {
                 name: '',
                 description: '',
                 color: '#808080',
+                isDefault: false,
             });
             setErrors({});
         }
     }, [isAddCallMethodModalOpen]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-        const { id, value } = e.target;
-        setFormState(prev => ({ ...prev, [id]: value }));
+        const { id, value, type } = e.target;
+        const checked = (e.target as HTMLInputElement).checked;
+        setFormState(prev => ({ ...prev, [id]: type === 'checkbox' ? checked : value }));
         clearError(id);
     };
 
@@ -68,6 +71,7 @@ export const AddCallMethodModal = () => {
             name: '',
             description: '',
             color: '#808080',
+            isDefault: false,
         });
         setErrors({});
     };
@@ -90,6 +94,7 @@ export const AddCallMethodModal = () => {
                 description: formState.description,
                 color: formState.color,
                 company: currentUser.company.id,
+                is_default: formState.isDefault,
             });
 
             handleClose();
@@ -164,6 +169,16 @@ export const AddCallMethodModal = () => {
                         />
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-400 uppercase">{formState.color}</span>
                     </div>
+                </div>
+                <div className="flex items-center gap-2">
+                    <input
+                        type="checkbox"
+                        id="isDefault"
+                        checked={formState.isDefault}
+                        onChange={handleChange}
+                        className="rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary"
+                    />
+                    <Label htmlFor="isDefault">{t('default') || 'Default'}</Label>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

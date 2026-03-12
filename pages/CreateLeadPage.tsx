@@ -55,16 +55,16 @@ export const CreateLeadPage = () => {
     // Get default status from settings (first non-hidden status or first status)
     const defaultStatus = useMemo(() => {
         if (!Array.isArray(statuses)) return undefined;
-        const status = statuses.find(s => s.isDefault && !s.isHidden) || 
-                      statuses.find(s => !s.isHidden) || 
+        const status = statuses.find((s: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (s.isDefault ?? s.is_default) && !s.isHidden) || 
+                      statuses.find((s: { isHidden?: boolean }) => !s.isHidden) || 
                       statuses[0];
         return status ? status.id : undefined;
     }, [statuses]);
     
-    // Get default channel from settings (first channel)
+    // Get default channel from settings (first default or first channel)
     const defaultChannel = useMemo(() => {
         if (!Array.isArray(channels)) return undefined;
-        const channel = channels[0];
+        const channel = channels.find((c: { isDefault?: boolean; is_default?: boolean }) => c.isDefault ?? c.is_default) || channels[0];
         return channel ? channel.id : undefined;
     }, [channels]);
     

@@ -4,7 +4,7 @@ import React from 'react';
 import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/index';
 import { Channel } from '../../types';
 import { useAppContext } from '../../context/AppContext';
-import { useChannels, useDeleteChannel } from '../../hooks/useQueries';
+import { useChannels, useDeleteChannel, useUpdateChannel } from '../../hooks/useQueries';
 
 
 export const ChannelsSettings = () => {
@@ -25,8 +25,9 @@ export const ChannelsSettings = () => {
         ? channelsData 
         : (channelsData?.results || []);
     
-    // Delete mutation
+    // Delete and update mutations
     const deleteChannelMutation = useDeleteChannel();
+    const updateChannelMutation = useUpdateChannel();
 
     // Helper function to translate channel type names
     const translateChannelType = (type: string): string => {
@@ -68,6 +69,22 @@ export const ChannelsSettings = () => {
         setIsEditChannelModalOpen(true);
     };
 
+    const handleSetDefaultChannel = (channel: Channel) => {
+        const ch = channel as Channel & { is_default?: boolean };
+        if (ch.isDefault || ch.is_default) return;
+        updateChannelMutation.mutate({
+            id: channel.id,
+            data: {
+                name: channel.name,
+                type: channel.type,
+                priority: channel.priority,
+                company: (channel as any).company,
+                is_active: (channel as any).is_active ?? true,
+                is_default: true,
+            },
+        });
+    };
+
     const handleDeleteChannel = (id: number) => {
         const channel = channels.find(c => c.id === id);
         if (channel) {
@@ -105,37 +122,42 @@ export const ChannelsSettings = () => {
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[200px]">
                                     {t('name')}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
                                     {t('type')}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[150px]">
                                     {t('priority')}
                                 </th>
-                                <th className="px-6 py-4 text-left rtl:text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[120px]">
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[90px]">
+                                    {t('default') || 'Default'}
+                                </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[120px]">
                                     {t('actions')}
                                 </th>
                             </tr>
                         </thead>
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                            {channels && channels.length > 0 ? channels.map(channel => (
+                            {channels && channels.length > 0 ? channels.map(channel => {
+                                const isDefault = (channel as any).isDefault ?? (channel as any).is_default;
+                                return (
                                 <tr 
                                     key={channel.id} 
                                     className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150"
                                 >
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
                                             {channel.name}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="text-sm text-gray-700 dark:text-gray-300">
                                             {translateChannelType(channel.type)}
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                                             (channel.priority?.toLowerCase() || 'medium') === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300' :
                                             (channel.priority?.toLowerCase() || 'medium') === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
@@ -144,8 +166,24 @@ export const ChannelsSettings = () => {
                                             {t((channel.priority?.toLowerCase() || 'medium'))}
                                         </span>
                                     </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className={`flex items-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        {isDefault ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-primary/20 text-primary dark:bg-primary-900 dark:text-primary-200">
+                                                {t('default')}
+                                            </span>
+                                        ) : (
+                                            <button
+                                                type="button"
+                                                className="text-xs text-primary hover:underline"
+                                                onClick={() => handleSetDefaultChannel(channel)}
+                                                disabled={updateChannelMutation.isPending}
+                                            >
+                                                {t('setAsDefault') || 'Set as default'}
+                                            </button>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                                        <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                                             <button
                                                 type="button"
                                                 className="p-2 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-600 dark:text-gray-400"
@@ -165,9 +203,9 @@ export const ChannelsSettings = () => {
                                         </div>
                                     </td>
                                 </tr>
-                            )) : (
+                            );}) : (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-12 text-center">
+                                    <td colSpan={5} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noChannelsAvailable') || 'No channels available'}
                                         </div>

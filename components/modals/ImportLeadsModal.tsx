@@ -1,9 +1,12 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Modal, Button } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
 import { createLeadAPI } from '../../services/api';
+import { getUserDisplayName } from '../../types';
+import { ChevronDownIcon } from '../icons';
 import ExcelJS from 'exceljs';
 
 type ImportStep = 'upload' | 'preview' | 'importing' | 'done';
@@ -21,6 +24,25 @@ export interface PreviewRow {
 
 const normalizeHeader = (val: unknown): string =>
   String(val ?? '').trim().toLowerCase().replace(/\s+/g, ' ');
+
+// Helpers for status pill colors: dark background + lighter border (like the design)
+function parseHex(hex: string): [number, number, number] | null {
+  const m = hex.replace(/^#/, '').match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
+  if (!m) return null;
+  return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)];
+}
+function darkenHex(hex: string, factor: number): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return '#2C3660';
+  const [r, g, b] = rgb.map((c) => Math.max(0, Math.round(c * factor)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+function lightenHex(hex: string, factor: number): string {
+  const rgb = parseHex(hex);
+  if (!rgb) return '#7989F2';
+  const [r, g, b] = rgb.map((c) => Math.min(255, Math.round(c + (255 - c) * factor)));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
 
 // Map common column names (EN/AR) to our field keys
 const NAME_KEYS = ['name', 'اسم', 'client name', 'اسم العميل', 'الاسم', 'full name', 'الاسم الكامل'];
@@ -163,7 +185,22 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
   const [importedCount, setImportedCount] = useState(0);
   const [failedCount, setFailedCount] = useState(0);
   const [importErrors, setImportErrors] = useState<string[]>([]);
+  const [openStatusDropdownRow, setOpenStatusDropdownRow] = useState<number | null>(null);
+  const [dropdownTriggerRect, setDropdownTriggerRect] = useState<{ top: number; left: number; width: number } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (openStatusDropdownRow === null) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest('.status-dropdown-trigger') && !target.closest('.status-dropdown-panel')) {
+        setOpenStatusDropdownRow(null);
+        setDropdownTriggerRect(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [openStatusDropdownRow]);
 
   const { data: usersResponse } = useUsers();
   const users = usersResponse?.results || [];
@@ -299,6 +336,8 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
     setImportedCount(0);
     setFailedCount(0);
     setImportErrors([]);
+    setOpenStatusDropdownRow(null);
+    setDropdownTriggerRect(null);
     if (fileInputRef.current) fileInputRef.current.value = '';
     onClose();
   };
@@ -381,8 +420,8 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                         title={t('applyToAll') || 'Apply to all'}
                       >
                         <option value="">{t('applyToAll') || 'Apply to all'}</option>
-                        {users.map((u: { id: number; email?: string; first_name?: string }) => (
-                          <option key={u.id} value={u.id}>{u.email || (u as any).first_name || `#${u.id}`}</option>
+                        {users.map((u: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }) => (
+                          <option key={u.id} value={u.id}>{getUserDisplayName(u as any)}</option>
                         ))}
                       </select>
                     </th>
@@ -398,7 +437,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                         title={t('applyToAll') || 'Apply to all'}
                       >
                         <option value="">{t('applyToAll') || 'Apply to all'}</option>
-                        {statuses.map((s: { id: number; name: string }) => (
+                        {statuses.map((s: { id: number; name: string; color?: string }) => (
                           <option key={s.id} value={s.id}>{s.name}</option>
                         ))}
                       </select>
@@ -445,29 +484,92 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                           }}
                         >
                           <option value="">-</option>
-                          {users.map((u: { id: number; email?: string; first_name?: string }) => (
-                            <option key={u.id} value={u.id}>{u.email || (u as any).first_name || `#${u.id}`}</option>
+                          {users.map((u: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }) => (
+                            <option key={u.id} value={u.id}>{getUserDisplayName(u as any)}</option>
                           ))}
                         </select>
                       </td>
                       <td className="px-2 py-1.5">
-                        <select
-                          className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
-                          value={row.status_id ?? ''}
-                          onChange={(e) => {
-                            const v = e.target.value;
-                            setPreviewRows((prev) => {
-                              const next = [...prev];
-                              next[idx] = { ...next[idx], status_id: v === '' ? null : Number(v) };
-                              return next;
-                            });
-                          }}
-                        >
-                          <option value="">-</option>
-                          {statuses.map((s: { id: number; name: string }) => (
-                            <option key={s.id} value={s.id}>{s.name}</option>
-                          ))}
-                        </select>
+                        {(() => {
+                          const st = statuses.find((s: { id: number; name: string; color?: string }) => s.id === row.status_id) as { id: number; name: string; color?: string } | undefined;
+                          const hex = st?.color && /^#[0-9a-fA-F]{6}$/.test(st.color) ? st.color : '#808080';
+                          const bg = darkenHex(hex, 0.45);
+                          const border = lightenHex(hex, 0.35);
+                          const isOpen = openStatusDropdownRow === idx;
+                          return (
+                            <div className="relative min-w-[100px]">
+                              <button
+                                type="button"
+                                className="status-dropdown-trigger w-full rounded-full border text-left rtl:text-right py-1 pl-2.5 pr-6 text-xs font-medium text-white cursor-pointer flex items-center justify-between gap-1 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-white/30"
+                                onClick={(e) => {
+                                  if (isOpen) {
+                                    setOpenStatusDropdownRow(null);
+                                    setDropdownTriggerRect(null);
+                                  } else {
+                                    const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
+                                    setDropdownTriggerRect({ top: rect.bottom, left: rect.left, width: rect.width });
+                                    setOpenStatusDropdownRow(idx);
+                                  }
+                                }}
+                                style={{
+                                  backgroundColor: bg,
+                                  borderColor: border,
+                                }}
+                              >
+                                <span className="truncate">{st?.name || '-'}</span>
+                                <ChevronDownIcon className={`w-3.5 h-3.5 shrink-0 transition-transform ${isOpen ? 'rotate-180' : ''}`} style={{ marginLeft: 'auto' }} />
+                              </button>
+                              {isOpen && dropdownTriggerRect && createPortal(
+                                <div
+                                  className="status-dropdown-panel fixed z-[9999] rounded shadow-lg border border-gray-600 overflow-hidden"
+                                  style={{
+                                    backgroundColor: '#1e293b',
+                                    top: dropdownTriggerRect.top + 2,
+                                    left: dropdownTriggerRect.left,
+                                    minWidth: Math.max(dropdownTriggerRect.width, 100),
+                                    maxHeight: 'min(12rem, 50vh)',
+                                    overflowY: 'auto',
+                                  }}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setPreviewRows((prev) => {
+                                        const next = [...prev];
+                                        next[idx] = { ...next[idx], status_id: null };
+                                        return next;
+                                      });
+                                      setOpenStatusDropdownRow(null);
+                                      setDropdownTriggerRect(null);
+                                    }}
+                                    className={`w-full px-2 py-1 text-left rtl:text-right text-xs text-white hover:bg-slate-600/80 block ${row.status_id == null ? 'bg-blue-600' : ''}`}
+                                  >
+                                    -
+                                  </button>
+                                  {statuses.map((s: { id: number; name: string; color?: string }) => (
+                                    <button
+                                      key={s.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setPreviewRows((prev) => {
+                                          const next = [...prev];
+                                          next[idx] = { ...next[idx], status_id: s.id };
+                                          return next;
+                                        });
+                                        setOpenStatusDropdownRow(null);
+                                        setDropdownTriggerRect(null);
+                                      }}
+                                      className={`w-full px-2 py-1 text-left rtl:text-right text-xs text-white hover:bg-slate-600/80 block ${row.status_id === s.id ? 'bg-blue-600' : ''}`}
+                                    >
+                                      {s.name}
+                                    </button>
+                                  ))}
+                                </div>,
+                                document.body
+                              )}
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td className="px-2 py-1.5">
                         <select

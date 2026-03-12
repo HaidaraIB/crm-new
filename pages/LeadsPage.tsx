@@ -31,7 +31,7 @@ const StatusDropdown = ({
 }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [openUpward, setOpenUpward] = useState(false);
-    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0 });
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
     const dropdownRef = useRef<HTMLDivElement>(null);
     const buttonRef = useRef<HTMLButtonElement>(null);
     const dropdownMenuRef = useRef<HTMLDivElement>(null);
@@ -69,7 +69,7 @@ const StatusDropdown = ({
             }
             
             setOpenUpward(shouldOpenUpward);
-            setDropdownPosition({ top, left });
+            setDropdownPosition({ top, left, width: buttonRect.width });
         }
     }, [isOpen, availableStatuses.length]);
     
@@ -150,10 +150,12 @@ const StatusDropdown = ({
                 <>
                     <div 
                         ref={dropdownMenuRef}
-                        className="fixed z-[9999] min-w-[180px] bg-gray-800 dark:bg-gray-900 rounded-lg shadow-2xl overflow-hidden border border-gray-700/80 dark:border-gray-600/80 backdrop-blur-md"
+                        className="fixed z-[9999] bg-gray-800 dark:bg-gray-900 rounded-lg shadow-2xl overflow-hidden border border-gray-700/80 dark:border-gray-600/80 backdrop-blur-md"
                         style={{
                             top: `${dropdownPosition.top}px`,
                             left: `${dropdownPosition.left}px`,
+                            width: `${dropdownPosition.width || 180}px`,
+                            minWidth: '110px',
                         }}
                     >
                         <div className="py-1.5">

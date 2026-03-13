@@ -96,6 +96,8 @@ export interface User {
   emailVerified?: boolean;
   /** Set when role is supervisor (from /users/me/ or login) */
   supervisor_permissions?: SupervisorPermissionPayload | null;
+  /** User preferred language (ar/en), synced with API for emails and UI */
+  language?: 'ar' | 'en';
 }
 
 export interface TimelineEntry {

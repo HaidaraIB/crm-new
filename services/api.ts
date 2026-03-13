@@ -1077,6 +1077,18 @@ export const getCurrentUserAPI = async () => {
 };
 
 /**
+ * تحديث لغة المستخدم المفضلة (تخزينها في السيرفر ومزامنتها مع الإيميلات)
+ * POST /api/users/update-language/
+ * Body: { language: 'ar' | 'en' }
+ */
+export const updateLanguageAPI = async (lang: 'ar' | 'en') => {
+  return apiRequest<{ message: string; language: string }>('/users/update-language/', {
+    method: 'POST',
+    body: JSON.stringify({ language: lang }),
+  });
+};
+
+/**
  * تغيير كلمة المرور للمستخدم الحالي
  * POST /api/users/change_password/
  * Headers: { Authorization: 'Bearer token' }

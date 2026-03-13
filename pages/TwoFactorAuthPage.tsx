@@ -4,7 +4,7 @@ import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI, getCurrentUserAPI } from '../services/api';
 
 export const TwoFactorAuthPage = () => {
-    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
+    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, setLang, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRequesting, setIsRequesting] = useState(false);
@@ -232,6 +232,7 @@ export const TwoFactorAuthPage = () => {
                     domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
                     specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
                 } : undefined,
+                language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
             };
             
             // Reset subscription inactive flag since user passed backend check
@@ -261,6 +262,7 @@ export const TwoFactorAuthPage = () => {
             
             // Update context state immediately BEFORE navigation
             setCurrentUser(frontendUser);
+            if (frontendUser.language) setLang(frontendUser.language);
             setIsLoggedIn(true);
             setCurrentPage('Dashboard');
             

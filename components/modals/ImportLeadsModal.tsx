@@ -3,13 +3,30 @@ import { createPortal } from 'react-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Modal, Button } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
+import { useUsers, useStatuses, useChannels, useCampaigns } from '../../hooks/useQueries';
 import { createLeadAPI } from '../../services/api';
 import { getUserDisplayName } from '../../types';
 import { ChevronDownIcon } from '../icons';
 import ExcelJS from 'exceljs';
 
-type ImportStep = 'upload' | 'preview' | 'importing' | 'done';
+type ImportStep = 'upload' | 'match' | 'preview' | 'importing' | 'done';
+
+export type LeadImportFieldKey = 'name' | 'phone' | 'budget' | 'type' | 'priority' | 'status' | 'communicationWay' | 'assignedTo' | 'source' | 'campaign' | 'createdAt' | '';
+
+const SYSTEM_FIELDS: { value: LeadImportFieldKey; labelKey: string }[] = [
+  { value: '', labelKey: 'importLeadsChooseField' },
+  { value: 'name', labelKey: 'name' },
+  { value: 'phone', labelKey: 'phone' },
+  { value: 'budget', labelKey: 'budget' },
+  { value: 'type', labelKey: 'type' },
+  { value: 'priority', labelKey: 'priority' },
+  { value: 'status', labelKey: 'status' },
+  { value: 'communicationWay', labelKey: 'communicationWay' },
+  { value: 'assignedTo', labelKey: 'assignedTo' },
+  { value: 'source', labelKey: 'source' },
+  { value: 'campaign', labelKey: 'campaign' },
+  { value: 'createdAt', labelKey: 'createdAt' },
+];
 
 export interface PreviewRow {
   name: string;
@@ -20,6 +37,9 @@ export interface PreviewRow {
   assigned_to: number | null;
   status_id: number | null;
   channel_id: number | null;
+  source: string | null;
+  campaign_id: number | null;
+  created_at: string | null;
 }
 
 const normalizeHeader = (val: unknown): string =>
@@ -50,6 +70,12 @@ const PHONE_KEYS = ['phone', 'هاتف', 'phone number', 'رقم الهاتف', 
 const BUDGET_KEYS = ['budget', 'ميزانية', 'الميزانية'];
 const TYPE_KEYS = ['type', 'نوع', 'lead type', 'نوع العميل'];
 const PRIORITY_KEYS = ['priority', 'أولوية', 'الأولوية'];
+const STATUS_KEYS = ['status', 'حالة', 'الحالة', 'state'];
+const CHANNEL_KEYS = ['channel', 'قناة', 'communication way', 'طريقة التواصل', 'contact method', 'مصدر التواصل'];
+const ASSIGNED_KEYS = ['assigned to', 'مسند إلى', 'assigned_to', 'assignee', 'موظف'];
+const SOURCE_KEYS = ['source', 'مصدر', 'المصدر', 'origin'];
+const CAMPAIGN_KEYS = ['campaign', 'حملة', 'الحملة'];
+const CREATED_AT_KEYS = ['created at', 'تاريخ الإنشاء', 'creation date', 'date', 'تاريخ', 'created_at'];
 
 function findColumnIndex(headers: string[], keys: string[]): number {
   for (let i = 0; i < headers.length; i++) {
@@ -108,38 +134,119 @@ function getRowValue(row: Record<string, unknown>, colIndex: number, headers: st
   return s;
 }
 
-function buildPreviewRows(
-  rawRows: Record<string, unknown>[],
-  headers: string[],
-  defaultStatusId: number | undefined,
-  defaultChannelId: number | undefined,
-  defaultAssignedTo: number | null,
-): PreviewRow[] {
+function getHeaderToFieldMapping(headers: string[]): Record<string, LeadImportFieldKey> {
+  const mapping: Record<string, LeadImportFieldKey> = {};
+  headers.forEach((h) => { mapping[h] = ''; });
   const nameIdx = findColumnIndex(headers, NAME_KEYS);
   const phoneIdx = findColumnIndex(headers, PHONE_KEYS);
   const budgetIdx = findColumnIndex(headers, BUDGET_KEYS);
   const typeIdx = findColumnIndex(headers, TYPE_KEYS);
   const priorityIdx = findColumnIndex(headers, PRIORITY_KEYS);
+  const statusIdx = findColumnIndex(headers, STATUS_KEYS);
+  const channelIdx = findColumnIndex(headers, CHANNEL_KEYS);
+  const assignedIdx = findColumnIndex(headers, ASSIGNED_KEYS);
+  const sourceIdx = findColumnIndex(headers, SOURCE_KEYS);
+  const campaignIdx = findColumnIndex(headers, CAMPAIGN_KEYS);
+  const createdAtIdx = findColumnIndex(headers, CREATED_AT_KEYS);
+  if (nameIdx >= 0) mapping[headers[nameIdx]] = 'name';
+  if (phoneIdx >= 0) mapping[headers[phoneIdx]] = 'phone';
+  if (budgetIdx >= 0) mapping[headers[budgetIdx]] = 'budget';
+  if (typeIdx >= 0) mapping[headers[typeIdx]] = 'type';
+  if (priorityIdx >= 0) mapping[headers[priorityIdx]] = 'priority';
+  if (statusIdx >= 0) mapping[headers[statusIdx]] = 'status';
+  if (channelIdx >= 0) mapping[headers[channelIdx]] = 'communicationWay';
+  if (assignedIdx >= 0) mapping[headers[assignedIdx]] = 'assignedTo';
+  if (sourceIdx >= 0) mapping[headers[sourceIdx]] = 'source';
+  if (campaignIdx >= 0) mapping[headers[campaignIdx]] = 'campaign';
+  if (createdAtIdx >= 0) mapping[headers[createdAtIdx]] = 'createdAt';
+  return mapping;
+}
+
+function getValueByHeader(row: Record<string, unknown>, header: string): string {
+  const val = row[header];
+  if (val == null) return '';
+  return String(val).trim();
+}
+
+function resolveStatusId(val: string, statuses: { id: number; name: string }[]): number | null {
+  if (!val.trim()) return null;
+  const v = val.trim().toLowerCase();
+  const found = statuses.find((s) => s.name.toLowerCase() === v || s.name.toLowerCase().includes(v) || v.includes(s.name.toLowerCase()));
+  return found?.id ?? null;
+}
+function resolveChannelId(val: string, channels: { id: number; name: string }[]): number | null {
+  if (!val.trim()) return null;
+  const v = val.trim().toLowerCase();
+  const found = channels.find((c) => c.name.toLowerCase() === v || c.name.toLowerCase().includes(v) || v.includes(c.name.toLowerCase()));
+  return found?.id ?? null;
+}
+function resolveUserId(val: string, users: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }[], getDisplayName: (u: any) => string): number | null {
+  if (!val.trim()) return null;
+  const v = val.trim().toLowerCase();
+  const found = users.find((u) => getDisplayName(u).toLowerCase() === v || getDisplayName(u).toLowerCase().includes(v) || v.includes(getDisplayName(u).toLowerCase()) || (u.email && u.email.toLowerCase() === v));
+  return found?.id ?? null;
+}
+function resolveCampaignId(val: string, campaigns: { id: number; name?: string }[]): number | null {
+  if (!val.trim()) return null;
+  const v = val.trim().toLowerCase();
+  const found = campaigns.find((c) => (c.name || '').toLowerCase() === v || (c.name || '').toLowerCase().includes(v) || v.includes((c.name || '').toLowerCase()));
+  return found?.id ?? null;
+}
+
+function buildPreviewRowsFromMapping(
+  rawRows: Record<string, unknown>[],
+  columnMapping: Record<string, LeadImportFieldKey>,
+  opts: {
+    defaultStatusId: number | undefined;
+    defaultChannelId: number | undefined;
+    defaultAssignedTo: number | null;
+    statuses: { id: number; name: string }[];
+    channels: { id: number; name: string }[];
+    users: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }[];
+    campaigns: { id: number; name?: string }[];
+    getDisplayName: (u: any) => string;
+  },
+): PreviewRow[] {
+  const headerByField: Record<string, string> = {};
+  Object.entries(columnMapping).forEach(([header, field]) => {
+    if (field) headerByField[field] = header;
+  });
   return rawRows.map((row) => {
-    const name = getRowValue(row, nameIdx, headers).trim();
-    const phone = getRowValue(row, phoneIdx, headers).trim();
-    const budgetVal = getRowValue(row, budgetIdx, headers);
+    const name = getValueByHeader(row, headerByField.name || '').trim();
+    const phone = getValueByHeader(row, headerByField.phone || '').trim();
+    const budgetVal = getValueByHeader(row, headerByField.budget || '');
     const budget = budgetVal ? Number(budgetVal) || null : null;
-    let typeVal = getRowValue(row, typeIdx, headers).toLowerCase();
+    let typeVal = getValueByHeader(row, headerByField.type || '').toLowerCase();
     if (typeVal && typeVal !== 'fresh' && typeVal !== 'cold') typeVal = 'fresh';
     if (!typeVal) typeVal = 'fresh';
-    let priorityVal = getRowValue(row, priorityIdx, headers).toLowerCase();
+    let priorityVal = getValueByHeader(row, headerByField.priority || '').toLowerCase();
     if (priorityVal && !['low', 'medium', 'high'].includes(priorityVal)) priorityVal = 'medium';
     if (!priorityVal) priorityVal = 'medium';
+
+    const statusVal = getValueByHeader(row, headerByField.status || '');
+    const channelVal = getValueByHeader(row, headerByField.communicationWay || '');
+    const assignedVal = getValueByHeader(row, headerByField.assignedTo || '');
+    const sourceVal = getValueByHeader(row, headerByField.source || '');
+    const campaignVal = getValueByHeader(row, headerByField.campaign || '');
+    const createdAtVal = getValueByHeader(row, headerByField.createdAt || '');
+
+    const status_id = statusVal ? resolveStatusId(statusVal, opts.statuses) : (opts.defaultStatusId ?? null);
+    const channel_id = channelVal ? resolveChannelId(channelVal, opts.channels) : (opts.defaultChannelId ?? null);
+    const assigned_to = assignedVal ? resolveUserId(assignedVal, opts.users, opts.getDisplayName) : opts.defaultAssignedTo;
+    const campaign_id = campaignVal ? resolveCampaignId(campaignVal, opts.campaigns) : null;
+
     return {
       name,
       phone,
       budget,
       type: typeVal as 'fresh' | 'cold',
       priority: priorityVal as 'low' | 'medium' | 'high',
-      assigned_to: defaultAssignedTo,
-      status_id: defaultStatusId ?? null,
-      channel_id: defaultChannelId ?? null,
+      assigned_to,
+      status_id,
+      channel_id,
+      source: sourceVal || null,
+      campaign_id,
+      created_at: createdAtVal || null,
     };
   });
 }
@@ -187,6 +294,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
   const [importErrors, setImportErrors] = useState<string[]>([]);
   const [openStatusDropdownRow, setOpenStatusDropdownRow] = useState<number | null>(null);
   const [dropdownTriggerRect, setDropdownTriggerRect] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [columnMapping, setColumnMapping] = useState<Record<string, LeadImportFieldKey>>({});
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -208,6 +316,8 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
   const statuses = Array.isArray(statusesData) ? statusesData : (statusesData?.results || []);
   const { data: channelsData } = useChannels();
   const channels = Array.isArray(channelsData) ? channelsData : (channelsData?.results || []);
+  const { data: campaignsData } = useCampaigns();
+  const campaigns = Array.isArray(campaignsData) ? campaignsData : (campaignsData?.results || []);
 
   const defaultStatusId = statuses.find((s: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (s.isDefault ?? s.is_default) && !s.isHidden)?.id
     || statuses.find((s: { isHidden?: boolean }) => !s.isHidden)?.id
@@ -240,26 +350,17 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
 
       const firstRow = rawRows[0];
       const headerKeys = Object.keys(firstRow);
-      setHeaders(headerKeys);
-
-      const nameIdx = findColumnIndex(headerKeys, NAME_KEYS);
-      const phoneIdx = findColumnIndex(headerKeys, PHONE_KEYS);
-      if (nameIdx < 0 || phoneIdx < 0) {
-        setParseError(t('importLeadsMissingColumns') || 'Required columns not found. The Excel file must have columns for Name and Phone (e.g. "Name", "Phone").');
+      if (headerKeys.length === 0 || headerKeys.every((h) => !h || h.startsWith('column_'))) {
+        setParseError(t('importLeadsMissingColumns') || 'No headers found. The first row should contain column names.');
         return;
       }
 
-      const initialPreview = buildPreviewRows(
-        rawRows,
-        headerKeys,
-        defaultStatusId,
-        defaultChannelId,
-        defaultAssignedTo,
-      );
+      setHeaders(headerKeys);
+      setColumnMapping(getHeaderToFieldMapping(headerKeys));
       setRows(rawRows);
-      setPreviewRows(initialPreview);
+      setPreviewRows([]);
       setFile(selectedFile);
-      setStep('preview');
+      setStep('match');
     } catch (err: unknown) {
       setParseError((err as Error)?.message || (t('importLeadsParseError') || 'Failed to read the Excel file.'));
     }
@@ -275,7 +376,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
 
     for (let i = 0; i < previewRows.length; i++) {
       const row = previewRows[i];
-      const { name, phone, budget, type, priority, assigned_to, status_id, channel_id } = row;
+      const { name, phone, budget, type, priority, assigned_to, status_id, channel_id, source, campaign_id } = row;
       if (!name.trim() || !phone.trim()) {
         fail++;
         errors.push(`Row ${i + 1}: ${t('importLeadsNamePhoneRequired') || 'Name and phone are required.'}`);
@@ -300,6 +401,8 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
         priority,
         status: status_id ?? undefined,
         company: companyId,
+        ...(source != null && source.trim() !== '' ? { source: source.trim() } : {}),
+        ...(campaign_id != null ? { campaign: campaign_id } : {}),
       };
 
       try {
@@ -326,12 +429,46 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
     setPreviewRows((prev) => prev.map((r) => ({ ...r, [field]: value })));
   };
 
+  const handleMatchContinue = () => {
+    const mappedName = headers.some((h) => columnMapping[h] === 'name');
+    const mappedPhone = headers.some((h) => columnMapping[h] === 'phone');
+    if (!mappedName || !mappedPhone) {
+      setParseError(t('importLeadsMatchRequired') || 'Please map at least one column to Name and one to Phone.');
+      return;
+    }
+    setParseError(null);
+    const preview = buildPreviewRowsFromMapping(rows, columnMapping, {
+      defaultStatusId,
+      defaultChannelId,
+      defaultAssignedTo,
+      statuses,
+      channels,
+      users,
+      campaigns,
+      getDisplayName: getUserDisplayName,
+    });
+    setPreviewRows(preview);
+    setStep('preview');
+  };
+
+  const handleReupload = () => {
+    setStep('upload');
+    setFile(null);
+    setRows([]);
+    setHeaders([]);
+    setColumnMapping({});
+    setPreviewRows([]);
+    setParseError(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
   const handleClose = () => {
     setStep('upload');
     setFile(null);
     setRows([]);
     setHeaders([]);
     setPreviewRows([]);
+    setColumnMapping({});
     setParseError(null);
     setImportedCount(0);
     setFailedCount(0);
@@ -390,6 +527,88 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
             {parseError && (
               <p className="text-sm text-red-600 dark:text-red-400">{parseError}</p>
             )}
+          </>
+        )}
+
+        {step === 'match' && file && headers.length > 0 && rows.length > 0 && (
+          <>
+            <p className="text-sm text-gray-600 dark:text-gray-400">
+              {t('importLeadsStep2Match') || 'Step 2: Match columns'}. {t('importLeadsMatchDescription') || 'Match CSV/Excel columns to system fields. If headers were mistyped, choose the correct field for each column.'}
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="md:col-span-1">
+                <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                  {t('importLeadsDataExample') || 'Data example'}
+                </h4>
+                <div className="rounded border border-gray-200 dark:border-gray-600 p-2 bg-gray-50 dark:bg-gray-800/50 text-xs space-y-1 max-h-24 overflow-y-auto">
+                  {rows.slice(0, 2).map((row, ri) => (
+                    <div key={ri} className="flex flex-wrap gap-1">
+                      {headers.map((h) => (
+                        <span key={h} className="text-gray-600 dark:text-gray-400">
+                          {String(row[h] ?? '').slice(0, 20)}
+                          {headers.length > 1 && h !== headers[headers.length - 1] ? ',' : ''}
+                        </span>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="md:col-span-2 space-y-3">
+                <div className="grid grid-cols-[1fr,1fr] gap-x-4 gap-y-2 items-center text-sm">
+                  <h4 className="font-semibold text-gray-700 dark:text-gray-300 col-span-2">
+                    {t('importLeadsColumnNames') || 'Column names'} → {t('importLeadsCustomFields') || 'System field'}
+                  </h4>
+                  {headers.map((header) => {
+                    const currentValue = columnMapping[header] ?? '';
+                    const usedByOtherColumn = (fieldValue: LeadImportFieldKey) =>
+                      fieldValue !== '' && headers.some((h) => h !== header && (columnMapping[h] ?? '') === fieldValue);
+                    return (
+                      <React.Fragment key={header}>
+                        <div className="text-gray-700 dark:text-gray-300 truncate" title={header}>
+                          {header || '\u00A0'}
+                        </div>
+                        <select
+                          className="border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm py-1.5"
+                          value={currentValue}
+                          onChange={(e) => {
+                            const v = e.target.value as LeadImportFieldKey;
+                            setColumnMapping((prev) => ({ ...prev, [header]: v }));
+                          }}
+                        >
+                          {SYSTEM_FIELDS.map((opt) => {
+                            const alreadySelected = opt.value !== '' && usedByOtherColumn(opt.value);
+                            return (
+                              <option
+                                key={opt.value}
+                                value={opt.value}
+                                disabled={alreadySelected}
+                              >
+                                {opt.value === '' ? (t('importLeadsChooseField') || 'Choose field') : (t(opt.labelKey) || opt.labelKey)}
+                                {alreadySelected ? ` (${t('importLeadsAlreadyMapped') || 'already mapped'})` : ''}
+                              </option>
+                            );
+                          })}
+                        </select>
+                      </React.Fragment>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+            {parseError && (
+              <p className="text-sm text-red-600 dark:text-red-400">{parseError}</p>
+            )}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button variant="secondary" onClick={handleReupload}>
+                {t('importLeadsReupload') || 'Reupload'}
+              </Button>
+              <Button variant="secondary" onClick={handleClose}>
+                {t('cancel') || 'Cancel'}
+              </Button>
+              <Button onClick={handleMatchContinue}>
+                {t('save') || 'Save'}
+              </Button>
+            </div>
           </>
         )}
 
@@ -596,7 +815,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
               </table>
             </div>
             <div className="flex gap-2 pt-2">
-              <Button variant="secondary" onClick={() => { setStep('upload'); setFile(null); setRows([]); setHeaders([]); setPreviewRows([]); if (fileInputRef.current) fileInputRef.current.value = ''; }}>
+              <Button variant="secondary" onClick={() => setStep('match')}>
                 {t('back') || 'Back'}
               </Button>
               <Button onClick={handleImport}>

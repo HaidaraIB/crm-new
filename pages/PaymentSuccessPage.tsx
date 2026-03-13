@@ -5,7 +5,7 @@ import { getCurrentUserAPI, checkPaymentStatusAPI, requestTwoFactorAuthAPI, veri
 import { navigateToCompanyRoute } from '../utils/routing';
 
 export const PaymentSuccessPage = () => {
-    const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage } = useAppContext();
+    const { t, language, setCurrentUser, setIsLoggedIn, setCurrentPage, setLang } = useAppContext();
     const [error, setError] = useState<string | null>(null);
     const [isLoadingState, setIsLoading] = useState(true);
     const [paymentCompleted, setPaymentCompleted] = useState(false);
@@ -252,6 +252,7 @@ export const PaymentSuccessPage = () => {
                                 domain: retryUserData.company.domain || pendingUserData.company?.domain,
                                 specialization: retryUserData.company.specialization,
                             } : pendingUserData.company,
+                            language: (retryUserData.language === 'ar' || retryUserData.language === 'en') ? retryUserData.language : undefined,
                         };
                         
                         // Store success message for dashboard
@@ -264,6 +265,7 @@ export const PaymentSuccessPage = () => {
                         localStorage.removeItem('currentUser');
                         
                         setCurrentUser(frontendUser);
+                        if (frontendUser.language) setLang(frontendUser.language);
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
                         
@@ -294,12 +296,14 @@ export const PaymentSuccessPage = () => {
                             domain: userData.company.domain || pendingUserData.company?.domain,
                             specialization: userData.company.specialization,
                         } : pendingUserData.company,
+                        language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
                     };
                     
                     // Clear old user data before setting new user
                     localStorage.removeItem('currentUser');
                     
                     setCurrentUser(frontendUser);
+                    if (frontendUser.language) setLang(frontendUser.language);
                     setIsLoggedIn(true);
                     localStorage.removeItem('pendingUserData');
                     
@@ -390,6 +394,7 @@ export const PaymentSuccessPage = () => {
                                 ...pendingUserData.company,
                                 domain: pendingUserData.company.domain,
                             } : undefined,
+                            language: (pendingUserData.language === 'ar' || pendingUserData.language === 'en') ? pendingUserData.language : undefined,
                         };
                         
                         // Store success message for dashboard
@@ -402,6 +407,7 @@ export const PaymentSuccessPage = () => {
                         localStorage.removeItem('currentUser');
                         
                         setCurrentUser(frontendUser);
+                        if (frontendUser.language) setLang(frontendUser.language);
                         setIsLoggedIn(true);
                         localStorage.removeItem('pendingUserData');
                         

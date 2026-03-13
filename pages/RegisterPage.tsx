@@ -19,8 +19,11 @@ type PublicPlan = {
     storage: number;
 };
 
+const slugifyDomain = (text: string) =>
+    text.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+
 export const RegisterPage = () => {
-    const { setIsLoggedIn, setCurrentUser, t, language, setLanguage, setCurrentPage, theme, setTheme } = useAppContext();
+    const { setIsLoggedIn, setCurrentUser, t, language, setLanguage, setLang, setCurrentPage, theme, setTheme } = useAppContext();
 
     // Company information
     const [companyName, setCompanyName] = useState('');
@@ -236,6 +239,7 @@ export const RegisterPage = () => {
                         localStorage.removeItem('isLoggedIn');
                         
                         setCurrentUser(userData);
+                        if (userData.language === 'ar' || userData.language === 'en') setLang(userData.language);
                         setIsLoggedIn(true);
                         
                         // Navigate to dashboard
@@ -268,6 +272,7 @@ export const RegisterPage = () => {
             } else {
                 // No payment required - go to dashboard
                 setCurrentUser(pendingUserData);
+                if (pendingUserData.language === 'ar' || pendingUserData.language === 'en') setLang(pendingUserData.language);
                 setIsLoggedIn(true);
                 navigateToCompanyRoute(pendingUserData.company?.name, pendingUserData.company?.domain, 'Dashboard');
                 setCurrentPage('Dashboard');
@@ -407,7 +412,7 @@ export const RegisterPage = () => {
 
         if (!companyDomain.trim()) {
             newErrors.companyDomain = t('companyDomainRequired') || 'Company domain is required';
-        } else if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*\.?[a-zA-Z0-9-]*[a-zA-Z0-9]*$/.test(companyDomain)) {
+        } else if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*$/.test(companyDomain)) {
             newErrors.companyDomain = t('invalidDomain') || 'Invalid domain format';
         }
 
@@ -534,6 +539,7 @@ export const RegisterPage = () => {
             localStorage.removeItem('isLoggedIn');
             localStorage.removeItem('pendingUserData');
 
+            const userLang = (response.user.language === 'ar' || response.user.language === 'en') ? response.user.language : undefined;
             const frontendUser = {
                 id: response.user.id,
                 name: `${response.user.first_name || ''} ${response.user.last_name || ''}`.trim() || response.user.username,
@@ -548,6 +554,7 @@ export const RegisterPage = () => {
                     domain: response.company.domain || companyDomain,
                     specialization: response.company.specialization as 'real_estate' | 'services' | 'products',
                 },
+                language: userLang,
             };
 
             const subscription = response.subscription;
@@ -571,6 +578,7 @@ export const RegisterPage = () => {
             localStorage.setItem('accessToken', response.access);
             localStorage.setItem('refreshToken', response.refresh);
             setCurrentUser(frontendUser);
+            if (frontendUser.language) setLang(frontendUser.language);
             setIsLoggedIn(true);
             setTimeout(() => {
                 navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
@@ -703,6 +711,11 @@ export const RegisterPage = () => {
                                                     });
                                                 }
                                             }}
+                                            onBlur={() => {
+                                                if (companyName.trim() && !companyDomain.trim()) {
+                                                    setCompanyDomain(slugifyDomain(companyName));
+                                                }
+                                            }}
                                             className={errors.companyName ? 'border-red-500' : ''}
                                         />
                                         {errors.companyName && (
@@ -716,10 +729,10 @@ export const RegisterPage = () => {
                                         </label>
                                         <Input
                                             id="company-domain"
-                                            placeholder={t('enterCompanyDomain') || 'e.g., example.com'}
+                                            placeholder={t('enterCompanyDomain') || 'e.g., mycompany'}
                                             value={companyDomain}
                                             onChange={(e) => {
-                                                setCompanyDomain(e.target.value);
+                                                setCompanyDomain(slugifyDomain(e.target.value));
                                                 if (errors.companyDomain) {
                                                     setErrors(prev => {
                                                         const newErrors = { ...prev };

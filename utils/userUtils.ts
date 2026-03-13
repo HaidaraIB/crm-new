@@ -50,6 +50,7 @@ export const normalizeUser = (userData: any): User => {
     } : undefined,
     emailVerified: userData.email_verified || userData.is_email_verified || userData.emailVerified || false,
     supervisor_permissions: userData.supervisor_permissions ?? undefined,
+    language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
   };
 };
 

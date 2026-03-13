@@ -6,7 +6,7 @@ import { translations } from '../constants';
 import { formatStageName, getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
-import { getCurrentUserAPI, checkPaymentStatusAPI } from '../services/api';
+import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI } from '../services/api';
 
 // --- Helper Functions ---
 /**
@@ -870,6 +870,17 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         // Convert user data from API to Frontend format using the helper
         const frontendUser = normalizeUser(userData);
         
+        // Sync language from API so UI and emails use user's preferred language
+        if (frontendUser.language === 'ar' || frontendUser.language === 'en') {
+          const currentStored = typeof window !== 'undefined' ? localStorage.getItem('language') : null;
+          if (currentStored !== frontendUser.language) {
+            setLanguage(frontendUser.language);
+            localStorage.setItem('language', frontendUser.language);
+            document.documentElement.lang = frontendUser.language;
+            document.documentElement.dir = frontendUser.language === 'ar' ? 'rtl' : 'ltr';
+          }
+        }
+        
         // Clear old user data before setting new user to avoid conflicts
         const oldUserId = currentUser?.id;
         if (oldUserId && oldUserId !== frontendUser.id) {
@@ -1039,7 +1050,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (user) {
       // تنظيف الدور قبل الحفظ في localStorage
       const cleanedRole = normalizeRole(user.role);
-      // Save full user data including company info
+      // Save full user data including company info and language
       localStorage.setItem('currentUser', JSON.stringify({
         id: user.id,
         name: user.name,
@@ -1055,6 +1066,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           domain: user.company.domain,
           specialization: user.company.specialization,
         } : null,
+        language: user.language,
       }));
     } else {
       localStorage.removeItem('currentUser');
@@ -1155,6 +1167,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     localStorage.setItem('language', lang);
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    if (currentUser) {
+      updateLanguageAPI(lang).catch(() => {});
+      setCurrentUser({ ...currentUser, language: lang });
+    }
   }
 
   const setAppColor = (color: string) => {

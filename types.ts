@@ -158,6 +158,7 @@ export interface Lead {
   lastFeedback?: string; // From last ClientTask notes
   notes?: string; // From last ClientTask notes
   lastStage?: string; // From last ClientTask stage or status
+  leadCompanyName?: string; // Optional company name for the lead
 }
 
 export interface LeadFilters {
@@ -180,6 +181,8 @@ export interface Deal {
   status: string; // For display (Reservation, Contracted, Closed)
   stage: 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled'; // API stage field
   value: number;
+  /** Optional follow-up reminder datetime (ISO string) */
+  reminderDate?: string | null;
   leadId?: number;
   client?: number; // API client ID
   employee?: number; // API employee ID

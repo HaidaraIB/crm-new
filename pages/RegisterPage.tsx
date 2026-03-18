@@ -16,14 +16,16 @@ type PublicPlan = {
     trial_days: number;
     users: string;
     clients: string;
-    storage: number;
+    features?: Record<string, boolean>;
+    limits?: Record<string, number | 'unlimited' | null>;
+    usage_limits_monthly?: Record<string, number | 'unlimited' | null>;
 };
 
 const slugifyDomain = (text: string) =>
     text.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
 export const RegisterPage = () => {
-    const { setIsLoggedIn, setCurrentUser, t, language, setLanguage, setLang, setCurrentPage, theme, setTheme } = useAppContext();
+    const { setIsLoggedIn, setCurrentUser, t, language, setLanguage, setCurrentPage, theme, setTheme } = useAppContext();
 
     // Company information
     const [companyName, setCompanyName] = useState('');
@@ -74,6 +76,32 @@ export const RegisterPage = () => {
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: Plan
     const isNextButtonLoading = stepCheckLoading && currentStep < 3;
+
+    const entitlementLabel = (key: string) => {
+        const map: Record<string, { ar: string; en: string }> = {
+            sms_enabled: { ar: 'SMS', en: 'SMS' },
+            whatsapp_enabled: { ar: 'واتساب', en: 'WhatsApp' },
+            backups_enabled: { ar: 'نسخ احتياطي', en: 'Backups' },
+            lead_import_enabled: { ar: 'استيراد', en: 'Import' },
+            max_deals: { ar: 'الصفقات', en: 'Deals' },
+            max_tasks: { ar: 'المهام', en: 'Tasks' },
+            max_integration_accounts: { ar: 'التكاملات', en: 'Integrations' },
+            max_whatsapp_numbers: { ar: 'أرقام واتساب', en: 'WhatsApp numbers' },
+            max_message_templates: { ar: 'قوالب', en: 'Templates' },
+            monthly_sms_messages: { ar: 'SMS شهرياً', en: 'Monthly SMS' },
+            monthly_whatsapp_messages: { ar: 'واتساب شهرياً', en: 'Monthly WhatsApp' },
+            monthly_notifications: { ar: 'إشعارات شهرياً', en: 'Monthly notifications' },
+        };
+        const v = map[key];
+        return v ? (language === 'ar' ? v.ar : v.en) : key;
+    };
+
+    const formatLimitValue = (val: any) => {
+        if (val === 'unlimited') return language === 'ar' ? 'غير محدود' : 'Unlimited';
+        if (val === null || typeof val === 'undefined') return language === 'ar' ? 'غير محدود' : 'Unlimited';
+        if (typeof val === 'number') return `${val}`;
+        return `${val}`;
+    };
 
     const normalizeErrorMessage = (value: any): string => {
         if (!value) return '';
@@ -168,8 +196,10 @@ export const RegisterPage = () => {
     };
 
     const getPlanPriceLabel = (plan: PublicPlan) => {
+        // Free/trial plans do not have billing cycles (avoid "per month/year" confusion).
+        const isFreeOrTrial = Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0;
         const price = billingCycle === 'monthly' ? Number(plan.price_monthly || 0) : Number(plan.price_yearly || 0);
-        if (!price) {
+        if (isFreeOrTrial || !price) {
             return t('free') || 'Free';
         }
         return new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', {
@@ -177,6 +207,11 @@ export const RegisterPage = () => {
             currency: 'USD',
         }).format(price);
     };
+
+    const selectedPlanDetails = selectedPlan ? plans.find((p) => p.id === selectedPlan) : undefined;
+    const isSelectedPlanFreeOrTrial = !!selectedPlanDetails
+        && Number(selectedPlanDetails.price_monthly || 0) <= 0
+        && Number(selectedPlanDetails.price_yearly || 0) <= 0;
     const clearFieldError = (field: string) => {
         if (errors[field]) {
             setErrors(prev => {
@@ -239,7 +274,7 @@ export const RegisterPage = () => {
                         localStorage.removeItem('isLoggedIn');
                         
                         setCurrentUser(userData);
-                        if (userData.language === 'ar' || userData.language === 'en') setLang(userData.language);
+                        if (userData.language === 'ar' || userData.language === 'en') setLanguage(userData.language);
                         setIsLoggedIn(true);
                         
                         // Navigate to dashboard
@@ -272,7 +307,7 @@ export const RegisterPage = () => {
             } else {
                 // No payment required - go to dashboard
                 setCurrentUser(pendingUserData);
-                if (pendingUserData.language === 'ar' || pendingUserData.language === 'en') setLang(pendingUserData.language);
+                if (pendingUserData.language === 'ar' || pendingUserData.language === 'en') setLanguage(pendingUserData.language);
                 setIsLoggedIn(true);
                 navigateToCompanyRoute(pendingUserData.company?.name, pendingUserData.company?.domain, 'Dashboard');
                 setCurrentPage('Dashboard');
@@ -371,7 +406,9 @@ export const RegisterPage = () => {
                         trial_days: Number(plan.trial_days || 0),
                         users: plan.users,
                         clients: plan.clients,
-                        storage: Number(plan.storage || 0),
+                        features: plan.features || {},
+                        limits: plan.limits || {},
+                        usage_limits_monthly: plan.usage_limits_monthly || {},
                     }));
                     setPlans(normalizedPlans);
                 }
@@ -560,8 +597,13 @@ export const RegisterPage = () => {
             const subscription = response.subscription;
             const subscriptionId = subscription?.id ?? response.subscription_id ?? null;
 
-            // Store in DB is done. Always go to payment with subscription_id when we have one (do not log in yet).
-            if (subscriptionId) {
+            const requiresPayment =
+                response.requires_payment === true ||
+                response.requiresPayment === true ||
+                response.requires_payment === 'true';
+
+            // Only go to payment when payment is actually required.
+            if (subscriptionId && requiresPayment) {
                 const pendingData = {
                     ...frontendUser,
                     requiresPayment: true,
@@ -574,11 +616,11 @@ export const RegisterPage = () => {
                 return;
             }
 
-            // No subscription (e.g. free) – log in and go to dashboard
+            // Free / trial (no payment required) – log in and go to dashboard
             localStorage.setItem('accessToken', response.access);
             localStorage.setItem('refreshToken', response.refresh);
             setCurrentUser(frontendUser);
-            if (frontendUser.language) setLang(frontendUser.language);
+            if (frontendUser.language) setLanguage(frontendUser.language);
             setIsLoggedIn(true);
             setTimeout(() => {
                 navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
@@ -990,33 +1032,35 @@ export const RegisterPage = () => {
                                         {t('selectPlan') || 'Select a Plan'}
                                     </h3>
 
-                                    <div className="flex items-center justify-between gap-3">
-                                        <span className="text-sm font-medium text-secondary">
-                                            {t('billingCycle') || 'Billing cycle'}
-                                        </span>
-                                        <div className="inline-flex rounded-full border border-gray-300 dark:border-gray-600 overflow-hidden">
-                                            <button
-                                                type="button"
-                                                className={`px-3 py-1 text-sm font-medium transition ${billingCycle === 'monthly'
-                                                        ? 'bg-primary-500 text-white'
-                                                        : 'text-secondary'
-                                                    }`}
-                                                onClick={() => setBillingCycle('monthly')}
-                                            >
-                                                {t('monthly') || 'Monthly'}
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className={`px-3 py-1 text-sm font-medium transition ${billingCycle === 'yearly'
-                                                        ? 'bg-primary-500 text-white'
-                                                        : 'text-secondary'
-                                                    }`}
-                                                onClick={() => setBillingCycle('yearly')}
-                                            >
-                                                {t('yearly') || 'Yearly'}
-                                            </button>
+                                    {!isSelectedPlanFreeOrTrial && (
+                                        <div className="flex items-center justify-between gap-3">
+                                            <span className="text-sm font-medium text-secondary">
+                                                {t('billingCycle') || 'Billing cycle'}
+                                            </span>
+                                            <div className="inline-flex rounded-full border border-gray-300 dark:border-gray-600 overflow-hidden">
+                                                <button
+                                                    type="button"
+                                                    className={`px-3 py-1 text-sm font-medium transition ${billingCycle === 'monthly'
+                                                            ? 'bg-primary-500 text-white'
+                                                            : 'text-secondary'
+                                                        }`}
+                                                    onClick={() => setBillingCycle('monthly')}
+                                                >
+                                                    {t('monthly') || 'Monthly'}
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    className={`px-3 py-1 text-sm font-medium transition ${billingCycle === 'yearly'
+                                                            ? 'bg-primary-500 text-white'
+                                                            : 'text-secondary'
+                                                        }`}
+                                                    onClick={() => setBillingCycle('yearly')}
+                                                >
+                                                    {t('yearly') || 'Yearly'}
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
+                                    )}
 
                                     <div className="space-y-3">
                                         {plansLoading && (
@@ -1066,21 +1110,41 @@ export const RegisterPage = () => {
                                                                 <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                                                                     {getPlanPriceLabel(plan)}
                                                                 </div>
-                                                                <p className="text-xs text-secondary capitalize">
-                                                                    {billingCycle === 'monthly'
-                                                                        ? (t('perMonth') || 'per month')
-                                                                        : (t('perYear') || 'per year')}
-                                                                </p>
+                                                                {!(Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0) && (
+                                                                    <p className="text-xs text-secondary capitalize">
+                                                                        {billingCycle === 'monthly'
+                                                                            ? (t('perMonth') || 'per month')
+                                                                            : (t('perYear') || 'per year')}
+                                                                    </p>
+                                                                )}
                                                             </div>
                                                         </div>
                                                         <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-secondary">
                                                             <span>{t('usersIncluded') || 'Users'}: {plan.users}</span>
                                                             <span>{t('clientsIncluded') || 'Clients'}: {plan.clients}</span>
-                                                            <span>{t('storageIncluded') || 'Storage'}: {plan.storage} GB</span>
                                                             {plan.trial_days > 0 && (
                                                                 <span className="text-primary-600 dark:text-primary-400">
                                                                     {`${plan.trial_days} ${t('trialDaysLabel') || 'trial days'}`}
                                                                 </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/60 text-xs text-secondary space-y-1">
+                                                            <div>
+                                                                <span className="font-semibold">{language === 'ar' ? 'المميزات:' : 'Features:'}</span>{' '}
+                                                                {Object.entries(plan.features || {})
+                                                                    .filter(([, v]) => !!v)
+                                                                    .slice(0, 4)
+                                                                    .map(([k]) => entitlementLabel(k))
+                                                                    .join('، ') || (language === 'ar' ? 'لا يوجد' : 'None')}
+                                                            </div>
+                                                            {Object.keys(plan.usage_limits_monthly || {}).length > 0 && (
+                                                                <div>
+                                                                    <span className="font-semibold">{language === 'ar' ? 'الاستخدام الشهري:' : 'Monthly usage:'}</span>{' '}
+                                                                    {Object.entries(plan.usage_limits_monthly || {})
+                                                                        .slice(0, 2)
+                                                                        .map(([k, v]) => `${entitlementLabel(k)}: ${formatLimitValue(v)}`)
+                                                                        .join('، ')}
+                                                                </div>
                                                             )}
                                                         </div>
                                                     </button>

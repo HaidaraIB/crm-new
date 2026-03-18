@@ -76,6 +76,7 @@ export const EditLeadModal = () => {
         communicationWay: '',
         priority: '' as Lead['priority'],
         status: '' as Lead['status'],
+        leadCompanyName: '',
     });
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
 
@@ -91,6 +92,7 @@ export const EditLeadModal = () => {
                 communicationWay: editingLead.communicationWay || defaultChannelName,
                 priority: editingLead.priority || '',
                 status: editingLead.status || defaultStatusName,
+                leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
             });
             // Initialize phone numbers from editingLead
             if (editingLead.phoneNumbers && editingLead.phoneNumbers.length > 0) {
@@ -193,6 +195,7 @@ export const EditLeadModal = () => {
                 communicationWay: formState.communicationWay,
                 priority: formState.priority,
                 status: formState.status,
+                lead_company_name: formState.leadCompanyName?.trim() || null,
             };
             await updateLeadMutation.mutateAsync({ id: editingLead.id, data: updateData });
 
@@ -215,6 +218,10 @@ export const EditLeadModal = () => {
                     <div>
                         <Label htmlFor="name">{t('clientName')}</Label>
                         <Input id="name" placeholder={t('enterClientName')} value={formState.name} onChange={handleChange} />
+                    </div>
+                    <div>
+                        <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
+                        <Input id="leadCompanyName" placeholder={t('enterLeadCompanyName')} value={formState.leadCompanyName} onChange={handleChange} />
                     </div>
                      <div>
                         <Label htmlFor="budget">{t('budget')}</Label>

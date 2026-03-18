@@ -104,13 +104,28 @@ export const useUsers = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' 
   });
 };
 
+/** Normalize lead from API (snake_case) so it has leadCompanyName for edit forms */
+function normalizeLead(lead: any): any {
+  if (!lead) return lead;
+  return {
+    ...lead,
+    leadCompanyName: lead.leadCompanyName ?? lead.lead_company_name ?? undefined,
+  };
+}
+
 export const useLeads = (
   filters?: { type?: string; priority?: string; search?: string },
   options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>
 ) => {
   return useQuery({
     queryKey: queryKeys.leads(filters),
-    queryFn: () => getLeadsAPI(filters),
+    queryFn: async () => {
+      const data = await getLeadsAPI(filters);
+      if (data?.results && Array.isArray(data.results)) {
+        data.results = data.results.map(normalizeLead);
+      }
+      return data;
+    },
     staleTime: 1 * 60 * 1000, // 1 minute
     ...options,
   });

@@ -11,7 +11,7 @@ import ExcelJS from 'exceljs';
 
 type ImportStep = 'upload' | 'match' | 'preview' | 'importing' | 'done';
 
-export type LeadImportFieldKey = 'name' | 'phone' | 'budget' | 'type' | 'priority' | 'status' | 'communicationWay' | 'assignedTo' | 'source' | 'campaign' | 'createdAt' | '';
+export type LeadImportFieldKey = 'name' | 'phone' | 'budget' | 'type' | 'priority' | 'status' | 'communicationWay' | 'assignedTo' | 'source' | 'campaign' | 'createdAt' | 'leadCompanyName' | '';
 
 const SYSTEM_FIELDS: { value: LeadImportFieldKey; labelKey: string }[] = [
   { value: '', labelKey: 'importLeadsChooseField' },
@@ -26,6 +26,7 @@ const SYSTEM_FIELDS: { value: LeadImportFieldKey; labelKey: string }[] = [
   { value: 'source', labelKey: 'source' },
   { value: 'campaign', labelKey: 'campaign' },
   { value: 'createdAt', labelKey: 'createdAt' },
+  { value: 'leadCompanyName', labelKey: 'leadCompanyName' },
 ];
 
 export interface PreviewRow {
@@ -40,6 +41,7 @@ export interface PreviewRow {
   source: string | null;
   campaign_id: number | null;
   created_at: string | null;
+  lead_company_name: string | null;
 }
 
 const normalizeHeader = (val: unknown): string =>
@@ -76,6 +78,7 @@ const ASSIGNED_KEYS = ['assigned to', 'مسند إلى', 'assigned_to', 'assigne
 const SOURCE_KEYS = ['source', 'مصدر', 'المصدر', 'origin'];
 const CAMPAIGN_KEYS = ['campaign', 'حملة', 'الحملة'];
 const CREATED_AT_KEYS = ['created at', 'تاريخ الإنشاء', 'creation date', 'date', 'تاريخ', 'created_at'];
+const LEAD_COMPANY_NAME_KEYS = ['company name', 'company', 'اسم الشركة', 'شركة', 'lead company', 'company name (lead)'];
 
 function findColumnIndex(headers: string[], keys: string[]): number {
   for (let i = 0; i < headers.length; i++) {
@@ -148,6 +151,7 @@ function getHeaderToFieldMapping(headers: string[]): Record<string, LeadImportFi
   const sourceIdx = findColumnIndex(headers, SOURCE_KEYS);
   const campaignIdx = findColumnIndex(headers, CAMPAIGN_KEYS);
   const createdAtIdx = findColumnIndex(headers, CREATED_AT_KEYS);
+  const leadCompanyNameIdx = findColumnIndex(headers, LEAD_COMPANY_NAME_KEYS);
   if (nameIdx >= 0) mapping[headers[nameIdx]] = 'name';
   if (phoneIdx >= 0) mapping[headers[phoneIdx]] = 'phone';
   if (budgetIdx >= 0) mapping[headers[budgetIdx]] = 'budget';
@@ -159,6 +163,7 @@ function getHeaderToFieldMapping(headers: string[]): Record<string, LeadImportFi
   if (sourceIdx >= 0) mapping[headers[sourceIdx]] = 'source';
   if (campaignIdx >= 0) mapping[headers[campaignIdx]] = 'campaign';
   if (createdAtIdx >= 0) mapping[headers[createdAtIdx]] = 'createdAt';
+  if (leadCompanyNameIdx >= 0) mapping[headers[leadCompanyNameIdx]] = 'leadCompanyName';
   return mapping;
 }
 
@@ -229,6 +234,7 @@ function buildPreviewRowsFromMapping(
     const sourceVal = getValueByHeader(row, headerByField.source || '');
     const campaignVal = getValueByHeader(row, headerByField.campaign || '');
     const createdAtVal = getValueByHeader(row, headerByField.createdAt || '');
+    const leadCompanyNameVal = getValueByHeader(row, headerByField.leadCompanyName || '');
 
     const status_id = statusVal ? resolveStatusId(statusVal, opts.statuses) : (opts.defaultStatusId ?? null);
     const channel_id = channelVal ? resolveChannelId(channelVal, opts.channels) : (opts.defaultChannelId ?? null);
@@ -247,22 +253,36 @@ function buildPreviewRowsFromMapping(
       source: sourceVal || null,
       campaign_id,
       created_at: createdAtVal || null,
+      lead_company_name: leadCompanyNameVal ? leadCompanyNameVal : null,
     };
   });
 }
 
-// Empty Excel template with accepted CRM columns (first row = headers)
+// Empty Excel template with all lead fields (first row = headers)
+const TEMPLATE_HEADERS = [
+  'Name',
+  'Phone',
+  'Budget',
+  'Type',
+  'Priority',
+  'Status',
+  'Channel',
+  'Assigned To',
+  'Source',
+  'Campaign',
+  'Created At',
+];
+
 async function downloadLeadsTemplate(): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Leads', { headerRow: true });
-  const headers = ['Name', 'Phone', 'Budget', 'Type', 'Priority'];
   const headerRow = sheet.getRow(1);
-  headers.forEach((h, i) => {
+  TEMPLATE_HEADERS.forEach((h, i) => {
     headerRow.getCell(i + 1).value = h;
   });
   headerRow.font = { bold: true };
-  headers.forEach((_, i) => {
-    sheet.getColumn(i + 1).width = 14;
+  TEMPLATE_HEADERS.forEach((_, i) => {
+    sheet.getColumn(i + 1).width = i === 1 ? 16 : i >= 7 ? 18 : 14;
   });
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
@@ -376,7 +396,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
 
     for (let i = 0; i < previewRows.length; i++) {
       const row = previewRows[i];
-      const { name, phone, budget, type, priority, assigned_to, status_id, channel_id, source, campaign_id } = row;
+      const { name, phone, budget, type, priority, assigned_to, status_id, channel_id, source, campaign_id, lead_company_name: rowLeadCompanyName } = row;
       if (!name.trim() || !phone.trim()) {
         fail++;
         errors.push(`Row ${i + 1}: ${t('importLeadsNamePhoneRequired') || 'Name and phone are required.'}`);
@@ -403,6 +423,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
         company: companyId,
         ...(source != null && source.trim() !== '' ? { source: source.trim() } : {}),
         ...(campaign_id != null ? { campaign: campaign_id } : {}),
+        ...(rowLeadCompanyName != null && String(rowLeadCompanyName).trim() !== '' ? { lead_company_name: String(rowLeadCompanyName).trim() } : {}),
       };
 
       try {

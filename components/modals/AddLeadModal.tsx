@@ -78,6 +78,7 @@ export const AddLeadModal = () => {
         communicationWay: getDefaultChannel() ?? '',
         priority: '' as Lead['priority'],
         status: getDefaultStatus() ?? '',
+        leadCompanyName: '',
     });
     
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'>>>([]);
@@ -182,13 +183,14 @@ export const AddLeadModal = () => {
                 communicationWay: formState.communicationWay,
                 priority: formState.priority,
                 status: formState.status,
+                lead_company_name: formState.leadCompanyName?.trim() || null,
             });
 
             // Reset form
             const defaultUserId = currentUser?.id || users[0]?.id || '';
             setFormState({
                 name: '', phone: '', budget: '', assignedTo: defaultUserId.toString(),
-                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '',
+                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '',
             });
             setPhoneNumbers([]);
             
@@ -211,6 +213,10 @@ export const AddLeadModal = () => {
                     <div>
                         <Label htmlFor="name">{t('clientName')}</Label>
                         <Input id="name" placeholder={t('enterClientName')} value={formState.name} onChange={handleChange} />
+                    </div>
+                    <div>
+                        <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
+                        <Input id="leadCompanyName" placeholder={t('enterLeadCompanyName')} value={formState.leadCompanyName} onChange={handleChange} />
                     </div>
                      <div>
                         <Label htmlFor="budget">{t('budget')}</Label>

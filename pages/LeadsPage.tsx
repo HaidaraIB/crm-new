@@ -546,9 +546,11 @@ export const LeadsPage = () => {
 
         if (leadFilters.search) {
             const searchLower = leadFilters.search.toLowerCase();
+            const leadCompany = (l: any) => l.leadCompanyName ?? l.lead_company_name ?? '';
             leads = leads.filter(l => 
                 l.name.toLowerCase().includes(searchLower) || 
-                l.phone.includes(searchLower)
+                l.phone.includes(searchLower) ||
+                (leadCompany(l) && String(leadCompany(l)).toLowerCase().includes(searchLower))
             );
         }
 
@@ -725,6 +727,7 @@ export const LeadsPage = () => {
                                     <tr>
                                         <th scope="col" className="p-2 sm:p-4 text-center whitespace-nowrap"><input type="checkbox" onChange={(e) => handleSelectAll(e.target.checked)} checked={isAllSelected} className="rounded" /></th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('name')}</th>
+                                        <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('leadCompanyName')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('phone')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('source') || 'Source'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('campaign') || 'Campaign'}</th>
@@ -774,6 +777,9 @@ export const LeadsPage = () => {
                                                     >
                                                         {lead.name}
                                                     </button>
+                                                </td>
+                                                <td className="px-4 sm:px-6 py-4 hidden lg:table-cell text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                                    {(lead as any).leadCompanyName ?? (lead as any).lead_company_name ?? '-'}
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 text-center">
                                                     <div className="flex flex-col gap-2">

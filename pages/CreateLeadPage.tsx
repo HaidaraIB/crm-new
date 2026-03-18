@@ -77,6 +77,7 @@ export const CreateLeadPage = () => {
         communicationWay: '',
         priority: 'medium' as 'low' | 'medium' | 'high' | '',
         status: '',
+        leadCompanyName: '',
     });
     
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'>>>([]);
@@ -303,6 +304,7 @@ export const CreateLeadPage = () => {
                 priority: priorityValue,
                 status: statusId,
                 company: currentUser?.company?.id || null,
+                lead_company_name: formState.leadCompanyName?.trim() || null,
             };
             
             // Add phone_number for backward compatibility if we have phone numbers
@@ -331,6 +333,7 @@ export const CreateLeadPage = () => {
                     priority: t('priority') || 'Priority',
                     status: t('status') || 'Status',
                     company: t('company') || 'Company',
+                    lead_company_name: t('leadCompanyName') || 'Company name',
                 };
                 
                 Object.keys(error.fields).forEach(field => {
@@ -419,6 +422,15 @@ export const CreateLeadPage = () => {
                             {errors.name && (
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                             )}
+                        </div>
+                        <div>
+                            <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
+                            <Input 
+                                id="leadCompanyName" 
+                                placeholder={t('enterLeadCompanyName')} 
+                                value={formState.leadCompanyName} 
+                                onChange={handleChange}
+                            />
                         </div>
                         <div>
                             <Label htmlFor="budget">{t('budget')}</Label>

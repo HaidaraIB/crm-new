@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal } from '../components/index';
-import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI } from '../services/api';
+import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
 
 type SubscriptionInfo = {
@@ -16,9 +16,12 @@ type SubscriptionInfo = {
         description_ar?: string;
         price_monthly?: number;
         price_yearly?: number;
+        trial_days?: number;
         users?: string;
         clients?: string;
-        storage?: number;
+        features?: Record<string, boolean>;
+        limits?: Record<string, number | 'unlimited' | null>;
+        usage_limits_monthly?: Record<string, number | 'unlimited' | null>;
     };
     startDate?: string;
     endDate?: string;
@@ -37,6 +40,33 @@ export const BillingPage = () => {
     const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
     const [availablePlans, setAvailablePlans] = useState<any[]>([]);
     const [plansLoading, setPlansLoading] = useState(false);
+
+    const entitlementLabel = (key: string) => {
+        const map: Record<string, { ar: string; en: string }> = {
+            sms_enabled: { ar: 'تفعيل الرسائل النصية (SMS)', en: 'SMS enabled' },
+            whatsapp_enabled: { ar: 'تفعيل واتساب', en: 'WhatsApp enabled' },
+            backups_enabled: { ar: 'النسخ الاحتياطي', en: 'Backups' },
+            lead_import_enabled: { ar: 'استيراد العملاء المحتملين', en: 'Lead import' },
+            max_deals: { ar: 'الحد الأقصى للصفقات', en: 'Max deals' },
+            max_tasks: { ar: 'الحد الأقصى للمهام', en: 'Max tasks' },
+            max_integration_accounts: { ar: 'حسابات التكامل', en: 'Integration accounts' },
+            max_whatsapp_numbers: { ar: 'أرقام واتساب', en: 'WhatsApp numbers' },
+            max_message_templates: { ar: 'قوالب الرسائل', en: 'Message templates' },
+            monthly_sms_messages: { ar: 'رسائل SMS شهرياً', en: 'Monthly SMS messages' },
+            monthly_whatsapp_messages: { ar: 'رسائل واتساب شهرياً', en: 'Monthly WhatsApp messages' },
+            monthly_notifications: { ar: 'إشعارات شهرياً', en: 'Monthly notifications' },
+        };
+        const v = map[key];
+        return v ? (language === 'ar' ? v.ar : v.en) : key;
+    };
+
+    const formatLimitValue = (val: any) => {
+        if (val === 'unlimited') return language === 'ar' ? 'غير محدود' : 'Unlimited';
+        // In this app, null/undefined means "no cap" for limits/usage.
+        if (val === null || typeof val === 'undefined') return language === 'ar' ? 'غير محدود' : 'Unlimited';
+        if (typeof val === 'number') return `${val}`;
+        return `${val}`;
+    };
 
     // Load subscription info
     useEffect(() => {
@@ -79,9 +109,12 @@ export const BillingPage = () => {
                                     description_ar: publicPlan.description_ar,
                                     price_monthly: publicPlan.price_monthly,
                                     price_yearly: publicPlan.price_yearly,
+                                    trial_days: publicPlan.trial_days,
                                     users: publicPlan.users,
                                     clients: publicPlan.clients,
-                                    storage: publicPlan.storage,
+                                    features: publicPlan.features || {},
+                                    limits: publicPlan.limits || {},
+                                    usage_limits_monthly: publicPlan.usage_limits_monthly || {},
                                 };
                             }
                         } catch (error) {
@@ -89,9 +122,16 @@ export const BillingPage = () => {
                         }
                     }
 
-                    // Determine billing cycle from subscription duration
-                    let billingCycle: 'monthly' | 'yearly' = 'monthly';
-                    if (subscription.start_date && subscription.end_date) {
+                    // Determine billing cycle from subscription duration (paid plans only).
+                    // Free/trial plans do not have a billing cycle.
+                    let billingCycle: 'monthly' | 'yearly' | undefined = 'monthly';
+                    const pm = Number(planDetails?.price_monthly ?? subscription.plan?.price_monthly ?? 0);
+                    const py = Number(planDetails?.price_yearly ?? subscription.plan?.price_yearly ?? 0);
+                    const trialDays = Number(planDetails?.trial_days ?? 0);
+                    const isFreeOrTrial = pm <= 0 && py <= 0;
+                    if (isFreeOrTrial) {
+                        billingCycle = undefined;
+                    } else if (subscription.start_date && subscription.end_date) {
                         const startDate = new Date(subscription.start_date);
                         const endDate = new Date(subscription.end_date);
                         const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -108,7 +148,7 @@ export const BillingPage = () => {
                         },
                         startDate: subscription.start_date,
                         endDate: detailedStatus?.end_date || subscription.end_date,
-                        billingCycle,
+                        billingCycle: billingCycle as any,
                     });
                 } else {
                     setSubscriptionInfo(null);
@@ -144,6 +184,15 @@ export const BillingPage = () => {
     const handleRenewSubscription = async () => {
         if (!subscriptionInfo || !subscriptionInfo.id) {
             alert(t('subscriptionNotFound') || 'Subscription not found');
+            return;
+        }
+
+        // Free/trial plans do not support renewals
+        const currentPm = Number(subscriptionInfo.plan?.price_monthly ?? 0);
+        const currentPy = Number(subscriptionInfo.plan?.price_yearly ?? 0);
+        const isCurrentFreeOrTrial = currentPm <= 0 && currentPy <= 0;
+        if (isCurrentFreeOrTrial) {
+            alert(language === 'ar' ? 'لا يوجد تجديد للخطة المجانية/التجريبية.' : 'Free/trial plans do not require renewal.');
             return;
         }
 
@@ -188,24 +237,43 @@ export const BillingPage = () => {
             return;
         }
 
-        if (!selectedGateway) {
-            alert(t('paymentGatewayRequired') || 'Please select a payment method');
-            return;
-        }
+        const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
+        const selectedPm = Number(selectedPlanObj?.price_monthly ?? 0);
+        const selectedPy = Number(selectedPlanObj?.price_yearly ?? 0);
+        const isSelectedFreeOrTrial = selectedPm <= 0 && selectedPy <= 0;
 
         try {
             setIsRenewing(true);
-            const response = await createPaymentSessionAPI(
-                subscriptionInfo.id,
-                selectedGateway,
-                selectedPlan,
-                billingCycle
-            );
-            
-            if (response.redirect_url) {
-                window.location.href = response.redirect_url;
+            if (isSelectedFreeOrTrial) {
+                await switchSubscriptionPlanFreeAPI(selectedPlan);
+                // Refresh subscription info in-place
+                const refreshed = await getCurrentUserAPI();
+                if (refreshed?.company?.subscription) {
+                    const s = refreshed.company.subscription;
+                    setSubscriptionInfo((prev) => prev ? ({
+                        ...prev,
+                        id: s.id,
+                        isActive: s.is_active === true,
+                        startDate: s.start_date,
+                        endDate: s.end_date,
+                    }) : prev);
+                }
             } else {
-                alert(t('paymentRedirectError') || 'Failed to get payment URL');
+                if (!selectedGateway) {
+                    alert(t('paymentGatewayRequired') || 'Please select a payment method');
+                    return;
+                }
+                const response = await createPaymentSessionAPI(
+                    subscriptionInfo.id,
+                    selectedGateway,
+                    selectedPlan,
+                    billingCycle
+                );
+                if (response.redirect_url) {
+                    window.location.href = response.redirect_url;
+                } else {
+                    alert(t('paymentRedirectError') || 'Failed to get payment URL');
+                }
             }
         } catch (error: any) {
             console.error('Error changing plan:', error);
@@ -275,6 +343,7 @@ export const BillingPage = () => {
     const isRTL = language === 'ar';
     const daysRemaining = getDaysRemaining();
     const planPrice = getPlanPrice();
+    const isCurrentFreeOrTrial = Number(subscriptionInfo?.plan?.price_monthly ?? 0) <= 0 && Number(subscriptionInfo?.plan?.price_yearly ?? 0) <= 0;
 
     return (
         <PageWrapper title={t('billing') || 'Billing'}>
@@ -322,7 +391,8 @@ export const BillingPage = () => {
 
                             {/* Plan Details */}
                             {subscriptionInfo.plan && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                                             {t('currentPlan') || 'Current Plan'}
@@ -345,7 +415,9 @@ export const BillingPage = () => {
                                             {t('billingCycle') || 'Billing Cycle'}
                                         </p>
                                         <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                            {subscriptionInfo.billingCycle === 'yearly' ? t('yearly') : t('monthly')}
+                                            {subscriptionInfo.billingCycle
+                                                ? (subscriptionInfo.billingCycle === 'yearly' ? t('yearly') : t('monthly'))
+                                                : (language === 'ar' ? 'بدون دورة فوترة' : 'No billing cycle')}
                                         </p>
                                     </div>
                                     {planPrice !== null && planPrice > 0 && (
@@ -378,16 +450,69 @@ export const BillingPage = () => {
                                             </p>
                                         </div>
                                     )}
-                                    {subscriptionInfo.plan.storage && (
-                                        <div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                                                {t('storageIncluded') || 'Storage'}
+                                    </div>
+
+                                    {/* Entitlements */}
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                                {language === 'ar' ? 'المميزات' : 'Features'}
                                             </p>
-                                            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                                {subscriptionInfo.plan.storage} GB
-                                            </p>
+                                            <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                                                {Object.entries(subscriptionInfo.plan.features || {})
+                                                    .filter(([, enabled]) => !!enabled)
+                                                    .map(([k]) => (
+                                                        <div key={k} className="flex items-start gap-2">
+                                                            <span className="mt-0.5">✓</span>
+                                                            <span>{entitlementLabel(k)}</span>
+                                                        </div>
+                                                    ))}
+                                                {Object.entries(subscriptionInfo.plan.features || {}).filter(([, enabled]) => !!enabled).length === 0 && (
+                                                    <p className="text-gray-500 dark:text-gray-400">
+                                                        {language === 'ar' ? 'لا توجد مميزات مفعّلة' : 'No enabled features'}
+                                                    </p>
+                                                )}
+                                            </div>
                                         </div>
-                                    )}
+
+                                        <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                                {language === 'ar' ? 'حدود إضافية' : 'Extra limits'}
+                                            </p>
+                                            <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                                                {Object.entries(subscriptionInfo.plan.limits || {}).map(([k, v]) => (
+                                                    <div key={k} className="flex items-center justify-between gap-3">
+                                                        <span className="truncate">{entitlementLabel(k)}</span>
+                                                        <span className="font-semibold">{formatLimitValue(v)}</span>
+                                                    </div>
+                                                ))}
+                                                {Object.keys(subscriptionInfo.plan.limits || {}).length === 0 && (
+                                                    <p className="text-gray-500 dark:text-gray-400">
+                                                        {language === 'ar' ? 'لا توجد حدود إضافية' : 'No extra limits'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                                                {language === 'ar' ? 'حدود الاستخدام الشهري' : 'Monthly usage limits'}
+                                            </p>
+                                            <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
+                                                {Object.entries(subscriptionInfo.plan.usage_limits_monthly || {}).map(([k, v]) => (
+                                                    <div key={k} className="flex items-center justify-between gap-3">
+                                                        <span className="truncate">{entitlementLabel(k)}</span>
+                                                        <span className="font-semibold">{formatLimitValue(v)}</span>
+                                                    </div>
+                                                ))}
+                                                {Object.keys(subscriptionInfo.plan.usage_limits_monthly || {}).length === 0 && (
+                                                    <p className="text-gray-500 dark:text-gray-400">
+                                                        {language === 'ar' ? 'لا توجد حدود استخدام' : 'No usage limits'}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             )}
 
@@ -428,13 +553,16 @@ export const BillingPage = () => {
                             {/* Action Buttons */}
                             <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                 {subscriptionInfo.isActive && (
-                                    <Button 
-                                        onClick={() => setShowRenewalModal(true)}
-                                        disabled={isRenewing}
-                                        className="flex-1"
-                                    >
-                                        {t('renewSubscription') || 'Renew Subscription'}
-                                    </Button>
+                                    <div className="flex-1">
+                                        <Button
+                                            onClick={() => setShowRenewalModal(true)}
+                                            disabled={isRenewing || isCurrentFreeOrTrial}
+                                            className="w-full"
+                                        >
+                                            {t('renewSubscription') || 'Renew Subscription'}
+                                        </Button>
+                                        {isCurrentFreeOrTrial}
+                                    </div>
                                 )}
                                 <Button 
                                     onClick={() => setShowChangePlanModal(true)}
@@ -520,31 +648,38 @@ export const BillingPage = () => {
                 maxWidth="2xl"
             >
                 <div className="space-y-6">
-                    {/* Billing Cycle Toggle */}
-                    <div className="flex justify-center">
-                        <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1">
-                            <button
-                                onClick={() => setBillingCycle('monthly')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    billingCycle === 'monthly'
-                                        ? 'bg-primary text-white'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                            >
-                                {t('monthly') || 'Monthly'}
-                            </button>
-                            <button
-                                onClick={() => setBillingCycle('yearly')}
-                                className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                                    billingCycle === 'yearly'
-                                        ? 'bg-primary text-white'
-                                        : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
-                                }`}
-                            >
-                                {t('yearly') || 'Yearly'}
-                            </button>
-                        </div>
-                    </div>
+                    {(() => {
+                        const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
+                        const isSelectedFreeOrTrial = Number(selectedPlanObj?.price_monthly ?? 0) <= 0 && Number(selectedPlanObj?.price_yearly ?? 0) <= 0;
+                        return !isSelectedFreeOrTrial ? (
+                            <div className="flex justify-center">
+                                <div className="inline-flex rounded-lg border border-gray-300 dark:border-gray-600 p-1">
+                                    <button
+                                        onClick={() => setBillingCycle('monthly')}
+                                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                            billingCycle === 'monthly'
+                                                ? 'bg-primary text-white'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        {t('monthly') || 'Monthly'}
+                                    </button>
+                                    <button
+                                        onClick={() => setBillingCycle('yearly')}
+                                        className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                                            billingCycle === 'yearly'
+                                                ? 'bg-primary text-white'
+                                                : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        {t('yearly') || 'Yearly'}
+                                    </button>
+                                </div>
+                            </div>
+                        ) : (
+                        null
+                        );
+                    })()}
 
                     {/* Plans List */}
                     {plansLoading ? (
@@ -557,6 +692,7 @@ export const BillingPage = () => {
                                 const price = billingCycle === 'monthly' 
                                     ? Number(plan.price_monthly || 0) 
                                     : Number(plan.price_yearly || 0);
+                                const isFreeOrTrial = Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0;
                                 const isSelected = selectedPlan === plan.id;
                                 
                                 return (
@@ -589,19 +725,43 @@ export const BillingPage = () => {
                                                 : plan.description}
                                         </p>
                                         <p className="text-lg font-bold text-primary">
-                                            {price === 0 ? t('free') : formatCurrency(price)} / {billingCycle === 'monthly' ? t('month') : t('year')}
+                                            {isFreeOrTrial ? (t('free') || 'Free') : `${formatCurrency(price)} / ${billingCycle === 'monthly' ? t('month') : t('year')}`}
                                         </p>
+                                        <div className="mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/60 text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                                            <div>
+                                                <span className="font-semibold">{language === 'ar' ? 'المميزات:' : 'Features:'}</span>{' '}
+                                                {Object.entries((plan.features || {}) as Record<string, boolean>)
+                                                    .filter(([, v]) => !!v)
+                                                    .slice(0, 4)
+                                                    .map(([k]) => entitlementLabel(k))
+                                                    .join('، ') || (language === 'ar' ? 'لا يوجد' : 'None')}
+                                            </div>
+                                            {plan.usage_limits_monthly && Object.keys(plan.usage_limits_monthly).length > 0 && (
+                                                <div>
+                                                    <span className="font-semibold">{language === 'ar' ? 'الاستخدام الشهري:' : 'Monthly usage:'}</span>{' '}
+                                                    {Object.entries(plan.usage_limits_monthly as Record<string, any>)
+                                                        .slice(0, 2)
+                                                        .map(([k, v]) => `${entitlementLabel(k)}: ${formatLimitValue(v)}`)
+                                                        .join('، ')}
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 );
                             })}
                         </div>
                     )}
 
-                    {/* Payment Gateway Selection */}
-                    <PaymentGatewaySelector
-                        selectedGateway={selectedGateway}
-                        onSelect={setSelectedGateway}
-                    />
+                    {(() => {
+                        const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
+                        const isSelectedFreeOrTrial = Number(selectedPlanObj?.price_monthly ?? 0) <= 0 && Number(selectedPlanObj?.price_yearly ?? 0) <= 0;
+                        return !isSelectedFreeOrTrial ? (
+                            <PaymentGatewaySelector
+                                selectedGateway={selectedGateway}
+                                onSelect={setSelectedGateway}
+                            />
+                        ) : null;
+                    })()}
 
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -618,7 +778,11 @@ export const BillingPage = () => {
                         <Button
                             onClick={handleChangePlan}
                             loading={isRenewing}
-                            disabled={!selectedPlan || !selectedGateway || isRenewing}
+                            disabled={!selectedPlan || isRenewing || (() => {
+                                const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
+                                const isSelectedFreeOrTrial = Number(selectedPlanObj?.price_monthly ?? 0) <= 0 && Number(selectedPlanObj?.price_yearly ?? 0) <= 0;
+                                return !isSelectedFreeOrTrial && !selectedGateway;
+                            })()}
                         >
                             {isRenewing ? (t('processing') || 'Processing...') : (t('changePlan') || 'Change Plan')}
                         </Button>

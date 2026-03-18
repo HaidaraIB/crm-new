@@ -15,7 +15,9 @@ type PublicPlan = {
     trial_days: number;
     users: string;
     clients: string;
-    storage: number;
+    features?: Record<string, boolean>;
+    limits?: Record<string, number | 'unlimited' | null>;
+    usage_limits_monthly?: Record<string, number | 'unlimited' | null>;
 };
 
 export const ChangePlanPage = () => {
@@ -28,6 +30,32 @@ export const ChangePlanPage = () => {
     const [selectedGateway, setSelectedGateway] = useState<number | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+
+    const entitlementLabel = (key: string) => {
+        const map: Record<string, { ar: string; en: string }> = {
+            sms_enabled: { ar: 'SMS', en: 'SMS' },
+            whatsapp_enabled: { ar: 'واتساب', en: 'WhatsApp' },
+            backups_enabled: { ar: 'نسخ احتياطي', en: 'Backups' },
+            lead_import_enabled: { ar: 'استيراد', en: 'Import' },
+            max_deals: { ar: 'الصفقات', en: 'Deals' },
+            max_tasks: { ar: 'المهام', en: 'Tasks' },
+            max_integration_accounts: { ar: 'التكاملات', en: 'Integrations' },
+            max_whatsapp_numbers: { ar: 'أرقام واتساب', en: 'WhatsApp numbers' },
+            max_message_templates: { ar: 'قوالب', en: 'Templates' },
+            monthly_sms_messages: { ar: 'SMS شهرياً', en: 'Monthly SMS' },
+            monthly_whatsapp_messages: { ar: 'واتساب شهرياً', en: 'Monthly WhatsApp' },
+            monthly_notifications: { ar: 'إشعارات شهرياً', en: 'Monthly notifications' },
+        };
+        const v = map[key];
+        return v ? (language === 'ar' ? v.ar : v.en) : key;
+    };
+
+    const formatLimitValue = (val: any) => {
+        if (val === 'unlimited') return language === 'ar' ? 'غير محدود' : 'Unlimited';
+        if (val === null || typeof val === 'undefined') return language === 'ar' ? 'غير محدود' : 'Unlimited';
+        if (typeof val === 'number') return `${val}`;
+        return `${val}`;
+    };
 
     useEffect(() => {
         // Get subscription_id from URL
@@ -81,7 +109,9 @@ export const ChangePlanPage = () => {
                     trial_days: Number(plan.trial_days || 0),
                     users: plan.users,
                     clients: plan.clients,
-                    storage: Number(plan.storage || 0),
+                    features: plan.features || {},
+                    limits: plan.limits || {},
+                    usage_limits_monthly: plan.usage_limits_monthly || {},
                 }));
                 setPlans(normalizedPlans);
             } catch (error: any) {
@@ -258,12 +288,6 @@ export const ChangePlanPage = () => {
                                             </svg>
                                             <span>{t('clientsIncluded') || 'Clients'}: {plan.clients}</span>
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            <span>{t('storageIncluded') || 'Storage'}: {plan.storage} GB</span>
-                                        </div>
                                         {plan.trial_days > 0 && (
                                             <div className="flex items-center gap-2">
                                                 <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -272,6 +296,30 @@ export const ChangePlanPage = () => {
                                                 <span>{`${plan.trial_days} ${t('trialDaysLabel') || 'trial days'}`}</span>
                                             </div>
                                         )}
+
+                                        {/* New plan fields summary */}
+                                        <div className="pt-2 border-t border-gray-200/60 dark:border-gray-700/60 space-y-1">
+                                            <p className="text-xs font-semibold text-gray-700 dark:text-gray-300">
+                                                {language === 'ar' ? 'المميزات/الحدود' : 'Entitlements'}
+                                            </p>
+                                            <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                {language === 'ar' ? 'المميزات:' : 'Features:'}{' '}
+                                                {Object.entries(plan.features || {})
+                                                    .filter(([, v]) => !!v)
+                                                    .slice(0, 4)
+                                                    .map(([k]) => entitlementLabel(k))
+                                                    .join('، ') || (language === 'ar' ? 'لا يوجد' : 'None')}
+                                            </p>
+                                            {Object.keys(plan.usage_limits_monthly || {}).length > 0 && (
+                                                <p className="text-xs text-gray-600 dark:text-gray-400">
+                                                    {language === 'ar' ? 'استخدام شهري:' : 'Monthly usage:'}{' '}
+                                                    {Object.entries(plan.usage_limits_monthly || {})
+                                                        .slice(0, 2)
+                                                        .map(([k, v]) => `${entitlementLabel(k)}: ${formatLimitValue(v)}`)
+                                                        .join('، ')}
+                                                </p>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
                             ))}

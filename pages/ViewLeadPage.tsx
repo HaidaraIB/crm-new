@@ -235,6 +235,7 @@ export const ViewLeadPage = () => {
                 priority: lead.priority || '',
                 status: status.id,
                 company: companyId,
+                lead_company_name: lead.lead_company_name ?? lead.leadCompanyName ?? null,
             };
             
             // Include phoneNumbers if they exist
@@ -322,6 +323,7 @@ export const ViewLeadPage = () => {
                     campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
                     source: apiLead.source || 'manual',
                     integration_account: apiLead.integration_account || null,
+                    leadCompanyName: apiLead.lead_company_name ?? apiLead.leadCompanyName ?? undefined,
                 };
                 // Store assigned_to from API for display
                 (transformedLead as any).assigned_to = apiLead.assigned_to;
@@ -355,6 +357,7 @@ export const ViewLeadPage = () => {
                 campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
                 source: apiLead.source || 'manual',
                 integration_account: apiLead.integration_account || null,
+                leadCompanyName: apiLead.lead_company_name ?? apiLead.leadCompanyName ?? undefined,
             };
             // Store assigned_to from API for display
             (transformedLead as any).assigned_to = apiLead.assigned_to;
@@ -728,173 +731,90 @@ export const ViewLeadPage = () => {
                     <h3 className="font-semibold text-lg mb-4 border-b pb-3 dark:border-gray-700">{t('contactInformation') || 'Contact Information'}</h3>
                     <div className="space-y-4">
                         <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('leadCompanyName')}</label>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || '—'}</p>
+                        </div>
+                        <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('phoneNumbers') || 'Phone Numbers'}</label>
                             <div className="mt-2 space-y-2">
                                 {displayLead.phoneNumbers && displayLead.phoneNumbers.length > 0 ? (
                                     displayLead.phoneNumbers.map((pn) => (
-                                        <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto_auto]'} items-center gap-2`}>
-                                            {language === 'ar' ? (
-                                                <>
-                                                    <div className="min-w-0">
-                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate" dir="ltr">
-                                                            {pn.phone_number}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            {pn.phone_type === 'mobile' ? t('mobile') : 
-                                                             pn.phone_type === 'home' ? t('home') : 
-                                                             pn.phone_type === 'work' ? t('work') : 
-                                                             pn.phone_type === 'other' ? t('other') : 
-                                                             pn.phone_type}
-                                                        </p>
-                                                    </div>
-                                                    <div className="w-16 text-right">
-                                                        {pn.is_primary ? (
-                                                            <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
-                                                        ) : (
-                                                            <span className="text-xs whitespace-nowrap">&nbsp;</span>
-                                                        )}
-                                                    </div>
-                                                    <a 
-                                                        href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={`${t('call') || 'Call'} - ${pn.phone_type}`}
-                                                    >
-                                                        <PhoneIcon className="w-5 h-5"/>
-                                                    </a>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setSendSMSModal({ phone: pn.phone_number })}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('sendSms') || 'Send SMS'}
-                                                    >
-                                                        <SmsIcon className="w-5 h-5"/>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setSendWhatsAppModal({ phone: pn.phone_number })}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                    >
-                                                        <WhatsappIcon className="w-5 h-5"/>
-                                                    </button>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <div className="min-w-0">
-                                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate" dir="ltr">
-                                                            {pn.phone_number}
-                                                        </p>
-                                                        <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                            {pn.phone_type === 'mobile' ? t('mobile') : 
-                                                             pn.phone_type === 'home' ? t('home') : 
-                                                             pn.phone_type === 'work' ? t('work') : 
-                                                             pn.phone_type === 'other' ? t('other') : 
-                                                             pn.phone_type}
-                                                        </p>
-                                                    </div>
-                                                    <div className="w-16 text-left">
-                                                        {pn.is_primary ? (
-                                                            <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
-                                                        ) : (
-                                                            <span className="text-xs whitespace-nowrap">&nbsp;</span>
-                                                        )}
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setSendSMSModal({ phone: pn.phone_number })}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('sendSms') || 'Send SMS'}
-                                                    >
-                                                        <SmsIcon className="w-5 h-5"/>
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => setSendWhatsAppModal({ phone: pn.phone_number })}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                    >
-                                                        <WhatsappIcon className="w-5 h-5"/>
-                                                    </button>
-                                                    <a 
-                                                        href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={`${t('call') || 'Call'} - ${pn.phone_type}`}
-                                                    >
-                                                        <PhoneIcon className="w-5 h-5"/>
-                                                    </a>
-                                                </>
-                                            )}
+                                        <div key={pn.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                                            <div className="min-w-0 justify-self-start">
+                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate" dir="ltr">
+                                                    {pn.phone_number}
+                                                </p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {pn.phone_type === 'mobile' ? t('mobile') : 
+                                                     pn.phone_type === 'home' ? t('home') : 
+                                                     pn.phone_type === 'work' ? t('work') : 
+                                                     pn.phone_type === 'other' ? t('other') : 
+                                                     pn.phone_type}
+                                                </p>
+                                            </div>
+                                            <div className={language === 'ar' ? 'w-16 text-end' : 'w-16 text-start'}>
+                                                {pn.is_primary ? (
+                                                    <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
+                                                ) : (
+                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
+                                                )}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSendSMSModal({ phone: pn.phone_number })}
+                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                title={t('sendSms') || 'Send SMS'}
+                                            >
+                                                <SmsIcon className="w-5 h-5"/>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSendWhatsAppModal({ phone: pn.phone_number })}
+                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
+                                            >
+                                                <WhatsappIcon className="w-5 h-5"/>
+                                            </button>
+                                            <a 
+                                                href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
+                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                title={`${t('call') || 'Call'} - ${pn.phone_type}`}
+                                            >
+                                                <PhoneIcon className="w-5 h-5"/>
+                                            </a>
                                         </div>
                                     ))
                                 ) : (
-                                    <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto_auto]'} items-center gap-2`}>
-                                        {language === 'ar' ? (
+                                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2" dir={language === 'ar' ? 'rtl' : 'ltr'}>
+                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 justify-self-start">
+                                            {displayLead.phone || '-'}
+                                        </p>
+                                        <div className="w-16"></div>
+                                        {displayLead.phone && (
                                             <>
-                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                                    {displayLead.phone || '-'}
-                                                </p>
-                                                <div className="w-16"></div>
-                                                {displayLead.phone && (
-                                                    <>
-                                                        <a 
-                                                            href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('call') || 'Call'}
-                                                        >
-                                                            <PhoneIcon className="w-5 h-5"/>
-                                                        </a>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('sendSms') || 'Send SMS'}
-                                                        >
-                                                            <SmsIcon className="w-5 h-5"/>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSendWhatsAppModal({ phone: displayLead.phone! })}
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                        >
-                                                            <WhatsappIcon className="w-5 h-5"/>
-                                                        </button>
-                                                    </>
-                                                )}
-                                            </>
-                                        ) : (
-                                            <>
-                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100">
-                                                    {displayLead.phone || '-'}
-                                                </p>
-                                                <div className="w-16"></div>
-                                                {displayLead.phone && (
-                                                    <>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('sendSms') || 'Send SMS'}
-                                                        >
-                                                            <SmsIcon className="w-5 h-5"/>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => setSendWhatsAppModal({ phone: displayLead.phone! })}
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                        >
-                                                            <WhatsappIcon className="w-5 h-5"/>
-                                                        </button>
-                                                        <a 
-                                                            href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
-                                                            className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                            title={t('call') || 'Call'}
-                                                        >
-                                                            <PhoneIcon className="w-5 h-5"/>
-                                                        </a>
-                                                    </>
-                                                )}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
+                                                    className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                    title={t('sendSms') || 'Send SMS'}
+                                                >
+                                                    <SmsIcon className="w-5 h-5"/>
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => setSendWhatsAppModal({ phone: displayLead.phone! })}
+                                                    className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                    title={t('sendWhatsApp') || 'Send WhatsApp'}
+                                                >
+                                                    <WhatsappIcon className="w-5 h-5"/>
+                                                </button>
+                                                <a 
+                                                    href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
+                                                    className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
+                                                    title={t('call') || 'Call'}
+                                                >
+                                                    <PhoneIcon className="w-5 h-5"/>
+                                                </a>
                                             </>
                                         )}
                                     </div>

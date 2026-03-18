@@ -50,6 +50,159 @@ const TheApp = () => {
         
         return () => clearInterval(interval);
     }, []);
+
+    // Keep URL <-> page state in sync (must run on every render in same order)
+    React.useEffect(() => {
+        if (!isLoggedIn) return;
+
+        const checkPathname = () => {
+            const currentPath = decodeURIComponent(window.location.pathname);
+            const companyFromPath = extractCompanyFromPath(currentPath);
+            const pageFromPath = extractPageFromPath(currentPath);
+            const subdomainSlug = getCompanySubdomainSlug();
+
+            if (companyFromPath && currentUser?.company && subdomainSlug && companyFromPath !== subdomainSlug) {
+                const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
+                window.history.replaceState({}, '', correctRoute);
+                return;
+            }
+            if (!companyFromPath && currentUser?.company && currentPath !== '/' && subdomainSlug) {
+                const viewLeadMatch = pageFromPath.match(/^view-lead\/(\d+)$/i);
+                const correctRoute = viewLeadMatch
+                    ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10))
+                    : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
+                window.history.replaceState({}, '', correctRoute);
+                return;
+            }
+
+            const pathToPageMap: Record<string, Page> = {
+                'dashboard': 'Dashboard',
+                'leads': 'Leads',
+                'all leads': 'All Leads',
+                'all-leads': 'All Leads',
+                'fresh leads': 'Fresh Leads',
+                'fresh-leads': 'Fresh Leads',
+                'cold leads': 'Cold Leads',
+                'cold-leads': 'Cold Leads',
+                'my leads': 'My Leads',
+                'my-leads': 'My Leads',
+                'rotated leads': 'Rotated Leads',
+                'rotated-leads': 'Rotated Leads',
+                'create-lead': 'CreateLead',
+                'edit-lead': 'EditLead',
+                'view-lead': 'ViewLead',
+                'activities': 'Activities',
+                'properties': 'Properties',
+                'owners': 'Owners',
+                'services': 'Services',
+                'service packages': 'Service Packages',
+                'service-packages': 'Service Packages',
+                'service providers': 'Service Providers',
+                'service-providers': 'Service Providers',
+                'products': 'Products',
+                'product categories': 'Product Categories',
+                'product-categories': 'Product Categories',
+                'suppliers': 'Suppliers',
+                'deals': 'Deals',
+                'create-deal': 'CreateDeal',
+                'employees': 'Employees',
+                'users': 'Users',
+                'marketing': 'Marketing',
+                'campaigns': 'Campaigns',
+                'messaging-center': 'Messaging Center',
+                'messaging center': 'Messaging Center',
+                'todos': 'Todos',
+                'reports': 'Reports',
+                'teams report': 'Teams Report',
+                'teams-report': 'Teams Report',
+                'employees report': 'Employees Report',
+                'employees-report': 'Employees Report',
+                'marketing report': 'Marketing Report',
+                'marketing-report': 'Marketing Report',
+                'integrations': 'Integrations',
+                'meta': 'Meta',
+                'tiktok': 'TikTok',
+                'whatsapp': 'WhatsApp',
+                'twilio': 'Twilio',
+                'billing': 'Billing',
+                'change plan': 'Change Plan',
+                'change-plan': 'Change Plan',
+                'payment': 'Payment',
+                'subscription': 'Subscription',
+                'support-center': 'Support Center',
+                'support': 'Support Center',
+                'settings': 'Settings',
+                'profile': 'Profile',
+            };
+
+            const normalizedPath = pageFromPath.toLowerCase();
+            console.log('[App] checkPathname - currentPath:', currentPath, 'pageFromPath:', pageFromPath, 'normalizedPath:', normalizedPath);
+
+            // Check for view-lead/:id pattern
+            if (normalizedPath.startsWith('view-lead/')) {
+                const leadIdMatch = pageFromPath.match(/view-lead\/(\d+)/);
+                if (leadIdMatch && currentPage !== 'ViewLead') {
+                    setCurrentPage('ViewLead');
+                } else if (!leadIdMatch) {
+                    if (currentUser?.company) {
+                        const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
+                        window.history.replaceState({}, '', leadsRoute);
+                    } else {
+                        window.history.replaceState({}, '', '/leads');
+                    }
+                    setCurrentPage('Leads');
+                }
+                return;
+            }
+
+            // Try to match page - check both with hyphens and with spaces
+            const normalizedWithSpaces = normalizedPath.replace(/-/g, ' ');
+            const matchedPage = pathToPageMap[normalizedPath] || pathToPageMap[normalizedWithSpaces];
+            console.log('[App] checkPathname - matchedPage:', matchedPage);
+
+            if (matchedPage && currentPage !== matchedPage) {
+                console.log('[App] checkPathname - setting currentPage to:', matchedPage);
+                setCurrentPage(matchedPage);
+            } else if (!matchedPage && pageFromPath && pageFromPath !== '') {
+                console.warn('[App] checkPathname - No match found, redirecting to Dashboard. currentPath:', currentPath);
+                if (currentUser?.company) {
+                    const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
+                    window.history.replaceState({}, '', dashboardRoute);
+                } else {
+                    window.history.replaceState({}, '', '/dashboard');
+                }
+                setCurrentPage('Dashboard');
+            }
+        };
+
+        // Check immediately
+        checkPathname();
+
+        // Listen to popstate for browser back/forward
+        window.addEventListener('popstate', checkPathname);
+
+        // Check after a short delay to catch programmatic URL changes
+        const timeout = setTimeout(checkPathname, 50);
+
+        return () => {
+            window.removeEventListener('popstate', checkPathname);
+            clearTimeout(timeout);
+        };
+    }, [isLoggedIn, currentPage, setCurrentPage, currentUser]);
+
+    // Supervisor: redirect to Dashboard if they try to access a page they don't have permission for
+    React.useEffect(() => {
+        if (!isLoggedIn || !currentUser || currentUser.role !== 'Supervisor') return;
+        if (!canAccessPage(currentPage)) {
+            setCurrentPage('Dashboard');
+            if (currentUser?.company) {
+                const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
+                window.history.replaceState({}, '', dashboardRoute);
+            } else {
+                window.history.replaceState({}, '', '/dashboard');
+            }
+        }
+    }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
     
     // CurrentPageContent component defined inside TheApp to have access to currentPage
     const CurrentPageContent = () => {
@@ -504,160 +657,6 @@ const TheApp = () => {
         window.history.replaceState({}, '', '/login');
         return <LoginPage />;
     }
-    
-    // Also check pathname on mount and when pathname might have changed
-    React.useEffect(() => {
-        if (!isLoggedIn) return;
-        
-        const checkPathname = () => {
-            const currentPath = decodeURIComponent(window.location.pathname);
-            const companyFromPath = extractCompanyFromPath(currentPath);
-            const pageFromPath = extractPageFromPath(currentPath);
-            const subdomainSlug = getCompanySubdomainSlug();
-            
-            if (companyFromPath && currentUser?.company && subdomainSlug && companyFromPath !== subdomainSlug) {
-                const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
-                window.history.replaceState({}, '', correctRoute);
-                return;
-            }
-            if (!companyFromPath && currentUser?.company && currentPath !== '/' && subdomainSlug) {
-                const viewLeadMatch = pageFromPath.match(/^view-lead\/(\d+)$/i);
-                const correctRoute = viewLeadMatch
-                    ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10))
-                    : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
-                window.history.replaceState({}, '', correctRoute);
-                return;
-            }
-            
-            const pathToPageMap: Record<string, Page> = {
-                'dashboard': 'Dashboard',
-                'leads': 'Leads',
-                'all leads': 'All Leads',
-                'all-leads': 'All Leads',
-                'fresh leads': 'Fresh Leads',
-                'fresh-leads': 'Fresh Leads',
-                'cold leads': 'Cold Leads',
-                'cold-leads': 'Cold Leads',
-                'my leads': 'My Leads',
-                'my-leads': 'My Leads',
-                'rotated leads': 'Rotated Leads',
-                'rotated-leads': 'Rotated Leads',
-                'create-lead': 'CreateLead',
-                'edit-lead': 'EditLead',
-                'view-lead': 'ViewLead',
-                'activities': 'Activities',
-                'properties': 'Properties',
-                'owners': 'Owners',
-                'services': 'Services',
-                'service packages': 'Service Packages',
-                'service-packages': 'Service Packages',
-                'service providers': 'Service Providers',
-                'service-providers': 'Service Providers',
-                'products': 'Products',
-                'product categories': 'Product Categories',
-                'product-categories': 'Product Categories',
-                'suppliers': 'Suppliers',
-                'deals': 'Deals',
-                'create-deal': 'CreateDeal',
-                'employees': 'Employees',
-                'users': 'Users',
-                'marketing': 'Marketing',
-'campaigns': 'Campaigns',
-            'messaging-center': 'Messaging Center',
-            'messaging center': 'Messaging Center',
-            'todos': 'Todos',
-                'reports': 'Reports',
-                'teams report': 'Teams Report',
-                'teams-report': 'Teams Report',
-                'employees report': 'Employees Report',
-                'employees-report': 'Employees Report',
-                'marketing report': 'Marketing Report',
-                'marketing-report': 'Marketing Report',
-                'integrations': 'Integrations',
-                'meta': 'Meta',
-                'tiktok': 'TikTok',
-                'whatsapp': 'WhatsApp',
-                'twilio': 'Twilio',
-                'billing': 'Billing',
-                'change plan': 'Change Plan',
-                'change-plan': 'Change Plan',
-                'payment': 'Payment',
-                'subscription': 'Subscription',
-                'support-center': 'Support Center',
-                'support': 'Support Center',
-                'settings': 'Settings',
-                'profile': 'Profile',
-            };
-            
-            const normalizedPath = pageFromPath.toLowerCase();
-            console.log('[App] checkPathname - currentPath:', currentPath, 'pageFromPath:', pageFromPath, 'normalizedPath:', normalizedPath);
-            
-            // Check for view-lead/:id pattern
-            if (normalizedPath.startsWith('view-lead/')) {
-                const leadIdMatch = pageFromPath.match(/view-lead\/(\d+)/);
-                if (leadIdMatch && currentPage !== 'ViewLead') {
-                    setCurrentPage('ViewLead');
-                } else if (!leadIdMatch) {
-                    if (currentUser?.company) {
-                        const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
-                        window.history.replaceState({}, '', leadsRoute);
-                    } else {
-                        window.history.replaceState({}, '', '/leads');
-                    }
-                    setCurrentPage('Leads');
-                }
-                return;
-            }
-            
-            // Try to match page - check both with hyphens and with spaces
-            const normalizedWithSpaces = normalizedPath.replace(/-/g, ' ');
-            const matchedPage = pathToPageMap[normalizedPath] || pathToPageMap[normalizedWithSpaces];
-            console.log('[App] checkPathname - matchedPage:', matchedPage);
-            
-            if (matchedPage && currentPage !== matchedPage) {
-                console.log('[App] checkPathname - setting currentPage to:', matchedPage);
-                setCurrentPage(matchedPage);
-            } else if (!matchedPage && pageFromPath && pageFromPath !== '') {
-                console.warn('[App] checkPathname - No match found, redirecting to Dashboard. currentPath:', currentPath);
-                if (currentUser?.company) {
-                    const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                    window.history.replaceState({}, '', dashboardRoute);
-                } else {
-                    window.history.replaceState({}, '', '/dashboard');
-                }
-                setCurrentPage('Dashboard');
-            }
-        };
-        
-        // Check immediately
-        checkPathname();
-        
-        // Listen to popstate for browser back/forward
-        window.addEventListener('popstate', checkPathname);
-        
-        // Check after a short delay to catch programmatic URL changes
-        const timeout = setTimeout(checkPathname, 50);
-        
-        return () => {
-            window.removeEventListener('popstate', checkPathname);
-            clearTimeout(timeout);
-        };
-    }, [isLoggedIn, currentPage, setCurrentPage, currentUser]);
-
-    // Supervisor: redirect to Dashboard if they try to access a page they don't have permission for
-    React.useEffect(() => {
-        if (!isLoggedIn || !currentUser || currentUser.role !== 'Supervisor') return;
-        if (!canAccessPage(currentPage)) {
-            setCurrentPage('Dashboard');
-            if (currentUser?.company) {
-                const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                window.history.replaceState({}, '', dashboardRoute);
-            } else {
-                window.history.replaceState({}, '', '/dashboard');
-            }
-        }
-    }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
-
     return (
         <div className={`flex h-screen ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
             <Sidebar />

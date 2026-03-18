@@ -81,6 +81,7 @@ export const EditDealModal = () => {
         stage: 'in_progress' as 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled',
         startDate: '',
         closedDate: '',
+        reminderDate: '',
         value: '',
         discountPercentage: '',
         discountAmount: '',
@@ -192,6 +193,7 @@ export const EditDealModal = () => {
             // Handle startDate and closedDate - API might return start_date/closed_date or startDate/closedDate
             const startDateValue = (editingDeal as any).start_date || editingDeal.startDate;
             const closedDateValue = (editingDeal as any).closed_date || editingDeal.closedDate;
+            const reminderDateValue = (editingDeal as any).reminder_date || (editingDeal as any).reminderDate || '';
             
             // Handle paymentMethod - API might return payment_method or paymentMethod
             // API expects lowercase: 'cash' or 'installment'
@@ -214,6 +216,9 @@ export const EditDealModal = () => {
                 stage: editingDeal.stage || 'in_progress',
                 startDate: formatDate(startDateValue),
                 closedDate: formatDate(closedDateValue),
+                reminderDate: (typeof reminderDateValue === "string" && reminderDateValue.includes("T"))
+                    ? reminderDateValue.slice(0, 16)
+                    : (reminderDateValue || ""),
                 value: originalValue > 0 ? originalValue.toString() : '',
                 discountPercentage: discountPercentage > 0 ? discountPercentage.toString() : '',
                 discountAmount: discountAmount > 0 ? discountAmount.toString() : '',
@@ -317,6 +322,7 @@ export const EditDealModal = () => {
                 value: calculatedValues.totalValue, // Send totalValue as value to API
                 start_date: formState.startDate || null, // Send as start_date (snake_case) for API
                 closed_date: formState.closedDate || null, // Send as closed_date (snake_case) for API
+                reminder_date: formState.reminderDate || null,
                 discount_percentage: Number(formState.discountPercentage) || 0,
                 discount_amount: calculatedValues.discountAmount, // Use calculated discountAmount
                 sales_commission_percentage: Number(formState.salesCommissionPercentage) || 0,
@@ -584,6 +590,10 @@ export const EditDealModal = () => {
                     <div>
                         <Label htmlFor="closedDate">{t('closedDate')}</Label>
                         <Input id="closedDate" type="date" value={formState.closedDate} onChange={handleChange}/>
+                    </div>
+                    <div>
+                        <Label htmlFor="reminderDate">{t('reminderDateAndTime') || t('reminderDate') || 'Reminder date & time'}</Label>
+                        <Input id="reminderDate" type="datetime-local" value={formState.reminderDate} onChange={handleChange}/>
                     </div>
                     <div>
                         <Label htmlFor="value">{t('value')} <span className="text-red-500">*</span></Label>

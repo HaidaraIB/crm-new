@@ -58,6 +58,7 @@ export const ViewDealModal = () => {
     // Handle startDate and closedDate - API might return start_date/closed_date or startDate/closedDate
     const startDate = (viewingDeal as any).start_date || viewingDeal.startDate;
     const closedDate = (viewingDeal as any).closed_date || viewingDeal.closedDate;
+    const reminderDate = (viewingDeal as any).reminder_date || (viewingDeal as any).reminderDate;
     // Handle project - API might return project_name, project (ID), or project object
     const project = isRealEstate && viewingDeal.project 
         ? ((viewingDeal as any).project_name 
@@ -82,6 +83,19 @@ export const ViewDealModal = () => {
             const date = new Date(dateStr);
             if (!isNaN(date.getTime())) {
                 return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+            }
+        } catch (e) {
+            // Ignore parsing errors
+        }
+        return dateStr;
+    };
+
+    const formatDateTime = (dateStr: string | undefined): string => {
+        if (!dateStr) return '-';
+        try {
+            const date = new Date(dateStr);
+            if (!isNaN(date.getTime())) {
+                return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
             }
         } catch (e) {
             // Ignore parsing errors
@@ -236,6 +250,10 @@ export const ViewDealModal = () => {
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('closedDate') || 'Closed Date'}</p>
                             <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{formatDate(closedDate)}</p>
+                        </div>
+                        <div className="text-center">
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('reminderDate') || 'Reminder'}</p>
+                            <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{formatDateTime(reminderDate)}</p>
                         </div>
                         {isRealEstate && (
                             <>

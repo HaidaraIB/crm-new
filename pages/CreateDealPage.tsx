@@ -76,6 +76,7 @@ export const CreateDealPage = () => {
         stage: 'in_progress' as 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled',
         startDate: new Date().toISOString().split('T')[0],
         closedDate: '',
+        reminderDate: '',
         value: '',
         discountPercentage: '',
         discountAmount: '',
@@ -236,6 +237,7 @@ export const CreateDealPage = () => {
                 closed_by: Number(formState.closedBy) || currentUser?.id || null, // Send as closed_by (snake_case) for API
                 start_date: formState.startDate || null, // Send as start_date (snake_case) for API
                 closed_date: formState.closedDate || null, // Send as closed_date (snake_case) for API
+                reminder_date: formState.reminderDate || null, // Deal follow-up reminder (datetime)
                 discount_percentage: Number(formState.discountPercentage) || 0, // Send as discount_percentage (snake_case) for API
                 discount_amount: Number(formState.discountAmount) || 0, // Send as discount_amount (snake_case) for API
                 sales_commission_percentage: Number(formState.salesCommissionPercentage) || 0, // Send as sales_commission_percentage (snake_case) for API
@@ -528,6 +530,10 @@ export const CreateDealPage = () => {
                         <div>
                             <Label htmlFor="closedDate">{t('closedDate')}</Label>
                             <Input id="closedDate" type="date" value={formState.closedDate} onChange={handleChange}/>
+                        </div>
+                        <div>
+                            <Label htmlFor="reminderDate">{t('reminderDateAndTime') || t('reminderDate') || 'Reminder date & time'}</Label>
+                            <Input id="reminderDate" type="datetime-local" value={formState.reminderDate} onChange={handleChange}/>
                         </div>
                          {/* Row 4 */}
                         <div>

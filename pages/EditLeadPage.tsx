@@ -76,6 +76,7 @@ export const EditLeadPage = () => {
         communicationWay: '',
         priority: '' as 'low' | 'medium' | 'high' | '',
         status: '',
+        leadCompanyName: '',
     });
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -185,6 +186,7 @@ export const EditLeadPage = () => {
                 communicationWay: channelId || (defaultChannel != null ? defaultChannel.toString() : ''),
                 priority: priorityValue,
                 status: statusId || (defaultStatus != null ? defaultStatus.toString() : ''),
+                leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
             });
             
             // Initialize phone numbers from editingLead
@@ -312,6 +314,7 @@ export const EditLeadPage = () => {
                 priority: priorityValue,
                 status: statusId,
                 company: companyId,
+                lead_company_name: formState.leadCompanyName?.trim() || null,
             };
             
             // Add phone_number for backward compatibility if we have phone numbers
@@ -474,6 +477,15 @@ export const EditLeadPage = () => {
                             {errors.name && (
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                             )}
+                        </div>
+                        <div>
+                            <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
+                            <Input 
+                                id="leadCompanyName" 
+                                placeholder={t('enterLeadCompanyName')} 
+                                value={formState.leadCompanyName} 
+                                onChange={handleChange}
+                            />
                         </div>
                         <div>
                             <Label htmlFor="budget">{t('budget')}</Label>

@@ -675,6 +675,21 @@ export const getPublicPaymentGatewaysAPI = async () => {
 };
 
 /**
+ * Switch subscription to a free/trial plan (no payment).
+ * POST /api/subscriptions/switch-plan-free/
+ * Body: { plan_id: number }
+ */
+export const switchSubscriptionPlanFreeAPI = async (planId: number) => {
+  return apiRequest<any>('/subscriptions/switch-plan-free/', {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify({ plan_id: planId }),
+  });
+};
+
+/**
  * التحقق من توفر البيانات أثناء التسجيل (بريد، اسم مستخدم، رقم هاتف، دومين)
  * POST /api/auth/check-availability/
  */

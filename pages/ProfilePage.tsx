@@ -5,9 +5,10 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
 import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal, LegalLinks } from '../components/index';
-import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI } from '../services/api';
+import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI, type CreatePaymentSessionResult } from '../services/api';
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { formatDaysRemainingLabel } from '../utils/planEntitlements';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -275,7 +276,7 @@ export const ProfilePage = () => {
             }
 
             // Create payment session for renewal (no plan_id change, just extend subscription)
-            const response = await createPaymentSessionAPI(
+            const response: CreatePaymentSessionResult = await createPaymentSessionAPI(
                 subscriptionInfo.id,
                 selectedGateway,
                 undefined, // No plan change
@@ -486,10 +487,14 @@ export const ProfilePage = () => {
                                         
                                         // Only show reminder if subscription ends within 30 days
                                         if (daysUntilEnd > 0 && daysUntilEnd <= 30) {
-                                            const reminderText = t('subscriptionRenewalReminder') || `Your subscription will end in ${daysUntilEnd} day(s). Please renew to continue using our services.`;
+                                            const reminderText = t('subscriptionRenewalReminder');
+                                            const planLang = language === 'ar' ? 'ar' : 'en';
                                             return (
                                                 <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
-                                                    {reminderText.replace('{days}', daysUntilEnd.toString())}
+                                                    {reminderText.replace(
+                                                        '{remaining}',
+                                                        formatDaysRemainingLabel(daysUntilEnd, planLang),
+                                                    )}
                                                 </p>
                                             );
                                         }

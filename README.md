@@ -69,15 +69,15 @@ To run the project locally:
     ```
 
 4.  **Create `.env` file:**
-    Create a file named `.env` in the project root with:
+    Copy `.env.example` to `.env` and adjust values, or create `.env` with:
     ```env
-    VITE_API_URL=https://your-api.example.com/api
-    VITE_API_KEY=your-api-key-if-required
+    VITE_API_URL=https://your-api.example.com/api/v1
+    VITE_API_KEY_WEB=your-web-api-key
     GEMINI_API_KEY=your-gemini-key-if-needed
     VITE_BASE_DOMAIN=dashboard.loop-crm.app
     ```
-    *   `VITE_API_URL` (required): Backend API base URL.
-    *   `VITE_API_KEY` (optional): API key for `X-API-Key` header.
+    *   `VITE_API_URL` (required): Base URL for JSON API calls — **recommended** to include the version prefix, e.g. `https://host/api/v1` (no trailing slash). Legacy `/api` without `v1` still works if the backend exposes it.
+    *   `VITE_API_KEY_WEB` (required in production when the API enforces keys): Same value as `API_KEY_WEB` on the server; sent as `X-API-Key`. The legacy name `VITE_API_KEY` is still read as a fallback.
     *   `GEMINI_API_KEY` (optional): Used at build time if Gemini features are enabled.
     *   `VITE_BASE_DOMAIN` (optional): For subdomain-based multi-tenant routing.
 

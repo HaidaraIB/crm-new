@@ -136,9 +136,9 @@ export const SupportCenterPage = () => {
                   accept="image/*"
                   multiple
                   onChange={(e) => {
-                    const newFiles = e.target.files ? Array.from(e.target.files) : [];
+                    const newFiles: File[] = e.target.files ? Array.from(e.target.files) : [];
                     setScreenshots((prev) => {
-                      const combined = [...prev];
+                      const combined: File[] = [...prev];
                       newFiles.forEach((f) => {
                         if (!combined.some((ex) => ex.name === f.name && ex.size === f.size)) combined.push(f);
                       });

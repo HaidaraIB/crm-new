@@ -275,7 +275,7 @@ const TEMPLATE_HEADERS = [
 
 async function downloadLeadsTemplate(): Promise<void> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet('Leads', { headerRow: true });
+  const sheet = workbook.addWorksheet('Leads');
   const headerRow = sheet.getRow(1);
   TEMPLATE_HEADERS.forEach((h, i) => {
     headerRow.getCell(i + 1).value = h;

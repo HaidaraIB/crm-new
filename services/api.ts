@@ -1,12 +1,19 @@
 /**
  * API Service
- * 
- * هذا الملف يحتوي على جميع استدعاءات API
- * TODO: تأكد من أن API يعمل على هذا الرابط (افتراضي: https://haidaraib.pythonanywhere.com)
+ *
+ * العقد: Base URL يُفضَّل أن ينتهي بـ `/api/v1` (مثال: https://host/api/v1).
+ * مفتاح الويب: `VITE_API_KEY_WEB` (يطابق `API_KEY_WEB` في السيرفر)، مع توافق خلفي مع `VITE_API_KEY`.
  */
 
-const BASE_URL = import.meta.env.VITE_API_URL || '';
-const API_KEY = import.meta.env.VITE_API_KEY || '';
+function normalizeApiBaseUrl(raw: string): string {
+  if (!raw) return '';
+  return raw.replace(/\/+$/, '');
+}
+
+const BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || '');
+/** يُرسل كـ X-API-Key — يجب أن يطابق قيمة API_KEY_WEB في الـ backend */
+const API_KEY =
+  import.meta.env.VITE_API_KEY_WEB || import.meta.env.VITE_API_KEY || '';
 
 // متغير لتتبع عملية refresh token الجارية لتجنب استدعاءات متعددة
 let refreshTokenPromise: Promise<void> | null = null;
@@ -22,6 +29,132 @@ function getHeadersWithApiKey(customHeaders: Record<string, string> = {}): Recor
     headers['X-API-Key'] = API_KEY;
   }
   return headers;
+}
+
+// --- Unified envelope (CRM-api EnvelopeJSONRenderer + success_response / exception handler) ---
+
+/**
+ * Strip `{ success: true, data }` from API JSON; pass through legacy non-enveloped bodies.
+ */
+export function unwrapApiSuccess<T = unknown>(body: unknown): T {
+  if (body !== null && typeof body === 'object' && 'success' in body && (body as { success: unknown }).success === true) {
+    const o = body as { success: true; data?: T; message?: string; [key: string]: unknown };
+    if ('data' in o) {
+      return o.data as T;
+    }
+    const { success: _ignored, ...rest } = o;
+    return rest as unknown as T;
+  }
+  return body as T;
+}
+
+function getErrorMessageFromBody(errorData: unknown): string {
+  if (errorData == null || typeof errorData !== 'object') {
+    return '';
+  }
+  const d = errorData as Record<string, unknown>;
+  if (d.success === false && d.error && typeof d.error === 'object') {
+    const e = d.error as Record<string, unknown>;
+    if (e.message != null) return String(e.message);
+    if (e.code != null) return String(e.code);
+    return '';
+  }
+  if (d.detail != null) return String(d.detail);
+  if (typeof d.message === 'string') return d.message;
+  if (typeof d.error === 'string') return d.error;
+  return '';
+}
+
+function getErrorCodeFromBody(errorData: unknown): string | undefined {
+  if (errorData == null || typeof errorData !== 'object') return undefined;
+  const d = errorData as Record<string, unknown>;
+  if (d.success === false && d.error && typeof d.error === 'object') {
+    const c = (d.error as Record<string, unknown>).code;
+    return c != null ? String(c) : undefined;
+  }
+  if (typeof d.error_key === 'string') return d.error_key;
+  if (typeof d.code === 'string') return d.code;
+  return undefined;
+}
+
+function getErrorDetailsFromBody(errorData: unknown): unknown {
+  if (errorData == null || typeof errorData !== 'object') return undefined;
+  const d = errorData as Record<string, unknown>;
+  if (d.success === false && d.error && typeof d.error === 'object') {
+    return (d.error as Record<string, unknown>).details;
+  }
+  return undefined;
+}
+
+/** User-facing / logging message from any API error JSON shape */
+export function getApiErrorMessage(errorData: unknown, fallback = ''): string {
+  return getErrorMessageFromBody(errorData) || fallback;
+}
+
+/** رمز الخطأ من الحمولة الموحّدة أو الحقول القديمة */
+export function getApiErrorCode(errorData: unknown): string | undefined {
+  return getErrorCodeFromBody(errorData);
+}
+
+/** تفاصيل التحقق (حقول) من `error.details` */
+export function getApiErrorDetails(errorData: unknown): unknown {
+  return getErrorDetailsFromBody(errorData);
+}
+
+function attachErrorFields(
+  err: Error & { fields?: Record<string, unknown> },
+  errorData: unknown
+): void {
+  const details = getErrorDetailsFromBody(errorData);
+  if (details != null && typeof details === 'object' && !Array.isArray(details)) {
+    err.fields = details as Record<string, unknown>;
+    return;
+  }
+  if (errorData != null && typeof errorData === 'object') {
+    const d = errorData as Record<string, unknown>;
+    const fieldErrors: Record<string, unknown> = {};
+    for (const key of Object.keys(d)) {
+      if (!['detail', 'message', 'error', 'error_key', 'success'].includes(key)) {
+        fieldErrors[key] = d[key];
+      }
+    }
+    if (Object.keys(fieldErrors).length > 0) {
+      err.fields = fieldErrors;
+    }
+  }
+}
+
+function throwApiError(errorData: unknown, fallbackMessage: string): never {
+  const message = getErrorMessageFromBody(errorData) || fallbackMessage;
+  const err: Error & {
+    data?: unknown;
+    code?: string;
+    fields?: Record<string, unknown>;
+    subscriptionId?: string;
+  } = new Error(message);
+  err.data = errorData;
+  const code = getErrorCodeFromBody(errorData);
+  if (code) err.code = code;
+  attachErrorFields(err, errorData);
+  const raw = errorData as Record<string, unknown> | null;
+  const sid = raw && (raw.subscriptionId ?? raw.subscription_id);
+  if (sid != null) err.subscriptionId = String(sid);
+  throw err;
+}
+
+export async function readJsonResponse(response: Response): Promise<unknown> {
+  const text = await response.text();
+  if (!text) return undefined;
+  try {
+    return JSON.parse(text);
+  } catch {
+    return undefined;
+  }
+}
+
+async function parseSuccessJsonResponse<T>(response: Response): Promise<T> {
+  const raw = await readJsonResponse(response);
+  return unwrapApiSuccess<T>(raw);
 }
 
 /**
@@ -64,26 +197,32 @@ async function apiRequest<T>(
     headers,
   });
 
-  // إذا كان الخطأ 401 و retryOn401 = true، حاول refresh token
+  // 401: مفتاح API مفقود/غير صالح — لا نحاول refresh JWT (لن يُصلح المفتاح)
   if (response.status === 401 && retryOn401) {
+    const errorData401 = await readJsonResponse(response);
+    const keyCode = getErrorCodeFromBody(errorData401);
+    if (keyCode === 'missing_api_key' || keyCode === 'invalid_api_key') {
+      const err: Error & { code?: string; data?: unknown } = new Error(
+        getApiErrorMessage(errorData401, 'Invalid or missing API key (X-API-Key / VITE_API_KEY_WEB).')
+      );
+      err.code = keyCode;
+      err.data = errorData401;
+      throw err;
+    }
     try {
-      // إذا كانت هناك عملية refresh جارية، انتظرها بدلاً من بدء عملية جديدة
       if (refreshTokenPromise) {
         await refreshTokenPromise;
       } else {
-        // بدء عملية refresh جديدة
         refreshTokenPromise = refreshTokenAPI().then(() => {
-          refreshTokenPromise = null; // إعادة تعيين بعد النجاح
+          refreshTokenPromise = null;
         }).catch((error) => {
-          refreshTokenPromise = null; // إعادة تعيين بعد الفشل
+          refreshTokenPromise = null;
           throw error;
         });
         await refreshTokenPromise;
       }
-      // أعد المحاولة مرة أخرى بدون retry
       return apiRequest<T>(endpoint, options, false);
     } catch (refreshError) {
-      // إذا فشل refresh، أعد المستخدم إلى صفحة تسجيل الدخول على نفس النطاق الفرعي
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('isLoggedIn');
@@ -100,8 +239,8 @@ async function apiRequest<T>(
   // إذا كان الخطأ 403 (Forbidden)، قد يكون بسبب عدم وجود اشتراك نشط
   // لكن لا نتحقق من ذلك في endpoint /users/me/ لأنه يستخدم للتحقق من حالة الاشتراك
   if (response.status === 403 && !endpoint.includes('/users/me/')) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.detail || errorData.message || errorData.error || '';
+    const errorData = await readJsonResponse(response);
+    const errorMessage = getApiErrorMessage(errorData, '');
     
     // إذا كان الخطأ متعلق بعدم وجود اشتراك نشط، قم بتسجيل الخروج تلقائياً
     if (errorMessage.toLowerCase().includes('subscription') || 
@@ -147,26 +286,28 @@ async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const errorMessage = errorData.detail || errorData.message || errorData.error || JSON.stringify(errorData) || `API Error: ${response.status} ${response.statusText}`;
+    const errorData = await readJsonResponse(response);
+    const errorMessage =
+      getApiErrorMessage(errorData, '') ||
+      (typeof errorData === 'object' && errorData !== null
+        ? JSON.stringify(errorData)
+        : '') ||
+      `API Error: ${response.status} ${response.statusText}`;
     console.error('API Error:', response.status, errorData);
-    
-    // Create error object with fields for Django REST Framework validation errors
+
     const error: any = new Error(errorMessage);
     if (errorData && typeof errorData === 'object') {
       error.data = errorData;
-      // Check for field-specific errors (e.g., { email: ["error message"], username: ["error message"] })
-      const fieldErrors: Record<string, any> = {};
-      Object.keys(errorData).forEach(key => {
-        if (key !== 'detail' && key !== 'message' && key !== 'error' && key !== 'error_key') {
-          fieldErrors[key] = errorData[key];
-        }
-      });
-      if (Object.keys(fieldErrors).length > 0) {
-        error.fields = fieldErrors;
-      }
+      const code = getErrorCodeFromBody(errorData);
+      if (code) error.code = code;
+      attachErrorFields(error, errorData);
     }
     throw error;
+  }
+
+  // 204 No Content — لا يوجد جسم JSON (مثلاً حذف نسخ احتياطي)
+  if (response.status === 204) {
+    return undefined as T;
   }
 
   // معالجة DELETE requests - قد لا تعيد response body
@@ -181,7 +322,7 @@ async function apiRequest<T>(
     
     // إذا كان response JSON، parseه
     try {
-      return JSON.parse(text);
+      return unwrapApiSuccess<T>(JSON.parse(text));
     } catch {
       return undefined as T;
     }
@@ -194,7 +335,7 @@ async function apiRequest<T>(
   }
   
   try {
-    return JSON.parse(text);
+    return unwrapApiSuccess<T>(JSON.parse(text));
   } catch {
     return undefined as T;
   }
@@ -218,17 +359,46 @@ export const loginAPI = async (username: string, password: string) => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || 'Invalid username or password');
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Invalid username or password');
   }
 
-  const data = await response.json();
-  // احفظ tokens
+  const data = await parseSuccessJsonResponse<{
+    access: string;
+    refresh: string;
+    user?: unknown;
+    [key: string]: unknown;
+  }>(response);
   localStorage.setItem('accessToken', data.access);
   localStorage.setItem('refreshToken', data.refresh);
-  
+
   return data;
 };
+
+/** Unwrapped success body for POST `/auth/register/` */
+export interface RegisterCompanyResponse {
+  access: string;
+  refresh: string;
+  user: {
+    id: number;
+    first_name?: string;
+    last_name?: string;
+    username: string;
+    email: string;
+    phone?: string;
+    language?: string;
+  };
+  company: {
+    id: number;
+    name: string;
+    domain?: string;
+    specialization: 'real_estate' | 'services' | 'products' | string;
+  };
+  subscription?: { id: number };
+  subscription_id?: number;
+  requires_payment?: boolean | string;
+  requiresPayment?: boolean | string;
+}
 
 /**
  * تسجيل شركة جديدة مع المالك
@@ -252,7 +422,7 @@ export const registerCompanyAPI = async (data: {
   };
   plan_id?: number | null;
   billing_cycle?: 'monthly' | 'yearly';
-}, language: string = 'en') => {
+}, language: string = 'en'): Promise<RegisterCompanyResponse> => {
   const response = await fetch(`${BASE_URL}/auth/register/`, {
     method: 'POST',
     headers: getHeadersWithApiKey({
@@ -263,28 +433,47 @@ export const registerCompanyAPI = async (data: {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const error: any = new Error(
-      errorData.detail || errorData.message || errorData.error || 'Registration failed'
-    );
+    const errorData = await readJsonResponse(response);
+    const msg = getApiErrorMessage(errorData, 'Registration failed');
+    const error: any = new Error(msg);
     if (errorData && typeof errorData === 'object') {
-      error.fields = errorData;
+      error.data = errorData;
+      const code = getErrorCodeFromBody(errorData);
+      if (code) error.code = code;
+      attachErrorFields(error, errorData);
     }
     throw error;
   }
 
-  const responseData = await response.json();
-  
-  // Save tokens
+  const responseData = await parseSuccessJsonResponse<RegisterCompanyResponse>(response);
+
   if (responseData.access) {
     localStorage.setItem('accessToken', responseData.access);
   }
   if (responseData.refresh) {
     localStorage.setItem('refreshToken', responseData.refresh);
   }
-  
+
   return responseData;
 };
+
+/** Unwrapped body from create-*-session payment endpoints (redirect URL and/or gateway-specific fields). */
+export interface CreatePaymentSessionResult {
+  redirect_url?: string;
+  /** Gateway-specific (numeric id or string ref, e.g. FIB) */
+  payment_id?: string | number;
+  tran_ref?: string;
+  transaction_id?: string;
+  session_id?: string;
+  qr_code?: string;
+  readable_code?: string;
+  personal_app_link?: string;
+  business_app_link?: string;
+  corporate_app_link?: string;
+  valid_until?: string;
+  subscription_active?: boolean;
+  payment_status?: string;
+}
 
 /**
  * إنشاء جلسة دفع Paytabs
@@ -316,14 +505,11 @@ export const createPaytabsPaymentSessionAPI = async (
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const error: any = new Error(
-      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
-    );
-    throw error;
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to create payment session');
   }
 
-  return response.json();
+  return parseSuccessJsonResponse<CreatePaymentSessionResult>(response);
 };
 
 
@@ -344,27 +530,25 @@ export const paytabsReturnAPI = async (tranRef?: string, subscriptionId?: number
     }),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
+  const data: any = unwrapApiSuccess(raw ?? {});
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Failed to verify payment return'
-    );
+    const error: any = new Error(getApiErrorMessage(raw, 'Failed to verify payment return'));
     error.status = response.status;
-    error.data = data;
+    error.data = raw;
     throw error;
   }
-  
-  // Also check if the response indicates failure even with 200 status
+
   if (data.status === 'error' || data.status === 'failed' || (data.payment_status && data.payment_status !== 'A')) {
     const error: any = new Error(
-      data?.message || data?.error || 'Payment verification failed'
+      data?.message || (typeof data?.error === 'string' ? data.error : '') || 'Payment verification failed'
     );
     error.status = response.status;
     error.data = data;
     throw error;
   }
-  
+
   return data;
 };
 
@@ -399,14 +583,11 @@ export const createZaincashPaymentSessionAPI = async (
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const error: any = new Error(
-      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
-    );
-    throw error;
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to create payment session');
   }
 
-  return response.json();
+  return parseSuccessJsonResponse<CreatePaymentSessionResult>(response);
 };
 
 
@@ -427,27 +608,25 @@ export const zaincashReturnAPI = async (token?: string, subscriptionId?: number)
     }),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
+  const data: any = unwrapApiSuccess(raw ?? {});
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Failed to verify payment return'
-    );
+    const error: any = new Error(getApiErrorMessage(raw, 'Failed to verify payment return'));
     error.status = response.status;
-    error.data = data;
+    error.data = raw;
     throw error;
   }
-  
-  // Also check if the response indicates failure even with 200 status
+
   if (data.status === 'error' || data.status === 'failed') {
     const error: any = new Error(
-      data?.message || data?.error || 'Payment verification failed'
+      data?.message || (typeof data?.error === 'string' ? data.error : '') || 'Payment verification failed'
     );
     error.status = response.status;
     error.data = data;
     throw error;
   }
-  
+
   return data;
 };
 
@@ -482,14 +661,11 @@ export const createStripePaymentSessionAPI = async (
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const error: any = new Error(
-      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
-    );
-    throw error;
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to create payment session');
   }
 
-  return response.json();
+  return parseSuccessJsonResponse<CreatePaymentSessionResult>(response);
 };
 
 
@@ -548,14 +724,11 @@ export const createQicardPaymentSessionAPI = async (
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const error: any = new Error(
-      errorData.detail || errorData.message || errorData.error || 'Failed to create payment session'
-    );
-    throw error;
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to create payment session');
   }
 
-  return response.json();
+  return parseSuccessJsonResponse<CreatePaymentSessionResult>(response);
 };
 
 
@@ -581,13 +754,10 @@ export const createFibPaymentSessionAPI = async (
     body: JSON.stringify(body),
   });
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    const error: any = new Error(
-      errorData.detail || errorData.message || errorData.error || 'Failed to create FIB payment session'
-    );
-    throw error;
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to create FIB payment session');
   }
-  return response.json();
+  return parseSuccessJsonResponse<CreatePaymentSessionResult>(response);
 };
 
 
@@ -603,7 +773,7 @@ export const createPaymentSessionAPI = async (
   gatewayId: number,
   planId?: number,
   billingCycle?: 'monthly' | 'yearly'
-) => {
+): Promise<CreatePaymentSessionResult> => {
   // Get gateway info to determine which API to call
   const gateways = await getPublicPaymentGatewaysAPI();
   const gateway = gateways.find((g: any) => g.id === gatewayId);
@@ -630,12 +800,25 @@ export const createPaymentSessionAPI = async (
 };
 
 
+/** Polling payload for GET `/payment-status/{subscription_id}/` */
+export interface CheckPaymentStatusResponse {
+  is_truly_active: boolean;
+  end_date?: string | null;
+  is_expiring_soon?: boolean;
+  days_until_expiry?: number;
+  /** Present on some responses (e.g. FIB / payment-complete polling) */
+  subscription_active?: boolean;
+  payment_status?: string;
+}
+
 /**
  * Check payment status by subscription_id - for polling
  * GET /api/payments/subscription/{subscription_id}/status/
  * Returns payment status and subscription status
  */
-export const checkPaymentStatusAPI = async (subscriptionId: number) => {
+export const checkPaymentStatusAPI = async (
+  subscriptionId: number
+): Promise<CheckPaymentStatusResponse> => {
   const response = await fetch(`${BASE_URL}/payment-status/${subscriptionId}/`, {
     method: 'GET',
     headers: getHeadersWithApiKey({
@@ -643,15 +826,12 @@ export const checkPaymentStatusAPI = async (subscriptionId: number) => {
     }),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Failed to check payment status'
-    );
-    throw error;
+    throwApiError(raw, 'Failed to check payment status');
   }
-  return data;
+  return unwrapApiSuccess<CheckPaymentStatusResponse>(raw);
 };
 
 /**
@@ -689,6 +869,35 @@ export const switchSubscriptionPlanFreeAPI = async (planId: number) => {
   });
 };
 
+/** GET /api/subscriptions/preview-change/?plan_id=&billing_cycle= */
+export const previewSubscriptionChangeAPI = async (
+  planId: number,
+  billingCycle?: 'monthly' | 'yearly'
+) => {
+  const params = new URLSearchParams({ plan_id: String(planId) });
+  if (billingCycle) params.set('billing_cycle', billingCycle);
+  return apiRequest<any>(`/subscriptions/preview-change/?${params.toString()}`, {
+    method: 'GET',
+    headers: getHeadersWithApiKey(),
+  });
+};
+
+/** POST /api/subscriptions/schedule-downgrade/ */
+export const scheduleSubscriptionDowngradeAPI = async (
+  planId: number,
+  pendingBillingCycle?: 'monthly' | 'yearly'
+) => {
+  const body: Record<string, unknown> = { plan_id: planId };
+  if (pendingBillingCycle) body.pending_billing_cycle = pendingBillingCycle;
+  return apiRequest<any>('/subscriptions/schedule-downgrade/', {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+    }),
+    body: JSON.stringify(body),
+  });
+};
+
 /**
  * التحقق من توفر البيانات أثناء التسجيل (بريد، اسم مستخدم، رقم هاتف، دومين)
  * POST /api/auth/check-availability/
@@ -707,19 +916,20 @@ export const checkRegistrationAvailabilityAPI = async (payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Availability check failed'
-    );
-    if (data?.errors) {
-      error.fields = data.errors;
+    const error: any = new Error(getApiErrorMessage(raw, 'Availability check failed'));
+    const details = getErrorDetailsFromBody(raw);
+    if (details && typeof details === 'object') {
+      error.fields = details as Record<string, unknown>;
+    } else if (raw && typeof raw === 'object' && (raw as any).errors) {
+      error.fields = (raw as any).errors;
     }
     throw error;
   }
 
-  return data;
+  return unwrapApiSuccess(raw);
 };
 
 /**
@@ -739,19 +949,16 @@ export const verifyEmailAPI = async (payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Email verification failed'
-    );
-    if (data?.error) {
-      error.fields = data;
-    }
+    const error: any = new Error(getApiErrorMessage(raw, 'Email verification failed'));
+    error.data = raw;
+    attachErrorFields(error, raw);
     throw error;
   }
 
-  return data;
+  return unwrapApiSuccess(raw);
 };
 
 /**
@@ -771,19 +978,16 @@ export const resendVerificationCodeAPI = async (email: string) => {
     body: JSON.stringify({ email }),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Failed to resend verification code'
-    );
-    if (data?.error) {
-      error.fields = data;
-    }
+    const error: any = new Error(getApiErrorMessage(raw, 'Failed to resend verification code'));
+    error.data = raw;
+    attachErrorFields(error, raw);
     throw error;
   }
 
-  return data;
+  return unwrapApiSuccess<{ message?: string; sent?: boolean; expires_at?: string }>(raw);
 };
 
 /**
@@ -803,19 +1007,16 @@ export const changeEmailAPI = async (email: string, newEmail: string) => {
     body: JSON.stringify({ email, new_email: newEmail }),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Failed to change email'
-    );
-    if (data?.error) {
-      error.fields = data;
-    }
+    const error: any = new Error(getApiErrorMessage(raw, 'Failed to change email'));
+    error.data = raw;
+    attachErrorFields(error, raw);
     throw error;
   }
 
-  return data;
+  return unwrapApiSuccess(raw);
 };
 
 /**
@@ -834,19 +1035,16 @@ export const forgotPasswordAPI = async (email: string, language: string = 'en') 
     body: JSON.stringify({ email }),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Failed to send password reset email'
-    );
-    if (data?.error) {
-      error.fields = data;
-    }
+    const error: any = new Error(getApiErrorMessage(raw, 'Failed to send password reset email'));
+    error.data = raw;
+    attachErrorFields(error, raw);
     throw error;
   }
 
-  return data;
+  return unwrapApiSuccess(raw);
 };
 
 /**
@@ -870,20 +1068,24 @@ export const resetPasswordAPI = async (payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    const error: any = new Error(
-      data?.detail || data?.message || data?.error || 'Password reset failed'
-    );
-    if (data?.error) {
-      error.fields = data;
-    }
+    const error: any = new Error(getApiErrorMessage(raw, 'Password reset failed'));
+    error.data = raw;
+    attachErrorFields(error, raw);
     throw error;
   }
 
-  return data;
+  return unwrapApiSuccess(raw);
 };
+
+/** Success body for POST `/auth/request-2fa/` */
+export interface RequestTwoFactorAuthResponse {
+  message?: string;
+  sent?: boolean;
+  token: string;
+}
 
 /**
  * طلب رمز المصادقة الثنائية
@@ -891,7 +1093,11 @@ export const resetPasswordAPI = async (payload: {
  * Body: { username: string, password: string }
  * Response: { message: string, sent: bool, token: string }
  */
-export const requestTwoFactorAuthAPI = async (username: string, password: string, language: string = 'ar') => {
+export const requestTwoFactorAuthAPI = async (
+  username: string,
+  password: string,
+  language: string = 'ar'
+): Promise<RequestTwoFactorAuthResponse> => {
   try {
     const url = `${BASE_URL}/auth/request-2fa/`;
     
@@ -906,71 +1112,74 @@ export const requestTwoFactorAuthAPI = async (username: string, password: string
     });
     
 
-    // Try to parse response as JSON, but handle non-JSON responses
-    let data: any = {};
+    let raw: any;
     const contentType = response.headers.get('content-type');
     if (contentType && contentType.includes('application/json')) {
-      try {
-        data = await response.json();
-      } catch (e) {
-        console.error('Failed to parse JSON response:', e);
-        data = { error: 'Invalid response from server' };
+      raw = await readJsonResponse(response);
+      if (raw === undefined) {
+        raw = { success: false, error: { code: 'parse_error', message: 'Invalid response from server' } };
       }
     } else {
-      // If response is not JSON, try to get text
       const text = await response.text();
       console.error('Non-JSON response:', text);
-      data = { error: text || 'Invalid response from server' };
+      raw = { success: false, error: { code: 'non_json', message: text || 'Invalid response from server' } };
     }
 
+    const apiCode = getErrorCodeFromBody(raw) ?? raw?.code;
+    const nestedMsg = (raw?.error && typeof raw.error === 'object' ? (raw.error as any).message : '') || '';
+
     if (!response.ok) {
-      // Handle account temporarily inactive error (for employees)
-      if (response.status === 403 && data?.code === 'ACCOUNT_TEMPORARILY_INACTIVE') {
-        const accountError: any = new Error(data?.error || data?.message || 'ACCOUNT_TEMPORARILY_INACTIVE');
+      if (response.status === 403 && apiCode === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+        const accountError: any = new Error(getApiErrorMessage(raw, 'ACCOUNT_TEMPORARILY_INACTIVE'));
         accountError.code = 'ACCOUNT_TEMPORARILY_INACTIVE';
         accountError.status = response.status;
         throw accountError;
       }
-      
-      // Handle subscription inactive error (for admins)
-      if (response.status === 403 && (data?.code === 'SUBSCRIPTION_INACTIVE' || data?.error?.toLowerCase().includes('subscription'))) {
-        const subscriptionError: any = new Error(data?.error || data?.message || 'SUBSCRIPTION_INACTIVE');
+
+      if (
+        response.status === 403 &&
+        (apiCode === 'SUBSCRIPTION_INACTIVE' ||
+          nestedMsg.toLowerCase().includes('subscription') ||
+          (typeof raw?.error === 'string' && raw.error.toLowerCase().includes('subscription')))
+      ) {
+        const subscriptionError: any = new Error(getApiErrorMessage(raw, 'SUBSCRIPTION_INACTIVE'));
         subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
-        subscriptionError.subscriptionId = data?.subscriptionId;
+        subscriptionError.subscriptionId = raw?.subscriptionId ?? raw?.subscription_id;
         subscriptionError.status = response.status;
         throw subscriptionError;
       }
-      
-      // Handle different error formats
-      let errorMessage = data?.detail || data?.error || data?.message || 'Failed to request 2FA code';
-      
-      // Check for field-specific errors (from serializer)
-      if (data?.username) {
-        if (Array.isArray(data.username)) {
-          errorMessage = data.username[0];
-        } else if (typeof data.username === 'string') {
-          errorMessage = data.username;
+
+      let errorMessage = getApiErrorMessage(raw, 'Failed to request 2FA code');
+      const details = getErrorDetailsFromBody(raw) as Record<string, unknown> | undefined;
+      const usernameErr = details?.username ?? raw?.username;
+      if (usernameErr) {
+        if (Array.isArray(usernameErr)) {
+          errorMessage = String(usernameErr[0]);
+        } else if (typeof usernameErr === 'string') {
+          errorMessage = usernameErr;
         }
       }
-      
-      // Map common error messages
-      if (errorMessage.toLowerCase().includes('user not found') || 
-          errorMessage.toLowerCase().includes('not found')) {
+
+      if (errorMessage.toLowerCase().includes('user not found') || errorMessage.toLowerCase().includes('not found')) {
         errorMessage = 'Invalid username or password';
-      } else if (errorMessage.toLowerCase().includes('inactive') && !errorMessage.toLowerCase().includes('account is temporarily')) {
+      } else if (
+        errorMessage.toLowerCase().includes('inactive') &&
+        !errorMessage.toLowerCase().includes('account is temporarily')
+      ) {
         errorMessage = 'Account is inactive';
       }
-      
+
       const error: any = new Error(errorMessage);
-      if (data?.errors) {
-        error.fields = data.errors;
+      if (raw?.errors) {
+        error.fields = raw.errors;
+      } else {
+        attachErrorFields(error, raw);
       }
-      // Add status code for better error handling
       error.status = response.status;
       throw error;
     }
 
-    return data;
+    return unwrapApiSuccess<RequestTwoFactorAuthResponse>(raw);
   } catch (error: any) {
     // If it's already our custom error, re-throw it
     if (error.message && error.status) {
@@ -1011,34 +1220,41 @@ export const verifyTwoFactorAuthAPI = async (payload: {
     body: JSON.stringify(payload),
   });
 
-  const data = await response.json().catch(() => ({}));
+  const raw = await readJsonResponse(response);
+  const apiCode = getErrorCodeFromBody(raw) ?? (raw as any)?.code;
+  const nestedMsg = (raw && typeof raw === 'object' && (raw as any).error && typeof (raw as any).error === 'object'
+    ? String((raw as any).error.message || '')
+    : '');
 
   if (!response.ok) {
-    // Handle account temporarily inactive error (for employees)
-    if (response.status === 403 && data?.code === 'ACCOUNT_TEMPORARILY_INACTIVE') {
-      const accountError: any = new Error(data?.error || data?.message || 'ACCOUNT_TEMPORARILY_INACTIVE');
+    if (response.status === 403 && apiCode === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+      const accountError: any = new Error(getApiErrorMessage(raw, 'ACCOUNT_TEMPORARILY_INACTIVE'));
       accountError.code = 'ACCOUNT_TEMPORARILY_INACTIVE';
       throw accountError;
     }
-    
-    // Handle subscription inactive error (for admins)
-    if (response.status === 403 && (data?.code === 'SUBSCRIPTION_INACTIVE' || data?.error?.toLowerCase().includes('subscription'))) {
-      const subscriptionError: any = new Error(data?.error || data?.message || 'SUBSCRIPTION_INACTIVE');
+
+    if (
+      response.status === 403 &&
+      (apiCode === 'SUBSCRIPTION_INACTIVE' ||
+        nestedMsg.toLowerCase().includes('subscription') ||
+        (typeof (raw as any)?.error === 'string' && (raw as any).error.toLowerCase().includes('subscription')))
+    ) {
+      const subscriptionError: any = new Error(getApiErrorMessage(raw, 'SUBSCRIPTION_INACTIVE'));
       subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
-      subscriptionError.subscriptionId = data?.subscriptionId;
+      subscriptionError.subscriptionId = (raw as any)?.subscriptionId ?? (raw as any)?.subscription_id;
       throw subscriptionError;
     }
-    
-    const error: any = new Error(
-      data?.detail || data?.error || data?.message || 'Invalid 2FA code'
-    );
-    if (data?.errors) {
-      error.fields = data.errors;
+
+    const error: any = new Error(getApiErrorMessage(raw, 'Invalid 2FA code'));
+    if ((raw as any)?.errors) {
+      error.fields = (raw as any).errors;
+    } else {
+      attachErrorFields(error, raw);
     }
     throw error;
   }
 
-  // Save tokens
+  const data = unwrapApiSuccess<any>(raw);
   if (data.access) {
     localStorage.setItem('accessToken', data.access);
   }
@@ -1069,14 +1285,15 @@ export const refreshTokenAPI = async () => {
     body: JSON.stringify({ refresh: refreshToken }),
   });
 
+  const raw = await readJsonResponse(response);
+
   if (!response.ok) {
-    // إذا فشل refresh، احذف tokens وأعد المستخدم إلى صفحة تسجيل الدخول
     localStorage.removeItem('accessToken');
     localStorage.removeItem('refreshToken');
-    throw new Error('Token refresh failed');
+    throwApiError(raw, 'Token refresh failed');
   }
 
-  const data = await response.json();
+  const data = unwrapApiSuccess<{ access: string }>(raw);
   localStorage.setItem('accessToken', data.access);
   return data;
 };
@@ -1397,8 +1614,8 @@ export const deleteDeveloperAPI = async (developerId: number) => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || `API Error: ${response.status}`);
+    const errorData = await readJsonResponse(response);
+    throw new Error(getApiErrorMessage(errorData, `API Error: ${response.status}`));
   }
 
   // DELETE قد لا يعيد response body
@@ -1451,8 +1668,8 @@ export const deleteProjectAPI = async (projectId: number) => {
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || `API Error: ${response.status}`);
+    const errorData = await readJsonResponse(response);
+    throw new Error(getApiErrorMessage(errorData, `API Error: ${response.status}`));
   }
 
   // DELETE قد لا يعيد response body
@@ -2423,8 +2640,8 @@ export const deleteClientCallAPI = async (clientCallId: number) => {
   }
 
   if (!response.ok && response.status !== 204) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || `API Error: ${response.status} ${response.statusText}`);
+    const errorData = await readJsonResponse(response);
+    throw new Error(getApiErrorMessage(errorData, `API Error: ${response.status} ${response.statusText}`));
   }
 };
 
@@ -2492,8 +2709,8 @@ export const deleteClientTaskAPI = async (clientTaskId: number) => {
   }
 
   if (!response.ok && response.status !== 204) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || errorData.message || `API Error: ${response.status} ${response.statusText}`);
+    const errorData = await readJsonResponse(response);
+    throw new Error(getApiErrorMessage(errorData, `API Error: ${response.status} ${response.statusText}`));
   }
 };
 
@@ -2671,7 +2888,9 @@ export const getSupportTicketsAPI = async (params?: { page?: number; page_size?:
   const queryString = params
     ? new URLSearchParams(
         Object.fromEntries(
-          Object.entries(params).filter(([, v]) => v != null) as [string, string][]
+          Object.entries(params)
+            .filter(([, v]) => v != null)
+            .map(([k, v]) => [k, String(v)])
         )
       ).toString()
     : '';

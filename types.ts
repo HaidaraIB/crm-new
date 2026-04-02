@@ -39,6 +39,8 @@ export interface Company {
   auto_assign_enabled?: boolean;
   re_assign_enabled?: boolean;
   re_assign_hours?: number;
+  /** True after any paid conversion or expired/forfeited trial — no new time-limited trials. */
+  free_trial_consumed?: boolean;
   subscription?: Subscription;
 }
 

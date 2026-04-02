@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal } from '../components/index';
+import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanEntitlementsSummary } from '../components/index';
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
+import { entitlementLabel, formatDaysRemainingLabel, formatLimitValue, isFreeTrialPlan } from '../utils/planEntitlements';
 
 type SubscriptionInfo = {
     id: number;
@@ -17,6 +18,7 @@ type SubscriptionInfo = {
         price_monthly?: number;
         price_yearly?: number;
         trial_days?: number;
+        tier?: number;
         users?: string;
         clients?: string;
         features?: Record<string, boolean>;
@@ -26,6 +28,9 @@ type SubscriptionInfo = {
     startDate?: string;
     endDate?: string;
     billingCycle?: 'monthly' | 'yearly';
+    daysRemainingInPeriod?: number;
+    pendingPlan?: { id?: number; name?: string; tier?: number } | null;
+    subscriptionStatus?: string;
 };
 
 export const BillingPage = () => {
@@ -40,33 +45,9 @@ export const BillingPage = () => {
     const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
     const [availablePlans, setAvailablePlans] = useState<any[]>([]);
     const [plansLoading, setPlansLoading] = useState(false);
+    const [freeTrialConsumed, setFreeTrialConsumed] = useState(false);
 
-    const entitlementLabel = (key: string) => {
-        const map: Record<string, { ar: string; en: string }> = {
-            sms_enabled: { ar: 'تفعيل الرسائل النصية (SMS)', en: 'SMS enabled' },
-            whatsapp_enabled: { ar: 'تفعيل واتساب', en: 'WhatsApp enabled' },
-            backups_enabled: { ar: 'النسخ الاحتياطي', en: 'Backups' },
-            lead_import_enabled: { ar: 'استيراد العملاء المحتملين', en: 'Lead import' },
-            max_deals: { ar: 'الحد الأقصى للصفقات', en: 'Max deals' },
-            max_tasks: { ar: 'الحد الأقصى للمهام', en: 'Max tasks' },
-            max_integration_accounts: { ar: 'حسابات التكامل', en: 'Integration accounts' },
-            max_whatsapp_numbers: { ar: 'أرقام واتساب', en: 'WhatsApp numbers' },
-            max_message_templates: { ar: 'قوالب الرسائل', en: 'Message templates' },
-            monthly_sms_messages: { ar: 'رسائل SMS شهرياً', en: 'Monthly SMS messages' },
-            monthly_whatsapp_messages: { ar: 'رسائل واتساب شهرياً', en: 'Monthly WhatsApp messages' },
-            monthly_notifications: { ar: 'إشعارات شهرياً', en: 'Monthly notifications' },
-        };
-        const v = map[key];
-        return v ? (language === 'ar' ? v.ar : v.en) : key;
-    };
-
-    const formatLimitValue = (val: any) => {
-        if (val === 'unlimited') return language === 'ar' ? 'غير محدود' : 'Unlimited';
-        // In this app, null/undefined means "no cap" for limits/usage.
-        if (val === null || typeof val === 'undefined') return language === 'ar' ? 'غير محدود' : 'Unlimited';
-        if (typeof val === 'number') return `${val}`;
-        return `${val}`;
-    };
+    const planLang = language === 'ar' ? 'ar' : 'en';
 
     // Load subscription info
     useEffect(() => {
@@ -80,6 +61,7 @@ export const BillingPage = () => {
                 setIsLoading(true);
                 const userData = await getCurrentUserAPI();
                 
+                setFreeTrialConsumed(!!userData?.company?.free_trial_consumed);
                 if (userData?.company?.subscription) {
                     const subscription = userData.company.subscription;
                     const subscriptionId = subscription.id;
@@ -131,6 +113,8 @@ export const BillingPage = () => {
                     const isFreeOrTrial = pm <= 0 && py <= 0;
                     if (isFreeOrTrial) {
                         billingCycle = undefined;
+                    } else if (subscription.billing_cycle === 'yearly' || subscription.billing_cycle === 'monthly') {
+                        billingCycle = subscription.billing_cycle;
                     } else if (subscription.start_date && subscription.end_date) {
                         const startDate = new Date(subscription.start_date);
                         const endDate = new Date(subscription.end_date);
@@ -145,10 +129,14 @@ export const BillingPage = () => {
                             id: subscription.plan?.id,
                             name: subscription.plan?.name,
                             name_ar: subscription.plan?.name_ar,
+                            tier: subscription.plan?.tier,
                         },
                         startDate: subscription.start_date,
                         endDate: detailedStatus?.end_date || subscription.end_date,
                         billingCycle: billingCycle as any,
+                        daysRemainingInPeriod: subscription.days_remaining_in_period,
+                        pendingPlan: subscription.pending_plan,
+                        subscriptionStatus: subscription.subscription_status,
                     });
                 } else {
                     setSubscriptionInfo(null);
@@ -180,6 +168,22 @@ export const BillingPage = () => {
             loadPlans();
         }
     }, [showChangePlanModal]);
+
+    const currentPlanId = subscriptionInfo?.plan?.id ?? null;
+
+    useEffect(() => {
+        if (currentPlanId != null && selectedPlan === currentPlanId) {
+            setSelectedPlan(null);
+        }
+    }, [currentPlanId, selectedPlan]);
+
+    useEffect(() => {
+        if (!selectedPlan || !freeTrialConsumed) return;
+        const p = availablePlans.find((x: any) => x.id === selectedPlan);
+        if (p && isFreeTrialPlan(p)) {
+            setSelectedPlan(null);
+        }
+    }, [freeTrialConsumed, selectedPlan, availablePlans]);
 
     const handleRenewSubscription = async () => {
         if (!subscriptionInfo || !subscriptionInfo.id) {
@@ -237,7 +241,21 @@ export const BillingPage = () => {
             return;
         }
 
+        if (currentPlanId != null && selectedPlan === currentPlanId) {
+            alert(
+                language === 'ar'
+                    ? 'أنت مشترك بالفعل في هذه الخطة. اختر خطة أخرى.'
+                    : 'This is already your current plan. Choose a different plan.'
+            );
+            return;
+        }
+
         const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
+        if (freeTrialConsumed && selectedPlanObj && isFreeTrialPlan(selectedPlanObj)) {
+            alert(t('trialUnavailable') || 'Trial already used');
+            return;
+        }
+
         const selectedPm = Number(selectedPlanObj?.price_monthly ?? 0);
         const selectedPy = Number(selectedPlanObj?.price_yearly ?? 0);
         const isSelectedFreeOrTrial = selectedPm <= 0 && selectedPy <= 0;
@@ -248,6 +266,7 @@ export const BillingPage = () => {
                 await switchSubscriptionPlanFreeAPI(selectedPlan);
                 // Refresh subscription info in-place
                 const refreshed = await getCurrentUserAPI();
+                setFreeTrialConsumed(!!refreshed?.company?.free_trial_consumed);
                 if (refreshed?.company?.subscription) {
                     const s = refreshed.company.subscription;
                     setSubscriptionInfo((prev) => prev ? ({
@@ -313,11 +332,49 @@ export const BillingPage = () => {
         );
     };
 
-    const formatCurrency = (amount: number) => {
-        return new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en-US', {
-            style: 'currency',
-            currency: 'USD',
+    const isRTL = language === 'ar';
+
+    /** Comma thousands separator, no trailing fraction zeros (e.g. 99, 99.5, 1,234.56). */
+    const formatMoneyAmount = (amount: number) =>
+        new Intl.NumberFormat('en-US', {
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+            useGrouping: true,
         }).format(amount);
+
+    /** Localized amount + currency label (LTR English string; Arabic uses {@link renderPricePeriodLine}). */
+    const formatPriceLocalized = (amount: number) => {
+        return `${formatMoneyAmount(amount)} ${t('currencyUSD')}`;
+    };
+
+    /** Price + period with correct bidi: Arabic RTL line, LTR number island. */
+    const renderPricePeriodLine = (amount: number, cycle: 'yearly' | 'monthly' | undefined) => {
+        const period = cycle === 'yearly' ? t('perYear') : t('perMonth');
+        if (!isRTL) {
+            return (
+                <>
+                    {formatPriceLocalized(amount)} / {period}
+                </>
+            );
+        }
+        return (
+            <>
+                <span dir="ltr" className="inline-block [unicode-bidi:isolate]">
+                    {formatMoneyAmount(amount)}
+                </span>
+                {'\u00A0'}
+                {t('currencyUSD')}
+                {' / '}
+                {period}
+            </>
+        );
+    };
+
+    const localizePlanSlot = (raw: string | undefined) => {
+        if (raw === undefined || raw === null || String(raw).trim() === '') return '—';
+        const s = String(raw).trim().toLowerCase();
+        if (s === 'unlimited') return t('unlimited');
+        return String(raw).trim();
     };
 
     if (isLoading) {
@@ -340,7 +397,6 @@ export const BillingPage = () => {
         );
     }
 
-    const isRTL = language === 'ar';
     const daysRemaining = getDaysRemaining();
     const planPrice = getPlanPrice();
     const isCurrentFreeOrTrial = Number(subscriptionInfo?.plan?.price_monthly ?? 0) <= 0 && Number(subscriptionInfo?.plan?.price_yearly ?? 0) <= 0;
@@ -357,34 +413,47 @@ export const BillingPage = () => {
 
                     {subscriptionInfo ? (
                         <div className={`space-y-6 ${isRTL ? 'text-right' : 'text-left'}`}>
-                            {/* Status Badge */}
-                            <div className="flex items-center gap-4">
-                                <div>
-                                    <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                                        {t('subscriptionStatus') || 'Status'}
-                                    </p>
-                                    <span className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
-                                        subscriptionInfo.isActive 
-                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
-                                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                    }`}>
+                            {/* Status + days: label beside value, larger type */}
+                            <div
+                                dir={isRTL ? 'rtl' : 'ltr'}
+                                className="flex flex-wrap items-center justify-start gap-x-6 gap-y-4"
+                            >
+                                <div
+                                    dir={isRTL ? 'rtl' : 'ltr'}
+                                    className="flex flex-wrap items-center gap-3"
+                                >
+                                    <span className="text-lg font-medium text-gray-600 dark:text-gray-400">
+                                        {t('subscriptionStatus')}
+                                    </span>
+                                    <span
+                                        className={`inline-flex items-center px-5 py-2 rounded-full text-lg font-semibold ${
+                                            subscriptionInfo.isActive
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                        }`}
+                                    >
                                         {subscriptionInfo.isActive ? t('active') : t('inactive')}
                                     </span>
                                 </div>
                                 {daysRemaining !== null && daysRemaining > 0 && (
-                                    <div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                                            {t('daysRemaining') || 'Days Remaining'}
-                                        </p>
-                                        <p className={`text-lg font-semibold ${
-                                            daysRemaining <= 7 
-                                                ? 'text-red-600 dark:text-red-400' 
-                                                : daysRemaining <= 30 
-                                                    ? 'text-amber-600 dark:text-amber-400' 
-                                                    : 'text-green-600 dark:text-green-400'
-                                        }`}>
-                                            {daysRemaining} {t('days') || 'days'}
-                                        </p>
+                                    <div
+                                        dir={isRTL ? 'rtl' : 'ltr'}
+                                        className="flex flex-wrap items-center gap-3"
+                                    >
+                                        <span className="text-lg font-medium text-gray-600 dark:text-gray-400">
+                                            {t('daysRemaining')}
+                                        </span>
+                                        <span
+                                            className={`text-2xl font-bold ${
+                                                daysRemaining <= 7
+                                                    ? 'text-red-600 dark:text-red-400'
+                                                    : daysRemaining <= 30
+                                                      ? 'text-amber-600 dark:text-amber-400'
+                                                      : 'text-green-600 dark:text-green-400'
+                                            }`}
+                                        >
+                                            {formatDaysRemainingLabel(daysRemaining, planLang)}
+                                        </span>
                                     </div>
                                 )}
                             </div>
@@ -417,7 +486,7 @@ export const BillingPage = () => {
                                         <p className="text-lg font-semibold text-gray-900 dark:text-white">
                                             {subscriptionInfo.billingCycle
                                                 ? (subscriptionInfo.billingCycle === 'yearly' ? t('yearly') : t('monthly'))
-                                                : (language === 'ar' ? 'بدون دورة فوترة' : 'No billing cycle')}
+                                                : t('noBillingCycle')}
                                         </p>
                                     </div>
                                     {planPrice !== null && planPrice > 0 && (
@@ -425,8 +494,11 @@ export const BillingPage = () => {
                                             <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
                                                 {t('price') || 'Price'}
                                             </p>
-                                            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                                {formatCurrency(planPrice)} / {subscriptionInfo.billingCycle === 'yearly' ? t('year') : t('month')}
+                                            <p
+                                                className="text-lg font-semibold text-gray-900 dark:text-white"
+                                                dir={isRTL ? 'rtl' : 'ltr'}
+                                            >
+                                                {renderPricePeriodLine(planPrice, subscriptionInfo.billingCycle)}
                                             </p>
                                         </div>
                                     )}
@@ -436,7 +508,7 @@ export const BillingPage = () => {
                                                 {t('usersIncluded') || 'Users'}
                                             </p>
                                             <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                                {subscriptionInfo.plan.users}
+                                                {localizePlanSlot(subscriptionInfo.plan.users)}
                                             </p>
                                         </div>
                                     )}
@@ -446,7 +518,7 @@ export const BillingPage = () => {
                                                 {t('clientsIncluded') || 'Clients'}
                                             </p>
                                             <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                                {subscriptionInfo.plan.clients}
+                                                {localizePlanSlot(subscriptionInfo.plan.clients)}
                                             </p>
                                         </div>
                                     )}
@@ -456,7 +528,7 @@ export const BillingPage = () => {
                                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                         <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
                                             <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                                {language === 'ar' ? 'المميزات' : 'Features'}
+                                                {t('planSectionFeatures')}
                                             </p>
                                             <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
                                                 {Object.entries(subscriptionInfo.plan.features || {})
@@ -464,12 +536,12 @@ export const BillingPage = () => {
                                                     .map(([k]) => (
                                                         <div key={k} className="flex items-start gap-2">
                                                             <span className="mt-0.5">✓</span>
-                                                            <span>{entitlementLabel(k)}</span>
+                                                            <span>{entitlementLabel(k, planLang)}</span>
                                                         </div>
                                                     ))}
                                                 {Object.entries(subscriptionInfo.plan.features || {}).filter(([, enabled]) => !!enabled).length === 0 && (
                                                     <p className="text-gray-500 dark:text-gray-400">
-                                                        {language === 'ar' ? 'لا توجد مميزات مفعّلة' : 'No enabled features'}
+                                                        {t('billingFeaturesEmpty')}
                                                     </p>
                                                 )}
                                             </div>
@@ -477,18 +549,18 @@ export const BillingPage = () => {
 
                                         <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
                                             <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                                {language === 'ar' ? 'حدود إضافية' : 'Extra limits'}
+                                                {t('planSectionExtraLimits')}
                                             </p>
                                             <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
                                                 {Object.entries(subscriptionInfo.plan.limits || {}).map(([k, v]) => (
                                                     <div key={k} className="flex items-center justify-between gap-3">
-                                                        <span className="truncate">{entitlementLabel(k)}</span>
-                                                        <span className="font-semibold">{formatLimitValue(v)}</span>
+                                                        <span className="truncate">{entitlementLabel(k, planLang)}</span>
+                                                        <span className="font-semibold">{formatLimitValue(v, planLang)}</span>
                                                     </div>
                                                 ))}
                                                 {Object.keys(subscriptionInfo.plan.limits || {}).length === 0 && (
                                                     <p className="text-gray-500 dark:text-gray-400">
-                                                        {language === 'ar' ? 'لا توجد حدود إضافية' : 'No extra limits'}
+                                                        {t('billingExtraLimitsEmpty')}
                                                     </p>
                                                 )}
                                             </div>
@@ -496,18 +568,18 @@ export const BillingPage = () => {
 
                                         <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
                                             <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                                {language === 'ar' ? 'حدود الاستخدام الشهري' : 'Monthly usage limits'}
+                                                {t('planSectionUsageLimits')}
                                             </p>
                                             <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
                                                 {Object.entries(subscriptionInfo.plan.usage_limits_monthly || {}).map(([k, v]) => (
                                                     <div key={k} className="flex items-center justify-between gap-3">
-                                                        <span className="truncate">{entitlementLabel(k)}</span>
-                                                        <span className="font-semibold">{formatLimitValue(v)}</span>
+                                                        <span className="truncate">{entitlementLabel(k, planLang)}</span>
+                                                        <span className="font-semibold">{formatLimitValue(v, planLang)}</span>
                                                     </div>
                                                 ))}
                                                 {Object.keys(subscriptionInfo.plan.usage_limits_monthly || {}).length === 0 && (
                                                     <p className="text-gray-500 dark:text-gray-400">
-                                                        {language === 'ar' ? 'لا توجد حدود استخدام' : 'No usage limits'}
+                                                        {t('billingUsageLimitsEmpty')}
                                                     </p>
                                                 )}
                                             </div>
@@ -544,8 +616,10 @@ export const BillingPage = () => {
                             {subscriptionInfo.isActive && daysRemaining !== null && daysRemaining > 0 && daysRemaining <= 30 && (
                                 <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                                     <p className="text-sm text-amber-800 dark:text-amber-200">
-                                        {t('subscriptionRenewalReminder')?.replace('{days}', daysRemaining.toString()) || 
-                                         `Your subscription will end in ${daysRemaining} day(s). Please renew to continue using our services.`}
+                                        {t('subscriptionRenewalReminder').replace(
+                                            '{remaining}',
+                                            formatDaysRemainingLabel(daysRemaining, planLang),
+                                        )}
                                     </p>
                                 </div>
                             )}
@@ -561,7 +635,6 @@ export const BillingPage = () => {
                                         >
                                             {t('renewSubscription') || 'Renew Subscription'}
                                         </Button>
-                                        {isCurrentFreeOrTrial}
                                     </div>
                                 )}
                                 <Button 
@@ -693,16 +766,35 @@ export const BillingPage = () => {
                                     ? Number(plan.price_monthly || 0) 
                                     : Number(plan.price_yearly || 0);
                                 const isFreeOrTrial = Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0;
-                                const isSelected = selectedPlan === plan.id;
+                                const isCurrentPlan = currentPlanId != null && plan.id === currentPlanId;
+                                const trialLocked = freeTrialConsumed && isFreeTrialPlan(plan);
+                                const isLocked = isCurrentPlan || trialLocked;
+                                const isSelected = !isLocked && selectedPlan === plan.id;
                                 
                                 return (
                                     <div
                                         key={plan.id}
-                                        onClick={() => setSelectedPlan(plan.id)}
-                                        className={`p-4 border-2 rounded-lg cursor-pointer transition-all ${
-                                            isSelected
-                                                ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                                                : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
+                                        role="button"
+                                        tabIndex={isLocked ? -1 : 0}
+                                        onClick={() => {
+                                            if (isLocked) return;
+                                            setSelectedPlan(plan.id);
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (isLocked) return;
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                setSelectedPlan(plan.id);
+                                            }
+                                        }}
+                                        className={`p-4 border-2 rounded-lg transition-all ${
+                                            isLocked
+                                                ? 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/40 opacity-75 cursor-not-allowed'
+                                                : `cursor-pointer ${
+                                                      isSelected
+                                                          ? 'border-primary bg-primary/5 dark:bg-primary/10'
+                                                          : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
+                                                  }`
                                         }`}
                                     >
                                         <div className="flex items-center justify-between mb-2">
@@ -711,7 +803,17 @@ export const BillingPage = () => {
                                                     ? plan.name_ar
                                                     : plan.name}
                                             </h3>
-                                            {isSelected && (
+                                            {isCurrentPlan && (
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100">
+                                                    {t('currentPlan') || 'Current plan'}
+                                                </span>
+                                            )}
+                                            {trialLocked && !isCurrentPlan && (
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-200 border border-amber-700/50">
+                                                    {t('trialUnavailable') || 'Trial already used'}
+                                                </span>
+                                            )}
+                                            {!isLocked && isSelected && (
                                                 <div className="w-5 h-5 rounded-full bg-primary flex items-center justify-center">
                                                     <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -724,28 +826,24 @@ export const BillingPage = () => {
                                                 ? plan.description_ar
                                                 : plan.description}
                                         </p>
-                                        <p className="text-lg font-bold text-primary">
-                                            {isFreeOrTrial ? (t('free') || 'Free') : `${formatCurrency(price)} / ${billingCycle === 'monthly' ? t('month') : t('year')}`}
+                                        <p className="text-lg font-bold text-primary" dir={isRTL ? 'rtl' : 'ltr'}>
+                                            {isFreeOrTrial
+                                                ? (t('free') || 'Free')
+                                                : renderPricePeriodLine(
+                                                      price,
+                                                      billingCycle === 'yearly' ? 'yearly' : 'monthly',
+                                                  )}
                                         </p>
-                                        <div className="mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/60 text-xs text-gray-600 dark:text-gray-400 space-y-1">
-                                            <div>
-                                                <span className="font-semibold">{language === 'ar' ? 'المميزات:' : 'Features:'}</span>{' '}
-                                                {Object.entries((plan.features || {}) as Record<string, boolean>)
-                                                    .filter(([, v]) => !!v)
-                                                    .slice(0, 4)
-                                                    .map(([k]) => entitlementLabel(k))
-                                                    .join('، ') || (language === 'ar' ? 'لا يوجد' : 'None')}
-                                            </div>
-                                            {plan.usage_limits_monthly && Object.keys(plan.usage_limits_monthly).length > 0 && (
-                                                <div>
-                                                    <span className="font-semibold">{language === 'ar' ? 'الاستخدام الشهري:' : 'Monthly usage:'}</span>{' '}
-                                                    {Object.entries(plan.usage_limits_monthly as Record<string, any>)
-                                                        .slice(0, 2)
-                                                        .map(([k, v]) => `${entitlementLabel(k)}: ${formatLimitValue(v)}`)
-                                                        .join('، ')}
-                                                </div>
-                                            )}
-                                        </div>
+                                        <PlanEntitlementsSummary
+                                            features={(plan.features || {}) as Record<string, boolean>}
+                                            usage_limits_monthly={plan.usage_limits_monthly as Record<string, number | 'unlimited' | null>}
+                                            language={planLang}
+                                            labels={{
+                                                featuresTitle: t('planSectionFeatures') || 'Features',
+                                                monthlyUsageTitle: t('planSectionMonthlyUsage') || 'Monthly usage',
+                                                none: t('planFeaturesNone') || 'None',
+                                            }}
+                                        />
                                     </div>
                                 );
                             })}
@@ -778,11 +876,19 @@ export const BillingPage = () => {
                         <Button
                             onClick={handleChangePlan}
                             loading={isRenewing}
-                            disabled={!selectedPlan || isRenewing || (() => {
-                                const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
-                                const isSelectedFreeOrTrial = Number(selectedPlanObj?.price_monthly ?? 0) <= 0 && Number(selectedPlanObj?.price_yearly ?? 0) <= 0;
-                                return !isSelectedFreeOrTrial && !selectedGateway;
-                            })()}
+                            disabled={
+                                !selectedPlan ||
+                                isRenewing ||
+                                (currentPlanId != null && selectedPlan === currentPlanId) ||
+                                (() => {
+                                    const sp = availablePlans.find((p: any) => p.id === selectedPlan);
+                                    if (sp && freeTrialConsumed && isFreeTrialPlan(sp)) return true;
+                                    const isSelectedFreeOrTrial =
+                                        Number(sp?.price_monthly ?? 0) <= 0 &&
+                                        Number(sp?.price_yearly ?? 0) <= 0;
+                                    return !isSelectedFreeOrTrial && !selectedGateway;
+                                })()
+                            }
                         >
                             {isRenewing ? (t('processing') || 'Processing...') : (t('changePlan') || 'Change Plan')}
                         </Button>

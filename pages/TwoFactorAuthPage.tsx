@@ -1,10 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
-import { requestTwoFactorAuthAPI, verifyTwoFactorAuthAPI, getCurrentUserAPI } from '../services/api';
+import {
+    requestTwoFactorAuthAPI,
+    verifyTwoFactorAuthAPI,
+    getCurrentUserAPI,
+    type RequestTwoFactorAuthResponse,
+} from '../services/api';
 
 export const TwoFactorAuthPage = () => {
-    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, setLang, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
+    const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRequesting, setIsRequesting] = useState(false);
@@ -152,7 +157,7 @@ export const TwoFactorAuthPage = () => {
                 setIsRequesting(false);
                 return;
             }
-            const response = await requestTwoFactorAuthAPI(username, passwordToUse, language);
+            const response: RequestTwoFactorAuthResponse = await requestTwoFactorAuthAPI(username, passwordToUse, language);
             setToken(response.token);
             sessionStorage.setItem('2fa_token', response.token);
             setSuccess(t('twoFactorCodeSent') || 'Two-factor authentication code has been sent to your email');
@@ -262,7 +267,7 @@ export const TwoFactorAuthPage = () => {
             
             // Update context state immediately BEFORE navigation
             setCurrentUser(frontendUser);
-            if (frontendUser.language) setLang(frontendUser.language);
+            if (frontendUser.language) setLanguage(frontendUser.language);
             setIsLoggedIn(true);
             setCurrentPage('Dashboard');
             

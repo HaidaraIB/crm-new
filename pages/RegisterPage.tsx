@@ -1,9 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks } from '../components/index';
+import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PlanEntitlementsSummary } from '../components/index';
 import { registerCompanyAPI, getPublicPlansAPI, checkRegistrationAvailabilityAPI, verifyEmailAPI } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { isRedundantPlanDescription } from '../utils/planEntitlements';
 
 type PublicPlan = {
     id: number;
@@ -76,32 +77,6 @@ export const RegisterPage = () => {
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: Plan
     const isNextButtonLoading = stepCheckLoading && currentStep < 3;
-
-    const entitlementLabel = (key: string) => {
-        const map: Record<string, { ar: string; en: string }> = {
-            sms_enabled: { ar: 'SMS', en: 'SMS' },
-            whatsapp_enabled: { ar: 'واتساب', en: 'WhatsApp' },
-            backups_enabled: { ar: 'نسخ احتياطي', en: 'Backups' },
-            lead_import_enabled: { ar: 'استيراد', en: 'Import' },
-            max_deals: { ar: 'الصفقات', en: 'Deals' },
-            max_tasks: { ar: 'المهام', en: 'Tasks' },
-            max_integration_accounts: { ar: 'التكاملات', en: 'Integrations' },
-            max_whatsapp_numbers: { ar: 'أرقام واتساب', en: 'WhatsApp numbers' },
-            max_message_templates: { ar: 'قوالب', en: 'Templates' },
-            monthly_sms_messages: { ar: 'SMS شهرياً', en: 'Monthly SMS' },
-            monthly_whatsapp_messages: { ar: 'واتساب شهرياً', en: 'Monthly WhatsApp' },
-            monthly_notifications: { ar: 'إشعارات شهرياً', en: 'Monthly notifications' },
-        };
-        const v = map[key];
-        return v ? (language === 'ar' ? v.ar : v.en) : key;
-    };
-
-    const formatLimitValue = (val: any) => {
-        if (val === 'unlimited') return language === 'ar' ? 'غير محدود' : 'Unlimited';
-        if (val === null || typeof val === 'undefined') return language === 'ar' ? 'غير محدود' : 'Unlimited';
-        if (typeof val === 'number') return `${val}`;
-        return `${val}`;
-    };
 
     const normalizeErrorMessage = (value: any): string => {
         if (!value) return '';
@@ -1083,30 +1058,54 @@ export const RegisterPage = () => {
 
                                         {!plansLoading && !plansError && plans.length > 0 && (
                                             <div className="space-y-3">
-                                                {plans.map((plan) => (
+                                                {plans.map((plan) => {
+                                                    const displayName =
+                                                        language === 'ar' && plan.name_ar && plan.name_ar.trim()
+                                                            ? plan.name_ar
+                                                            : plan.name;
+                                                    const explicitDesc =
+                                                        language === 'ar' && plan.description_ar && plan.description_ar.trim()
+                                                            ? plan.description_ar.trim()
+                                                            : (plan.description?.trim() || '');
+                                                    const resolvedDesc =
+                                                        explicitDesc || (t('planDefaultDescription') || 'All CRM essentials included.');
+                                                    const showPlanDescription = !isRedundantPlanDescription(displayName, resolvedDesc);
+                                                    const isPlanSelected = selectedPlan === plan.id;
+                                                    return (
                                                     <button
                                                         type="button"
                                                         key={plan.id}
+                                                        aria-pressed={isPlanSelected}
                                                         onClick={() => handlePlanSelect(plan.id)}
-                                                        className={`w-full p-4 border-2 rounded-lg text-left transition-colors ${selectedPlan === plan.id
+                                                        className={`w-full p-4 border-2 rounded-lg text-left transition-colors ${isPlanSelected
                                                                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
                                                                 : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                                                             }`}
                                                     >
-                                                        <div className="flex items-center justify-between gap-4">
-                                                            <div>
-                                                                <h4 className="font-semibold text-primary">
-                                                                    {language === 'ar' && plan.name_ar && plan.name_ar.trim() 
-                                                                        ? plan.name_ar 
-                                                                        : plan.name}
-                                                                </h4>
-                                                                <p className="text-sm text-secondary">
-                                                                    {language === 'ar' && plan.description_ar && plan.description_ar.trim()
-                                                                        ? plan.description_ar 
-                                                                        : (plan.description || (t('planDefaultDescription') || 'All CRM essentials included.'))}
-                                                                </p>
+                                                        <div className="flex items-start justify-between gap-4">
+                                                            <div className="flex min-w-0 flex-1 items-start gap-2">
+                                                                {isPlanSelected && (
+                                                                    <div
+                                                                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white"
+                                                                        aria-hidden
+                                                                    >
+                                                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                                        </svg>
+                                                                    </div>
+                                                                )}
+                                                                <div className="min-w-0">
+                                                                    <h4 className="font-semibold text-primary">
+                                                                        {displayName}
+                                                                    </h4>
+                                                                    {showPlanDescription && (
+                                                                        <p className="text-sm text-secondary">
+                                                                            {resolvedDesc}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
                                                             </div>
-                                                            <div className="text-right">
+                                                            <div className="shrink-0 text-right">
                                                                 <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                                                                     {getPlanPriceLabel(plan)}
                                                                 </div>
@@ -1128,27 +1127,19 @@ export const RegisterPage = () => {
                                                                 </span>
                                                             )}
                                                         </div>
-                                                        <div className="mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/60 text-xs text-secondary space-y-1">
-                                                            <div>
-                                                                <span className="font-semibold">{language === 'ar' ? 'المميزات:' : 'Features:'}</span>{' '}
-                                                                {Object.entries(plan.features || {})
-                                                                    .filter(([, v]) => !!v)
-                                                                    .slice(0, 4)
-                                                                    .map(([k]) => entitlementLabel(k))
-                                                                    .join('، ') || (language === 'ar' ? 'لا يوجد' : 'None')}
-                                                            </div>
-                                                            {Object.keys(plan.usage_limits_monthly || {}).length > 0 && (
-                                                                <div>
-                                                                    <span className="font-semibold">{language === 'ar' ? 'الاستخدام الشهري:' : 'Monthly usage:'}</span>{' '}
-                                                                    {Object.entries(plan.usage_limits_monthly || {})
-                                                                        .slice(0, 2)
-                                                                        .map(([k, v]) => `${entitlementLabel(k)}: ${formatLimitValue(v)}`)
-                                                                        .join('، ')}
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                        <PlanEntitlementsSummary
+                                                            features={plan.features}
+                                                            usage_limits_monthly={plan.usage_limits_monthly}
+                                                            language={language === 'ar' ? 'ar' : 'en'}
+                                                            labels={{
+                                                                featuresTitle: t('planSectionFeatures') || 'Features',
+                                                                monthlyUsageTitle: t('planSectionMonthlyUsage') || 'Monthly usage',
+                                                                none: t('planFeaturesNone') || 'None',
+                                                            }}
+                                                        />
                                                     </button>
-                                                ))}
+                                                );
+                                                })}
                                             </div>
                                         )}
                                     </div>

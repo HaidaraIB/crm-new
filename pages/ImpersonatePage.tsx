@@ -1,14 +1,21 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { getCompanyRoute } from '../utils/routing';
+import { readJsonResponse, unwrapApiSuccess, getApiErrorMessage } from '../services/api';
 
-const BASE_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
-const API_KEY = import.meta.env.VITE_API_KEY || '';
+const RAW_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/+$/, '');
+const API_KEY = import.meta.env.VITE_API_KEY_WEB || import.meta.env.VITE_API_KEY || '';
 
-/** Build API root: ensure it ends with /api so path is correct on prod (e.g. VITE_API_URL might be domain only) */
-const getApiRoot = () => {
-    if (!BASE_URL) return '';
-    return BASE_URL.endsWith('/api') ? BASE_URL : `${BASE_URL}/api`;
+/** يطابق `services/api.ts`: يُفضَّل `/api/v1` كجذر للمسارات المحمية */
+const getApiRoot = (): string => {
+    if (!RAW_BASE) return '';
+    if (/\/api\/v1$/i.test(RAW_BASE) || RAW_BASE.includes('/api/v1/')) {
+        return RAW_BASE.replace(/\/+$/, '');
+    }
+    if (RAW_BASE.endsWith('/api')) {
+        return `${RAW_BASE}/v1`;
+    }
+    return `${RAW_BASE}/api/v1`;
 };
 
 /**
@@ -48,14 +55,18 @@ const ImpersonatePage: React.FC = () => {
 
         fetch(url, { method: 'GET', headers })
             .then(async (res) => {
+                const raw = await readJsonResponse(res);
                 if (!res.ok) {
-                    const err = await res.json().catch(() => ({}));
-                    let msg = (err && typeof err.error === 'string' ? err.error : '') || 'Invalid or expired code.';
+                    let msg = getApiErrorMessage(raw, 'Invalid or expired code.');
+                    const err = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
                     if (res.status === 404 && err?.hint) msg += ` (${err.hint})`;
-                    else if (res.status === 404) msg = 'الرمز غير صالح أو منتهي. تأكد أن لوحة التحكم تستخدم نفس عنوان الـ API الذي تستخدمه لوحة الإدارة.';
+                    else if (res.status === 404) {
+                        msg =
+                            'الرمز غير صالح أو منتهي. تأكد أن لوحة التحكم تستخدم نفس عنوان الـ API الذي تستخدمه لوحة الإدارة.';
+                    }
                     throw new Error(msg.trim().replace(/^\.+/, ''));
                 }
-                return res.json();
+                return unwrapApiSuccess<any>(raw);
             })
             .then((data) => {
                 if (successHandledRef.current) return;

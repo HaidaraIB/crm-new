@@ -5,6 +5,7 @@ import { XIcon } from '../icons';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { useProjects, useUnits } from '../../hooks/useQueries';
+import type { Unit } from '../../types';
 
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
     <details className="group" open>
@@ -49,7 +50,7 @@ export const UnitsFilterDrawer = () => {
     const projects = projectsResponse?.results || [];
     
     const { data: unitsResponse } = useUnits();
-    const units = unitsResponse?.results || [];
+    const units: Unit[] = unitsResponse?.results ?? [];
 
     useEffect(() => {
         setLocalFilters(unitFilters);
@@ -106,11 +107,11 @@ export const UnitsFilterDrawer = () => {
         .sort();
     const uniqueBedrooms = Array.from(new Set((units || [])
         .map(u => u.bedrooms)
-        .filter(bedrooms => bedrooms !== null && bedrooms !== undefined && bedrooms !== '')))
+        .filter(bedrooms => bedrooms !== null && bedrooms !== undefined)))
         .sort((a, b) => Number(a) - Number(b));
     const uniqueBathrooms = Array.from(new Set((units || [])
         .map(u => u.bathrooms)
-        .filter(bathrooms => bathrooms !== null && bathrooms !== undefined && bathrooms !== '')))
+        .filter(bathrooms => bathrooms !== null && bathrooms !== undefined)))
         .sort((a, b) => Number(a) - Number(b));
 
     // Helper function to translate type

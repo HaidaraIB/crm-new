@@ -1,7 +1,12 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Loader, Card, PaymentGatewaySelector } from '../components/index';
-import { createPaymentSessionAPI, checkPaymentStatusAPI } from '../services/api';
+import {
+    createPaymentSessionAPI,
+    checkPaymentStatusAPI,
+    type CreatePaymentSessionResult,
+    type CheckPaymentStatusResponse,
+} from '../services/api';
 
 type FibPaymentData = {
     payment_id: string;
@@ -68,7 +73,7 @@ export const PaymentPage = () => {
         if (!fibPaymentData || !subscriptionId) return;
         const check = async () => {
             try {
-                const data = await checkPaymentStatusAPI(parseInt(subscriptionId));
+                const data: CheckPaymentStatusResponse = await checkPaymentStatusAPI(parseInt(subscriptionId));
                 if (data.subscription_active || data.payment_status === 'completed') {
                     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                     pollIntervalRef.current = null;
@@ -93,14 +98,14 @@ export const PaymentPage = () => {
             setIsLoading(true);
             setError(null);
             setFibPaymentData(null);
-            const result = await createPaymentSessionAPI(parseInt(subscriptionId), selectedGateway);
+            const result: CreatePaymentSessionResult = await createPaymentSessionAPI(parseInt(subscriptionId), selectedGateway);
             
             if (result.redirect_url) {
                 window.location.href = result.redirect_url;
-            } else if (result.payment_id && (result.qr_code || result.readable_code || result.personal_app_link)) {
+            } else if (result.payment_id != null && (result.qr_code || result.readable_code || result.personal_app_link)) {
                 // FIB: show QR and app links, poll for completion
                 setFibPaymentData({
-                    payment_id: result.payment_id,
+                    payment_id: String(result.payment_id),
                     qr_code: result.qr_code || null,
                     readable_code: result.readable_code || null,
                     business_app_link: result.business_app_link || null,

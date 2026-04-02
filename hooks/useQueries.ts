@@ -505,7 +505,7 @@ export const useAssignUnassignedClients = (options?: UseMutationOptions<any, Err
   
   return useMutation({
     mutationFn: () => assignUnassignedClientsAPI(),
-    onSuccess: (data, variables, context) => {
+    onSuccess: (data, variables, onMutateResult, context) => {
       // Invalidate all leads queries regardless of filters to refresh the list
       queryClient.invalidateQueries({ 
         queryKey: ['leads'],
@@ -524,7 +524,7 @@ export const useAssignUnassignedClients = (options?: UseMutationOptions<any, Err
       
       // Call custom onSuccess if provided
       if (customOnSuccess) {
-        customOnSuccess(data, variables, context);
+        customOnSuccess(data, variables, onMutateResult, context);
       }
     },
     ...options,

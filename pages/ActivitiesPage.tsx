@@ -3,8 +3,19 @@
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Loader, Button, FilterIcon, SearchIcon, Input } from '../components/index';
-import { Activity, TaskStage } from '../types';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
+
+/** صف جدول الأنشطة بعد دمج client_task و client_call (المعرّف نصي لتفادي التعارض بين الأنواع) */
+type ActivitiesTableRow = {
+    id: string;
+    user: string;
+    lead: string;
+    stage: string;
+    callMethod: string;
+    date: string;
+    notes: string;
+    type?: string;
+};
 import { useClientTasks, useClientCalls, useUsers, useLeads, useStages, useCallMethods } from '../hooks/useQueries';
 import { formatDateToLocal } from '../utils/dateUtils';
 
@@ -40,7 +51,7 @@ export const ActivitiesPage = () => {
         : (callMethodsData?.results || []);
 
     // Combine ClientTasks and ClientCalls, then filter and transform to Activities format
-    const filteredActivities = useMemo(() => {
+    const filteredActivities = useMemo((): ActivitiesTableRow[] => {
         // Combine client tasks and client calls
         const allActivities = [
             ...clientTasks.map((ct: any) => ({ ...ct, type: 'client_task' })),
@@ -198,7 +209,7 @@ export const ActivitiesPage = () => {
                 date: formattedDate,
                 notes: item.notes || '',
                 type: item.type, // Store type for display
-            } as Activity & { type?: string; callMethod?: string };
+            };
         });
     }, [clientTasks, clientCalls, activityFilters, users, leads, t]);
 
@@ -231,7 +242,7 @@ export const ActivitiesPage = () => {
                             <tbody>
                                 {filteredActivities.length > 0 ? (
                                     filteredActivities.map(activity => {
-                                        const activityType = (activity as any).type || 'client_task';
+                                        const activityType = activity.type || 'client_task';
                                         const typeLabel = activityType === 'client_task' 
                                             ? (t('action') || 'Action')
                                             : (t('call') || 'Call');
@@ -268,7 +279,7 @@ export const ActivitiesPage = () => {
                                                     stageColor = stageConfig?.color || '#808080';
                                                 } else if (activityType === 'client_call') {
                                                     // For client calls, use call method (not stage)
-                                                    const callMethodName = (activity as any).callMethod || '';
+                                                    const callMethodName = activity.callMethod || '';
                                                     displayName = callMethodName;
                                                     callMethodConfig = callMethods.find(c => 
                                                         c.name.toLowerCase().replace(/\s+/g, '_') === callMethodName.toLowerCase().replace(/\s+/g, '_') ||
@@ -320,7 +331,7 @@ export const ActivitiesPage = () => {
                                             {(() => {
                                                 if (activityType === 'client_call') {
                                                     // Show call method for client calls
-                                                    const callMethodName = (activity as any).callMethod || '';
+                                                    const callMethodName = activity.callMethod || '';
                                                     const callMethodConfig = callMethods.find(c => 
                                                         c.name.toLowerCase().replace(/\s+/g, '_') === callMethodName.toLowerCase().replace(/\s+/g, '_') ||
                                                         c.name === callMethodName

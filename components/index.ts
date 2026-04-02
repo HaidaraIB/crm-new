@@ -90,3 +90,4 @@ export * from './modals/AddCallMethodModal';
 export * from './modals/EditCallMethodModal';
 export * from './PaymentGatewaySelector';
 export * from './LegalLinks';
+export * from './PlanEntitlementsSummary';

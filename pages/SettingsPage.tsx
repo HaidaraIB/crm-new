@@ -14,7 +14,14 @@ type SettingsTab = 'Channels' | 'Stages' | 'Statuses' | 'CallMethods' | 'LeadAss
 
 export const SettingsPage = () => {
     const { t, currentUser } = useAppContext();
-    const tabs: SettingsTab[] = ['Channels', 'Stages', 'Statuses', 'CallMethods', 'LeadAssignment', ...(currentUser?.role === 'Owner' ? ['Supervisors'] : [])];
+    const tabs: SettingsTab[] = [
+        'Channels',
+        'Stages',
+        'Statuses',
+        'CallMethods',
+        'LeadAssignment',
+        ...(currentUser?.role === 'Owner' ? (['Supervisors'] as SettingsTab[]) : []),
+    ];
     const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
         const savedTab = localStorage.getItem('settingsActiveTab') as SettingsTab;
         return savedTab && tabs.includes(savedTab) ? savedTab : 'Channels';

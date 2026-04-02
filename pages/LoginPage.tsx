@@ -24,14 +24,22 @@ export const LoginPage = () => {
             window.history.replaceState({}, '', '/login');
         }
         
-        // Check for payment success message
+        // After payment: force clean session so accessToken does not keep user "logged in" (AppContext)
         if (urlParams.get('payment_success') === 'true') {
+            localStorage.removeItem('currentUser');
+            localStorage.removeItem('accessToken');
+            localStorage.removeItem('refreshToken');
+            localStorage.removeItem('isLoggedIn');
+            localStorage.removeItem('pendingUserData');
+            localStorage.removeItem('pendingSubscriptionId');
+            sessionStorage.removeItem('2fa_username');
+            sessionStorage.removeItem('2fa_password');
+
             const storedMessage = localStorage.getItem('paymentSuccessMessage');
             if (storedMessage) {
                 try {
                     const messageData = JSON.parse(storedMessage);
                     setPaymentSuccessMessage(messageData.message);
-                    // Clean URL
                     window.history.replaceState({}, '', '/login');
                 } catch (e) {
                     console.error('Error parsing payment success message:', e);

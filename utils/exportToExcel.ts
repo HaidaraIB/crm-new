@@ -1,6 +1,14 @@
 import ExcelJS from 'exceljs';
+import type { CellValue } from 'exceljs';
 
 export type ExportColumn = { key: string; label: string };
+
+function rowValueToCell(val: unknown): CellValue {
+  if (val == null || val === '') return '';
+  if (typeof val === 'number' || typeof val === 'boolean') return val;
+  if (val instanceof Date) return val;
+  return String(val);
+}
 
 /**
  * Export an array of objects to an Excel file and trigger download.
@@ -16,7 +24,7 @@ export async function exportToExcel(
   sheetName = 'Sheet1'
 ): Promise<void> {
   const workbook = new ExcelJS.Workbook();
-  const sheet = workbook.addWorksheet(sheetName, { headerRow: true });
+  const sheet = workbook.addWorksheet(sheetName);
 
   // Headers
   const headerRow = sheet.getRow(1);
@@ -29,8 +37,7 @@ export async function exportToExcel(
   data.forEach((row, rowIndex) => {
     const r = sheet.getRow(rowIndex + 2);
     columns.forEach((col, colIndex) => {
-      const val = row[col.key];
-      r.getCell(colIndex + 1).value = val != null ? val : '';
+      r.getCell(colIndex + 1).value = rowValueToCell(row[col.key]);
     });
   });
 

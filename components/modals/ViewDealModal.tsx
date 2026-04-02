@@ -8,12 +8,12 @@ import { useUsers, useLeads, useProjects, useUnits } from '../../hooks/useQuerie
 import { User } from '../../types';
 
 // Helper function to get user display name
-const getUserDisplayName = (user: User): string => {
+const getUserDisplayName = (user: User, t?: (key: string) => string): string => {
     if (user.name) return user.name;
     if (user.first_name || user.last_name) {
         return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
     }
-    return user.username || user.email || (t ? t('unknown') : 'Unknown');
+    return user.username || user.email || t?.('unknown') || 'Unknown';
 };
 
 export const ViewDealModal = () => {
@@ -270,13 +270,13 @@ export const ViewDealModal = () => {
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('startedBy') || 'Started By'}</p>
                             <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {startedByUser ? getUserDisplayName(startedByUser) : '-'}
+                                {startedByUser ? getUserDisplayName(startedByUser, t) : '-'}
                             </p>
                         </div>
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('closedBy') || 'Closed By'}</p>
                             <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {closedByUser ? getUserDisplayName(closedByUser) : '-'}
+                                {closedByUser ? getUserDisplayName(closedByUser, t) : '-'}
                             </p>
                         </div>
                     </div>
@@ -370,13 +370,13 @@ export const ViewDealModal = () => {
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('startedBy') || 'Started By'}</p>
                             <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {startedByUser ? getUserDisplayName(startedByUser) : '-'}
+                                {startedByUser ? getUserDisplayName(startedByUser, t) : '-'}
                             </p>
                         </div>
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('closedBy') || 'Closed By'}</p>
                             <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {closedByUser ? getUserDisplayName(closedByUser) : '-'}
+                                {closedByUser ? getUserDisplayName(closedByUser, t) : '-'}
                             </p>
                         </div>
                         {viewingDeal.employee && (
@@ -385,7 +385,7 @@ export const ViewDealModal = () => {
                                 <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
                                     {(() => {
                                         const employee = users.find((u: any) => u.id === viewingDeal.employee);
-                                        return employee ? getUserDisplayName(employee) : '-';
+                                        return employee ? getUserDisplayName(employee, t) : '-';
                                     })()}
                                 </p>
                             </div>

@@ -34,6 +34,32 @@ const platformConfig: Record<string, { name: string, icon: React.FC<React.SVGPro
     'WhatsApp': { name: 'WhatsApp', icon: WhatsappIcon, dataKey: 'whatsapp' },
 };
 
+/** Build props for SelectLeadFormModal from IntegrationAccount metadata.pages */
+function buildMetaLeadFormModalConfig(account: any, accountId: number) {
+    const raw = account?.metadata?.pages || [];
+    const pages = raw.map((p: any) => ({
+        id: String(p.id),
+        name: String(p.name || p.id),
+    }));
+    if (!pages.length) return null;
+    const linkedPid =
+        account.metadata?.selected_page_id != null && String(account.metadata.selected_page_id).length
+            ? String(account.metadata.selected_page_id)
+            : '';
+    const defaultPage = pages.find((p) => p.id === linkedPid) || pages[0];
+    const isLinkedContext = Boolean(linkedPid && defaultPage.id === linkedPid);
+    const formId = isLinkedContext ? String(account.metadata?.selected_form_id || '') : '';
+    const mapping = account.metadata?.form_campaign_mapping || {};
+    const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
+    return {
+        accountId,
+        pages,
+        linkedPageId: linkedPid || undefined,
+        linkedFormId: formId || undefined,
+        linkedCampaignId: campaignId || undefined,
+    };
+}
+
 function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; replaceTwilio: (str: string) => string }) {
     const [accountSid, setAccountSid] = useState('');
     const [twilioNumber, setTwilioNumber] = useState('');
@@ -425,20 +451,9 @@ export const IntegrationsPage = () => {
                 const account = Array.isArray(accounts)
                     ? accounts.find((a: any) => a.id === id)
                     : accounts?.results?.find((a: any) => a.id === id);
-                if (account?.metadata?.pages?.length) {
-                    const firstPage = account.metadata.pages[0];
-                    const pageIdStr = String(firstPage.id);
-                    const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
-                    const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
-                    const mapping = account.metadata?.form_campaign_mapping || {};
-                    const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
-                    setSelectLeadFormConfig({
-                        accountId: id,
-                        pageId: pageIdStr,
-                        pageName: firstPage.name || pageIdStr,
-                        linkedFormId: formId || undefined,
-                        linkedCampaignId: campaignId || undefined,
-                    });
+                const cfg = account ? buildMetaLeadFormModalConfig(account, id) : null;
+                if (cfg) {
+                    setSelectLeadFormConfig(cfg);
                     setIsSelectLeadFormModalOpen(true);
                 }
             }).catch(console.error);
@@ -472,20 +487,12 @@ export const IntegrationsPage = () => {
             });
             return;
         }
-        const first = pages[0];
-        const pageIdStr = String(first.id);
-        const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
-        const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
-        const mapping = account.metadata?.form_campaign_mapping || {};
-        const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
-        setSelectLeadFormConfig({
-            accountId: account.id,
-            pageId: pageIdStr,
-            pageName: first.name || pageIdStr,
-            linkedFormId: formId || undefined,
-            linkedCampaignId: campaignId || undefined,
-        });
-        setIsSelectLeadFormModalOpen(true);
+        const merged = { ...account, metadata: { ...account.metadata, pages } };
+        const cfg = buildMetaLeadFormModalConfig(merged, account.id);
+        if (cfg) {
+            setSelectLeadFormConfig(cfg);
+            setIsSelectLeadFormModalOpen(true);
+        }
     };
 
     const handleTestConnection = async (accountId: number) => {
@@ -552,20 +559,9 @@ export const IntegrationsPage = () => {
                         getConnectedAccountsAPI(platformParam).then((accounts: any) => {
                             const list = Array.isArray(accounts) ? accounts : accounts?.results || [];
                             const account = list.find((a: any) => a.id === event.data.accountId);
-                            if (account?.metadata?.pages?.length) {
-                                const firstPage = account.metadata.pages[0];
-                                const pageIdStr = String(firstPage.id);
-                                const isThisPageLinked = account.metadata?.selected_page_id === pageIdStr;
-                                const formId = isThisPageLinked ? (account.metadata?.selected_form_id || '') : '';
-                                const mapping = account.metadata?.form_campaign_mapping || {};
-                                const campaignId = formId && mapping[formId] != null ? String(mapping[formId]) : '';
-                                setSelectLeadFormConfig({
-                                    accountId: event.data.accountId,
-                                    pageId: pageIdStr,
-                                    pageName: firstPage.name || pageIdStr,
-                                    linkedFormId: formId || undefined,
-                                    linkedCampaignId: campaignId || undefined,
-                                });
+                            const cfg = account ? buildMetaLeadFormModalConfig(account, event.data.accountId) : null;
+                            if (cfg) {
+                                setSelectLeadFormConfig(cfg);
                                 setIsSelectLeadFormModalOpen(true);
                             }
                         }).catch(console.error);
@@ -1591,8 +1587,8 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                         setSelectLeadFormConfig(null);
                     }}
                     accountId={selectLeadFormConfig.accountId}
-                    pageId={selectLeadFormConfig.pageId}
-                    pageName={selectLeadFormConfig.pageName}
+                    pages={selectLeadFormConfig.pages}
+                    linkedPageId={selectLeadFormConfig.linkedPageId}
                     linkedFormId={selectLeadFormConfig.linkedFormId}
                     linkedCampaignId={selectLeadFormConfig.linkedCampaignId}
                     onSuccess={() => {

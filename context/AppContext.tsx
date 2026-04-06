@@ -272,17 +272,17 @@ export interface AppContextType {
   setIsSelectLeadFormModalOpen: (isOpen: boolean) => void;
   selectLeadFormConfig: {
     accountId: number;
-    pageId: string;
-    pageName: string;
-    /** Currently linked form id for this page (so modal can pre-select it) */
+    /** All Meta Pages from /me/accounts (user can pick which Page’s forms to load) */
+    pages: { id: string; name: string }[];
+    /** Page id that currently has selected_form_id in metadata (for pre-select + pre-fill form) */
+    linkedPageId?: string;
     linkedFormId?: string;
-    /** Currently linked campaign id for this form (so modal can pre-select it) */
     linkedCampaignId?: string;
   } | null;
   setSelectLeadFormConfig: React.Dispatch<React.SetStateAction<{
     accountId: number;
-    pageId: string;
-    pageName: string;
+    pages: { id: string; name: string }[];
+    linkedPageId?: string;
     linkedFormId?: string;
     linkedCampaignId?: string;
   } | null>>;
@@ -716,8 +716,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isSelectLeadFormModalOpen, setIsSelectLeadFormModalOpen] = useState(false);
   const [selectLeadFormConfig, setSelectLeadFormConfig] = useState<{
     accountId: number;
-    pageId: string;
-    pageName: string;
+    pages: { id: string; name: string }[];
+    linkedPageId?: string;
     linkedFormId?: string;
     linkedCampaignId?: string;
   } | null>(null);

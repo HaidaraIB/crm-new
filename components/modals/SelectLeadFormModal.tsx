@@ -9,11 +9,11 @@ interface SelectLeadFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   accountId: number;
-  pageId: string;
-  pageName: string;
-  /** Pre-select this form when modal opens (currently linked for this page) */
+  /** Facebook Pages returned from Meta ( /me/accounts ); user picks one to load leadgen_forms */
+  pages: { id: string; name: string }[];
+  /** When set, this page id has selected_form_id in CRM metadata (pre-fill when that page is selected) */
+  linkedPageId?: string;
   linkedFormId?: string;
-  /** Pre-select this campaign when modal opens (currently linked for this form) */
   linkedCampaignId?: string;
   onSuccess?: () => void;
 }
@@ -52,35 +52,42 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
   isOpen,
   onClose,
   accountId,
-  pageId,
-  pageName,
+  pages,
+  linkedPageId,
   linkedFormId: initialFormId,
   linkedCampaignId: initialCampaignId,
   onSuccess,
 }) => {
   const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+  const [selectedPageId, setSelectedPageId] = useState('');
   const [selectedFormId, setSelectedFormId] = useState<string>('');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
 
-  // Fetch lead forms
-  const { data: leadFormsData, isLoading: loadingForms, isError: leadFormsError, error: leadFormsErrorObj } = useLeadForms(accountId, pageId);
+  useEffect(() => {
+    if (!isOpen || !pages.length) return;
+    const initial =
+      linkedPageId && pages.some((p) => p.id === linkedPageId) ? linkedPageId : pages[0].id;
+    setSelectedPageId(initial);
+    if (linkedPageId && initial === linkedPageId) {
+      setSelectedFormId(initialFormId ?? '');
+      setSelectedCampaignId(initialCampaignId ?? '');
+    } else {
+      setSelectedFormId('');
+      setSelectedCampaignId('');
+    }
+  }, [isOpen, pages, linkedPageId, initialFormId, initialCampaignId]);
+
+  const { data: leadFormsData, isLoading: loadingForms, isError: leadFormsError, error: leadFormsErrorObj } =
+    useLeadForms(accountId, selectedPageId || null);
   const leadForms = leadFormsData?.lead_forms || [];
   const errorMessage = leadFormsErrorObj && (leadFormsErrorObj as any)?.message;
 
-  // Fetch campaigns
   const { data: campaignsData } = useCampaigns();
   const campaigns = campaignsData?.results || [];
 
-  // Select lead form mutation
   const selectFormMutation = useSelectLeadForm();
 
-  // When modal opens, pre-select currently linked form and campaign (if any)
-  useEffect(() => {
-    if (isOpen) {
-      setSelectedFormId(initialFormId ?? '');
-      setSelectedCampaignId(initialCampaignId ?? '');
-    }
-  }, [isOpen, initialFormId, initialCampaignId]);
+  const selectedPageName = pages.find((p) => p.id === selectedPageId)?.name || selectedPageId;
 
   const handleSubmit = async () => {
     if (!selectedFormId) {
@@ -92,9 +99,9 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
       await selectFormMutation.mutateAsync({
         accountId,
         data: {
-          page_id: pageId,
+          page_id: selectedPageId,
           form_id: selectedFormId,
-          campaign_id: selectedCampaignId ? parseInt(selectedCampaignId) : undefined,
+          campaign_id: selectedCampaignId ? parseInt(selectedCampaignId, 10) : undefined,
         },
       });
 
@@ -108,16 +115,45 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
     }
   };
 
+  const onPageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const next = e.target.value;
+    setSelectedPageId(next);
+    if (linkedPageId && next === linkedPageId) {
+      setSelectedFormId(initialFormId ?? '');
+      setSelectedCampaignId(initialCampaignId ?? '');
+    } else {
+      setSelectedFormId('');
+      setSelectedCampaignId('');
+    }
+  };
+
+  if (!pages.length) {
+    return null;
+  }
+
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={t('selectLeadForm') || 'Select Lead Form'}
-    >
+    <Modal isOpen={isOpen} onClose={onClose} title={t('selectLeadForm') || 'Select Lead Form'}>
       <div className="space-y-4">
+        {pages.length > 1 && (
+          <div>
+            <Label htmlFor="meta-page">{t('selectFacebookPage') || 'Facebook Page'}</Label>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+              {t('selectPageForLeadFormsHint') ||
+                'Choose the Page that runs your Lead Ads. Forms are loaded from that Page only.'}
+            </p>
+            <Select id="meta-page" value={selectedPageId} onChange={onPageChange} disabled={selectFormMutation.isPending}>
+              {pages.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </Select>
+          </div>
+        )}
+
         <div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            {t('selectLeadFormForPage') || 'Select a lead form for'}: <strong>{pageName}</strong>
+            {t('selectLeadFormForPage') || 'Select a lead form for'}: <strong>{selectedPageName}</strong>
           </p>
         </div>
 
@@ -192,6 +228,3 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
     </Modal>
   );
 };
-
-
-

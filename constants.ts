@@ -1152,6 +1152,9 @@ export const translations = {
     selectLeadForm: "Select Lead Form",
     pleaseSelectLeadForm: "Please select a lead form",
     selectLeadFormForPage: "Select a lead form for",
+    selectFacebookPage: "Facebook Page",
+    selectPageForLeadFormsHint:
+      "Choose the Page that runs your Lead Ads. Instant Forms are listed per Page.",
     noLeadFormsFound: "No lead forms found for this page",
     noFacebookPagesFound: "No Facebook pages found",
     noFacebookPagesReconnectHint: "No Facebook pages were found for this account. Try disconnecting and reconnecting the account.",
@@ -2596,6 +2599,9 @@ export const translations = {
     selectLeadForm: "اختر نموذج الليد",
     pleaseSelectLeadForm: "يرجى اختيار نموذج ليد",
     selectLeadFormForPage: "اختر نموذج ليد للصفحة",
+    selectFacebookPage: "صفحة فيسبوك",
+    selectPageForLeadFormsHint:
+      "اختر الصفحة التي تعرض عليها إعلانات جمع العملاء. النماذج تُعرض لكل صفحة على حدة.",
     noLeadFormsFound: "لم يتم العثور على نماذج ليد لهذه الصفحة",
     noFacebookPagesFound: "لم يتم العثور على صفحات فيسبوك",
     noFacebookPagesReconnectHint: "لم يتم العثور على صفحات فيسبوك لهذا الحساب. جرّب قطع الاتصال ثم إعادة الربط.",

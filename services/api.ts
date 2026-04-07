@@ -2247,8 +2247,9 @@ export interface LeadWhatsAppMessageResponse {
  * GET /api/integrations/whatsapp/messages/?client=:clientId
  */
 export const getLeadWhatsAppMessagesAPI = async (
-  clientId: number
+  clientId?: number
 ): Promise<LeadWhatsAppMessageResponse[]> => {
+  if (typeof clientId !== 'number' || Number.isNaN(clientId)) return [];
   const res = await apiRequest<
     { results?: LeadWhatsAppMessageResponse[] } | LeadWhatsAppMessageResponse[]
   >(`/integrations/whatsapp/messages/?client=${clientId}`);

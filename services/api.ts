@@ -2161,16 +2161,39 @@ export const testConnectionAPI = async (accountId: number) => {
   );
 };
 
+/** WhatsApp Embedded Signup (optional — when set in API env, CRM uses FB SDK instead of URL-only OAuth). */
+export type WhatsAppEmbeddedSignupConnectInfo = {
+  enabled: boolean;
+  app_id: string;
+  config_id: string;
+  graph_api_version: string;
+};
+
 /**
  * بدء عملية OAuth لربط الحساب
  * POST /api/integrations/accounts/:id/connect/
- * Response: { authorization_url: string, state: string }
+ * Response: { authorization_url, state, embedded_signup? (WhatsApp only) }
  */
 export const connectIntegrationAccountAPI = async (accountId: number) => {
-  return apiRequest<{ authorization_url: string; state: string }>(
-    `/integrations/accounts/${accountId}/connect/`,
+  return apiRequest<{
+    authorization_url: string;
+    state: string;
+    embedded_signup?: WhatsAppEmbeddedSignupConnectInfo;
+  }>(`/integrations/accounts/${accountId}/connect/`, {
+    method: 'POST',
+  });
+};
+
+/**
+ * Complete WhatsApp Embedded Signup after FB.login returns authResponse.code
+ * POST /api/integrations/accounts/:id/whatsapp/embedded-signup/complete/
+ */
+export const completeWhatsAppEmbeddedSignupAPI = async (accountId: number, code: string) => {
+  return apiRequest<{ account_id: number; connected: boolean }>(
+    `/integrations/accounts/${accountId}/whatsapp/embedded-signup/complete/`,
     {
       method: 'POST',
+      body: JSON.stringify({ code }),
     }
   );
 };

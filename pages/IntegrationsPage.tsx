@@ -6,7 +6,8 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI } from '../services/api';
+import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
@@ -535,9 +536,42 @@ export const IntegrationsPage = () => {
         }
     };
 
+    const finalizeOAuthConnect = (accountId: number) => {
+        queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+        if (platformParam === 'meta') {
+            getConnectedAccountsAPI(platformParam).then((accounts: any) => {
+                const list = Array.isArray(accounts) ? accounts : accounts?.results || [];
+                const account = list.find((a: any) => a.id === accountId);
+                const cfg = account ? buildMetaLeadFormModalConfig(account, accountId) : null;
+                if (cfg) {
+                    setSelectLeadFormConfig(cfg);
+                    setIsSelectLeadFormModalOpen(true);
+                }
+            }).catch(console.error);
+        }
+    };
+
     const openConnectPopup = async (accountId: number) => {
         try {
             const response = await connectIntegrationAccountAPI(accountId);
+
+            if (response.embedded_signup?.enabled && response.embedded_signup.config_id) {
+                const es = response.embedded_signup;
+                const code = await obtainWhatsAppEmbeddedSignupCode({
+                    app_id: es.app_id,
+                    config_id: es.config_id,
+                    graph_api_version: es.graph_api_version,
+                });
+                if (!code) {
+                    showAlert(t('connectionCancelled') || 'Connection was cancelled.', 'info');
+                    return;
+                }
+                await completeWhatsAppEmbeddedSignupAPI(accountId, code);
+                finalizeOAuthConnect(accountId);
+                showAlert(t('connectionSuccessful') || 'Connected successfully.', 'success');
+                return;
+            }
+
             if (!response.authorization_url) return;
             const width = 600;
             const height = 700;
@@ -556,18 +590,7 @@ export const IntegrationsPage = () => {
                 if (event.origin !== window.location.origin) return;
                 if (event.data?.type === 'oauth_connected' && event.data?.accountId != null) {
                     window.removeEventListener('message', handleMessage);
-                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-                    if (platformParam === 'meta') {
-                        getConnectedAccountsAPI(platformParam).then((accounts: any) => {
-                            const list = Array.isArray(accounts) ? accounts : accounts?.results || [];
-                            const account = list.find((a: any) => a.id === event.data.accountId);
-                            const cfg = account ? buildMetaLeadFormModalConfig(account, event.data.accountId) : null;
-                            if (cfg) {
-                                setSelectLeadFormConfig(cfg);
-                                setIsSelectLeadFormModalOpen(true);
-                            }
-                        }).catch(console.error);
-                    }
+                    finalizeOAuthConnect(event.data.accountId);
                 }
                 if (event.data?.type === 'oauth_failed') {
                     window.removeEventListener('message', handleMessage);

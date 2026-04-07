@@ -57,6 +57,16 @@ const TheApp = () => {
 
         const checkPathname = () => {
             const currentPath = decodeURIComponent(window.location.pathname);
+            const oauthResultInQuery = (() => {
+                try {
+                    const p = new URLSearchParams(window.location.search);
+                    return p.get('connected') === 'true' || p.get('connected') === 'false';
+                } catch {
+                    return false;
+                }
+            })();
+            // Never rewrite OAuth callback popup URL (with or without company prefix)
+            if (currentPath.includes('oauth-callback') || oauthResultInQuery) return;
             const companyFromPath = extractCompanyFromPath(currentPath);
             const pageFromPath = extractPageFromPath(currentPath);
             const subdomainSlug = getCompanySubdomainSlug();

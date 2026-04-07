@@ -16,6 +16,7 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [manualPhone, setManualPhone] = useState('');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -33,6 +34,19 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
     onSelectClient(client);
     onClose();
   };
+  const handleStartWithNumber = () => {
+    const normalized = manualPhone.replace(/\s+/g, '').replace(/^\+/, '');
+    if (!normalized || !/^\d+$/.test(normalized)) return;
+    onSelectClient({
+      id: `manual:${normalized}`,
+      name: normalized,
+      company_name: normalized,
+      phone_number: normalized,
+      is_manual: true,
+    } as Client);
+    setManualPhone('');
+    onClose();
+  };
 
   const displayName = (c: Client) => c.company_name || c.name || `#${c.id}`;
   const displaySub = (c: Client) => (c.name && c.company_name ? c.name : c.phone_number || '');
@@ -48,6 +62,24 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
     >
       <div className="space-y-4">
         <p className="text-sm text-gray-600 dark:text-gray-400">{t('chooseClientFromDb')}</p>
+        <div className="flex gap-2">
+          <input
+            type="tel"
+            value={manualPhone}
+            onChange={(e) => setManualPhone(e.target.value.replace(/[^\d+\s]/g, ''))}
+            placeholder={t('enterPhoneNumber') || 'Type phone number (e.g. +971501234567)'}
+            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+            dir="ltr"
+          />
+          <button
+            type="button"
+            onClick={handleStartWithNumber}
+            disabled={!manualPhone.trim()}
+            className="px-3 py-2 rounded bg-primary text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {t('start') || 'Start'}
+          </button>
+        </div>
         <input
           type="text"
           value={search}

@@ -324,8 +324,10 @@ export const IntegrationsPage = () => {
 
     const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations();
     const isWhatsAppOrMessagingCenter = currentPage === 'WhatsApp' || currentPage === 'Messaging Center';
+    const selectedChatLeadId =
+        selectedChatClient && typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined;
     const { data: leadWhatsAppMessages = [], refetch: refetchLeadWhatsApp } = useLeadWhatsAppMessages(
-        isWhatsAppOrMessagingCenter && selectedChatClient?.id ? selectedChatClient.id : undefined
+        isWhatsAppOrMessagingCenter ? selectedChatLeadId : undefined
     );
 
     const conversations = useMemo(() => {
@@ -696,7 +698,9 @@ export const IntegrationsPage = () => {
             setMessageInput('');
             setOptimisticMessages((prev) => [...prev, { body, direction: 'out' as const, time: new Date().toLocaleTimeString() }]);
             try {
-                await sendWhatsAppMessageAPI({ to, message: body, client_id: selectedChatClient.id });
+                const payload: { to: string; message: string; client_id?: number } = { to, message: body };
+                if (typeof selectedChatClient.id === 'number') payload.client_id = selectedChatClient.id;
+                await sendWhatsAppMessageAPI(payload);
                 refetchLeadWhatsApp();
                 setOptimisticMessages([]);
             } catch (e: any) {

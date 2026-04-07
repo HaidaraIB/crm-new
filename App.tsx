@@ -594,7 +594,11 @@ const TheApp = () => {
     // OAuth popup callback: show "Connection succeeded/failed" and ask user to close (no sidebar, no app layout)
     const urlParamsForOAuth = new URLSearchParams(window.location.search);
     const isOAuthCallbackPath = pathname.includes('oauth-callback');
-    const isOAuthPopupWithResult = typeof window !== 'undefined' && !!window.opener && (urlParamsForOAuth.get('connected') === 'true' || urlParamsForOAuth.get('connected') === 'false');
+    // Some providers/navigation paths may nullify window.opener.
+    // Show OAuth callback page whenever connected result exists in query.
+    const isOAuthPopupWithResult =
+        urlParamsForOAuth.get('connected') === 'true' ||
+        urlParamsForOAuth.get('connected') === 'false';
     if (isOAuthCallbackPath || isOAuthPopupWithResult) {
         return <OAuthCallbackPage />;
     }

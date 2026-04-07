@@ -702,7 +702,10 @@ export const IntegrationsPage = () => {
                 if (typeof selectedChatClient.id === 'number') payload.client_id = selectedChatClient.id;
                 await sendWhatsAppMessageAPI(payload);
                 refetchLeadWhatsApp();
-                setOptimisticMessages([]);
+                // Manual-number chats have no client_id, so history never loads from API; keep optimistic rows.
+                if (typeof selectedChatClient.id === 'number') {
+                    setOptimisticMessages([]);
+                }
             } catch (e: any) {
                 setOptimisticMessages((prev) => prev.slice(0, -1));
                 setMessageInput(body);

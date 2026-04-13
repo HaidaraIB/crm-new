@@ -2098,6 +2098,10 @@ export const getConnectedAccountsAPI = async (platform?: string) => {
   return apiRequest<any[]>(`/integrations/accounts${query}`);
 };
 
+export const getIntegrationPolicyAPI = async (): Promise<Record<string, { enabled: boolean; message: string; scope: string }>> => {
+  return apiRequest('/integrations/policy/');
+};
+
 /**
  * الحصول على تفاصيل حساب تكامل
  * GET /api/integrations/accounts/:id/

@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
@@ -266,9 +266,16 @@ export const IntegrationsPage = () => {
             return 'tiktok';
         } else if (currentPage === 'WhatsApp' || currentPage === 'Messaging Center') {
             return 'whatsapp';
+        } else if (currentPage === 'Twilio') {
+            return 'twilio';
         }
         return undefined;
     }, [currentPage]);
+    const { data: integrationPolicyMap } = useQuery({
+        queryKey: ['integrationPolicy'],
+        queryFn: getIntegrationPolicyAPI,
+        enabled: !!platformParam,
+    });
 
     // Get dataKey based on currentPage (memoized)
     const dataKey = useMemo(() => {
@@ -418,11 +425,28 @@ export const IntegrationsPage = () => {
         };
     }, [dataKey]);
 
+    const currentPolicy = platformParam ? integrationPolicyMap?.[platformParam] : undefined;
+    function renderPolicyBanner() {
+        if (!currentPolicy) return null;
+        const isEnabled = currentPolicy.enabled !== false;
+        return (
+            <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+                isEnabled
+                    ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
+                    : 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200'
+            }`}>
+                <div className="font-semibold">{isEnabled ? (t('integrationStatusEnabled') || 'Integration is active') : (t('integrationStatusDisabled') || 'Integration is disabled')}</div>
+                {!isEnabled && <div className="mt-1">{currentPolicy.message || (t('integrationDisabledDefaultMessage') || 'This integration is currently disabled by your administrator.')}</div>}
+            </div>
+        );
+    }
+
     // Twilio SMS: we only accept Twilio for SMS. Credentials form and "integration enabled" toggle.
     const replaceTwilio = (str: string) => (str || '').replace(/\{\{twilio\}\}/g, t('twilioWord') || 'Twilio');
     if (currentPage === 'Twilio') {
         return (
             <PageWrapper title={replaceTwilio(t('twilioSmsIntegration')) || 'SMS (Twilio) Notifications Integration'}>
+                {renderPolicyBanner()}
                 <TwilioSMSForm t={t} replaceTwilio={replaceTwilio} />
             </PageWrapper>
         );
@@ -643,6 +667,7 @@ export const IntegrationsPage = () => {
         ];
         return (
             <PageWrapper title={pageTitle}>
+                {renderPolicyBanner()}
                 <Card>
                     <div className="max-w-2xl space-y-6">
                         <div className="flex items-center gap-3">
@@ -930,6 +955,7 @@ export const IntegrationsPage = () => {
                     )
                 }
             >
+                {renderPolicyBanner()}
                 <div className="flex border-b border-gray-200 dark:border-gray-700 gap-1 mb-4">
                     <button
                         type="button"
@@ -1533,6 +1559,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                 </Button>
             }
         >
+            {renderPolicyBanner()}
             <Card className="overflow-hidden p-0">
                 {accounts.length > 0 ? (
                     <ul className="divide-y divide-gray-200/80 dark:divide-gray-700/80">

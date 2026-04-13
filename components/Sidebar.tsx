@@ -9,6 +9,7 @@ import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
 import { Button } from './Button';
 import { ChevronDownIcon, XIcon } from './icons';
+import { getIntegrationPolicyAPI } from '../services/api';
 
 type SidebarItemProps = { 
     name: string; 
@@ -52,7 +53,7 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
 
 
 export const Sidebar = () => {
-    const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme, canAccessPage } = useAppContext();
+    const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme, canAccessPage, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
     
     // Get logo path based on theme
@@ -62,7 +63,31 @@ export const Sidebar = () => {
         setOpenSubMenus(prev => ({ ...prev, [name]: !prev[name] }));
     };
     
-    const handleNavigation = (page: PageType) => {
+    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio'>> = {
+        Integrations: 'meta',
+        Meta: 'meta',
+        TikTok: 'tiktok',
+        WhatsApp: 'whatsapp',
+        'Messaging Center': 'whatsapp',
+        Twilio: 'twilio',
+    };
+
+    const handleNavigation = async (page: PageType) => {
+        const platform = integrationPlatformByPage[page];
+        if (platform && currentUser?.company?.id) {
+            try {
+                const policies = await getIntegrationPolicyAPI();
+                const policy = policies?.[platform];
+                if (policy && policy.enabled === false) {
+                    setAlertMessage(policy.message || 'This integration is currently disabled.');
+                    setAlertVariant('warning');
+                    setIsAlertModalOpen(true);
+                    return;
+                }
+            } catch {
+                // Ignore policy fetch failures to avoid blocking navigation.
+            }
+        }
         console.log('[Sidebar] handleNavigation called with page:', page);
         console.log('[Sidebar] currentUser:', currentUser);
         console.log('[Sidebar] subscription_id:', currentUser?.company?.subscription?.id);
@@ -134,7 +159,7 @@ export const Sidebar = () => {
                         src={logoPath} 
                         alt="LOOP CRM Logo" 
                         className="h-10 w-auto object-contain cursor-pointer hover:opacity-80 transition-opacity" 
-                        onClick={() => handleNavigation('Dashboard')}
+                        onClick={() => void handleNavigation('Dashboard')}
                     />
                 </div>
                 <button
@@ -190,7 +215,7 @@ export const Sidebar = () => {
                                 isActive={currentPage === item.name || (!!subItems && subItems.some(sub => sub === currentPage))}
                                 hasSubItems={!!subItems && subItems.length > 0}
                                 isOpen={isOpen}
-                                onClick={() => subItems && subItems.length ? handleToggleSubMenu(item.name) : handleNavigation(item.name)}
+                                onClick={() => subItems && subItems.length ? handleToggleSubMenu(item.name) : void handleNavigation(item.name)}
                             />
                             {subItems && subItems.length > 0 && isOpen && (
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>
@@ -202,7 +227,7 @@ export const Sidebar = () => {
                                                 href="#"
                                                 onClick={(e) => {
                                                     e.preventDefault();
-                                                    handleNavigation(sub);
+                                                    void handleNavigation(sub);
                                                 }}
                                                 className={`block px-4 py-2 font-medium rounded-md transition-colors duration-150 ${
                                                     currentPage === sub
@@ -228,7 +253,7 @@ export const Sidebar = () => {
                                 name={t('billing')}
                                 icon={SIDEBAR_ITEMS.find(item => item.name === 'Billing')?.icon}
                                 isActive={currentPage === 'Billing'}
-                                onClick={() => handleNavigation('Billing')}
+                                onClick={() => void handleNavigation('Billing')}
                             />
                         )}
                         {canAccessPage('Settings') && (
@@ -236,7 +261,7 @@ export const Sidebar = () => {
                                 name={t('settings')}
                                 icon={SETTINGS_ITEM.icon}
                                 isActive={currentPage === 'Settings'}
-                                onClick={() => handleNavigation('Settings')}
+                                onClick={() => void handleNavigation('Settings')}
                             />
                         )}
                     </>

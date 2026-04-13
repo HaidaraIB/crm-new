@@ -616,6 +616,9 @@ export const translations = {
     noAccountsConnected: "No accounts connected",
     connectAccountPrompt: "Click 'Add New Account' to connect your page and start capturing leads.",
     addAccountThenConnectHint: "After saving the account name, a Meta login window will open to connect your WhatsApp/Meta account.",
+    integrationStatusEnabled: "Integration is active",
+    integrationStatusDisabled: "Integration is disabled",
+    integrationDisabledDefaultMessage: "This integration is currently disabled by your administrator.",
     // TikTok Lead Gen
     tiktokLeadGen: "TikTok Lead Gen",
     tiktokLeadGenDescription: "Receive leads from TikTok Instant Forms instantly in your CRM. Follow the steps below to connect TikTok Ads Manager.",
@@ -2051,6 +2054,9 @@ export const translations = {
     noAccountsConnected: "لا توجد حسابات متصلة",
     connectAccountPrompt: "انقر فوق 'إضافة حساب جديد' لتوصيل صفحتك والبدء في التقاط العملاء المحتملين.",
     addAccountThenConnectHint: "بعد حفظ اسم الحساب ستفتح نافذة تسجيل الدخول إلى Meta لربط حساب واتساب/ميتا.",
+    integrationStatusEnabled: "التكامل مفعّل",
+    integrationStatusDisabled: "التكامل معطّل",
+    integrationDisabledDefaultMessage: "هذا التكامل معطّل حالياً من قبل المسؤول.",
     // TikTok Lead Gen
     tiktokLeadGen: "تيك توك ليدز",
     tiktokLeadGenDescription: "استقبل ليدز استمارات تيك توك فوراً في الـ CRM. اتبع الخطوات أدناه لربط TikTok Ads Manager.",

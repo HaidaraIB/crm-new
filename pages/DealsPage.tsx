@@ -1,11 +1,34 @@
 
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Loader, TrashIcon, EditIcon, EyeIcon } from '../components/index';
 import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
+
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+const getPageSizeFromResponse = (response: any): number => {
+    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
+    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
+    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
+    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
+    return DEFAULT_PAGE_SIZE;
+};
+
+const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const items: Array<number | 'ellipsis'> = [1];
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    if (start > 2) items.push('ellipsis');
+    for (let page = start; page <= end; page += 1) items.push(page);
+    if (end < total - 1) items.push('ellipsis');
+    items.push(total);
+    return items;
+};
 
 const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, units }: { deals: Deal[], onDelete: (id: number) => void, onEdit: (id: number) => void, onView: (id: number) => void, isRealEstate: boolean, projects: any[], units: any[] }) => {
     const { t } = useAppContext();
@@ -216,10 +239,18 @@ export const DealsPage = () => {
         setIsViewDealModalOpen,
         setViewingDeal
     } = useAppContext();
+    const [dealsPageNumber, setDealsPageNumber] = useState(1);
+    const [dealsPageSize, setDealsPageSize] = useState(20);
 
     // Fetch deals using React Query
-    const { data: dealsResponse, isLoading: dealsLoading, error: dealsError } = useDeals();
+    const { data: dealsResponse, isLoading: dealsLoading, error: dealsError } = useDeals(dealsPageNumber, undefined, dealsPageSize);
     const dealsRaw = dealsResponse?.results || [];
+    const hasNextPage = Boolean(dealsResponse?.next);
+    const hasPreviousPage = Boolean(dealsResponse?.previous);
+    const totalDealsCount = dealsResponse?.count || 0;
+    const pageSize = getPageSizeFromResponse(dealsResponse);
+    const totalPages = Math.max(1, Math.ceil(totalDealsCount / pageSize));
+    const paginationItems = getPaginationItems(dealsPageNumber, totalPages);
 
     // Fetch projects and units for real estate
     const { data: projectsResponse } = useProjects();
@@ -365,6 +396,22 @@ export const DealsPage = () => {
         return filtered;
     }, [allDeals, dealFilters, isRealEstate]);
 
+    useEffect(() => {
+        setDealsPageNumber(1);
+    }, [
+        dealFilters.status,
+        dealFilters.paymentMethod,
+        dealFilters.unit,
+        dealFilters.project,
+        dealFilters.valueMin,
+        dealFilters.valueMax,
+        dealFilters.search,
+    ]);
+
+    useEffect(() => {
+        setDealsPageNumber(1);
+    }, [dealsPageSize]);
+
     const handleDelete = (id: number) => {
         const deal = allDeals.find(d => d.id === id);
         if (deal) {
@@ -482,6 +529,66 @@ export const DealsPage = () => {
         >
             <Card>
                 <DealsTable deals={filteredDeals} onDelete={handleDelete} onEdit={handleEdit} onView={handleView} isRealEstate={isRealEstate} projects={projects} units={units} />
+                <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        {(t('page') || 'Page')} {dealsPageNumber} / {totalPages}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={dealsPageSize}
+                            onChange={(e) => setDealsPageSize(Number(e.target.value))}
+                            className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                        >
+                            {PAGE_SIZE_OPTIONS.map((size) => (
+                                <option key={size} value={size}>
+                                    {size}/page
+                                </option>
+                            ))}
+                        </select>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setDealsPageNumber(1)}
+                            disabled={dealsPageNumber === 1 || dealsLoading}
+                        >
+                            &laquo;
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setDealsPageNumber((prev) => Math.max(1, prev - 1))}
+                            disabled={!hasPreviousPage || dealsLoading}
+                        >
+                            {t('previous') || 'Previous'}
+                        </Button>
+                        {paginationItems.map((item, idx) =>
+                            item === 'ellipsis' ? (
+                                <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
+                            ) : (
+                                <Button
+                                    key={item}
+                                    variant={item === dealsPageNumber ? 'primary' : 'secondary'}
+                                    onClick={() => setDealsPageNumber(item)}
+                                    disabled={dealsLoading}
+                                >
+                                    {item}
+                                </Button>
+                            )
+                        )}
+                        <Button
+                            variant="secondary"
+                            onClick={() => setDealsPageNumber((prev) => prev + 1)}
+                            disabled={!hasNextPage || dealsLoading}
+                        >
+                            {t('next') || 'Next'}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setDealsPageNumber(totalPages)}
+                            disabled={dealsPageNumber === totalPages || dealsLoading}
+                        >
+                            &raquo;
+                        </Button>
+                    </div>
+                </div>
             </Card>
         </PageWrapper>
     );

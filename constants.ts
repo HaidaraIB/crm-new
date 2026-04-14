@@ -607,6 +607,10 @@ export const translations = {
     // Integrations
     integration: "Integration",
     addNewAccount: "Add New Account",
+    oneIntegrationAccountPerPlatformHint:
+        "Only one account per platform is allowed. Disconnect the existing account if you want to connect a different one.",
+    oneIntegrationAccountLimitModal:
+        "You already have an account for this platform. Disconnect it first to add another.",
     disconnect: "Disconnect",
     disconnectAccount: "Disconnect Account",
     confirmDisconnectAccount: "Are you sure you want to disconnect",
@@ -731,6 +735,18 @@ export const translations = {
     templateApproved: "Approved",
     templateRejected: "Rejected",
     templatePending: "Pending review",
+    whatsappOutsideSessionUseTemplate:
+        "This contact is outside the 24-hour messaging window. Send an approved WhatsApp template instead.",
+    whatsappSessionClosedHint:
+        "No customer reply in the last 24 hours (in this CRM). Use an approved Meta template below to start or continue the conversation.",
+    whatsappSessionOpenHint: "Free-form messages are allowed for about {h} more hour(s) after the contact’s last message.",
+    sendMetaTemplate: "Send Meta template",
+    selectApprovedTemplate: "Select approved template…",
+    sendTemplateMessage: "Send template",
+    whatsappTemplateSent: "WhatsApp template message sent.",
+    whatsapp_template_not_approved: "This template is not approved in Meta yet. Submit it and sync status, or pick another template.",
+    whatsapp_template_parameter_count: "Wrong number of template variables. Check placeholders vs. values.",
+    whatsapp_template_parameter_mismatch: "Could not fill template variables from this lead.",
     sync: "Sync",
     syncing: "Syncing…",
     templatesSynced: "Templates synced.",
@@ -2045,6 +2061,10 @@ export const translations = {
     // Integrations
     integration: "التكامل",
     addNewAccount: "إضافة حساب جديد",
+    oneIntegrationAccountPerPlatformHint:
+        "يُسمح بحساب واحد فقط لكل منصة. اقطع الاتصال بالحساب الحالي إذا أردت ربط حساب آخر.",
+    oneIntegrationAccountLimitModal:
+        "لديك بالفعل حساب لهذه المنصة. اقطع الاتصال أولاً لإضافة حساب آخر.",
     disconnect: "قطع الاتصال",
     disconnectAccount: "قطع اتصال الحساب",
     confirmDisconnectAccount: "هل أنت متأكد أنك تريد قطع الاتصال",
@@ -2169,6 +2189,18 @@ export const translations = {
     templateApproved: "معتمد",
     templateRejected: "مرفوض",
     templatePending: "قيد المراجعة",
+    whatsappOutsideSessionUseTemplate:
+        "انتهت نافذة الـ 24 ساعة لهذا العميل. أرسل قالب واتساب معتمد من ميتا بدلاً من نص حر.",
+    whatsappSessionClosedHint:
+        "لا توجد رسالة واردة من العميل خلال 24 ساعة (حسب سجلات الـ CRM). استخدم قالب ميتا المعتمد أدناه.",
+    whatsappSessionOpenHint: "مسموح بالرسائل الحرة لنحو {h} ساعة إضافية بعد آخر رسالة من العميل.",
+    sendMetaTemplate: "إرسال قالب ميتا",
+    selectApprovedTemplate: "اختر قالباً معتمداً…",
+    sendTemplateMessage: "إرسال القالب",
+    whatsappTemplateSent: "تم إرسال رسالة القالب عبر واتساب.",
+    whatsapp_template_not_approved: "القالب غير معتمد في ميتا بعد. أرسله للمراجعة وحدّث الحالة أو اختر قالباً آخر.",
+    whatsapp_template_parameter_count: "عدد متغيرات القالب غير صحيح.",
+    whatsapp_template_parameter_mismatch: "تعذر ملء متغيرات القالب من بيانات هذا العميل.",
     sync: "مزامنة",
     syncing: "جاري المزامنة…",
     templatesSynced: "تمت مزامنة القوالب.",

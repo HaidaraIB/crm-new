@@ -2,7 +2,14 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PlanEntitlementsSummary } from '../components/index';
-import { registerCompanyAPI, getPublicPlansAPI, checkRegistrationAvailabilityAPI, verifyEmailAPI } from '../services/api';
+import {
+    registerCompanyAPI,
+    getPublicPlansAPI,
+    checkRegistrationAvailabilityAPI,
+    verifyEmailAPI,
+    registerPhoneSendOtpAPI,
+    registerPhoneVerifyOtpAPI,
+} from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { isRedundantPlanDescription } from '../utils/planEntitlements';
 
@@ -75,8 +82,13 @@ export const RegisterPage = () => {
     };
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: Plan
-    const isNextButtonLoading = stepCheckLoading && currentStep < 3;
+    const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: WhatsApp OTP, 4: Plan
+    const [phoneOtpCode, setPhoneOtpCode] = useState('');
+    const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
+    const [otpSending, setOtpSending] = useState(false);
+    const [otpVerifying, setOtpVerifying] = useState(false);
+    const isNextButtonLoading =
+        (stepCheckLoading && (currentStep === 1 || currentStep === 2)) || otpSending;
 
     const normalizeErrorMessage = (value: any): string => {
         if (!value) return '';
@@ -155,6 +167,7 @@ export const RegisterPage = () => {
             domain: 'companyDomain',
             name: 'companyName',
             plan_id: 'plan',
+            phone_verification_token: 'phoneOtp',
         };
 
         Object.entries(directMap).forEach(([apiKey, uiKey]) => {
@@ -165,6 +178,10 @@ export const RegisterPage = () => {
 
         if (apiFields.non_field_errors) {
             fieldErrors.general = normalizeErrorMessage(apiFields.non_field_errors);
+        }
+
+        if (apiFields.phone_verification_token) {
+            fieldErrors.phoneOtp = normalizeErrorMessage(apiFields.phone_verification_token);
         }
 
         return fieldErrors;
@@ -494,17 +511,84 @@ export const RegisterPage = () => {
                 username: username.trim(),
                 phone: phone.trim(),
             });
-            if (ownerAvailable) {
+            if (!ownerAvailable) return;
+            setOtpSending(true);
+            setErrors((prev) => {
+                const next = { ...prev };
+                delete next.phoneOtp;
+                delete next.general;
+                return next;
+            });
+            try {
+                await registerPhoneSendOtpAPI(phone.trim(), language);
+                setPhoneVerificationToken(null);
+                setPhoneOtpCode('');
                 setCurrentStep(3);
+            } catch (e: any) {
+                setErrors((prev) => ({
+                    ...prev,
+                    general: e.message || t('otpSendFailed') || 'Could not send WhatsApp code. Try again.',
+                }));
+            } finally {
+                setOtpSending(false);
             }
         } else if (currentStep === 3) {
-            setCurrentStep(3);
+            return;
+        }
+    };
+
+    const handleVerifyPhoneOtp = async () => {
+        const code = phoneOtpCode.trim();
+        if (!/^\d{4,8}$/.test(code)) {
+            setErrors((prev) => ({
+                ...prev,
+                phoneOtp: t('verificationCodeRequired') || 'Enter the code from WhatsApp.',
+            }));
+            return;
+        }
+        setOtpVerifying(true);
+        setErrors((prev) => {
+            const next = { ...prev };
+            delete next.phoneOtp;
+            delete next.general;
+            return next;
+        });
+        try {
+            const data = await registerPhoneVerifyOtpAPI(phone.trim(), code, language);
+            setPhoneVerificationToken(data.phone_verification_token);
+            setCurrentStep(4);
+        } catch (e: any) {
+            setErrors((prev) => ({
+                ...prev,
+                phoneOtp: e.message || t('verificationFailed') || 'Invalid code. Try again.',
+            }));
+        } finally {
+            setOtpVerifying(false);
+        }
+    };
+
+    const handleResendPhoneOtp = async () => {
+        setOtpSending(true);
+        try {
+            await registerPhoneSendOtpAPI(phone.trim(), language);
+        } catch (e: any) {
+            setErrors((prev) => ({
+                ...prev,
+                general: e.message || t('otpSendFailed') || 'Could not resend code.',
+            }));
+        } finally {
+            setOtpSending(false);
         }
     };
 
     const handleBack = () => {
         if (currentStep > 1) {
-            setCurrentStep(currentStep - 1);
+            const next = currentStep - 1;
+            setCurrentStep(next);
+            if (next === 2) {
+                setPhoneVerificationToken(null);
+                setPhoneOtpCode('');
+            }
         }
     };
 
@@ -513,12 +597,22 @@ export const RegisterPage = () => {
             setCurrentStep(2);
             return;
         }
+        if (!phoneVerificationToken) {
+            setErrors({
+                general:
+                    t('phoneVerificationRequired') ||
+                    'Verify your phone number via WhatsApp before completing registration.',
+            });
+            setCurrentStep(3);
+            return;
+        }
+
         if (!selectedPlan) {
             setErrors(prev => ({
                 ...prev,
                 plan: t('planRequired') || 'Please select a plan to continue',
             }));
-            setCurrentStep(3);
+            setCurrentStep(4);
             return;
         }
 
@@ -540,6 +634,7 @@ export const RegisterPage = () => {
                     password: password,
                     phone: phone.trim(),
                 },
+                phone_verification_token: phoneVerificationToken,
                 plan_id: selectedPlan,
                 billing_cycle: billingCycle,
             }, language);
@@ -616,8 +711,10 @@ export const RegisterPage = () => {
                     backendFieldErrors.phone
                 ) {
                     setCurrentStep(2);
-                } else if (backendFieldErrors.plan) {
+                } else if (backendFieldErrors.phoneOtp) {
                     setCurrentStep(3);
+                } else if (backendFieldErrors.plan) {
+                    setCurrentStep(4);
                 }
             } else {
                 const errorMessage = error.message || t('registrationFailed') || 'Registration failed. Please try again.';
@@ -682,17 +779,21 @@ export const RegisterPage = () => {
                         </div>
 
                         {/* Progress indicator */}
-                        <div className="flex items-center justify-center space-x-2">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 1 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
+                        <div className="flex items-center justify-center space-x-1 sm:space-x-2">
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 1 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
                                 1
                             </div>
-                            <div className={`flex-1 h-1 ${currentStep >= 2 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 2 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
+                            <div className={`flex-1 h-1 max-w-12 sm:max-w-none ${currentStep >= 2 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 2 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
                                 2
                             </div>
-                            <div className={`flex-1 h-1 ${currentStep >= 3 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center ${currentStep >= 3 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
+                            <div className={`flex-1 h-1 max-w-12 sm:max-w-none ${currentStep >= 3 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 3 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
                                 3
+                            </div>
+                            <div className={`flex-1 h-1 max-w-12 sm:max-w-none ${currentStep >= 4 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
+                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 4 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
+                                4
                             </div>
                         </div>
 
@@ -1000,8 +1101,55 @@ export const RegisterPage = () => {
                                 </div>
                             )}
 
-                            {/* Step 3: Plan Selection */}
+                            {/* Step 3: WhatsApp OTP */}
                             {currentStep === 3 && (
+                                <div className="space-y-4">
+                                    <h3 className="text-lg font-semibold text-primary">
+                                        {t('verifyPhoneWhatsApp') || 'Verify your phone (WhatsApp)'}
+                                    </h3>
+                                    <p className="text-sm text-secondary">
+                                        {t('verifyPhoneWhatsAppHint') ||
+                                            'We sent a verification code to your WhatsApp. Enter it below.'}
+                                    </p>
+                                    <div>
+                                        <label htmlFor="phone-otp" className="block text-sm font-medium text-secondary mb-1">
+                                            {t('verificationCode') || 'Verification code'}
+                                        </label>
+                                        <Input
+                                            id="phone-otp"
+                                            inputMode="numeric"
+                                            autoComplete="one-time-code"
+                                            placeholder="123456"
+                                            value={phoneOtpCode}
+                                            onChange={(e) => {
+                                                setPhoneOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8));
+                                                if (errors.phoneOtp) {
+                                                    setErrors((prev) => {
+                                                        const next = { ...prev };
+                                                        delete next.phoneOtp;
+                                                        return next;
+                                                    });
+                                                }
+                                            }}
+                                            className={errors.phoneOtp ? 'border-red-500' : ''}
+                                        />
+                                        {errors.phoneOtp && (
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phoneOtp}</p>
+                                        )}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        className="text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50"
+                                        onClick={handleResendPhoneOtp}
+                                        disabled={otpSending || otpVerifying}
+                                    >
+                                        {t('resendCode') || 'Resend code'}
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Step 4: Plan Selection */}
+                            {currentStep === 4 && (
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-primary">
                                         {t('selectPlan') || 'Select a Plan'}
@@ -1153,23 +1301,37 @@ export const RegisterPage = () => {
                             )}
 
                             {/* Navigation buttons */}
-                            <div className="flex justify-between gap-2">
+                            <div className="flex justify-between gap-2 items-center flex-wrap">
                                 {currentStep > 1 && (
-                                    <Button variant="secondary" onClick={handleBack} disabled={isLoading}>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={handleBack}
+                                        disabled={isLoading || otpVerifying || otpSending}
+                                    >
                                         {t('back') || 'Back'}
                                     </Button>
                                 )}
-                                <div className="flex-1"></div>
-                                {currentStep < 3 ? (
+                                <div className="flex-1" />
+                                {currentStep < 3 && (
                                     <Button
                                         onClick={handleNext}
-                                        disabled={isLoading || stepCheckLoading}
+                                        disabled={isLoading || stepCheckLoading || otpSending}
                                         loading={isNextButtonLoading}
                                     >
                                         {t('next') || 'Next'}
                                     </Button>
-                                ) : (
-                                    <Button onClick={handleRegister} loading={isLoading} disabled={isLoading} className="w-full">
+                                )}
+                                {currentStep === 3 && (
+                                    <Button
+                                        onClick={handleVerifyPhoneOtp}
+                                        loading={otpVerifying}
+                                        disabled={otpSending || otpVerifying}
+                                    >
+                                        {t('verifyAndContinue') || 'Verify and continue'}
+                                    </Button>
+                                )}
+                                {currentStep === 4 && (
+                                    <Button onClick={handleRegister} loading={isLoading} disabled={isLoading}>
                                         {t('register') || 'Register'}
                                     </Button>
                                 )}

@@ -341,6 +341,58 @@ async function apiRequest<T>(
   }
 }
 
+type PaginatedResponse<T> = {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+};
+
+function isPaginatedResponse<T>(value: unknown): value is PaginatedResponse<T> {
+  if (!value || typeof value !== 'object') return false;
+  const obj = value as Record<string, unknown>;
+  return Array.isArray(obj.results) && 'next' in obj && 'previous' in obj && 'count' in obj;
+}
+
+function toRelativeApiEndpoint(urlOrPath: string): string | null {
+  if (!urlOrPath) return null;
+  if (urlOrPath.startsWith('/')) return urlOrPath;
+  if (!BASE_URL) return null;
+  if (urlOrPath.startsWith(BASE_URL)) {
+    const rel = urlOrPath.slice(BASE_URL.length);
+    return rel.startsWith('/') ? rel : `/${rel}`;
+  }
+  return null;
+}
+
+async function fetchAllPaginatedPages<T>(initialEndpoint: string): Promise<PaginatedResponse<T>> {
+  let endpoint: string | null = initialEndpoint;
+  let count = 0;
+  const results: T[] = [];
+  let previous: string | null = null;
+  let safetyCounter = 0;
+
+  while (endpoint && safetyCounter < 200) {
+    safetyCounter += 1;
+    const pageData = await apiRequest<unknown>(endpoint);
+    if (!isPaginatedResponse<T>(pageData)) {
+      break;
+    }
+
+    count = pageData.count ?? count;
+    previous = previous ?? pageData.previous;
+    results.push(...(pageData.results || []));
+    endpoint = pageData.next ? toRelativeApiEndpoint(pageData.next) : null;
+  }
+
+  return {
+    count: Math.max(count, results.length),
+    next: null,
+    previous,
+    results,
+  };
+}
+
 // ==================== Authentication APIs ====================
 
 /**
@@ -406,6 +458,44 @@ export interface RegisterCompanyResponse {
  * Body: { company: { name, domain, specialization }, owner: { first_name, last_name, email, username, password }, plan_id?, billing_cycle? }
  * Response: { access, refresh, user, company, subscription? }
  */
+export const registerPhoneSendOtpAPI = async (phone: string, language: string = 'en') => {
+  const response = await fetch(`${BASE_URL}/auth/register/phone/send-otp/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      'Accept-Language': language,
+    }),
+    body: JSON.stringify({ phone }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to send WhatsApp verification code');
+  }
+  return parseSuccessJsonResponse<{ expires_in_seconds: number; phone: string }>(response);
+};
+
+export const registerPhoneVerifyOtpAPI = async (
+  phone: string,
+  code: string,
+  language: string = 'en'
+) => {
+  const response = await fetch(`${BASE_URL}/auth/register/phone/verify-otp/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      'Accept-Language': language,
+    }),
+    body: JSON.stringify({ phone, code }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Verification failed');
+  }
+  return parseSuccessJsonResponse<{ phone_verification_token: string; expires_in_seconds: number }>(
+    response
+  );
+};
+
 export const registerCompanyAPI = async (data: {
   company: {
     name: string;
@@ -420,6 +510,7 @@ export const registerCompanyAPI = async (data: {
     password: string;
     phone?: string;
   };
+  phone_verification_token: string;
   plan_id?: number | null;
   billing_cycle?: 'monthly' | 'yearly';
 }, language: string = 'en'): Promise<RegisterCompanyResponse> => {
@@ -1345,8 +1436,12 @@ export const changePasswordAPI = async (currentPassword: string, newPassword: st
  * GET /api/users/
  * Response: { count, next, previous, results: User[] }
  */
-export const getUsersAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/users/');
+export const getUsersAPI = async (page?: number, pageSize?: number) => {
+  const queryParams = new URLSearchParams();
+  if (page) queryParams.append('page', String(page));
+  if (pageSize) queryParams.append('page_size', String(pageSize));
+  const endpoint = `/users/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };
 
 /**
@@ -1389,7 +1484,7 @@ export const deleteUserAPI = async (userId: number) => {
 
 /** GET /api/supervisors/ - returns paginated { count, next, previous, results } */
 export const getSupervisorsAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(`/supervisors/`);
+  return fetchAllPaginatedPages<any>('/supervisors/');
 };
 
 /** POST /api/supervisors/ - create supervisor (user + permissions) */
@@ -1458,14 +1553,24 @@ export const toggleSupervisorActiveAPI = async (id: number) => {
  * Query params: ?type=fresh&priority=high&search=name (اختياري)
  * Response: { count, next, previous, results: Client[] }
  */
-export const getLeadsAPI = async (filters?: { type?: string; priority?: string; search?: string }) => {
+export const getLeadsAPI = async (
+  filters?: { type?: string; priority?: string; search?: string },
+  page?: number,
+  pageSize?: number
+) => {
   const queryParams = new URLSearchParams();
   if (filters?.type && filters.type !== 'All') queryParams.append('type', filters.type.toLowerCase());
   if (filters?.priority && filters.priority !== 'All') queryParams.append('priority', filters.priority.toLowerCase());
   if (filters?.search) queryParams.append('search', filters.search);
+  if (typeof page === 'number') queryParams.append('page', String(page));
+  if (typeof pageSize === 'number') queryParams.append('page_size', String(pageSize));
   
   const queryString = queryParams.toString();
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(`/clients/${queryString ? `?${queryString}` : ''}`);
+  const endpoint = `/clients/${queryString ? `?${queryString}` : ''}`;
+  if (typeof page === 'number') {
+    return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint);
+  }
+  return fetchAllPaginatedPages<any>(endpoint);
 };
 
 /**
@@ -1526,8 +1631,12 @@ export const bulkAssignLeadsAPI = async (clientIds: number[], userId: number | n
  * GET /api/deals/
  * Response: { count, next, previous, results: Deal[] }
  */
-export const getDealsAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/deals/');
+export const getDealsAPI = async (page?: number, pageSize?: number) => {
+  const queryParams = new URLSearchParams();
+  if (page) queryParams.append('page', String(page));
+  if (pageSize) queryParams.append('page_size', String(pageSize));
+  const endpoint = `/deals/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };
 
 /**
@@ -1572,8 +1681,12 @@ export const deleteDealAPI = async (dealId: number) => {
  * الحصول على جميع Developers
  * GET /api/developers/
  */
-export const getDevelopersAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/developers/');
+export const getDevelopersAPI = async (page?: number, pageSize?: number) => {
+  const queryParams = new URLSearchParams();
+  if (page) queryParams.append('page', String(page));
+  if (pageSize) queryParams.append('page_size', String(pageSize));
+  const endpoint = `/developers/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };
 
 /**
@@ -1626,8 +1739,12 @@ export const deleteDeveloperAPI = async (developerId: number) => {
  * الحصول على جميع Projects
  * GET /api/projects/
  */
-export const getProjectsAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/projects/');
+export const getProjectsAPI = async (page?: number, pageSize?: number) => {
+  const queryParams = new URLSearchParams();
+  if (page) queryParams.append('page', String(page));
+  if (pageSize) queryParams.append('page_size', String(pageSize));
+  const endpoint = `/projects/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };
 
 /**
@@ -1681,12 +1798,15 @@ export const deleteProjectAPI = async (projectId: number) => {
  * GET /api/units/
  * Query params: ?project=xxx&bedrooms=xxx (اختياري)
  */
-export const getUnitsAPI = async (filters?: any) => {
+export const getUnitsAPI = async (filters?: any, page?: number) => {
   const queryParams = new URLSearchParams();
   if (filters?.project) queryParams.append('project', filters.project);
   if (filters?.bedrooms) queryParams.append('bedrooms', filters.bedrooms);
+  if (page) queryParams.append('page', String(page));
+  if (filters?.page_size) queryParams.append('page_size', String(filters.page_size));
   const queryString = queryParams.toString();
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(`/units/${queryString ? `?${queryString}` : ''}`);
+  const endpoint = `/units/${queryString ? `?${queryString}` : ''}`;
+  return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };
 
 /**
@@ -1726,7 +1846,7 @@ export const deleteUnitAPI = async (unitId: number) => {
  * GET /api/owners/
  */
 export const getOwnersAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/owners/');
+  return fetchAllPaginatedPages<any>('/owners/');
 };
 
 /**
@@ -1768,7 +1888,7 @@ export const deleteOwnerAPI = async (ownerId: number) => {
  * GET /api/services/
  */
 export const getServicesAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/services/');
+  return fetchAllPaginatedPages<any>('/services/');
 };
 
 /**
@@ -1808,7 +1928,7 @@ export const deleteServiceAPI = async (serviceId: number) => {
  * GET /api/service-packages/
  */
 export const getServicePackagesAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/service-packages/');
+  return fetchAllPaginatedPages<any>('/service-packages/');
 };
 
 /**
@@ -1848,7 +1968,7 @@ export const deleteServicePackageAPI = async (packageId: number) => {
  * GET /api/service-providers/
  */
 export const getServiceProvidersAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/service-providers/');
+  return fetchAllPaginatedPages<any>('/service-providers/');
 };
 
 /**
@@ -1890,7 +2010,7 @@ export const deleteServiceProviderAPI = async (providerId: number) => {
  * GET /api/products/
  */
 export const getProductsAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/products/');
+  return fetchAllPaginatedPages<any>('/products/');
 };
 
 /**
@@ -1930,7 +2050,7 @@ export const deleteProductAPI = async (productId: number) => {
  * GET /api/product-categories/
  */
 export const getProductCategoriesAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/product-categories/');
+  return fetchAllPaginatedPages<any>('/product-categories/');
 };
 
 /**
@@ -1970,7 +2090,7 @@ export const deleteProductCategoryAPI = async (categoryId: number) => {
  * GET /api/suppliers/
  */
 export const getSuppliersAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/suppliers/');
+  return fetchAllPaginatedPages<any>('/suppliers/');
 };
 
 /**
@@ -2012,7 +2132,7 @@ export const deleteSupplierAPI = async (supplierId: number) => {
  * GET /api/campaigns/
  */
 export const getCampaignsAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/campaigns/');
+  return fetchAllPaginatedPages<any>('/campaigns/');
 };
 
 /**
@@ -2050,7 +2170,7 @@ export const deleteCampaignAPI = async (campaignId: number) => {
  * GET /api/tasks/
  */
 export const getTasksAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/tasks/');
+  return fetchAllPaginatedPages<any>('/tasks/');
 };
 
 /**
@@ -2254,6 +2374,48 @@ export const sendWhatsAppMessageAPI = async (data: {
       text: data.message,
       ...(data.phone_number_id && { phone_number_id: data.phone_number_id }),
       ...(data.client_id != null && { client_id: data.client_id }),
+    }),
+  });
+};
+
+export type WhatsAppSessionWindowResponse = {
+  in_session: boolean;
+  last_inbound_at: string | null;
+  session_expires_at: string | null;
+  hours_remaining: number | null;
+};
+
+/**
+ * GET /api/integrations/whatsapp/session-window/?client_id=
+ * Open ~24h after the contact's last inbound WhatsApp message stored in the CRM.
+ */
+export const getWhatsAppSessionWindowAPI = async (
+  clientId: number
+): Promise<WhatsAppSessionWindowResponse> => {
+  return apiRequest<WhatsAppSessionWindowResponse>(
+    `/integrations/whatsapp/session-window/?client_id=${clientId}`
+  );
+};
+
+/**
+ * POST /api/integrations/whatsapp/send-template/
+ * Sends an approved Meta template (for contacts outside the customer service window).
+ */
+export const sendWhatsAppTemplateAPI = async (data: {
+  to: string;
+  template_id: number;
+  client_id?: number;
+  phone_number_id?: string;
+  body_parameters?: string[];
+}) => {
+  return apiRequest<any>('/integrations/whatsapp/send-template/', {
+    method: 'POST',
+    body: JSON.stringify({
+      to: data.to,
+      template_id: data.template_id,
+      ...(data.client_id != null && { client_id: data.client_id }),
+      ...(data.phone_number_id && { phone_number_id: data.phone_number_id }),
+      ...(data.body_parameters && { body_parameters: data.body_parameters }),
     }),
   });
 };
@@ -2577,7 +2739,7 @@ export const getActivitiesAPI = async (filters?: any) => {
   if (filters?.search) queryParams.append('search', filters.search);
   
   const queryString = queryParams.toString();
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(`/tasks/${queryString ? `?${queryString}` : ''}`);
+  return fetchAllPaginatedPages<any>(`/tasks/${queryString ? `?${queryString}` : ''}`);
 };
 
 /**
@@ -2599,7 +2761,7 @@ export const createActivityAPI = async (activityData: any) => {
  * GET /api/client-tasks/
  */
 export const getClientTasksAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/client-tasks/');
+  return fetchAllPaginatedPages<any>('/client-tasks/');
 };
 
 // ==================== Client Calls APIs ====================
@@ -2609,7 +2771,7 @@ export const getClientTasksAPI = async () => {
  * GET /api/client-calls/
  */
 export const getClientCallsAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/client-calls/');
+  return fetchAllPaginatedPages<any>('/client-calls/');
 };
 
 /**
@@ -2678,7 +2840,7 @@ export const deleteClientCallAPI = async (clientCallId: number) => {
  */
 export const getClientEventsAPI = async (clientId?: number) => {
   const url = clientId ? `/client-events/?client=${clientId}` : '/client-events/';
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(url);
+  return fetchAllPaginatedPages<any>(url);
 };
 
 /**
@@ -2750,7 +2912,7 @@ export const deleteClientTaskAPI = async (clientTaskId: number) => {
  * GET /api/tasks/
  */
 export const getTodosAPI = async () => {
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>('/tasks/');
+  return fetchAllPaginatedPages<any>('/tasks/');
 };
 
 export const createTodoAPI = async (todoData: any) => {

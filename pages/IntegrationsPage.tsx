@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
@@ -338,6 +338,12 @@ export const IntegrationsPage = () => {
         isWhatsAppOrMessagingCenter ? selectedChatLeadId : undefined
     );
 
+    const { data: waSession, refetch: refetchWaSession } = useQuery({
+        queryKey: ['whatsappSession', selectedChatLeadId],
+        queryFn: () => getWhatsAppSessionWindowAPI(selectedChatLeadId!),
+        enabled: isWhatsAppOrMessagingCenter && typeof selectedChatLeadId === 'number',
+    });
+
     const conversations = useMemo(() => {
         const fromApi = (conversationsList as any[]).map((c: any) => ({
             client: {
@@ -351,7 +357,13 @@ export const IntegrationsPage = () => {
         return [...fromApi, ...extra];
     }, [conversationsList, extraConversations]);
     const [messageInput, setMessageInput] = useState('');
+    const [chatTemplateSendId, setChatTemplateSendId] = useState<number | ''>('');
+    const [chatTemplateSending, setChatTemplateSending] = useState(false);
     const [infoAlert, setInfoAlert] = useState<{ title: string; message: string } | null>(null);
+
+    useEffect(() => {
+        setChatTemplateSendId('');
+    }, [selectedChatLeadId]);
 
     // Message campaign state (WhatsApp tab: campaigns)
     const [campaignLeadSearch, setCampaignLeadSearch] = useState('');
@@ -380,6 +392,16 @@ export const IntegrationsPage = () => {
         queryFn: getMessageTemplatesAPI,
         enabled: isWhatsAppOrMessagingCenter,
     });
+
+    const approvedWaTemplates = useMemo(
+        () =>
+            (templates as MessageTemplateType[]).filter((tpl) => {
+                const ch = (tpl.channel_type || '').toLowerCase();
+                if (ch !== 'whatsapp' && ch !== 'whatsapp_api') return false;
+                return (tpl.meta_status || '').toUpperCase() === 'APPROVED';
+            }),
+        [templates]
+    );
 
     const { data: campaignLeadsData, isLoading: campaignLeadsLoading } = useQuery({
         queryKey: ['campaignLeads', campaignLeadSearchApplied],
@@ -426,17 +448,13 @@ export const IntegrationsPage = () => {
     }, [dataKey]);
 
     const currentPolicy = platformParam ? integrationPolicyMap?.[platformParam] : undefined;
+    /** Admin/plan policy: only show a banner when the integration is turned off (no redundant "all good" green bar). */
     function renderPolicyBanner() {
-        if (!currentPolicy) return null;
-        const isEnabled = currentPolicy.enabled !== false;
+        if (!currentPolicy || currentPolicy.enabled !== false) return null;
         return (
-            <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
-                isEnabled
-                    ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
-                    : 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200'
-            }`}>
-                <div className="font-semibold">{isEnabled ? (t('integrationStatusEnabled') || 'Integration is active') : (t('integrationStatusDisabled') || 'Integration is disabled')}</div>
-                {!isEnabled && <div className="mt-1">{currentPolicy.message || (t('integrationDisabledDefaultMessage') || 'This integration is currently disabled by your administrator.')}</div>}
+            <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                <div className="font-semibold">{t('integrationStatusDisabled') || 'Integration is disabled'}</div>
+                <div className="mt-1">{currentPolicy.message || (t('integrationDisabledDefaultMessage') || 'This integration is currently disabled by your administrator.')}</div>
             </div>
         );
     }
@@ -652,6 +670,10 @@ export const IntegrationsPage = () => {
     };
 
     const handleAddNew = () => {
+        if (accounts.length > 0) {
+            showAlert(t('oneIntegrationAccountPerPlatformHint'), 'info');
+            return;
+        }
         setEditingAccount(null);
         setIsManageIntegrationAccountModalOpen(true);
     };
@@ -735,11 +757,24 @@ export const IntegrationsPage = () => {
 
         const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '';
 
+        const blockFreeTextWhatsApp =
+            typeof selectedChatClient?.id === 'number' &&
+            waSession != null &&
+            !waSession.in_session;
+
         const handleSendMessage = async () => {
             if (!selectedChatClient || !messageInput.trim()) return;
             const to = getClientPhone(selectedChatClient);
             if (!to) {
                 showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
+                return;
+            }
+            if (blockFreeTextWhatsApp) {
+                showAlert(
+                    t('whatsappOutsideSessionUseTemplate') ||
+                        'This contact is outside the 24-hour messaging window. Send an approved WhatsApp template instead.',
+                    'warning'
+                );
                 return;
             }
             const body = messageInput.trim();
@@ -758,6 +793,37 @@ export const IntegrationsPage = () => {
                 setOptimisticMessages((prev) => prev.slice(0, -1));
                 setMessageInput(body);
                 showAlert(e?.message || t('failedToSendSms'), 'error');
+            }
+        };
+
+        const handleSendMetaTemplate = async () => {
+            if (!selectedChatClient || chatTemplateSendId === '') {
+                showAlert(t('selectApprovedTemplate') || 'Select an approved template', 'warning');
+                return;
+            }
+            const to = getClientPhone(selectedChatClient);
+            if (!to) {
+                showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
+                return;
+            }
+            setChatTemplateSending(true);
+            try {
+                await sendWhatsAppTemplateAPI({
+                    to,
+                    template_id: chatTemplateSendId as number,
+                    ...(typeof selectedChatClient.id === 'number' ? { client_id: selectedChatClient.id } : {}),
+                });
+                showAlert(t('whatsappTemplateSent') || 'Template message sent', 'info');
+                refetchLeadWhatsApp();
+                refetchWaSession();
+            } catch (e: any) {
+                const errKey = e?.data?.error_key;
+                showAlert(
+                    (errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')),
+                    'error'
+                );
+            } finally {
+                setChatTemplateSending(false);
             }
         };
 
@@ -949,7 +1015,7 @@ export const IntegrationsPage = () => {
                 }
                 actions={
                     !isEmployee && (
-                        <Button onClick={() => { setEditingAccount(null); setIsManageIntegrationAccountModalOpen(true); }}>
+                        <Button onClick={handleAddNew}>
                             <PlusIcon className="w-4 h-4 me-2" /> {t('addNewAccount')}
                         </Button>
                     )
@@ -1052,6 +1118,51 @@ export const IntegrationsPage = () => {
                                             ))}
                                         </div>
                                         <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+                                            {typeof selectedChatClient.id === 'number' && waSession && !waSession.in_session && (
+                                                <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5 mb-2">
+                                                    {t('whatsappSessionClosedHint') ||
+                                                        'No reply in the last 24 hours. Use an approved template below to message this contact.'}
+                                                </p>
+                                            )}
+                                            {typeof selectedChatClient.id === 'number' && waSession?.in_session && waSession.hours_remaining != null && (
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                                    {(t('whatsappSessionOpenHint') || 'Free-form messages allowed (~{h}h left in session)').replace(
+                                                        '{h}',
+                                                        String(Math.max(0, Math.round(waSession.hours_remaining)))
+                                                    )}
+                                                </p>
+                                            )}
+                                            {approvedWaTemplates.length > 0 && (
+                                                <div className="flex flex-wrap items-end gap-2 mb-2">
+                                                    <div className="flex-1 min-w-[10rem]">
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                                            {t('sendMetaTemplate') || 'Send Meta template'}
+                                                        </span>
+                                                        <select
+                                                            value={chatTemplateSendId === '' ? '' : String(chatTemplateSendId)}
+                                                            onChange={(e) =>
+                                                                setChatTemplateSendId(e.target.value ? Number(e.target.value) : '')
+                                                            }
+                                                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
+                                                        >
+                                                            <option value="">{t('selectApprovedTemplate') || 'Select approved template…'}</option>
+                                                            {approvedWaTemplates.map((tpl) => (
+                                                                <option key={tpl.id} value={tpl.id}>
+                                                                    {tpl.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </div>
+                                                    <Button
+                                                        variant="secondary"
+                                                        onClick={handleSendMetaTemplate}
+                                                        disabled={chatTemplateSending || chatTemplateSendId === ''}
+                                                        className="shrink-0"
+                                                    >
+                                                        {chatTemplateSending ? <Loader variant="primary" className="h-4 w-4" /> : (t('sendTemplateMessage') || 'Send template')}
+                                                    </Button>
+                                                </div>
+                                            )}
                                             {templates.length > 0 && (
                                                 <div className="flex flex-wrap gap-2 mb-2">
                                                     <span className="text-xs text-gray-500 dark:text-gray-400 w-full">{t('quickTemplates')}</span>
@@ -1072,11 +1183,14 @@ export const IntegrationsPage = () => {
                                                     type="text"
                                                     value={messageInput}
                                                     onChange={(e) => setMessageInput(e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                                                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && !blockFreeTextWhatsApp && handleSendMessage()}
                                                     placeholder={t('typeMessageWhatsApp')}
-                                                    className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                                                    disabled={blockFreeTextWhatsApp}
+                                                    className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-60"
                                                 />
-                                                <Button onClick={handleSendMessage}>{t('sendSms')}</Button>
+                                                <Button onClick={handleSendMessage} disabled={blockFreeTextWhatsApp}>
+                                                    {t('sendSms')}
+                                                </Button>
                                             </div>
                                         </div>
                                     </>

@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Loader } from '../Loader';
-import { sendWhatsAppMessageAPI, getMessageTemplatesAPI } from '../../services/api';
+import { sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, getMessageTemplatesAPI } from '../../services/api';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -60,21 +60,34 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [templateSendId, setTemplateSendId] = useState<number | ''>('');
+    const [templateSending, setTemplateSending] = useState(false);
 
     const { data: templates = [] } = useQuery({
         queryKey: ['messageTemplates'],
         queryFn: getMessageTemplatesAPI,
         enabled: isOpen,
     });
+    const { data: waSession } = useQuery({
+        queryKey: ['whatsappSession', leadId],
+        queryFn: () => getWhatsAppSessionWindowAPI(leadId),
+        enabled: isOpen && typeof leadId === 'number',
+    });
     // API returns channel_type 'whatsapp_api' (not 'whatsapp')
     const whatsappTemplates = (templates as any[]).filter((tpl: any) => {
         const ch = (tpl.channel_type || '').toLowerCase();
         return ch === 'whatsapp' || ch === 'whatsapp_api';
     });
+    const approvedWaTemplates = whatsappTemplates.filter(
+        (tpl: any) => (tpl.meta_status || '').toUpperCase() === 'APPROVED'
+    );
+
+    const blockFreeText = waSession != null && !waSession.in_session;
 
     const handleClose = () => {
         setBody('');
         setError(null);
+        setTemplateSendId('');
         onClose();
     };
 
@@ -82,6 +95,13 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
     const waMeUrl = to ? `https://wa.me/${to}${body.trim() ? `?text=${encodeURIComponent(body.trim())}` : ''}` : '#';
 
     const handleSend = async () => {
+        if (blockFreeText) {
+            setError(
+                t('whatsappOutsideSessionUseTemplate') ||
+                    'Outside the 24-hour window: send an approved template below instead of free text.'
+            );
+            return;
+        }
         const trimmed = body.trim();
         if (!trimmed) {
             setError(t('smsMessageRequired') || 'Please enter your message');
@@ -109,6 +129,35 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
         }
     };
 
+    const handleSendTemplate = async () => {
+        if (templateSendId === '') {
+            setError(t('selectApprovedTemplate') || 'Select an approved template');
+            return;
+        }
+        if (!to) {
+            setError(t('sms_error_invalid_to_number') || 'No phone number');
+            return;
+        }
+        setError(null);
+        setTemplateSending(true);
+        try {
+            await sendWhatsAppTemplateAPI({
+                to,
+                template_id: templateSendId as number,
+                client_id: leadId,
+            });
+            setSuccessMessage(t('whatsappTemplateSent') || 'Template message sent');
+            setIsSuccessModalOpen(true);
+            onSent?.();
+            handleClose();
+        } catch (e: any) {
+            const errKey = e?.data?.error_key;
+            setError((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')));
+        } finally {
+            setTemplateSending(false);
+        }
+    };
+
     if (!isOpen) return null;
 
     return (
@@ -121,6 +170,48 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                 <p className="text-sm text-gray-600 dark:text-gray-400">
                     {t('whatsappMessage') || 'WhatsApp message'} → <strong>{phoneNumber}</strong>
                 </p>
+                {blockFreeText && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">
+                        {t('whatsappSessionClosedHint') ||
+                            'This contact has not messaged you recently. Use an approved Meta template to reach them.'}
+                    </p>
+                )}
+                {waSession?.in_session && waSession.hours_remaining != null && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                        {(t('whatsappSessionOpenHint') || 'Free-form allowed (~{h}h left in session)').replace(
+                            '{h}',
+                            String(Math.max(0, Math.round(waSession.hours_remaining)))
+                        )}
+                    </p>
+                )}
+                {approvedWaTemplates.length > 0 && (
+                    <div>
+                        <Label htmlFor="wa-meta-template">{t('sendMetaTemplate') || 'Send Meta template'}</Label>
+                        <div className="flex gap-2 mt-1">
+                            <select
+                                id="wa-meta-template"
+                                value={templateSendId === '' ? '' : String(templateSendId)}
+                                onChange={(e) => setTemplateSendId(e.target.value ? Number(e.target.value) : '')}
+                                className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-2 text-sm text-gray-900 dark:text-white"
+                            >
+                                <option value="">{t('selectApprovedTemplate') || 'Select approved template…'}</option>
+                                {approvedWaTemplates.map((tpl: any) => (
+                                    <option key={tpl.id} value={tpl.id}>
+                                        {tpl.name}
+                                    </option>
+                                ))}
+                            </select>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={handleSendTemplate}
+                                disabled={templateSending || templateSendId === ''}
+                            >
+                                {templateSending ? <Loader variant="foreground" className="h-5" /> : (t('sendTemplateMessage') || 'Send')}
+                            </Button>
+                        </div>
+                    </div>
+                )}
                 {whatsappTemplates.length > 0 && (
                     <div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1.5">{t('quickTemplates')}</span>
@@ -149,7 +240,8 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                         rows={4}
                         value={body}
                         onChange={(e) => setBody(e.target.value)}
-                        className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                        disabled={blockFreeText}
+                        className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm disabled:opacity-60"
                         placeholder={t('smsMessagePlaceholder')}
                     />
                 </div>
@@ -172,7 +264,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                     <Button variant="secondary" onClick={handleClose} disabled={sending}>{t('cancel')}</Button>
                     <Button
                         onClick={handleSend}
-                        disabled={sending}
+                        disabled={sending || blockFreeText}
                         className={sending ? 'min-w-[7rem]' : ''}
                         title={sending ? (t('sending') || 'Sending...') : undefined}
                     >

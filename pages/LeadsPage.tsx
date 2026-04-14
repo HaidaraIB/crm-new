@@ -11,6 +11,29 @@ import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClien
 import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+const getPageSizeFromResponse = (response: any): number => {
+    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
+    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
+    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
+    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
+    return DEFAULT_PAGE_SIZE;
+};
+
+const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const items: Array<number | 'ellipsis'> = [1];
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    if (start > 2) items.push('ellipsis');
+    for (let page = start; page <= end; page += 1) items.push(page);
+    if (end < total - 1) items.push('ellipsis');
+    items.push(total);
+    return items;
+};
+
 // Status Dropdown Component
 const StatusDropdown = ({ 
     leadId, 
@@ -223,6 +246,8 @@ export const LeadsPage = () => {
         setIsSuccessModalOpen,
         setSuccessMessage,
     } = useAppContext();
+    const [leadsPageNumber, setLeadsPageNumber] = useState(1);
+    const [leadsPageSize, setLeadsPageSize] = useState(20);
     
     // Determine API filters based on current page
     const apiFilters = useMemo(() => {
@@ -236,8 +261,23 @@ export const LeadsPage = () => {
     }, [currentPage, leadFilters]);
 
     // Fetch leads using React Query
-    const { data: leadsResponse, isLoading: leadsLoading, error: leadsError } = useLeads(apiFilters);
+    const { data: leadsResponse, isLoading: leadsLoading, error: leadsError } = useLeads(apiFilters, leadsPageNumber, undefined, leadsPageSize);
     const allLeads = leadsResponse?.results || [];
+    const totalLeadsCount = leadsResponse?.count || 0;
+    const hasNextPage = Boolean(leadsResponse?.next);
+    const hasPreviousPage = Boolean(leadsResponse?.previous);
+    const pageSize = getPageSizeFromResponse(leadsResponse);
+    const totalPages = Math.max(1, Math.ceil(totalLeadsCount / pageSize));
+    const paginationItems = getPaginationItems(leadsPageNumber, totalPages);
+
+    useEffect(() => {
+        // Reset to first page when lead filters / category change
+        setLeadsPageNumber(1);
+    }, [currentPage, apiFilters.type, apiFilters.priority, apiFilters.search]);
+
+    useEffect(() => {
+        setLeadsPageNumber(1);
+    }, [leadsPageSize]);
     // Normalize API fields to frontend naming for consistent rendering (phone_numbers -> phoneNumbers, etc.)
     const normalizedLeads = React.useMemo(() => {
         return (allLeads || []).map((l: any) => ({
@@ -1123,6 +1163,71 @@ export const LeadsPage = () => {
                                 </tbody>
                             </table>
                         </div>
+                    </div>
+                </div>
+                <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        {totalLeadsCount > 0
+                            ? `${t('showing') || 'Showing'} ${allLeads.length} ${t('of') || 'of'} ${totalLeadsCount}`
+                            : (t('noLeadsFound') || 'No leads found')}
+                    </p>
+                    <div className="flex items-center gap-2">
+                        <select
+                            value={leadsPageSize}
+                            onChange={(e) => setLeadsPageSize(Number(e.target.value))}
+                            className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                        >
+                            {PAGE_SIZE_OPTIONS.map((size) => (
+                                <option key={size} value={size}>
+                                    {size}/page
+                                </option>
+                            ))}
+                        </select>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setLeadsPageNumber(1)}
+                            disabled={leadsPageNumber === 1 || leadsLoading}
+                        >
+                            &laquo;
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setLeadsPageNumber((prev) => Math.max(1, prev - 1))}
+                            disabled={!hasPreviousPage || leadsLoading}
+                        >
+                            {t('previous') || 'Previous'}
+                        </Button>
+                        {paginationItems.map((item, idx) =>
+                            item === 'ellipsis' ? (
+                                <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
+                            ) : (
+                                <Button
+                                    key={item}
+                                    variant={item === leadsPageNumber ? 'primary' : 'secondary'}
+                                    onClick={() => setLeadsPageNumber(item)}
+                                    disabled={leadsLoading}
+                                >
+                                    {item}
+                                </Button>
+                            )
+                        )}
+                        <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 min-w-[90px] text-center">
+                            {(t('page') || 'Page')} {leadsPageNumber} / {totalPages}
+                        </span>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setLeadsPageNumber((prev) => prev + 1)}
+                            disabled={!hasNextPage || leadsLoading}
+                        >
+                            {t('next') || 'Next'}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setLeadsPageNumber(totalPages)}
+                            disabled={leadsPageNumber === totalPages || leadsLoading}
+                        >
+                            &raquo;
+                        </Button>
                     </div>
                 </div>
             </Card>

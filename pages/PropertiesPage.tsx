@@ -8,6 +8,29 @@ import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProj
 
 type Tab = 'units' | 'projects' | 'developers';
 
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+const getPageSizeFromResponse = (response: any): number => {
+    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
+    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
+    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
+    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
+    return DEFAULT_PAGE_SIZE;
+};
+
+const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const items: Array<number | 'ellipsis'> = [1];
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    if (start > 2) items.push('ellipsis');
+    for (let page = start; page <= end; page += 1) items.push(page);
+    if (end < total - 1) items.push('ellipsis');
+    items.push(total);
+    return items;
+};
+
 const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { developers: Developer[], onUpdate: (dev: Developer) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
@@ -220,14 +243,21 @@ export const PropertiesPage = () => {
         hasSupervisorPermission
     } = useAppContext();
 
+    const [developersPageNumber, setDevelopersPageNumber] = useState(1);
+    const [projectsPageNumber, setProjectsPageNumber] = useState(1);
+    const [unitsPageNumber, setUnitsPageNumber] = useState(1);
+    const [developersPageSize, setDevelopersPageSize] = useState(20);
+    const [projectsPageSize, setProjectsPageSize] = useState(20);
+    const [unitsPageSize, setUnitsPageSize] = useState(20);
+
     // Fetch data using React Query
-    const { data: developersResponse, isLoading: developersLoading } = useDevelopers();
+    const { data: developersResponse, isLoading: developersLoading } = useDevelopers(developersPageNumber, undefined, developersPageSize);
     const developersRaw = developersResponse?.results || [];
     
     // Transform developers (already in correct format)
     const developers = developersRaw;
 
-    const { data: projectsResponse, isLoading: projectsLoading } = useProjects();
+    const { data: projectsResponse, isLoading: projectsLoading } = useProjects(projectsPageNumber, undefined, projectsPageSize);
     const projectsRaw = projectsResponse?.results || [];
     
     // Transform projects: convert developer from object/ID to string name, and normalize paymentMethod
@@ -254,7 +284,7 @@ export const PropertiesPage = () => {
         });
     }, [projectsRaw, developers]);
 
-    const { data: unitsResponse, isLoading: unitsLoading } = useUnits(unitFilters);
+    const { data: unitsResponse, isLoading: unitsLoading } = useUnits(unitFilters, unitsPageNumber, undefined, unitsPageSize);
     const unitsRaw = unitsResponse?.results || [];
     
     // Transform units: convert project from object/ID to string name
@@ -292,6 +322,27 @@ export const PropertiesPage = () => {
     useEffect(() => {
         localStorage.setItem('propertiesActiveTab', activeTab);
     }, [activeTab]);
+
+    useEffect(() => {
+        setDevelopersPageNumber(1);
+    }, [developerFilters.search]);
+    useEffect(() => {
+        setDevelopersPageNumber(1);
+    }, [developersPageSize]);
+
+    useEffect(() => {
+        setProjectsPageNumber(1);
+    }, [projectFilters.developer, projectFilters.type, projectFilters.city, projectFilters.paymentMethod, projectFilters.search]);
+    useEffect(() => {
+        setProjectsPageNumber(1);
+    }, [projectsPageSize]);
+
+    useEffect(() => {
+        setUnitsPageNumber(1);
+    }, [unitFilters]);
+    useEffect(() => {
+        setUnitsPageNumber(1);
+    }, [unitsPageSize]);
 
     // Check if user's company specialization is real_estate
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
@@ -549,23 +600,195 @@ export const PropertiesPage = () => {
     }, [units, unitFilters]);
 
     const renderContent = () => {
+        const developersTotalPages = Math.max(1, Math.ceil((developersResponse?.count || 0) / getPageSizeFromResponse(developersResponse)));
+        const projectsTotalPages = Math.max(1, Math.ceil((projectsResponse?.count || 0) / getPageSizeFromResponse(projectsResponse)));
+        const unitsTotalPages = Math.max(1, Math.ceil((unitsResponse?.count || 0) / getPageSizeFromResponse(unitsResponse)));
+        const visibleDeveloperPages = getPaginationItems(developersPageNumber, developersTotalPages);
+        const visibleProjectPages = getPaginationItems(projectsPageNumber, projectsTotalPages);
+        const visibleUnitPages = getPaginationItems(unitsPageNumber, unitsTotalPages);
+
         switch (activeTab) {
             case 'units':
                 return (
                     <Card>
                         <UnitsTable units={filteredUnits} onUpdate={handleUpdateUnit} onDelete={handleDeleteUnit} isAdmin={isAdmin} />
+                        <div className="mt-4 flex items-center justify-end gap-2">
+                            <select
+                                value={unitsPageSize}
+                                onChange={(e) => setUnitsPageSize(Number(e.target.value))}
+                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                            >
+                                {PAGE_SIZE_OPTIONS.map((size) => (
+                                    <option key={size} value={size}>{size}/page</option>
+                                ))}
+                            </select>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUnitsPageNumber(1)}
+                                disabled={unitsPageNumber === 1}
+                            >
+                                &laquo;
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUnitsPageNumber((prev) => Math.max(1, prev - 1))}
+                                disabled={!unitsResponse?.previous}
+                            >
+                                {t('previous') || 'Previous'}
+                            </Button>
+                            {visibleUnitPages.map((item, idx) =>
+                                item === 'ellipsis' ? (
+                                    <span key={`ellipsis-unit-${idx}`} className="px-2 text-gray-500">...</span>
+                                ) : (
+                                    <Button
+                                        key={item}
+                                        variant={item === unitsPageNumber ? 'primary' : 'secondary'}
+                                        onClick={() => setUnitsPageNumber(item)}
+                                    >
+                                        {item}
+                                    </Button>
+                                )
+                            )}
+                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
+                                {(t('page') || 'Page')} {unitsPageNumber} / {unitsTotalPages}
+                            </span>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUnitsPageNumber((prev) => prev + 1)}
+                                disabled={!unitsResponse?.next}
+                            >
+                                {t('next') || 'Next'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUnitsPageNumber(unitsTotalPages)}
+                                disabled={unitsPageNumber === unitsTotalPages}
+                            >
+                                &raquo;
+                            </Button>
+                        </div>
                     </Card>
                 );
             case 'projects':
                 return (
                     <Card>
                         <ProjectsTable projects={filteredProjects} onUpdate={handleUpdateProject} onDelete={handleDeleteProject} isAdmin={isAdmin} />
+                        <div className="mt-4 flex items-center justify-end gap-2">
+                            <select
+                                value={projectsPageSize}
+                                onChange={(e) => setProjectsPageSize(Number(e.target.value))}
+                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                            >
+                                {PAGE_SIZE_OPTIONS.map((size) => (
+                                    <option key={size} value={size}>{size}/page</option>
+                                ))}
+                            </select>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setProjectsPageNumber(1)}
+                                disabled={projectsPageNumber === 1}
+                            >
+                                &laquo;
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setProjectsPageNumber((prev) => Math.max(1, prev - 1))}
+                                disabled={!projectsResponse?.previous}
+                            >
+                                {t('previous') || 'Previous'}
+                            </Button>
+                            {visibleProjectPages.map((item, idx) =>
+                                item === 'ellipsis' ? (
+                                    <span key={`ellipsis-project-${idx}`} className="px-2 text-gray-500">...</span>
+                                ) : (
+                                    <Button
+                                        key={item}
+                                        variant={item === projectsPageNumber ? 'primary' : 'secondary'}
+                                        onClick={() => setProjectsPageNumber(item)}
+                                    >
+                                        {item}
+                                    </Button>
+                                )
+                            )}
+                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
+                                {(t('page') || 'Page')} {projectsPageNumber} / {projectsTotalPages}
+                            </span>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setProjectsPageNumber((prev) => prev + 1)}
+                                disabled={!projectsResponse?.next}
+                            >
+                                {t('next') || 'Next'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setProjectsPageNumber(projectsTotalPages)}
+                                disabled={projectsPageNumber === projectsTotalPages}
+                            >
+                                &raquo;
+                            </Button>
+                        </div>
                     </Card>
                 );
             case 'developers':
                 return (
                     <Card>
                         <DevelopersTable developers={filteredDevelopers} onUpdate={handleUpdateDeveloper} onDelete={handleDeleteDeveloper} isAdmin={isAdmin} />
+                        <div className="mt-4 flex items-center justify-end gap-2">
+                            <select
+                                value={developersPageSize}
+                                onChange={(e) => setDevelopersPageSize(Number(e.target.value))}
+                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                            >
+                                {PAGE_SIZE_OPTIONS.map((size) => (
+                                    <option key={size} value={size}>{size}/page</option>
+                                ))}
+                            </select>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setDevelopersPageNumber(1)}
+                                disabled={developersPageNumber === 1}
+                            >
+                                &laquo;
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setDevelopersPageNumber((prev) => Math.max(1, prev - 1))}
+                                disabled={!developersResponse?.previous}
+                            >
+                                {t('previous') || 'Previous'}
+                            </Button>
+                            {visibleDeveloperPages.map((item, idx) =>
+                                item === 'ellipsis' ? (
+                                    <span key={`ellipsis-developer-${idx}`} className="px-2 text-gray-500">...</span>
+                                ) : (
+                                    <Button
+                                        key={item}
+                                        variant={item === developersPageNumber ? 'primary' : 'secondary'}
+                                        onClick={() => setDevelopersPageNumber(item)}
+                                    >
+                                        {item}
+                                    </Button>
+                                )
+                            )}
+                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
+                                {(t('page') || 'Page')} {developersPageNumber} / {developersTotalPages}
+                            </span>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setDevelopersPageNumber((prev) => prev + 1)}
+                                disabled={!developersResponse?.next}
+                            >
+                                {t('next') || 'Next'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setDevelopersPageNumber(developersTotalPages)}
+                                disabled={developersPageNumber === developersTotalPages}
+                            >
+                                &raquo;
+                            </Button>
+                        </div>
                     </Card>
                 );
             default:

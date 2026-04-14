@@ -8,6 +8,7 @@ import { isSameDay } from '../utils/dateUtils';
 import { useTasks, useUpdateTask, useDeleteTask, useStages, useDeals, useClientTasks, useClientCalls, useDeleteClientTask, useDeleteClientCall, useCallMethods } from '../hooks/useQueries';
 
 type FilterType = 'all' | TaskStage;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 // Map stage categories to icons
 const getStageIcon = (stage: TaskStage) => {
@@ -16,6 +17,18 @@ const getStageIcon = (stage: TaskStage) => {
     if (category === 'Call') return PhoneIcon;
     if (category === 'WhatsApp') return PhoneIcon;
     return ClockIcon; // Default for hold and others
+};
+
+const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const items: Array<number | 'ellipsis'> = [1];
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    if (start > 2) items.push('ellipsis');
+    for (let page = start; page <= end; page += 1) items.push(page);
+    if (end < total - 1) items.push('ellipsis');
+    items.push(total);
+    return items;
 };
 
 export const TodosPage = () => {
@@ -52,6 +65,8 @@ export const TodosPage = () => {
     
     const [weekDays, setWeekDays] = useState<Date[]>([]);
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
+    const [todosPageNumber, setTodosPageNumber] = useState(1);
+    const [todosPageSize, setTodosPageSize] = useState(20);
     
     // Save selected date to localStorage when it changes
     // Save 'all' string when selectedDate is null (All option)
@@ -454,6 +469,20 @@ export const TodosPage = () => {
             return isDateMatch && isStageMatch;
         });
     }, [currentTodos, selectedDate, activeFilter]);
+
+    const totalTodoPages = Math.max(1, Math.ceil(filteredTodos.length / todosPageSize));
+    const paginationItems = getPaginationItems(todosPageNumber, totalTodoPages);
+    const paginatedTodos = useMemo(() => {
+        const start = (todosPageNumber - 1) * todosPageSize;
+        return filteredTodos.slice(start, start + todosPageSize);
+    }, [filteredTodos, todosPageNumber, todosPageSize]);
+
+    useEffect(() => {
+        setTodosPageNumber(1);
+    }, [activeTab, selectedDate, activeFilter]);
+    useEffect(() => {
+        setTodosPageNumber(1);
+    }, [todosPageSize]);
     
     const todosByDay = useMemo(() => {
         const counts = new Map<string, number>();
@@ -613,14 +642,14 @@ export const TodosPage = () => {
                                         </tr>
                                     </thead>
                                             <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-gray-700">
-                                                {filteredTodos.length === 0 ? (
+                                                {paginatedTodos.length === 0 ? (
                                                     <tr>
                                                         <td colSpan={10} className="px-4 py-12 text-center">
                                                             <p className="text-gray-500 dark:text-gray-400">{t('noTasksFound') || 'No tasks found'}</p>
                                                         </td>
                                                     </tr>
                                                 ) : (
-                                                    filteredTodos.map(todo => {
+                                                    paginatedTodos.map(todo => {
                                             // Get task type
                                             const taskType = (todo as any).type || 'deal_task';
                                             const typeLabel = taskType === 'client_task' 
@@ -855,6 +884,65 @@ export const TodosPage = () => {
                                     </tbody>
                                         </table>
                                     </div>
+                                </div>
+                            </div>
+                            <div className="mt-4 px-3 pb-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                                    {(t('page') || 'Page')} {todosPageNumber} / {totalTodoPages}
+                                </p>
+                                <div className="flex items-center gap-2">
+                                    <select
+                                        value={todosPageSize}
+                                        onChange={(e) => setTodosPageSize(Number(e.target.value))}
+                                        className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                                    >
+                                        {PAGE_SIZE_OPTIONS.map((size) => (
+                                            <option key={size} value={size}>
+                                                {size}/page
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setTodosPageNumber(1)}
+                                        disabled={todosPageNumber === 1}
+                                    >
+                                        &laquo;
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setTodosPageNumber((prev) => Math.max(1, prev - 1))}
+                                        disabled={todosPageNumber === 1}
+                                    >
+                                        {t('previous') || 'Previous'}
+                                    </Button>
+                                    {paginationItems.map((item, idx) =>
+                                        item === 'ellipsis' ? (
+                                            <span key={`todos-ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
+                                        ) : (
+                                            <Button
+                                                key={item}
+                                                variant={item === todosPageNumber ? 'primary' : 'secondary'}
+                                                onClick={() => setTodosPageNumber(item)}
+                                            >
+                                                {item}
+                                            </Button>
+                                        )
+                                    )}
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setTodosPageNumber((prev) => Math.min(totalTodoPages, prev + 1))}
+                                        disabled={todosPageNumber === totalTodoPages}
+                                    >
+                                        {t('next') || 'Next'}
+                                    </Button>
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setTodosPageNumber(totalTodoPages)}
+                                        disabled={todosPageNumber === totalTodoPages}
+                                    >
+                                        &raquo;
+                                    </Button>
                                 </div>
                             </div>
                         </Card>

@@ -124,7 +124,15 @@ export const PaymentPage = () => {
                 window.location.href = `/payment/success?subscription_id=${subscriptionId}&status=success`;
                 return;
             }
-            
+            if (err.code === 'phone_verification_required') {
+                setError(
+                    t('phoneVerificationRequiredPayment') ||
+                        'Phone verification is required before payment. Complete WhatsApp verification from registration, then try again.',
+                );
+                setIsLoading(false);
+                return;
+            }
+
             setError(err.message || t('paymentInitError') || 'Failed to initialize payment');
             setIsLoading(false);
         }

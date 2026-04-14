@@ -1,9 +1,32 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon } from '../components/index';
 import { User } from '../types';
 import { useUsers } from '../hooks/useQueries';
+
+const DEFAULT_PAGE_SIZE = 20;
+const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+const getPageSizeFromResponse = (response: any): number => {
+    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
+    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
+    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
+    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
+    return DEFAULT_PAGE_SIZE;
+};
+
+const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const items: Array<number | 'ellipsis'> = [1];
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    if (start > 2) items.push('ellipsis');
+    for (let page = start; page <= end; page += 1) items.push(page);
+    if (end < total - 1) items.push('ellipsis');
+    items.push(total);
+    return items;
+};
 
 // Helper function to translate role - only Owner and Employee are valid
 const getRoleTranslation = (role: string, t: (key: string) => string): string => {
@@ -153,17 +176,29 @@ const UserCard = ({ user }: { user: User }) => {
 
 export const UsersPage = () => {
     const { t, currentUser, setIsAddUserModalOpen, hasSupervisorPermission } = useAppContext();
+    const [usersPageNumber, setUsersPageNumber] = useState(1);
+    const [usersPageSize, setUsersPageSize] = useState(20);
     
     // Fetch users using React Query
-    const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers();
+    const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers(usersPageNumber, undefined, usersPageSize);
     const allUsers = usersResponse?.results || [];
+    const hasNextPage = Boolean(usersResponse?.next);
+    const hasPreviousPage = Boolean(usersResponse?.previous);
+    const totalUsersCount = usersResponse?.count || 0;
+    const pageSize = getPageSizeFromResponse(usersResponse);
+    const totalPages = Math.max(1, Math.ceil(totalUsersCount / pageSize));
+    const paginationItems = getPaginationItems(usersPageNumber, totalPages);
+
+    useEffect(() => {
+        setUsersPageNumber(1);
+    }, [usersPageSize]);
     
     // Filter out Owner, Admin, and Supervisor - only show Employee users
     const filteredUsers = allUsers.filter(user => {
         const roleLower = (user.role || '').toLowerCase();
         return roleLower !== 'owner' && roleLower !== 'admin' && roleLower !== 'supervisor';
     });
-    const userCount = filteredUsers.length;
+    const userCount = totalUsersCount || filteredUsers.length;
     
     // Check if current user can manage users (Owner or Supervisor with permission)
     const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
@@ -245,14 +280,79 @@ export const UsersPage = () => {
                     </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {filteredUsers.map(user => (
-                        // FIX: Wrapped UserCard in a div with a key to resolve TypeScript error about key prop not being in UserCard's props.
-                        <div key={user.id}>
-                            <UserCard user={user} />
+                <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                        {filteredUsers.map(user => (
+                            // FIX: Wrapped UserCard in a div with a key to resolve TypeScript error about key prop not being in UserCard's props.
+                            <div key={user.id}>
+                                <UserCard user={user} />
+                            </div>
+                        ))}
+                    </div>
+                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
+                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                            {(t('page') || 'Page')} {usersPageNumber} / {totalPages}
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <select
+                                value={usersPageSize}
+                                onChange={(e) => {
+                                    setUsersPageSize(Number(e.target.value));
+                                    setUsersPageNumber(1);
+                                }}
+                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                            >
+                                {PAGE_SIZE_OPTIONS.map((size) => (
+                                    <option key={size} value={size}>
+                                        {size}/page
+                                    </option>
+                                ))}
+                            </select>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUsersPageNumber(1)}
+                                disabled={usersPageNumber === 1 || usersLoading}
+                            >
+                                &laquo;
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUsersPageNumber((prev) => Math.max(1, prev - 1))}
+                                disabled={!hasPreviousPage || usersLoading}
+                            >
+                                {t('previous') || 'Previous'}
+                            </Button>
+                            {paginationItems.map((item, idx) =>
+                                item === 'ellipsis' ? (
+                                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
+                                ) : (
+                                    <Button
+                                        key={item}
+                                        variant={item === usersPageNumber ? 'primary' : 'secondary'}
+                                        onClick={() => setUsersPageNumber(item)}
+                                        disabled={usersLoading}
+                                    >
+                                        {item}
+                                    </Button>
+                                )
+                            )}
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUsersPageNumber((prev) => prev + 1)}
+                                disabled={!hasNextPage || usersLoading}
+                            >
+                                {t('next') || 'Next'}
+                            </Button>
+                            <Button
+                                variant="secondary"
+                                onClick={() => setUsersPageNumber(totalPages)}
+                                disabled={usersPageNumber === totalPages || usersLoading}
+                            >
+                                &raquo;
+                            </Button>
                         </div>
-                    ))}
-                </div>
+                    </div>
+                </>
             )}
         </PageWrapper>
     );

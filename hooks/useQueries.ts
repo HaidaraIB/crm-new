@@ -43,17 +43,17 @@ import {
 // ==================== Query Keys ====================
 export const queryKeys = {
   currentUser: ['currentUser'] as const,
-  users: ['users'] as const,
-  leads: (filters?: { type?: string; priority?: string; search?: string }) => ['leads', filters] as const,
-  deals: ['deals'] as const,
+  users: (page?: number, pageSize?: number) => ['users', page ?? 'all', pageSize ?? 'default'] as const,
+  leads: (filters?: { type?: string; priority?: string; search?: string }, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
+  deals: (page?: number, pageSize?: number) => ['deals', page ?? 'all', pageSize ?? 'default'] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
   clientTasks: ['clientTasks'] as const,
   clientCalls: ['clientCalls'] as const,
   clientEvents: (clientId?: number) => ['clientEvents', clientId] as const,
-  developers: ['developers'] as const,
-  projects: ['projects'] as const,
-  units: (filters?: any) => ['units', filters] as const,
+  developers: (page?: number, pageSize?: number) => ['developers', page ?? 'all', pageSize ?? 'default'] as const,
+  projects: (page?: number, pageSize?: number) => ['projects', page ?? 'all', pageSize ?? 'default'] as const,
+  units: (filters?: any, page?: number, pageSize?: number) => ['units', filters, page ?? 'all', pageSize ?? 'default'] as const,
   owners: ['owners'] as const,
   services: ['services'] as const,
   servicePackages: ['servicePackages'] as const,
@@ -86,11 +86,17 @@ export const useCurrentUser = (options?: Omit<UseQueryOptions<any, Error>, 'quer
   });
 };
 
-export const useUsers = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+export const useUsers = (
+  pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  pageSize?: number
+) => {
+  const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
+  const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   return useQuery({
-    queryKey: queryKeys.users,
+    queryKey: queryKeys.users(page, pageSize),
     queryFn: async () => {
-      const response = await getUsersAPI();
+      const response = await getUsersAPI(page, pageSize);
       if (response && response.results) {
         return {
           ...response,
@@ -100,7 +106,7 @@ export const useUsers = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' 
       return response;
     },
     staleTime: 2 * 60 * 1000, // 2 minutes
-    ...options,
+    ...resolvedOptions,
   });
 };
 
@@ -115,12 +121,14 @@ function normalizeLead(lead: any): any {
 
 export const useLeads = (
   filters?: { type?: string; priority?: string; search?: string },
-  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>
+  page?: number,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  pageSize?: number
 ) => {
   return useQuery({
-    queryKey: queryKeys.leads(filters),
+    queryKey: queryKeys.leads(filters, page, pageSize),
     queryFn: async () => {
-      const data = await getLeadsAPI(filters);
+      const data = await getLeadsAPI(filters, page, pageSize);
       if (data?.results && Array.isArray(data.results)) {
         data.results = data.results.map(normalizeLead);
       }
@@ -131,12 +139,18 @@ export const useLeads = (
   });
 };
 
-export const useDeals = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+export const useDeals = (
+  pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  pageSize?: number
+) => {
+  const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
+  const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   return useQuery({
-    queryKey: queryKeys.deals,
-    queryFn: () => getDealsAPI(),
+    queryKey: queryKeys.deals(page, pageSize),
+    queryFn: () => getDealsAPI(page, pageSize),
     staleTime: 1 * 60 * 1000, // 1 minute
-    ...options,
+    ...resolvedOptions,
   });
 };
 
@@ -191,30 +205,42 @@ export const useClientEvents = (clientId?: number, options?: Omit<UseQueryOption
   });
 };
 
-export const useDevelopers = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+export const useDevelopers = (
+  pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  pageSize?: number
+) => {
+  const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
+  const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   const { currentUser } = useAppContext();
   const specialization = currentUser?.company?.specialization;
   const shouldEnable = specialization === 'real_estate';
-  const { enabled: optionsEnabled, ...restOptions } = options || {};
+  const { enabled: optionsEnabled, ...restOptions } = resolvedOptions || {};
   
   return useQuery({
-    queryKey: queryKeys.developers,
-    queryFn: () => getDevelopersAPI(),
+    queryKey: queryKeys.developers(page, pageSize),
+    queryFn: () => getDevelopersAPI(page, pageSize),
     staleTime: 2 * 60 * 1000, // 2 minutes
     enabled: shouldEnable && (optionsEnabled !== false),
     ...restOptions,
   });
 };
 
-export const useProjects = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+export const useProjects = (
+  pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  pageSize?: number
+) => {
+  const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
+  const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   const { currentUser } = useAppContext();
   const specialization = currentUser?.company?.specialization;
   const shouldEnable = specialization === 'real_estate';
-  const { enabled: optionsEnabled, ...restOptions } = options || {};
+  const { enabled: optionsEnabled, ...restOptions } = resolvedOptions || {};
   
   return useQuery({
-    queryKey: queryKeys.projects,
-    queryFn: () => getProjectsAPI(),
+    queryKey: queryKeys.projects(page, pageSize),
+    queryFn: () => getProjectsAPI(page, pageSize),
     staleTime: 2 * 60 * 1000, // 2 minutes
     enabled: shouldEnable && (optionsEnabled !== false),
     ...restOptions,
@@ -223,16 +249,20 @@ export const useProjects = (options?: Omit<UseQueryOptions<any, Error>, 'queryKe
 
 export const useUnits = (
   filters?: any,
-  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>
+  pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  pageSize?: number
 ) => {
+  const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
+  const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   const { currentUser } = useAppContext();
   const specialization = currentUser?.company?.specialization;
   const shouldEnable = specialization === 'real_estate';
-  const { enabled: optionsEnabled, ...restOptions } = options || {};
+  const { enabled: optionsEnabled, ...restOptions } = resolvedOptions || {};
   
   return useQuery({
-    queryKey: queryKeys.units(filters),
-    queryFn: () => getUnitsAPI(filters),
+    queryKey: queryKeys.units(filters, page, pageSize),
+    queryFn: () => getUnitsAPI({ ...(filters || {}), ...(pageSize ? { page_size: pageSize } : {}) }, page),
     staleTime: 1 * 60 * 1000, // 1 minute
     enabled: shouldEnable && (optionsEnabled !== false),
     ...restOptions,
@@ -536,7 +566,7 @@ export const useCreateUser = (options?: UseMutationOptions<any, Error, any>) => 
   return useMutation({
     mutationFn: (data: any) => createUserAPI(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.users });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     ...options,
   });
@@ -547,7 +577,7 @@ export const useUpdateUser = (options?: UseMutationOptions<any, Error, { id: num
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateUserAPI(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.users });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.currentUser });
     },
     ...options,
@@ -559,7 +589,7 @@ export const useDeleteUser = (options?: UseMutationOptions<void, Error, number>)
   return useMutation({
     mutationFn: (id: number) => deleteUserAPI(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.users });
+      queryClient.invalidateQueries({ queryKey: ['users'] });
     },
     ...options,
   });
@@ -570,7 +600,7 @@ export const useCreateDeal = (options?: UseMutationOptions<any, Error, any>) => 
   return useMutation({
     mutationFn: (data: any) => createDealAPI(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.deals });
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
     },
     ...options,
   });
@@ -581,7 +611,7 @@ export const useUpdateDeal = (options?: UseMutationOptions<any, Error, { id: num
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateDealAPI(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.deals });
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
     },
     ...options,
   });
@@ -592,7 +622,7 @@ export const useDeleteDeal = (options?: UseMutationOptions<void, Error, number>)
   return useMutation({
     mutationFn: (id: number) => deleteDealAPI(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.deals });
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
     },
     ...options,
   });
@@ -714,7 +744,7 @@ export const useCreateDeveloper = (options?: UseMutationOptions<any, Error, any>
   return useMutation({
     mutationFn: (data: any) => createDeveloperAPI(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.developers });
+      queryClient.invalidateQueries({ queryKey: ['developers'] });
     },
     ...options,
   });
@@ -725,7 +755,7 @@ export const useUpdateDeveloper = (options?: UseMutationOptions<any, Error, { id
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateDeveloperAPI(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.developers });
+      queryClient.invalidateQueries({ queryKey: ['developers'] });
     },
     ...options,
   });
@@ -736,7 +766,7 @@ export const useDeleteDeveloper = (options?: UseMutationOptions<void, Error, num
   return useMutation({
     mutationFn: (id: number) => deleteDeveloperAPI(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.developers });
+      queryClient.invalidateQueries({ queryKey: ['developers'] });
     },
     ...options,
   });
@@ -747,7 +777,7 @@ export const useCreateProject = (options?: UseMutationOptions<any, Error, any>) 
   return useMutation({
     mutationFn: (data: any) => createProjectAPI(data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
     ...options,
   });
@@ -758,7 +788,7 @@ export const useUpdateProject = (options?: UseMutationOptions<any, Error, { id: 
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateProjectAPI(id, data),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
     ...options,
   });
@@ -769,7 +799,7 @@ export const useDeleteProject = (options?: UseMutationOptions<void, Error, numbe
   return useMutation({
     mutationFn: (id: number) => deleteProjectAPI(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: queryKeys.projects });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
     },
     ...options,
   });

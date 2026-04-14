@@ -1,11 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Page } from '../../types';
-import { useCreateConnectedAccount, useUpdateConnectedAccount } from '../../hooks/useQueries';
+import { useCreateConnectedAccount, useUpdateConnectedAccount, useConnectedAccounts } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -27,9 +27,26 @@ const getPlatformName = (currentPage: Page): string => {
         case 'TikTok':
             return 'TikTok';
         case 'WhatsApp':
+        case 'Messaging Center':
             return 'WhatsApp';
         default:
             return '';
+    }
+};
+
+/** API `platform` query value for GET /integrations/accounts/ */
+const getIntegrationPlatformApiParam = (currentPage: Page): string | undefined => {
+    switch (currentPage) {
+        case 'Integrations':
+        case 'Meta':
+            return 'meta';
+        case 'WhatsApp':
+        case 'Messaging Center':
+            return 'whatsapp';
+        case 'TikTok':
+            return 'tiktok';
+        default:
+            return undefined;
     }
 };
 
@@ -65,6 +82,18 @@ export const ManageIntegrationAccountModal = () => {
     const isEditMode = !!editingAccount;
     const modalTitleKey = getIntegrationModalTitleKey(platformName, isEditMode);
 
+    const platformApi = getIntegrationPlatformApiParam(currentPage);
+    const { data: existingAccountsResponse, isFetching: existingAccountsFetching } = useConnectedAccounts(platformApi, {
+        enabled: Boolean(isManageIntegrationAccountModalOpen && !isEditMode && platformApi),
+    });
+    const existingAccountCount = useMemo(() => {
+        const raw = existingAccountsResponse as { results?: unknown[] } | unknown[] | undefined;
+        const list = Array.isArray(raw) ? raw : (raw?.results ?? []);
+        return Array.isArray(list) ? list.length : 0;
+    }, [existingAccountsResponse]);
+    const cannotAddSecond = !isEditMode && existingAccountCount > 0;
+    const blockAddWhileLoading = !isEditMode && !!platformApi && existingAccountsFetching;
+
     useEffect(() => {
         if (editingAccount) {
             setAccountName(editingAccount.name || '');
@@ -84,6 +113,9 @@ export const ManageIntegrationAccountModal = () => {
     };
 
     const handleSubmit = async () => {
+        if (cannotAddSecond || blockAddWhileLoading) {
+            return;
+        }
         if (!accountName.trim()) {
             alert(t('accountNameRequired'));
             return;
@@ -149,11 +181,11 @@ export const ManageIntegrationAccountModal = () => {
                     <>
                         <div>
                             <Label htmlFor="account-name">{t('accountName')}</Label>
-                            <Input id="account-name" placeholder={t('enterAccountName')} value={accountName} onChange={e => setAccountName(e.target.value)} />
+                            <Input id="account-name" placeholder={t('enterAccountName')} value={accountName} onChange={e => setAccountName(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
                         </div>
                         <div>
                             <Label htmlFor="account-link">{t('accountLink')}</Label>
-                            <Input id="account-link" placeholder={t('enterAccountLink')} value={accountLink} onChange={e => setAccountLink(e.target.value)} />
+                            <Input id="account-link" placeholder={t('enterAccountLink')} value={accountLink} onChange={e => setAccountLink(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
                         </div>
                     </>
                 );
@@ -162,11 +194,11 @@ export const ManageIntegrationAccountModal = () => {
                     <>
                         <div>
                             <Label htmlFor="account-name">{t('accountName')}</Label>
-                            <Input id="account-name" placeholder={t('egSalesWhatsapp')} value={accountName} onChange={e => setAccountName(e.target.value)} />
+                            <Input id="account-name" placeholder={t('egSalesWhatsapp')} value={accountName} onChange={e => setAccountName(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
                         </div>
                         <div>
                             <Label htmlFor="phone-number">{t('phoneNumber')}</Label>
-                            <Input id="phone-number" placeholder={t('enterWhatsappNumber')} value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} />
+                            <Input id="phone-number" placeholder={t('enterWhatsappNumber')} value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
                         </div>
                     </>
                 );
@@ -182,10 +214,15 @@ export const ManageIntegrationAccountModal = () => {
             title={t(modalTitleKey)}
         >
             <div className="space-y-4">
+                {cannotAddSecond && (
+                    <p className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
+                        {t('oneIntegrationAccountLimitModal')}
+                    </p>
+                )}
                 {renderPlatformFields()}
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={handleClose} disabled={isLoading}>{t('cancel')}</Button>
-                    <Button onClick={handleSubmit} disabled={isLoading} loading={isLoading}>{t('submit')}</Button>
+                    <Button onClick={handleSubmit} disabled={isLoading || cannotAddSecond || blockAddWhileLoading} loading={isLoading}>{t('submit')}</Button>
                 </div>
             </div>
         </Modal>

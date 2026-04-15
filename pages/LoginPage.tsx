@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks } from '../components/index';
 import { loginAPI, getCurrentUserAPI, requestTwoFactorAuthAPI } from '../services/api';
+import { getLoginHeroUrl } from '../utils/loginHero';
 
 export const LoginPage = () => {
     // Check if this is a logout redirect and clear any remaining data
@@ -202,20 +203,10 @@ export const LoginPage = () => {
                     {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                 </Button>
             </div>
-            <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary-700 to-primary-500 text-white p-12 flex-col justify-between">
-                <div>
-                    <img 
-                        src={getLogoForBackground(true)} 
-                        alt="LOOP CRM Logo" 
-                        className="h-20 w-auto object-contain mb-6" 
-                    />
-                    <p className="mt-4 text-primary-200">{t('crmWelcome')}</p>
-                </div>
-                <div>
-                    <h2 className="text-4xl font-bold">{t('hello')}</h2>
-                    <p className="mt-2 text-primary-200 max-w-md">{t('crmDescription')}</p>
-                </div>
-            </div>
+            <div
+                className="hidden lg:block w-1/2 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: `url('${getLoginHeroUrl(language)}')` }}
+            />
             <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8">
                 <div className="max-w-md w-full space-y-8">
                     <div className="flex flex-col items-center">

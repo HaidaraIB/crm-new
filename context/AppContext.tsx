@@ -583,14 +583,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (typeof window !== 'undefined') {
       localStorage.removeItem('primaryColor');
     }
-    return '#9333ea'; // Purple (fixed, not customizable)
+    return '#4215aa'; // Purple (fixed, not customizable)
   });
   const [activeSubPageColor, setActiveSubPageColorState] = useState(() => {
     // Remove any old color from localStorage to ensure consistency
     if (typeof window !== 'undefined') {
       localStorage.removeItem('activeSubPageColor');
     }
-    return '#9333ea'; // Purple (same as primary color, fixed, not customizable)
+    return '#4215aa'; // Purple (same as primary color, fixed, not customizable)
   });
   
   // Company subscription status for employees

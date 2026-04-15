@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { getLoginHeroUrl } from '../utils/loginHero';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { forgotPasswordAPI } from '../services/api';
 
@@ -57,22 +58,10 @@ export const ForgotPasswordPage = () => {
                     {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                 </Button>
             </div>
-            <div className="hidden lg:flex w-1/2 bg-gradient-to-br from-primary-700 to-primary-500 text-white p-12 flex-col justify-between">
-                <div>
-                    <img 
-                        src="/logo_white.png" 
-                        alt="LOOP CRM Logo" 
-                        className="h-20 w-auto object-contain mb-6" 
-                    />
-                    <p className="mt-4 text-primary-200">{t('crmWelcome') || 'Welcome to LOOP CRM'}</p>
-                </div>
-                <div>
-                    <h2 className="text-4xl font-bold">{t('forgotPassword') || 'Forgot Password?'}</h2>
-                    <p className="mt-2 text-primary-200 max-w-md">
-                        {t('forgotPasswordDescription') || 'No worries! Enter your email address and we\'ll send you a link to reset your password.'}
-                    </p>
-                </div>
-            </div>
+            <div
+                className="hidden lg:block w-1/2 bg-cover bg-center bg-no-repeat"
+                style={{ backgroundImage: `url('${getLoginHeroUrl(language)}')` }}
+            />
             <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8">
                 <div className="max-w-md w-full space-y-8">
                     <div className="flex flex-col items-center">

@@ -43,8 +43,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
                     transition: all 0.2s;
                 }
                 input[type="checkbox"].purple-checkbox:checked {
-                    background-color: #9333ea;
-                    border-color: #9333ea;
+                    background-color: hsl(var(--color-primary-600));
+                    border-color: hsl(var(--color-primary-600));
                 }
                 input[type="checkbox"].purple-checkbox:checked::after {
                     content: '';
@@ -58,7 +58,7 @@ export const Checkbox: React.FC<CheckboxProps> = ({
                     border-width: 0 2px 2px 0;
                 }
                 input[type="checkbox"].purple-checkbox:focus {
-                    outline: 2px solid #9333ea;
+                    outline: 2px solid hsl(var(--color-primary-500));
                     outline-offset: 2px;
                 }
                 input[type="checkbox"].purple-checkbox:disabled {
@@ -70,8 +70,8 @@ export const Checkbox: React.FC<CheckboxProps> = ({
                     border-color: #4b5563;
                 }
                 .dark input[type="checkbox"].purple-checkbox:checked {
-                    background-color: #9333ea;
-                    border-color: #9333ea;
+                    background-color: hsl(var(--color-primary-500));
+                    border-color: hsl(var(--color-primary-500));
                 }
             `;
             document.head.appendChild(style);

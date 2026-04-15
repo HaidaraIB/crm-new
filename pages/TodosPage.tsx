@@ -888,9 +888,9 @@ export const TodosPage = () => {
                             </div>
                             <div className="mt-4 px-3 pb-3 flex flex-col sm:flex-row items-center justify-between gap-3">
                                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                                    {(t('page') || 'Page')} {todosPageNumber} / {totalTodoPages}
+                                    {t('page')} {todosPageNumber} {t('of')} {totalTodoPages}
                                 </p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2" dir="ltr">
                                     <select
                                         value={todosPageSize}
                                         onChange={(e) => setTodosPageSize(Number(e.target.value))}
@@ -898,7 +898,7 @@ export const TodosPage = () => {
                                     >
                                         {PAGE_SIZE_OPTIONS.map((size) => (
                                             <option key={size} value={size}>
-                                                {size}/page
+                                                {`${size} ${t('perPage')}`}
                                             </option>
                                         ))}
                                     </select>
@@ -914,7 +914,7 @@ export const TodosPage = () => {
                                         onClick={() => setTodosPageNumber((prev) => Math.max(1, prev - 1))}
                                         disabled={todosPageNumber === 1}
                                     >
-                                        {t('previous') || 'Previous'}
+                                        {t('previous')}
                                     </Button>
                                     {paginationItems.map((item, idx) =>
                                         item === 'ellipsis' ? (
@@ -934,7 +934,7 @@ export const TodosPage = () => {
                                         onClick={() => setTodosPageNumber((prev) => Math.min(totalTodoPages, prev + 1))}
                                         disabled={todosPageNumber === totalTodoPages}
                                     >
-                                        {t('next') || 'Next'}
+                                        {t('next')}
                                     </Button>
                                     <Button
                                         variant="secondary"

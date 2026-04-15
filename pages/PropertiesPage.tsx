@@ -612,14 +612,14 @@ export const PropertiesPage = () => {
                 return (
                     <Card>
                         <UnitsTable units={filteredUnits} onUpdate={handleUpdateUnit} onDelete={handleDeleteUnit} isAdmin={isAdmin} />
-                        <div className="mt-4 flex items-center justify-end gap-2">
+                        <div className="mt-4 flex items-center justify-end gap-2" dir="ltr">
                             <select
                                 value={unitsPageSize}
                                 onChange={(e) => setUnitsPageSize(Number(e.target.value))}
                                 className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
                             >
                                 {PAGE_SIZE_OPTIONS.map((size) => (
-                                    <option key={size} value={size}>{size}/page</option>
+                                    <option key={size} value={size}>{`${size} ${t('perPage')}`}</option>
                                 ))}
                             </select>
                             <Button
@@ -634,7 +634,7 @@ export const PropertiesPage = () => {
                                 onClick={() => setUnitsPageNumber((prev) => Math.max(1, prev - 1))}
                                 disabled={!unitsResponse?.previous}
                             >
-                                {t('previous') || 'Previous'}
+                                {t('previous')}
                             </Button>
                             {visibleUnitPages.map((item, idx) =>
                                 item === 'ellipsis' ? (
@@ -650,14 +650,14 @@ export const PropertiesPage = () => {
                                 )
                             )}
                             <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
-                                {(t('page') || 'Page')} {unitsPageNumber} / {unitsTotalPages}
+                                {t('page')} {unitsPageNumber} {t('of')} {unitsTotalPages}
                             </span>
                             <Button
                                 variant="secondary"
                                 onClick={() => setUnitsPageNumber((prev) => prev + 1)}
                                 disabled={!unitsResponse?.next}
                             >
-                                {t('next') || 'Next'}
+                                {t('next')}
                             </Button>
                             <Button
                                 variant="secondary"
@@ -673,14 +673,14 @@ export const PropertiesPage = () => {
                 return (
                     <Card>
                         <ProjectsTable projects={filteredProjects} onUpdate={handleUpdateProject} onDelete={handleDeleteProject} isAdmin={isAdmin} />
-                        <div className="mt-4 flex items-center justify-end gap-2">
+                        <div className="mt-4 flex items-center justify-end gap-2" dir="ltr">
                             <select
                                 value={projectsPageSize}
                                 onChange={(e) => setProjectsPageSize(Number(e.target.value))}
                                 className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
                             >
                                 {PAGE_SIZE_OPTIONS.map((size) => (
-                                    <option key={size} value={size}>{size}/page</option>
+                                    <option key={size} value={size}>{`${size} ${t('perPage')}`}</option>
                                 ))}
                             </select>
                             <Button
@@ -695,7 +695,7 @@ export const PropertiesPage = () => {
                                 onClick={() => setProjectsPageNumber((prev) => Math.max(1, prev - 1))}
                                 disabled={!projectsResponse?.previous}
                             >
-                                {t('previous') || 'Previous'}
+                                {t('previous')}
                             </Button>
                             {visibleProjectPages.map((item, idx) =>
                                 item === 'ellipsis' ? (
@@ -711,14 +711,14 @@ export const PropertiesPage = () => {
                                 )
                             )}
                             <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
-                                {(t('page') || 'Page')} {projectsPageNumber} / {projectsTotalPages}
+                                {t('page')} {projectsPageNumber} {t('of')} {projectsTotalPages}
                             </span>
                             <Button
                                 variant="secondary"
                                 onClick={() => setProjectsPageNumber((prev) => prev + 1)}
                                 disabled={!projectsResponse?.next}
                             >
-                                {t('next') || 'Next'}
+                                {t('next')}
                             </Button>
                             <Button
                                 variant="secondary"
@@ -734,14 +734,14 @@ export const PropertiesPage = () => {
                 return (
                     <Card>
                         <DevelopersTable developers={filteredDevelopers} onUpdate={handleUpdateDeveloper} onDelete={handleDeleteDeveloper} isAdmin={isAdmin} />
-                        <div className="mt-4 flex items-center justify-end gap-2">
+                        <div className="mt-4 flex items-center justify-end gap-2" dir="ltr">
                             <select
                                 value={developersPageSize}
                                 onChange={(e) => setDevelopersPageSize(Number(e.target.value))}
                                 className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
                             >
                                 {PAGE_SIZE_OPTIONS.map((size) => (
-                                    <option key={size} value={size}>{size}/page</option>
+                                    <option key={size} value={size}>{`${size} ${t('perPage')}`}</option>
                                 ))}
                             </select>
                             <Button
@@ -756,7 +756,7 @@ export const PropertiesPage = () => {
                                 onClick={() => setDevelopersPageNumber((prev) => Math.max(1, prev - 1))}
                                 disabled={!developersResponse?.previous}
                             >
-                                {t('previous') || 'Previous'}
+                                {t('previous')}
                             </Button>
                             {visibleDeveloperPages.map((item, idx) =>
                                 item === 'ellipsis' ? (
@@ -772,14 +772,14 @@ export const PropertiesPage = () => {
                                 )
                             )}
                             <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
-                                {(t('page') || 'Page')} {developersPageNumber} / {developersTotalPages}
+                                {t('page')} {developersPageNumber} {t('of')} {developersTotalPages}
                             </span>
                             <Button
                                 variant="secondary"
                                 onClick={() => setDevelopersPageNumber((prev) => prev + 1)}
                                 disabled={!developersResponse?.next}
                             >
-                                {t('next') || 'Next'}
+                                {t('next')}
                             </Button>
                             <Button
                                 variant="secondary"

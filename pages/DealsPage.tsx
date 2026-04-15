@@ -531,9 +531,9 @@ export const DealsPage = () => {
                 <DealsTable deals={filteredDeals} onDelete={handleDelete} onEdit={handleEdit} onView={handleView} isRealEstate={isRealEstate} projects={projects} units={units} />
                 <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        {(t('page') || 'Page')} {dealsPageNumber} / {totalPages}
+                        {t('page')} {dealsPageNumber} {t('of')} {totalPages}
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" dir="ltr">
                         <select
                             value={dealsPageSize}
                             onChange={(e) => setDealsPageSize(Number(e.target.value))}
@@ -541,7 +541,7 @@ export const DealsPage = () => {
                         >
                             {PAGE_SIZE_OPTIONS.map((size) => (
                                 <option key={size} value={size}>
-                                    {size}/page
+                                    {`${size} ${t('perPage')}`}
                                 </option>
                             ))}
                         </select>
@@ -557,7 +557,7 @@ export const DealsPage = () => {
                             onClick={() => setDealsPageNumber((prev) => Math.max(1, prev - 1))}
                             disabled={!hasPreviousPage || dealsLoading}
                         >
-                            {t('previous') || 'Previous'}
+                            {t('previous')}
                         </Button>
                         {paginationItems.map((item, idx) =>
                             item === 'ellipsis' ? (
@@ -578,7 +578,7 @@ export const DealsPage = () => {
                             onClick={() => setDealsPageNumber((prev) => prev + 1)}
                             disabled={!hasNextPage || dealsLoading}
                         >
-                            {t('next') || 'Next'}
+                            {t('next')}
                         </Button>
                         <Button
                             variant="secondary"

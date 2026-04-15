@@ -1168,10 +1168,10 @@ export const LeadsPage = () => {
                 <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         {totalLeadsCount > 0
-                            ? `${t('showing') || 'Showing'} ${allLeads.length} ${t('of') || 'of'} ${totalLeadsCount}`
-                            : (t('noLeadsFound') || 'No leads found')}
+                            ? `${t('showing')} ${allLeads.length} ${t('of')} ${totalLeadsCount}`
+                            : t('noLeadsFound')}
                     </p>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2" dir="ltr">
                         <select
                             value={leadsPageSize}
                             onChange={(e) => setLeadsPageSize(Number(e.target.value))}
@@ -1179,7 +1179,7 @@ export const LeadsPage = () => {
                         >
                             {PAGE_SIZE_OPTIONS.map((size) => (
                                 <option key={size} value={size}>
-                                    {size}/page
+                                    {`${size} ${t('perPage')}`}
                                 </option>
                             ))}
                         </select>
@@ -1195,7 +1195,7 @@ export const LeadsPage = () => {
                             onClick={() => setLeadsPageNumber((prev) => Math.max(1, prev - 1))}
                             disabled={!hasPreviousPage || leadsLoading}
                         >
-                            {t('previous') || 'Previous'}
+                            {t('previous')}
                         </Button>
                         {paginationItems.map((item, idx) =>
                             item === 'ellipsis' ? (
@@ -1212,14 +1212,14 @@ export const LeadsPage = () => {
                             )
                         )}
                         <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 min-w-[90px] text-center">
-                            {(t('page') || 'Page')} {leadsPageNumber} / {totalPages}
+                            {t('page')} {leadsPageNumber} {t('of')} {totalPages}
                         </span>
                         <Button
                             variant="secondary"
                             onClick={() => setLeadsPageNumber((prev) => prev + 1)}
                             disabled={!hasNextPage || leadsLoading}
                         >
-                            {t('next') || 'Next'}
+                            {t('next')}
                         </Button>
                         <Button
                             variant="secondary"

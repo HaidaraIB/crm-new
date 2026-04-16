@@ -125,9 +125,13 @@ const StatusDropdown = ({
                 }}
             >
                 <span 
-                    className="flex-1 text-center font-medium"
+                    className="flex flex-1 items-center justify-center gap-2 font-medium"
                     style={{ color: textColor }}
                 >
+                    <span
+                        className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: statusColor }}
+                    />
                     {statusName}
                 </span>
                 <div 
@@ -173,7 +177,13 @@ const StatusDropdown = ({
                                         }`}
                                     >
                                         <span className="relative z-10 flex items-center justify-between">
-                                            <span className="flex-1">{status.name}</span>
+                                            <span className="flex flex-1 items-center gap-2">
+                                                <span
+                                                    className="h-2.5 w-2.5 rounded-full flex-shrink-0"
+                                                    style={{ backgroundColor: status.color || '#808080' }}
+                                                />
+                                                <span>{status.name}</span>
+                                            </span>
                                             {isSelected && (
                                                 <svg className="w-4 h-4 text-primary ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                                                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />

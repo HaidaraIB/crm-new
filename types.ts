@@ -160,6 +160,7 @@ export interface Lead {
   lastFeedback?: string; // From last ClientTask notes
   notes?: string; // From last ClientTask notes
   lastStage?: string; // From last ClientTask stage or status
+  lastFeedbackAt?: string; // Latest task/call timestamp from API
   leadCompanyName?: string; // Optional company name for the lead
 }
 

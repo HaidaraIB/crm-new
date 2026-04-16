@@ -449,15 +449,6 @@ export const ViewLeadPage = () => {
         return clientId === displayLead.id;
     }) : [];
 
-    // Get last feedback from the most recent ClientTask
-    const sortedClientTasks = [...leadClientTasks].sort((a, b) => {
-        const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
-        const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
-        return dateB - dateA;
-    });
-    const lastClientTask = sortedClientTasks.length > 0 ? sortedClientTasks[0] : null;
-    const lastFeedback = lastClientTask?.notes || '';
-    
     const timelineHistory = useMemo(() => {
         if (!displayLead) return [];
 
@@ -1060,7 +1051,7 @@ export const ViewLeadPage = () => {
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('lastFeedback')}</label>
                             <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                                {lastFeedback || displayLead.lastFeedback || (displayLead as any).last_feedback || '-'}
+                                {displayLead.lastFeedback || (displayLead as any).last_feedback || '-'}
                             </p>
                         </div>
                     </div>

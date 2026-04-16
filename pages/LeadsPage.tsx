@@ -7,7 +7,7 @@ import { TrashIcon, ChevronDownIcon, FacebookIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead } from '../types';
-import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useClientTasks, useAssignUnassignedClients } from '../hooks/useQueries';
+import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 
@@ -301,7 +301,7 @@ export const LeadsPage = () => {
         }));
     }, [allLeads]);
 
-    // Fetch users, statuses, and client tasks
+    // Fetch users and statuses
     const { data: usersResponse } = useUsers();
     const users = usersResponse?.results || [];
     
@@ -311,9 +311,6 @@ export const LeadsPage = () => {
         ? statusesData 
         : (statusesData?.results || []);
     
-    const { data: clientTasksResponse } = useClientTasks();
-    const clientTasks = clientTasksResponse?.results || [];
-
     // Delete lead mutation
     const deleteLeadMutation = useDeleteLead();
     
@@ -793,20 +790,6 @@ export const LeadsPage = () => {
                                                                  assignedUser?.username || 
                                                                  null;
                                         
-                                        // Get last feedback from the most recent ClientTask for this lead
-                                        const leadClientTasks = clientTasks
-                                            .filter((ct: any) => {
-                                                const clientId = ct.client || ct.clientId;
-                                                return clientId === lead.id;
-                                            })
-                                            .sort((a: any, b: any) => {
-                                                const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
-                                                const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
-                                                return dateB - dateA;
-                                            });
-                                        const lastClientTask = leadClientTasks.length > 0 ? leadClientTasks[0] : null;
-                                        const lastFeedback = lastClientTask?.notes || '';
-                                        
                                         return (
                                             <tr key={lead.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                                 <td className="p-2 sm:p-4 text-center"><input type="checkbox" checked={checkedLeadIds.has(lead.id)} onChange={(e) => handleCheckChange(lead.id, e.target.checked)} className="rounded" /></td>
@@ -1128,7 +1111,7 @@ export const LeadsPage = () => {
                                                     </div>
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
-                                                    {lastFeedback || lead.lastFeedback || (lead as any).last_feedback || '-'}
+                                                    {lead.lastFeedback || (lead as any).last_feedback || '-'}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
                                                     {(lead as any).created_at ? 

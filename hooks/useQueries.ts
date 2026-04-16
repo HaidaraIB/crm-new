@@ -116,6 +116,9 @@ function normalizeLead(lead: any): any {
   return {
     ...lead,
     leadCompanyName: lead.leadCompanyName ?? lead.lead_company_name ?? undefined,
+    lastFeedback: lead.lastFeedback ?? lead.last_feedback ?? undefined,
+    lastStage: lead.lastStage ?? lead.last_stage ?? undefined,
+    lastFeedbackAt: lead.lastFeedbackAt ?? lead.last_feedback_at ?? undefined,
   };
 }
 
@@ -670,6 +673,8 @@ export const useCreateClientTask = (options?: UseMutationOptions<any, Error, any
     mutationFn: (data: any) => createClientTaskAPI(data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
       // Also invalidate events for this lead if task creation triggers an event
       if (variables.client || variables.clientId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.client || variables.clientId) });
@@ -685,6 +690,8 @@ export const useUpdateClientTask = (options?: UseMutationOptions<any, Error, { i
     mutationFn: ({ id, data }: { id: number; data: any }) => updateClientTaskAPI(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
     ...options,
   });
@@ -696,6 +703,8 @@ export const useDeleteClientTask = (options?: UseMutationOptions<void, Error, nu
     mutationFn: (id: number) => deleteClientTaskAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
     ...options,
   });
@@ -707,6 +716,8 @@ export const useCreateClientCall = (options?: UseMutationOptions<any, Error, any
     mutationFn: (data: any) => createClientCallAPI(data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
       // Also invalidate events for this lead if call creation triggers an event
       if (variables.client || variables.clientId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.client || variables.clientId) });
@@ -722,6 +733,8 @@ export const useUpdateClientCall = (options?: UseMutationOptions<any, Error, { i
     mutationFn: ({ id, data }: { id: number; data: any }) => updateClientCallAPI(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
     ...options,
   });
@@ -733,6 +746,8 @@ export const useDeleteClientCall = (options?: UseMutationOptions<void, Error, nu
     mutationFn: (id: number) => deleteClientCallAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
     ...options,
   });

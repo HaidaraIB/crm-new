@@ -366,33 +366,32 @@ export const DashboardPage = () => {
         return filteredUsers;
     }, [users, clientTasks, currentUser]);
     
-    // Latest feedbacks (latest ClientTasks)
+    // Latest feedbacks from API-computed latest client activity
     const latestFeedbacks = useMemo(() => {
-        return clientTasks
+        return [...leads]
+            .filter((lead: any) => lead.last_feedback || lead.lastFeedback)
             .sort((a: any, b: any) => {
-                const dateA = new Date(a.created_at || a.createdAt || 0).getTime();
-                const dateB = new Date(b.created_at || b.createdAt || 0).getTime();
+                const dateA = new Date(a.last_feedback_at || a.lastFeedbackAt || a.created_at || a.createdAt || 0).getTime();
+                const dateB = new Date(b.last_feedback_at || b.lastFeedbackAt || b.created_at || b.createdAt || 0).getTime();
                 return dateB - dateA;
             })
             .slice(0, 5)
-            .map((ct: any) => {
-                const createdAt = ct.created_at || ct.createdAt || '';
-                const createdById = ct.created_by || ct.createdBy;
-                const user = users.find(u => u.id === createdById);
-                const clientId = ct.client || ct.clientId;
-                const lead = leads.find((l: any) => l.id === clientId);
-                
+            .map((lead: any) => {
+                const createdAt = lead.last_feedback_at || lead.lastFeedbackAt || lead.created_at || lead.createdAt || '';
+                const assignedToId = lead.assigned_to || lead.assignedTo;
+                const user = users.find(u => u.id === assignedToId);
+
                 return {
-                    id: ct.id,
+                    id: lead.id,
                     date: createdAt ? new Date(createdAt).toLocaleDateString() : '',
-                    user: user?.name || ct.created_by_username || t('unknown'),
-                    lead: ct.client_name || lead?.name || '',
-                    stage: ct.stage_name || ct.stage || '',
-                    notes: ct.notes || '',
+                    user: user?.name || lead.assigned_to_username || t('unknown'),
+                    lead: lead.name || '',
+                    stage: lead.last_stage || lead.lastStage || '',
+                    notes: lead.last_feedback || lead.lastFeedback || '',
                     leadObj: lead ?? null,
                 };
             });
-    }, [clientTasks, users, leads, t]);
+    }, [leads, users, t]);
     
     // Leads to contact today - detailed list
     const leadsToContactTodayList = useMemo(() => {

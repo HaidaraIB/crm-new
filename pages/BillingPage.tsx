@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanEntitlementsSummary } from '../components/index';
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
-import { entitlementLabel, formatDaysRemainingLabel, formatLimitValue, isFreeTrialPlan } from '../utils/planEntitlements';
+import { formatDaysRemainingLabel, isFreeTrialPlan } from '../utils/planEntitlements';
 
 type SubscriptionInfo = {
     id: number;
@@ -502,89 +502,21 @@ export const BillingPage = () => {
                                             </p>
                                         </div>
                                     )}
-                                    {subscriptionInfo.plan.users && (
-                                        <div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                                                {t('usersIncluded') || 'Users'}
-                                            </p>
-                                            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                                {localizePlanSlot(subscriptionInfo.plan.users)}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {subscriptionInfo.plan.clients && (
-                                        <div>
-                                            <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
-                                                {t('clientsIncluded') || 'Clients'}
-                                            </p>
-                                            <p className="text-lg font-semibold text-gray-900 dark:text-white">
-                                                {localizePlanSlot(subscriptionInfo.plan.clients)}
-                                            </p>
-                                        </div>
-                                    )}
                                     </div>
 
-                                    {/* Entitlements */}
-                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                        <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                                {t('planSectionFeatures')}
-                                            </p>
-                                            <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                                                {Object.entries(subscriptionInfo.plan.features || {})
-                                                    .filter(([, enabled]) => !!enabled)
-                                                    .map(([k]) => (
-                                                        <div key={k} className="flex items-start gap-2">
-                                                            <span className="mt-0.5">✓</span>
-                                                            <span>{entitlementLabel(k, planLang)}</span>
-                                                        </div>
-                                                    ))}
-                                                {Object.entries(subscriptionInfo.plan.features || {}).filter(([, enabled]) => !!enabled).length === 0 && (
-                                                    <p className="text-gray-500 dark:text-gray-400">
-                                                        {t('billingFeaturesEmpty')}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                                {t('planSectionExtraLimits')}
-                                            </p>
-                                            <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                                                {Object.entries(subscriptionInfo.plan.limits || {}).map(([k, v]) => (
-                                                    <div key={k} className="flex items-center justify-between gap-3">
-                                                        <span className="truncate">{entitlementLabel(k, planLang)}</span>
-                                                        <span className="font-semibold">{formatLimitValue(v, planLang)}</span>
-                                                    </div>
-                                                ))}
-                                                {Object.keys(subscriptionInfo.plan.limits || {}).length === 0 && (
-                                                    <p className="text-gray-500 dark:text-gray-400">
-                                                        {t('billingExtraLimitsEmpty')}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="bg-white/70 dark:bg-gray-900/30 rounded-lg p-3 border border-gray-200/60 dark:border-gray-700/60">
-                                            <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
-                                                {t('planSectionUsageLimits')}
-                                            </p>
-                                            <div className="space-y-1 text-sm text-gray-700 dark:text-gray-300">
-                                                {Object.entries(subscriptionInfo.plan.usage_limits_monthly || {}).map(([k, v]) => (
-                                                    <div key={k} className="flex items-center justify-between gap-3">
-                                                        <span className="truncate">{entitlementLabel(k, planLang)}</span>
-                                                        <span className="font-semibold">{formatLimitValue(v, planLang)}</span>
-                                                    </div>
-                                                ))}
-                                                {Object.keys(subscriptionInfo.plan.usage_limits_monthly || {}).length === 0 && (
-                                                    <p className="text-gray-500 dark:text-gray-400">
-                                                        {t('billingUsageLimitsEmpty')}
-                                                    </p>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <PlanEntitlementsSummary
+                                        users={subscriptionInfo.plan.users}
+                                        clients={subscriptionInfo.plan.clients}
+                                        extra_limits={subscriptionInfo.plan.limits}
+                                        features={subscriptionInfo.plan.features}
+                                        language={planLang}
+                                        labels={{
+                                            resourceLimitsTitle: t('planSectionResourceLimits') || 'Resource limits',
+                                            featuresTitle: t('planSectionFeatures') || 'Features',
+                                            none: t('planFeaturesNone') || 'None',
+                                        }}
+                                        className="mt-0 pt-0 border-t-0 text-sm"
+                                    />
                                 </div>
                             )}
 
@@ -835,12 +767,14 @@ export const BillingPage = () => {
                                                   )}
                                         </p>
                                         <PlanEntitlementsSummary
+                                            users={plan.users}
+                                            clients={plan.clients}
+                                            extra_limits={plan.limits}
                                             features={(plan.features || {}) as Record<string, boolean>}
-                                            usage_limits_monthly={plan.usage_limits_monthly as Record<string, number | 'unlimited' | null>}
                                             language={planLang}
                                             labels={{
+                                                resourceLimitsTitle: t('planSectionResourceLimits') || 'Resource limits',
                                                 featuresTitle: t('planSectionFeatures') || 'Features',
-                                                monthlyUsageTitle: t('planSectionMonthlyUsage') || 'Monthly usage',
                                                 none: t('planFeaturesNone') || 'None',
                                             }}
                                         />

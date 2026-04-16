@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { getLoginHeroUrl } from '../utils/loginHero';
+import { AuthHero } from '../components/AuthHero';
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
 import { resetPasswordAPI } from '../services/api';
 
@@ -108,10 +108,7 @@ export const ResetPasswordPage = () => {
                     {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                 </Button>
             </div>
-            <div
-                className="hidden lg:block w-1/2 bg-cover bg-center bg-no-repeat"
-                style={{ backgroundImage: `url('${getLoginHeroUrl(language)}')` }}
-            />
+            <AuthHero language={language} />
             <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8">
                 <div className="max-w-md w-full space-y-8">
                     <div className="flex flex-col items-center">

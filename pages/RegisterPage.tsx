@@ -1,13 +1,14 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { getLoginHeroUrl } from '../utils/loginHero';
+import { AuthHero } from '../components/AuthHero';
 import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PlanEntitlementsSummary } from '../components/index';
 import {
     registerCompanyAPI,
     getPublicPlansAPI,
     checkRegistrationAvailabilityAPI,
     verifyEmailAPI,
+    getPhoneOtpRequirementAPI,
     registerPhoneSendOtpAPI,
     registerPhoneVerifyOtpAPI,
 } from '../services/api';
@@ -83,13 +84,16 @@ export const RegisterPage = () => {
     };
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: WhatsApp OTP, 4: Plan
+    const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: OTP or Plan, 4: Plan when OTP required
+    const [phoneOtpRequired, setPhoneOtpRequired] = useState(true);
     const [phoneOtpCode, setPhoneOtpCode] = useState('');
     const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
     const [otpSending, setOtpSending] = useState(false);
     const [otpVerifying, setOtpVerifying] = useState(false);
     const isNextButtonLoading =
         (stepCheckLoading && (currentStep === 1 || currentStep === 2)) || otpSending;
+    const otpStep = 3;
+    const planStep = phoneOtpRequired ? 4 : 3;
 
     const normalizeErrorMessage = (value: any): string => {
         if (!value) return '';
@@ -423,6 +427,25 @@ export const RegisterPage = () => {
     }, []);
 
     useEffect(() => {
+        let isMounted = true;
+        const loadPhoneOtpRequirement = async () => {
+            try {
+                const data = await getPhoneOtpRequirementAPI();
+                if (!isMounted) return;
+                const required = !!data.phone_otp_required;
+                setPhoneOtpRequired(required);
+                if (!required) setCurrentStep((prev) => (prev === 4 ? 3 : prev));
+            } catch {
+                // Keep secure default (required) if the requirement endpoint is unavailable.
+            }
+        };
+        loadPhoneOtpRequirement();
+        return () => {
+            isMounted = false;
+        };
+    }, []);
+
+    useEffect(() => {
         if (!plansLoading && plans.length > 0) {
             setSelectedPlan((prev) => {
                 if (prev && plans.some(plan => plan.id === prev)) {
@@ -513,6 +536,12 @@ export const RegisterPage = () => {
                 phone: phone.trim(),
             });
             if (!ownerAvailable) return;
+            if (!phoneOtpRequired) {
+                setPhoneVerificationToken(null);
+                setPhoneOtpCode('');
+                setCurrentStep(planStep);
+                return;
+            }
             setOtpSending(true);
             setErrors((prev) => {
                 const next = { ...prev };
@@ -524,7 +553,7 @@ export const RegisterPage = () => {
                 await registerPhoneSendOtpAPI(phone.trim(), language);
                 setPhoneVerificationToken(null);
                 setPhoneOtpCode('');
-                setCurrentStep(3);
+                setCurrentStep(otpStep);
             } catch (e: any) {
                 setErrors((prev) => ({
                     ...prev,
@@ -533,7 +562,7 @@ export const RegisterPage = () => {
             } finally {
                 setOtpSending(false);
             }
-        } else if (currentStep === 3) {
+        } else if (currentStep === otpStep) {
             return;
         }
     };
@@ -598,13 +627,13 @@ export const RegisterPage = () => {
             setCurrentStep(2);
             return;
         }
-        if (!phoneVerificationToken) {
+        if (phoneOtpRequired && !phoneVerificationToken) {
             setErrors({
                 general:
                     t('phoneVerificationRequired') ||
                     'Verify your phone number via WhatsApp before completing registration.',
             });
-            setCurrentStep(3);
+            setCurrentStep(otpStep);
             return;
         }
 
@@ -635,7 +664,7 @@ export const RegisterPage = () => {
                     password: password,
                     phone: phone.trim(),
                 },
-                phone_verification_token: phoneVerificationToken,
+                ...(phoneVerificationToken ? { phone_verification_token: phoneVerificationToken } : {}),
                 plan_id: selectedPlan,
                 billing_cycle: billingCycle,
             }, language);
@@ -713,9 +742,9 @@ export const RegisterPage = () => {
                 ) {
                     setCurrentStep(2);
                 } else if (backendFieldErrors.phoneOtp) {
-                    setCurrentStep(3);
+                    setCurrentStep(otpStep);
                 } else if (backendFieldErrors.plan) {
-                    setCurrentStep(4);
+                    setCurrentStep(planStep);
                 }
             } else {
                 const errorMessage = error.message || t('registrationFailed') || 'Registration failed. Please try again.';
@@ -747,10 +776,7 @@ export const RegisterPage = () => {
                         {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                     </Button>
                 </div>
-                <div
-                    className="hidden lg:block w-1/2 bg-cover bg-center bg-no-repeat"
-                    style={{ backgroundImage: `url('${getLoginHeroUrl(language)}')` }}
-                />
+                <AuthHero language={language} />
                 <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8 overflow-y-auto">
                     <div className="max-w-md w-full space-y-8">
                         <div className="flex flex-col items-center">
@@ -769,21 +795,28 @@ export const RegisterPage = () => {
 
                         {/* Progress indicator */}
                         <div className="flex items-center justify-center space-x-1 sm:space-x-2">
-                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 1 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
-                                1
-                            </div>
-                            <div className={`flex-1 h-1 max-w-12 sm:max-w-none ${currentStep >= 2 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
-                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 2 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
-                                2
-                            </div>
-                            <div className={`flex-1 h-1 max-w-12 sm:max-w-none ${currentStep >= 3 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
-                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 3 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
-                                3
-                            </div>
-                            <div className={`flex-1 h-1 max-w-12 sm:max-w-none ${currentStep >= 4 ? 'bg-primary-600' : 'bg-gray-300 dark:bg-gray-700'}`}></div>
-                            <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${currentStep >= 4 ? 'bg-primary-600 text-inverse' : 'bg-gray-300 dark:bg-gray-700 text-tertiary'}`}>
-                                4
-                            </div>
+                            {[1, 2, ...(phoneOtpRequired ? [3, 4] : [3])].map((stepNumber, idx, all) => (
+                                <React.Fragment key={stepNumber}>
+                                    <div
+                                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${
+                                            currentStep >= stepNumber
+                                                ? 'bg-primary-600 text-inverse'
+                                                : 'bg-gray-300 dark:bg-gray-700 text-tertiary'
+                                        }`}
+                                    >
+                                        {stepNumber}
+                                    </div>
+                                    {idx < all.length - 1 && (
+                                        <div
+                                            className={`flex-1 h-1 max-w-12 sm:max-w-none ${
+                                                currentStep >= all[idx + 1]
+                                                    ? 'bg-primary-600'
+                                                    : 'bg-gray-300 dark:bg-gray-700'
+                                            }`}
+                                        ></div>
+                                    )}
+                                </React.Fragment>
+                            ))}
                         </div>
 
                         {errors.general && (
@@ -1091,7 +1124,7 @@ export const RegisterPage = () => {
                             )}
 
                             {/* Step 3: WhatsApp OTP */}
-                            {currentStep === 3 && (
+                            {phoneOtpRequired && currentStep === otpStep && (
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-primary">
                                         {t('verifyPhoneWhatsApp') || 'Verify your phone (WhatsApp)'}
@@ -1138,7 +1171,7 @@ export const RegisterPage = () => {
                             )}
 
                             {/* Step 4: Plan Selection */}
-                            {currentStep === 4 && (
+                            {currentStep === planStep && (
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-primary">
                                         {t('selectPlan') || 'Select a Plan'}
@@ -1255,22 +1288,15 @@ export const RegisterPage = () => {
                                                                 )}
                                                             </div>
                                                         </div>
-                                                        <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-secondary">
-                                                            <span>{t('usersIncluded') || 'Users'}: {plan.users}</span>
-                                                            <span>{t('clientsIncluded') || 'Clients'}: {plan.clients}</span>
-                                                            {plan.trial_days > 0 && (
-                                                                <span className="text-primary-600 dark:text-primary-400">
-                                                                    {`${plan.trial_days} ${t('trialDaysLabel') || 'trial days'}`}
-                                                                </span>
-                                                            )}
-                                                        </div>
                                                         <PlanEntitlementsSummary
+                                                            users={plan.users}
+                                                            clients={plan.clients}
+                                                            extra_limits={plan.limits}
                                                             features={plan.features}
-                                                            usage_limits_monthly={plan.usage_limits_monthly}
                                                             language={language === 'ar' ? 'ar' : 'en'}
                                                             labels={{
+                                                                resourceLimitsTitle: t('planSectionResourceLimits') || 'Resource limits',
                                                                 featuresTitle: t('planSectionFeatures') || 'Features',
-                                                                monthlyUsageTitle: t('planSectionMonthlyUsage') || 'Monthly usage',
                                                                 none: t('planFeaturesNone') || 'None',
                                                             }}
                                                         />
@@ -1301,7 +1327,7 @@ export const RegisterPage = () => {
                                     </Button>
                                 )}
                                 <div className="flex-1" />
-                                {currentStep < 3 && (
+                                {(currentStep === 1 || currentStep === 2) && (
                                     <Button
                                         onClick={handleNext}
                                         disabled={isLoading || stepCheckLoading || otpSending}
@@ -1310,7 +1336,7 @@ export const RegisterPage = () => {
                                         {t('next') || 'Next'}
                                     </Button>
                                 )}
-                                {currentStep === 3 && (
+                                {phoneOtpRequired && currentStep === otpStep && (
                                     <Button
                                         onClick={handleVerifyPhoneOtp}
                                         loading={otpVerifying}
@@ -1319,7 +1345,7 @@ export const RegisterPage = () => {
                                         {t('verifyAndContinue') || 'Verify and continue'}
                                     </Button>
                                 )}
-                                {currentStep === 4 && (
+                                {currentStep === planStep && (
                                     <Button onClick={handleRegister} loading={isLoading} disabled={isLoading}>
                                         {t('register') || 'Register'}
                                     </Button>

@@ -474,6 +474,20 @@ export const registerPhoneSendOtpAPI = async (phone: string, language: string = 
   return parseSuccessJsonResponse<{ expires_in_seconds: number; phone: string }>(response);
 };
 
+export const getPhoneOtpRequirementAPI = async (): Promise<{ phone_otp_required: boolean }> => {
+  const response = await fetch(`${BASE_URL}/auth/register/phone-otp-requirement/`, {
+    method: 'GET',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+    }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to load registration phone verification requirement');
+  }
+  return parseSuccessJsonResponse<{ phone_otp_required: boolean }>(response);
+};
+
 export const registerPhoneVerifyOtpAPI = async (
   phone: string,
   code: string,
@@ -510,7 +524,7 @@ export const registerCompanyAPI = async (data: {
     password: string;
     phone?: string;
   };
-  phone_verification_token: string;
+  phone_verification_token?: string;
   plan_id?: number | null;
   billing_cycle?: 'monthly' | 'yearly';
 }, language: string = 'en'): Promise<RegisterCompanyResponse> => {

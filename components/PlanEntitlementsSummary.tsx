@@ -3,38 +3,69 @@ import {
     entitlementLabel,
     formatLimitValue,
     getSortedEnabledFeatureKeys,
-    getSortedUsageEntries,
+    getSortedLimitEntries,
     type PlanLanguage,
 } from '../utils/planEntitlements';
 
 export type PlanEntitlementsLabels = {
+    resourceLimitsTitle: string;
     featuresTitle: string;
-    monthlyUsageTitle: string;
     none: string;
 };
 
 type Props = {
+    users?: number | string | null;
+    clients?: number | string | null;
+    extra_limits?: Record<string, number | 'unlimited' | null>;
     features?: Record<string, boolean>;
-    usage_limits_monthly?: Record<string, number | 'unlimited' | null>;
     language: PlanLanguage;
     labels: PlanEntitlementsLabels;
     className?: string;
 };
 
 export const PlanEntitlementsSummary: React.FC<Props> = ({
+    users,
+    clients,
+    extra_limits,
     features,
-    usage_limits_monthly,
     language,
     labels,
     className = '',
 }) => {
+    const normalizedLimits: Record<string, number | 'unlimited' | null> = {
+        ...(extra_limits || {}),
+    };
+    if (users !== undefined && users !== null && users !== '') {
+        normalizedLimits.max_employees = users === 'unlimited' ? 'unlimited' : Number(users);
+    }
+    if (clients !== undefined && clients !== null && clients !== '') {
+        normalizedLimits.max_clients = clients === 'unlimited' ? 'unlimited' : Number(clients);
+    }
+
+    const limitRows = getSortedLimitEntries(normalizedLimits).filter(([k]) => k !== 'max_users');
     const featureKeys = getSortedEnabledFeatureKeys(features);
-    const usageRows = getSortedUsageEntries(usage_limits_monthly);
 
     return (
         <div
             className={`mt-3 pt-3 border-t border-gray-200/60 dark:border-gray-700/60 space-y-3 text-xs ${className}`.trim()}
         >
+            <div>
+                <p className="font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{labels.resourceLimitsTitle}</p>
+                {limitRows.length === 0 ? (
+                    <p className="text-secondary">{labels.none}</p>
+                ) : (
+                    <ul className="space-y-1.5">
+                        {limitRows.map(([k, v]) => (
+                            <li key={k} className="flex justify-between gap-3 text-secondary">
+                                <span className="min-w-0">{entitlementLabel(k, language)}</span>
+                                <span className="shrink-0 font-medium text-gray-800 dark:text-gray-200 tabular-nums">
+                                    {formatLimitValue(v, language)}
+                                </span>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </div>
             <div>
                 <p className="font-semibold text-gray-700 dark:text-gray-300 mb-2">{labels.featuresTitle}</p>
                 {featureKeys.length === 0 ? (
@@ -61,22 +92,6 @@ export const PlanEntitlementsSummary: React.FC<Props> = ({
                     </div>
                 )}
             </div>
-
-            {usageRows.length > 0 && (
-                <div>
-                    <p className="font-semibold text-gray-700 dark:text-gray-300 mb-1.5">{labels.monthlyUsageTitle}</p>
-                    <ul className="space-y-1.5">
-                        {usageRows.map(([k, v]) => (
-                            <li key={k} className="flex justify-between gap-3 text-secondary">
-                                <span className="min-w-0">{entitlementLabel(k, language)}</span>
-                                <span className="shrink-0 font-medium text-gray-800 dark:text-gray-200 tabular-nums">
-                                    {formatLimitValue(v, language)}
-                                </span>
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-            )}
         </div>
     );
 };

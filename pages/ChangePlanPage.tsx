@@ -445,35 +445,15 @@ export const ChangePlanPage = () => {
                                     <div className="text-2xl font-bold text-primary mb-4">
                                         {getPlanPriceLabel(plan)}
                                     </div>
-                                    <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
-                                        <div className="flex items-center gap-2">
-                                            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            <span>{t('usersIncluded') || 'Users'}: {plan.users}</span>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                            </svg>
-                                            <span>{t('clientsIncluded') || 'Clients'}: {plan.clients}</span>
-                                        </div>
-                                        {plan.trial_days > 0 && (
-                                            <div className="flex items-center gap-2">
-                                                <svg className="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                </svg>
-                                                <span>{`${plan.trial_days} ${t('trialDaysLabel') || 'trial days'}`}</span>
-                                            </div>
-                                        )}
-                                    </div>
                                     <PlanEntitlementsSummary
+                                        users={plan.users}
+                                        clients={plan.clients}
+                                        extra_limits={plan.limits}
                                         features={plan.features}
-                                        usage_limits_monthly={plan.usage_limits_monthly}
                                         language={language === 'ar' ? 'ar' : 'en'}
                                         labels={{
+                                            resourceLimitsTitle: t('planSectionResourceLimits') || 'Resource limits',
                                             featuresTitle: t('planSectionFeatures') || 'Features',
-                                            monthlyUsageTitle: t('planSectionMonthlyUsage') || 'Monthly usage',
                                             none: t('planFeaturesNone') || 'None',
                                         }}
                                     />

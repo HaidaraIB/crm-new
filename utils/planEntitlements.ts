@@ -15,12 +15,12 @@ export function isFreeTrialPlan(plan: {
   return pm <= 0 && py <= 0 && Number(plan.trial_days ?? 0) > 0;
 }
 
-/** Boolean feature flags — display order */
+/** Boolean feature flags — display order, aligned with backend entitlements catalog. */
 const FEATURE_KEY_ORDER = [
-    'whatsapp_enabled',
-    'sms_enabled',
-    'backups_enabled',
-    'lead_import_enabled',
+    'integration_meta',
+    'integration_tiktok',
+    'integration_whatsapp',
+    'integration_twilio',
 ] as const;
 
 /** Monthly usage keys — display order */
@@ -30,18 +30,32 @@ const USAGE_KEY_ORDER = [
     'monthly_notifications',
 ] as const;
 
+/** Resource / quota keys — display order */
+const LIMIT_KEY_ORDER = [
+    'max_employees',
+    'max_users',
+    'max_clients',
+    'max_deals',
+    'max_tasks',
+    'max_integration_accounts',
+    'max_whatsapp_numbers',
+    'max_message_templates',
+] as const;
+
 const LABELS: Record<string, { ar: string; en: string }> = {
-    sms_enabled: { ar: 'SMS', en: 'SMS' },
-    whatsapp_enabled: { ar: 'واتساب', en: 'WhatsApp' },
-    backups_enabled: { ar: 'نسخ احتياطي', en: 'Backups' },
-    lead_import_enabled: { ar: 'استيراد', en: 'Import' },
+    integration_meta: { ar: 'ميتا', en: 'Meta' },
+    integration_tiktok: { ar: 'تيك توك', en: 'TikTok' },
+    integration_whatsapp: { ar: 'واتساب', en: 'WhatsApp' },
+    integration_twilio: { ar: 'تويليو', en: 'Twilio' },
     max_deals: { ar: 'الصفقات', en: 'Deals' },
     max_tasks: { ar: 'المهام', en: 'Tasks' },
     max_integration_accounts: { ar: 'التكاملات', en: 'Integrations' },
     max_whatsapp_numbers: { ar: 'أرقام واتساب', en: 'WhatsApp numbers' },
     max_message_templates: { ar: 'قوالب', en: 'Templates' },
+    max_employees: { ar: 'حد المستخدمين', en: 'Max users' },
     max_users: { ar: 'حد المستخدمين', en: 'Max users' },
     max_clients: { ar: 'حد العملاء', en: 'Max clients' },
+    trial_days: { ar: 'أيام التجربة', en: 'Trial days' },
     monthly_sms_messages: { ar: 'SMS شهرياً', en: 'Monthly SMS' },
     monthly_whatsapp_messages: { ar: 'واتساب شهرياً', en: 'Monthly WhatsApp' },
     monthly_notifications: { ar: 'إشعارات شهرياً', en: 'Monthly notifications' },
@@ -94,8 +108,9 @@ function sortKeysByOrder(keys: string[], order: readonly string[]): string[] {
 
 /** Enabled feature keys, stable order (catalog first, then any extra keys alphabetically). */
 export function getSortedEnabledFeatureKeys(features: Record<string, boolean> | undefined): string[] {
+    const allowedKeys = new Set<string>(FEATURE_KEY_ORDER);
     const enabled = Object.entries(features || {})
-        .filter(([, v]) => !!v)
+        .filter(([k, v]) => !!v && allowedKeys.has(k))
         .map(([k]) => k);
     return sortKeysByOrder(enabled, FEATURE_KEY_ORDER);
 }
@@ -108,4 +123,14 @@ export function getSortedUsageEntries(
     const sortedKeys = sortKeysByOrder(keys, USAGE_KEY_ORDER);
     const u = usage || {};
     return sortedKeys.map((k) => [k, u[k] as number | 'unlimited' | null]);
+}
+
+/** All resource / quota entries, stable order. */
+export function getSortedLimitEntries(
+    limits: Record<string, number | 'unlimited' | null> | undefined,
+): [string, number | 'unlimited' | null][] {
+    const keys = Object.keys(limits || {});
+    const sortedKeys = sortKeysByOrder(keys, LIMIT_KEY_ORDER);
+    const l = limits || {};
+    return sortedKeys.map((k) => [k, l[k] as number | 'unlimited' | null]);
 }

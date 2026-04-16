@@ -18,6 +18,9 @@ type FibPaymentData = {
     valid_until: string | null;
 };
 
+const FIB_INITIAL_STATUS_DELAY_MS = 15000;
+const FIB_POLL_INTERVAL_MS = 5000;
+
 export const PaymentPage = () => {
     const { t, language, theme } = useAppContext();
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
@@ -27,6 +30,7 @@ export const PaymentPage = () => {
     const [showGatewaySelection, setShowGatewaySelection] = useState(true);
     const [fibPaymentData, setFibPaymentData] = useState<FibPaymentData | null>(null);
     const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const pollStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         // Get subscription_id from URL
@@ -68,25 +72,60 @@ export const PaymentPage = () => {
         handleProceedToPayment();
     }, [subscriptionId, selectedGateway, showGatewaySelection]);
 
-    // Poll payment status when FIB payment is showing
+    // FIB best practice: wait ~15s for callback, then poll every 5s until paid or expired.
     useEffect(() => {
         if (!fibPaymentData || !subscriptionId) return;
+
+        const validUntilMs = fibPaymentData.valid_until ? new Date(fibPaymentData.valid_until).getTime() : null;
+
         const check = async () => {
             try {
+                if (validUntilMs && Date.now() > validUntilMs) {
+                    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                    if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
+                    pollStartTimeoutRef.current = null;
+                    setFibPaymentData(null);
+                    setError(
+                        language === 'ar'
+                            ? 'انتهت صلاحية طلب الدفع. الرجاء إنشاء طلب جديد.'
+                            : 'Payment request expired. Please create a new one.'
+                    );
+                    return;
+                }
+
                 const data: CheckPaymentStatusResponse = await checkPaymentStatusAPI(parseInt(subscriptionId));
                 if (data.subscription_active || data.payment_status === 'completed') {
                     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                     pollIntervalRef.current = null;
+                    if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
+                    pollStartTimeoutRef.current = null;
                     window.location.href = `/payment/success?subscription_id=${subscriptionId}&status=success`;
+                } else if (data.gateway_status === 'declined' || data.payment_status === 'failed') {
+                    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                    pollIntervalRef.current = null;
+                    if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
+                    pollStartTimeoutRef.current = null;
+                    setFibPaymentData(null);
+                    setError(
+                        language === 'ar'
+                            ? 'تم رفض عملية الدفع أو إلغاؤها.'
+                            : 'Payment was declined or cancelled.'
+                    );
                 }
             } catch (_) {}
         };
-        pollIntervalRef.current = setInterval(check, 4000);
-        check();
+
+        pollStartTimeoutRef.current = setTimeout(() => {
+            check();
+            pollIntervalRef.current = setInterval(check, FIB_POLL_INTERVAL_MS);
+        }, FIB_INITIAL_STATUS_DELAY_MS);
+
         return () => {
             if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+            if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
         };
-    }, [fibPaymentData, subscriptionId]);
+    }, [fibPaymentData, subscriptionId, language]);
 
     const handleProceedToPayment = async () => {
         if (!selectedGateway || !subscriptionId) {
@@ -237,8 +276,14 @@ export const PaymentPage = () => {
                         )}
                     </div>
                     <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-4">
-                        {language === 'ar' ? 'جاري انتظار إتمام الدفع...' : 'Waiting for payment...'}
+                        {language === 'ar' ? 'ننتظر تحديث الدفع من FIB، ثم سنبدأ التحقق تلقائيًا...' : 'Waiting for FIB callback, then automatic status checks will start...'}
                     </p>
+                    {fibPaymentData.valid_until && (
+                        <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-2">
+                            {language === 'ar' ? 'صالح حتى: ' : 'Valid until: '}
+                            {new Date(fibPaymentData.valid_until).toLocaleString()}
+                        </p>
+                    )}
                 </Card>
             </div>
         );

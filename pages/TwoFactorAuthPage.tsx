@@ -362,7 +362,7 @@ export const TwoFactorAuthPage = () => {
                     {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                 </Button>
             </div>
-            <AuthHero language={language} />
+            <AuthHero />
             <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8">
                 <div className="max-w-md w-full space-y-8">
                     <div className="flex flex-col items-center">

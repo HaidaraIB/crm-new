@@ -514,9 +514,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                 </div>
               ))}
               <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => addButton('phone')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary">{t('phoneButtonAdd')}</button>
-                <button type="button" onClick={() => addButton('url')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary">{t('urlButtonAdd')}</button>
-                <button type="button" onClick={() => addButton('reply')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary">{t('replyButtonAdd')}</button>
+                <button type="button" onClick={() => addButton('phone')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('phoneButtonAdd')}</button>
+                <button type="button" onClick={() => addButton('url')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('urlButtonAdd')}</button>
+                <button type="button" onClick={() => addButton('reply')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('replyButtonAdd')}</button>
               </div>
             </div>
           </div>

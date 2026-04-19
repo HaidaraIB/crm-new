@@ -183,7 +183,7 @@ export const TemplateManagementSettings = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => { navigator.clipboard.writeText(tpl.content); showAlert(t('copied'), 'info'); }}
-                                                        className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary rounded-lg border border-gray-200 dark:border-gray-600"
+                                                        className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary-700 dark:hover:text-primary-200 rounded-lg border border-gray-200 dark:border-gray-600"
                                                         title={t('copyTemplate')}
                                                     >
                                                         <FileTextIcon className="w-4 h-4" />
@@ -191,7 +191,7 @@ export const TemplateManagementSettings = () => {
                                                     <button
                                                         type="button"
                                                         onClick={() => { setEditingTemplate(tpl); setIsEditTemplateOpen(true); }}
-                                                        className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary rounded-lg border border-gray-200 dark:border-gray-600"
+                                                        className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary-700 dark:hover:text-primary-200 rounded-lg border border-gray-200 dark:border-gray-600"
                                                         title={t('edit')}
                                                     >
                                                         <EditIcon className="w-4 h-4" />

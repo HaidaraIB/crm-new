@@ -806,7 +806,7 @@ export const LeadsPage = () => {
                                                 <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
                                                     <button 
                                                         onClick={() => handleViewLead(lead)}
-                                                        className="hover:text-primary transition-colors focus:outline-none"
+                                                        className="hover:text-primary-700 dark:hover:text-primary-200 transition-colors focus:outline-none"
                                                     >
                                                         {lead.name}
                                                     </button>

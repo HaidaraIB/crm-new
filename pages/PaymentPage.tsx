@@ -134,6 +134,7 @@ export const PaymentPage = () => {
         }
 
         try {
+            setShowGatewaySelection(false);
             setIsLoading(true);
             setError(null);
             setFibPaymentData(null);
@@ -156,6 +157,7 @@ export const PaymentPage = () => {
             } else {
                 setError(t('paymentRedirectError') || 'Failed to get payment URL');
                 setIsLoading(false);
+                setShowGatewaySelection(true);
             }
         } catch (err: any) {
             // If error is about subscription already active, redirect to success
@@ -169,13 +171,74 @@ export const PaymentPage = () => {
                         'Phone verification is required before payment. Complete WhatsApp verification from registration, then try again.',
                 );
                 setIsLoading(false);
+                setShowGatewaySelection(true);
                 return;
             }
 
             setError(err.message || t('paymentInitError') || 'Failed to initialize payment');
             setIsLoading(false);
+            setShowGatewaySelection(true);
         }
     };
+
+    // FIB / in-progress payment UI must render above gateway selection; otherwise selection stays
+    // mounted while fibPaymentData is set and status polling runs in the background.
+    if (fibPaymentData && subscriptionId) {
+        // High contrast on dark cards (primary purple was hard to read on dark gray)
+        const linkClass =
+            'block mt-2 text-sm font-medium text-teal-700 underline underline-offset-2 decoration-teal-600/70 hover:text-teal-900 hover:decoration-teal-800 dark:text-teal-300 dark:decoration-teal-400/80 dark:hover:text-teal-200 dark:hover:decoration-teal-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-teal-400 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-gray-900 rounded-sm';
+        return (
+            <div className={`min-h-screen flex items-center justify-center p-4 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
+                <Card className="max-w-lg w-full">
+                    <div className="flex items-center gap-3 mb-2 border-b pb-2 dark:border-gray-700">
+                        <img src="/fib_logo.png" alt="FIB" className="h-10 w-auto object-contain" />
+                        <h2 className="text-xl font-semibold">
+                            {language === 'ar' ? 'الدفع عبر FIB (البنك العراقي الأول)' : 'Pay with FIB (First Iraqi Bank)'}
+                        </h2>
+                    </div>
+                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
+                        {language === 'ar' ? 'امسح رمز QR بتطبيق FIB أو استخدم الرابط أدناه للدفع.' : 'Scan the QR code with the FIB app or use the link below to pay.'}
+                    </p>
+                    {fibPaymentData.qr_code && (
+                        <div className="flex justify-center mb-4">
+                            <img src={fibPaymentData.qr_code} alt="FIB QR Code" className="w-48 h-48 object-contain border border-gray-200 dark:border-gray-600 rounded-lg" />
+                        </div>
+                    )}
+                    {fibPaymentData.readable_code && (
+                        <p className="text-center text-gray-700 dark:text-gray-300 font-mono mb-4">
+                            {language === 'ar' ? 'الكود: ' : 'Code: '}{fibPaymentData.readable_code}
+                        </p>
+                    )}
+                    <div className="space-y-2 text-sm">
+                        {fibPaymentData.personal_app_link && (
+                            <a href={fibPaymentData.personal_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                                {language === 'ar' ? 'فتح تطبيق FIB الشخصي' : 'Open FIB Personal App'}
+                            </a>
+                        )}
+                        {fibPaymentData.business_app_link && (
+                            <a href={fibPaymentData.business_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                                {language === 'ar' ? 'فتح تطبيق FIB للأعمال' : 'Open FIB Business App'}
+                            </a>
+                        )}
+                        {fibPaymentData.corporate_app_link && (
+                            <a href={fibPaymentData.corporate_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
+                                {language === 'ar' ? 'فتح تطبيق FIB للشركات' : 'Open FIB Corporate App'}
+                            </a>
+                        )}
+                    </div>
+                    <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-4">
+                        {language === 'ar' ? 'ننتظر تحديث الدفع من FIB، ثم سنبدأ التحقق تلقائيًا...' : 'Waiting for FIB callback, then automatic status checks will start...'}
+                    </p>
+                    {fibPaymentData.valid_until && (
+                        <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-2">
+                            {language === 'ar' ? 'صالح حتى: ' : 'Valid until: '}
+                            {new Date(fibPaymentData.valid_until).toLocaleString()}
+                        </p>
+                    )}
+                </Card>
+            </div>
+        );
+    }
 
     if (showGatewaySelection && subscriptionId) {
         return (
@@ -230,61 +293,6 @@ export const PaymentPage = () => {
                         {t('paymentRedirecting') || 'Redirecting to payment gateway...'}
                     </p>
                 </div>
-            </div>
-        );
-    }
-
-    if (fibPaymentData && subscriptionId) {
-        const linkClass = 'text-primary hover:underline block mt-2';
-        return (
-            <div className={`min-h-screen flex items-center justify-center p-4 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
-                <Card className="max-w-lg w-full">
-                    <div className="flex items-center gap-3 mb-2 border-b pb-2 dark:border-gray-700">
-                        <img src="/fib_logo.png" alt="FIB" className="h-10 w-auto object-contain" />
-                        <h2 className="text-xl font-semibold">
-                            {language === 'ar' ? 'الدفع عبر FIB (البنك العراقي الأول)' : 'Pay with FIB (First Iraqi Bank)'}
-                        </h2>
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                        {language === 'ar' ? 'امسح رمز QR بتطبيق FIB أو استخدم الرابط أدناه للدفع.' : 'Scan the QR code with the FIB app or use the link below to pay.'}
-                    </p>
-                    {fibPaymentData.qr_code && (
-                        <div className="flex justify-center mb-4">
-                            <img src={fibPaymentData.qr_code} alt="FIB QR Code" className="w-48 h-48 object-contain border border-gray-200 dark:border-gray-600 rounded-lg" />
-                        </div>
-                    )}
-                    {fibPaymentData.readable_code && (
-                        <p className="text-center text-gray-700 dark:text-gray-300 font-mono mb-4">
-                            {language === 'ar' ? 'الكود: ' : 'Code: '}{fibPaymentData.readable_code}
-                        </p>
-                    )}
-                    <div className="space-y-2 text-sm">
-                        {fibPaymentData.personal_app_link && (
-                            <a href={fibPaymentData.personal_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                                {language === 'ar' ? 'فتح تطبيق FIB الشخصي' : 'Open FIB Personal App'}
-                            </a>
-                        )}
-                        {fibPaymentData.business_app_link && (
-                            <a href={fibPaymentData.business_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                                {language === 'ar' ? 'فتح تطبيق FIB للأعمال' : 'Open FIB Business App'}
-                            </a>
-                        )}
-                        {fibPaymentData.corporate_app_link && (
-                            <a href={fibPaymentData.corporate_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                                {language === 'ar' ? 'فتح تطبيق FIB للشركات' : 'Open FIB Corporate App'}
-                            </a>
-                        )}
-                    </div>
-                    <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-4">
-                        {language === 'ar' ? 'ننتظر تحديث الدفع من FIB، ثم سنبدأ التحقق تلقائيًا...' : 'Waiting for FIB callback, then automatic status checks will start...'}
-                    </p>
-                    {fibPaymentData.valid_until && (
-                        <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-2">
-                            {language === 'ar' ? 'صالح حتى: ' : 'Valid until: '}
-                            {new Date(fibPaymentData.valid_until).toLocaleString()}
-                        </p>
-                    )}
-                </Card>
             </div>
         );
     }

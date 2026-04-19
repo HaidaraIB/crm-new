@@ -907,6 +907,7 @@ export const createPaymentSessionAPI = async (
 
 /** Polling payload for GET `/payment-status/{subscription_id}/` */
 export interface CheckPaymentStatusResponse {
+  subscription_id?: number;
   is_truly_active: boolean;
   end_date?: string | null;
   is_expiring_soon?: boolean;
@@ -914,6 +915,10 @@ export interface CheckPaymentStatusResponse {
   /** Present on some responses (e.g. FIB / payment-complete polling) */
   subscription_active?: boolean;
   payment_status?: string;
+  /** Gateway-specific status string from the backend (e.g. FIB: paid/unpaid/declined) */
+  gateway_status?: string | null;
+  paytabs_status?: string | null;
+  payment_exists?: boolean;
 }
 
 /**

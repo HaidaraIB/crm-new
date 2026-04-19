@@ -172,8 +172,8 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
               )}
               <div className={`text-sm font-medium transition-colors ${
                 isSelected
-                  ? 'text-primary dark:text-primary'
-                  : 'text-gray-700 dark:text-gray-300 group-hover:text-primary'
+                  ? 'text-primary-700 dark:text-primary-200'
+                  : 'text-gray-700 dark:text-gray-300 group-hover:text-primary-700 dark:group-hover:text-primary-200'
               }`}>
                 {displayName}
               </div>

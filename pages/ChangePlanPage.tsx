@@ -50,6 +50,21 @@ export const ChangePlanPage = () => {
     } | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
+    const isFibSessionPayload = (response: any) =>
+        response?.payment_id != null &&
+        (response?.qr_code || response?.readable_code || response?.personal_app_link);
+
+    const routeToFibPaymentPage = (subId: string, response: any) => {
+        try {
+            sessionStorage.setItem(`fibPaymentData:${subId}`, JSON.stringify(response));
+            sessionStorage.setItem('fibPaymentLatestSubscriptionId', String(subId));
+            localStorage.setItem('pendingSubscriptionId', String(subId));
+        } catch (e) {
+            console.warn('Failed to cache FIB payment payload:', e);
+        }
+        window.location.href = `/payment?subscription_id=${subId}`;
+    };
+
     useEffect(() => {
         // Get subscription_id from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -267,6 +282,8 @@ export const ChangePlanPage = () => {
             );
             if (response.redirect_url) {
                 window.location.href = response.redirect_url;
+            } else if (isFibSessionPayload(response)) {
+                routeToFibPaymentPage(subscriptionId, response);
             } else {
                 alert(t('paymentRedirectError') || 'Failed to get payment URL');
             }

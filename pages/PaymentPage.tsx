@@ -33,11 +33,31 @@ export const PaymentPage = () => {
     const pollStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        // Get subscription_id from URL
+        // Get subscription_id from URL (with resilient fallbacks for FIB renewal/change flows)
         const urlParams = new URLSearchParams(window.location.search);
-        const subId = urlParams.get('subscription_id');
+        const subIdFromUrl = urlParams.get('subscription_id');
         const status = urlParams.get('status');
         const gatewayId = urlParams.get('gateway_id');
+        let subId = subIdFromUrl;
+
+        if (!subId) {
+            subId = localStorage.getItem('pendingSubscriptionId');
+        }
+        if (!subId) {
+            subId = sessionStorage.getItem('fibPaymentLatestSubscriptionId');
+        }
+        if (!subId) {
+            try {
+                const fibKeys: string[] = [];
+                for (let i = 0; i < sessionStorage.length; i += 1) {
+                    const key = sessionStorage.key(i);
+                    if (key && key.startsWith('fibPaymentData:')) fibKeys.push(key);
+                }
+                if (fibKeys.length === 1) {
+                    subId = fibKeys[0].replace('fibPaymentData:', '');
+                }
+            } catch (_) {}
+        }
         
         // If we have status parameter, we're coming back from payment gateway - redirect to success
         if (status && subId) {
@@ -54,8 +74,35 @@ export const PaymentPage = () => {
             }, 3000);
             return;
         }
+
+        if (!subIdFromUrl) {
+            window.history.replaceState({}, '', `/payment?subscription_id=${subId}`);
+        }
         
         setSubscriptionId(subId);
+
+        // If a previous flow (billing/change-plan) already created an FIB payment session,
+        // reuse it here so the user sees the same FIB QR/app-links screen as registration.
+        try {
+            const cachedFibData = sessionStorage.getItem(`fibPaymentData:${subId}`);
+            if (cachedFibData) {
+                const parsed = JSON.parse(cachedFibData);
+                if (parsed?.payment_id != null) {
+                    setFibPaymentData({
+                        payment_id: String(parsed.payment_id),
+                        qr_code: parsed.qr_code || null,
+                        readable_code: parsed.readable_code || null,
+                        business_app_link: parsed.business_app_link || null,
+                        corporate_app_link: parsed.corporate_app_link || null,
+                        personal_app_link: parsed.personal_app_link || null,
+                        valid_until: parsed.valid_until || null,
+                    });
+                    setShowGatewaySelection(false);
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to parse cached FIB payment payload:', e);
+        }
         
         // If gateway_id is provided in URL, use it and skip to payment (will auto-proceed in effect)
         if (gatewayId) {

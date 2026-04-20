@@ -56,6 +56,11 @@ const TheApp = () => {
         if (!isLoggedIn) return;
 
         const checkPathname = () => {
+            const withCurrentSearchAndHash = (path: string) => {
+                const search = window.location.search || '';
+                const hash = window.location.hash || '';
+                return `${path}${search}${hash}`;
+            };
             const currentPath = decodeURIComponent(window.location.pathname);
             const oauthResultInQuery = (() => {
                 try {
@@ -73,7 +78,7 @@ const TheApp = () => {
 
             if (companyFromPath && currentUser?.company && subdomainSlug && companyFromPath !== subdomainSlug) {
                 const correctRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, currentPage);
-                window.history.replaceState({}, '', correctRoute);
+                window.history.replaceState({}, '', withCurrentSearchAndHash(correctRoute));
                 return;
             }
             if (!companyFromPath && currentUser?.company && currentPath !== '/' && subdomainSlug) {
@@ -81,7 +86,7 @@ const TheApp = () => {
                 const correctRoute = viewLeadMatch
                     ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10))
                     : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
-                window.history.replaceState({}, '', correctRoute);
+                window.history.replaceState({}, '', withCurrentSearchAndHash(correctRoute));
                 return;
             }
 
@@ -156,9 +161,9 @@ const TheApp = () => {
                 } else if (!leadIdMatch) {
                     if (currentUser?.company) {
                         const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
-                        window.history.replaceState({}, '', leadsRoute);
+                        window.history.replaceState({}, '', withCurrentSearchAndHash(leadsRoute));
                     } else {
-                        window.history.replaceState({}, '', '/leads');
+                        window.history.replaceState({}, '', withCurrentSearchAndHash('/leads'));
                     }
                     setCurrentPage('Leads');
                 }
@@ -177,9 +182,9 @@ const TheApp = () => {
                 console.warn('[App] checkPathname - No match found, redirecting to Dashboard. currentPath:', currentPath);
                 if (currentUser?.company) {
                     const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                    window.history.replaceState({}, '', dashboardRoute);
+                    window.history.replaceState({}, '', withCurrentSearchAndHash(dashboardRoute));
                 } else {
-                    window.history.replaceState({}, '', '/dashboard');
+                    window.history.replaceState({}, '', withCurrentSearchAndHash('/dashboard'));
                 }
                 setCurrentPage('Dashboard');
             }
@@ -340,7 +345,17 @@ const TheApp = () => {
         // OAuth popup callback: preserve ?connected=true&account_id=... so IntegrationsPage can show "close window" message
         const urlParams = new URLSearchParams(window.location.search);
         const isOAuthPopupCallback = typeof window !== 'undefined' && !!window.opener && urlParams.get('connected') === 'true' && urlParams.get('account_id');
-        const withSearch = (path: string) => (isOAuthPopupCallback && window.location.search ? path + window.location.search : path);
+        const preserveSearchParams = isOAuthPopupCallback
+            || pathnameToCheck.includes('/payment')
+            || pathnameToCheck.includes('/change-plan')
+            || urlParams.has('subscription_id')
+            || urlParams.has('gateway_id')
+            || urlParams.has('status');
+        const withSearch = (path: string) => {
+            const search = preserveSearchParams ? (window.location.search || '') : '';
+            const hash = window.location.hash || '';
+            return `${path}${search}${hash}`;
+        };
         
         console.log('[App] Routing effect - pathnameToCheck:', pathnameToCheck);
         console.log('[App] Routing effect - currentPage:', currentPage);

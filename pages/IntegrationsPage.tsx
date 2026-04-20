@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
@@ -373,6 +373,11 @@ export const IntegrationsPage = () => {
     const [campaignMessage, setCampaignMessage] = useState('');
     const [campaignSending, setCampaignSending] = useState(false);
     const [campaignProgress, setCampaignProgress] = useState<{ sent: number; failed: number } | null>(null);
+    const [metaHealthModalOpen, setMetaHealthModalOpen] = useState(false);
+    const [metaHealthLoading, setMetaHealthLoading] = useState(false);
+    const [metaHealthData, setMetaHealthData] = useState<MetaHealthResponse | null>(null);
+    const [metaHealthAccountId, setMetaHealthAccountId] = useState<number | null>(null);
+    const [metaHealthSelectedPageId, setMetaHealthSelectedPageId] = useState<string>('');
     const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template'>(() => {
         try {
             const s = localStorage.getItem('messaging_center_tab');
@@ -555,6 +560,28 @@ export const IntegrationsPage = () => {
         } catch (error: any) {
             const msg = error?.message || error?.data?.error || t('errorTestingConnection') || 'Failed to test connection.';
             setInfoAlert({ title: t('connectionCheck') || 'Connection check', message: msg });
+        }
+    };
+
+    const handleCheckMetaHealth = async (accountId: number, subscribe = false, pageId?: string) => {
+        try {
+            setMetaHealthLoading(true);
+            const data = await getMetaHealthAPI(accountId, subscribe, pageId);
+            setMetaHealthData(data);
+            setMetaHealthAccountId(accountId);
+            const defaultPageId =
+                (pageId && data.pages.some((p) => p.id === pageId) ? pageId : '') ||
+                (data.selection.selected_page_id && data.pages.some((p) => p.id === data.selection.selected_page_id)
+                    ? data.selection.selected_page_id
+                    : '') ||
+                (data.pages[0]?.id || '');
+            setMetaHealthSelectedPageId(defaultPageId);
+            setMetaHealthModalOpen(true);
+        } catch (error: any) {
+            const msg = error?.message || error?.data?.error || t('metaHealthLoadFailed') || 'Failed to load Meta health.';
+            setInfoAlert({ title: t('metaHealth') || 'Meta health', message: msg });
+        } finally {
+            setMetaHealthLoading(false);
         }
     };
 
@@ -1719,6 +1746,16 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             <Button variant="secondary" onClick={() => handleSelectLeadForm(account)} className="rounded-lg text-sm">
                                                 {t('selectLeadForm') || 'Select Lead Form'}
                                             </Button>
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => handleCheckMetaHealth(account.id)}
+                                                disabled={metaHealthLoading}
+                                                className="rounded-lg text-sm"
+                                            >
+                                                {metaHealthLoading && metaHealthAccountId === account.id
+                                                    ? (t('loadingMetaHealth') || 'Loading...')
+                                                    : (t('checkMetaHealth') || 'Check Meta Health')}
+                                            </Button>
                                         </>
                                     )}
                                     <Button variant="ghost" onClick={() => handleEdit(account)} className="rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -1766,6 +1803,101 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                         queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
                     }}
                 />
+            )}
+            {metaHealthModalOpen && metaHealthData && (
+                <Modal
+                    isOpen={metaHealthModalOpen}
+                    onClose={() => setMetaHealthModalOpen(false)}
+                    title={t('metaHealth') || 'Meta Health'}
+                >
+                    <div className="space-y-4">
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                            {t('metaHealthHint') || 'Use this diagnostic to verify token, selected form/page, and per-page webhook subscription state.'}
+                        </div>
+                        <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="font-semibold text-sm mb-2">{t('tokenStatus') || 'Token status'}</div>
+                            <div className="text-sm">
+                                {metaHealthData.token.valid ? (
+                                    <span className="text-green-600 dark:text-green-400">{t('connected') || 'Connected'}</span>
+                                ) : (
+                                    <span className="text-red-600 dark:text-red-400">{t('connectionInvalid') || 'Connection invalid'}</span>
+                                )}
+                            </div>
+                            {!!metaHealthData.token.error && (
+                                <div className="text-xs text-red-600 dark:text-red-400 mt-1">{metaHealthData.token.error}</div>
+                            )}
+                        </div>
+                        <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="font-semibold text-sm mb-2">{t('selection') || 'Selection'}</div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300">
+                                <div>{t('selectedPage') || 'Selected page'}: {metaHealthData.selection.selected_page_id || '-'}</div>
+                                <div>{t('leadForm') || 'Lead Form'}: {metaHealthData.selection.selected_form_id || '-'}</div>
+                                <div>{t('pageInMetadata') || 'Page in metadata'}: {metaHealthData.selection.page_in_metadata ? 'Yes' : 'No'}</div>
+                            </div>
+                        </div>
+                        <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="font-semibold text-sm mb-2">{t('pages') || 'Pages'}</div>
+                            <div className="mb-3">
+                                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    {t('selectFacebookPage') || 'Facebook Page'}
+                                </label>
+                                <select
+                                    value={metaHealthSelectedPageId}
+                                    onChange={(e) => setMetaHealthSelectedPageId(e.target.value)}
+                                    className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                                >
+                                    {metaHealthData.pages.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div className="space-y-2 max-h-64 overflow-auto">
+                                {metaHealthData.pages.map((p) => (
+                                    <div key={p.id} className="rounded border border-gray-100 dark:border-gray-700 p-2 text-sm">
+                                        <div className="font-medium">{p.name}</div>
+                                        <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{p.id}</div>
+                                        <div className="text-xs mt-1">
+                                            <span className={p.app_installed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                                {t('appInstalled') || 'App installed'}: {p.app_installed ? 'Yes' : 'No'}
+                                            </span>
+                                            {' · '}
+                                            <span className={p.leadgen_subscribed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+                                                {t('leadgenSubscribed') || 'Leadgen subscribed'}: {p.leadgen_subscribed ? 'Yes' : 'No'}
+                                            </span>
+                                        </div>
+                                        {!!p.error && <div className="text-xs text-red-600 dark:text-red-400 mt-1">{p.error}</div>}
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
+                            <div className="font-semibold text-sm mb-2">{t('recentActivity') || 'Recent activity'}</div>
+                            <div className="text-sm text-gray-700 dark:text-gray-300">
+                                <div>{t('leadsLast7Days') || 'Leads last 7 days'}: {metaHealthData.recent_activity.leads_last_7d}</div>
+                                <div>{t('errorsLast7Days') || 'Errors last 7 days'}: {metaHealthData.recent_activity.errors_last_7d}</div>
+                                <div>{t('lastLeadReceivedAt') || 'Last lead received at'}: {metaHealthData.recent_activity.last_lead_received_at || '-'}</div>
+                            </div>
+                        </div>
+                        <div className="flex justify-between gap-2">
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    if (metaHealthAccountId != null && metaHealthSelectedPageId) {
+                                        handleCheckMetaHealth(metaHealthAccountId, true, metaHealthSelectedPageId);
+                                    }
+                                }}
+                                disabled={metaHealthLoading || !metaHealthSelectedPageId}
+                            >
+                                {t('subscribeSelectedPage') || 'Subscribe selected page to leadgen'}
+                            </Button>
+                            <Button onClick={() => setMetaHealthModalOpen(false)}>
+                                {t('close') || 'Close'}
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
             )}
             {/* Info alert (e.g. no Facebook pages) - styled like app dialogs */}
             {infoAlert && (

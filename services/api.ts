@@ -2304,6 +2304,62 @@ export const testConnectionAPI = async (accountId: number) => {
   );
 };
 
+export type MetaHealthPageStatus = {
+  id: string;
+  name: string;
+  has_access_token: boolean;
+  app_installed: boolean;
+  leadgen_subscribed: boolean;
+  error?: string | null;
+  subscribe_attempt?: { success: boolean; message?: string };
+};
+
+export type MetaHealthResponse = {
+  account_id: number;
+  status: string;
+  token: {
+    valid: boolean;
+    expires_at?: number;
+    scopes?: string[];
+    user_id?: string;
+    error?: string;
+  };
+  webhook: {
+    callback_url: string;
+    verify_token_set: boolean;
+    client_secret_set: boolean;
+  };
+  selection: {
+    selected_page_id?: string | null;
+    selected_form_id?: string | null;
+    page_in_metadata: boolean;
+    campaign_linked: boolean;
+  };
+  pages: MetaHealthPageStatus[];
+  recent_activity: {
+    last_lead_received_at?: string | null;
+    leads_last_7d: number;
+    errors_last_7d: number;
+  };
+};
+
+/**
+ * GET /api/integrations/accounts/:id/meta-health/
+ */
+export const getMetaHealthAPI = async (
+  accountId: number,
+  subscribe = false,
+  pageId?: string | null
+) => {
+  const params = new URLSearchParams();
+  if (subscribe) params.set('subscribe', '1');
+  if (pageId) params.set('page_id', pageId);
+  const query = params.toString();
+  return apiRequest<MetaHealthResponse>(
+    `/integrations/accounts/${accountId}/meta-health/${query ? `?${query}` : ''}`
+  );
+};
+
 /** WhatsApp Embedded Signup (optional — when set in API env, CRM uses FB SDK instead of URL-only OAuth). */
 export type WhatsAppEmbeddedSignupConnectInfo = {
   enabled: boolean;

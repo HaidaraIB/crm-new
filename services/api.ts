@@ -2794,7 +2794,13 @@ export const selectLeadFormAPI = async (
  * GET /api/integrations/accounts/tiktok-leadgen-config/
  */
 export const getTikTokLeadgenConfigAPI = async () => {
-  return apiRequest<{ webhook_url: string; company_id: number }>(
+  return apiRequest<{
+    webhook_url: string;
+    company_id: number;
+    integration_status?: string;
+    last_received_at?: string | null;
+    last_sync_at?: string | null;
+  }>(
     '/integrations/accounts/tiktok-leadgen-config/'
   );
 };

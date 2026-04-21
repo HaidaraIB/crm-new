@@ -708,6 +708,11 @@ export const IntegrationsPage = () => {
     // TikTok = Lead Gen only (like Meta lead forms). Show webhook URL and setup steps for subscribers.
     if (currentPage === 'TikTok') {
         const webhookUrl = leadgenConfig?.webhook_url || '';
+        const statusRaw = String(leadgenConfig?.integration_status || 'disconnected');
+        const isConnected = statusRaw === 'connected';
+        const lastReceivedAt = leadgenConfig?.last_received_at
+            ? new Date(leadgenConfig.last_received_at).toLocaleString()
+            : null;
         const setupSteps = [
             { step: 1, text: t('tiktokStep1') || 'Copy the Webhook URL below (it is unique to your company).' },
             { step: 2, text: t('tiktokStep2') || 'In TikTok Ads Manager go to Leads Center → CRM integration → TikTok Custom API with Webhooks.' },
@@ -728,6 +733,22 @@ export const IntegrationsPage = () => {
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                     {t('tiktokLeadGenDescription') || 'Receive leads from TikTok Instant Forms instantly in your CRM. Follow the steps below to connect TikTok Ads Manager.'}
                                 </p>
+                                <div className="mt-2 flex items-center gap-2">
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                            isConnected
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                        }`}
+                                    >
+                                        {isConnected ? (t('tiktokStatusConnected') || 'Connected') : (t('tiktokStatusPending') || 'Pending setup')}
+                                    </span>
+                                    {lastReceivedAt && (
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {(t('tiktokLastLeadReceivedAt') || 'Last lead received:')} {lastReceivedAt}
+                                        </span>
+                                    )}
+                                </div>
                             </div>
                         </div>
                         {leadgenLoading ? (
@@ -738,11 +759,14 @@ export const IntegrationsPage = () => {
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         {t('webhookUrl') || 'Webhook URL'}
                                     </label>
+                                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                                        {t('tiktokWebhookUrlHint') || 'Use this exact URL in TikTok Ads Manager. Do not edit company_id or signature.'}
+                                    </p>
                                     <div className="flex gap-2">
                                         <input
                                             readOnly
                                             value={webhookUrl}
-                                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm font-mono"
                                         />
                                         <Button
                                             variant="secondary"
@@ -1625,7 +1649,13 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             {account.status !== 'Connected' && (
                                                 <Button variant="primary" onClick={() => handleConnect(account.id)}>{t('connect')}</Button>
                                             )}
-                                            <Button variant="secondary" onClick={() => handleEdit(account)}><SettingsIcon className="w-4 h-4 me-2" /> {t('edit')}</Button>
+                                            <Button
+                                                variant="ghost"
+                                                onClick={() => handleEdit(account)}
+                                                className="rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                            >
+                                                <SettingsIcon className="w-4 h-4" /> <span className="sm:inline">{t('edit')}</span>
+                                            </Button>
                                             <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
                                         </div>
                                     </li>
@@ -1758,7 +1788,11 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             </Button>
                                         </>
                                     )}
-                                    <Button variant="ghost" onClick={() => handleEdit(account)} className="rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                                    <Button
+                                        variant="ghost"
+                                        onClick={() => handleEdit(account)}
+                                        className="rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                    >
                                         <SettingsIcon className="w-4 h-4" /> <span className="sm:inline">{t('edit')}</span>
                                     </Button>
                                     <Button
@@ -1879,6 +1913,20 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                 <div>{t('errorsLast7Days') || 'Errors last 7 days'}: {metaHealthData.recent_activity.errors_last_7d}</div>
                                 <div>{t('lastLeadReceivedAt') || 'Last lead received at'}: {metaHealthData.recent_activity.last_lead_received_at || '-'}</div>
                             </div>
+                        </div>
+                        <div className="rounded border border-amber-300/60 dark:border-amber-700/60 bg-amber-50/50 dark:bg-amber-900/10 p-3">
+                            <div className="font-semibold text-sm mb-2 text-amber-900 dark:text-amber-300">
+                                {t('assignCrmGuideTitle') || 'Assign LOOP CRM in Meta Business Suite'}
+                            </div>
+                            <ol className="list-decimal list-inside text-sm text-amber-900/90 dark:text-amber-200 space-y-1">
+                                <li>{t('assignCrmGuideStep1') || 'Open Meta Business Settings.'}</li>
+                                <li>{t('assignCrmGuideStep2') || 'Go to Integrations -> Leads Access.'}</li>
+                                <li>{t('assignCrmGuideStep3') || 'Select the Page used by your lead ads.'}</li>
+                                <li>{t('assignCrmGuideStep4') || 'Open the CRMs tab on the right panel.'}</li>
+                                <li>{t('assignCrmGuideStep5') || 'Click Assign CRM and choose LOOP CRM.'}</li>
+                                <li>{t('assignCrmGuideStep6') || 'Confirm LOOP CRM appears under CRMs with leads access.'}</li>
+                                <li>{t('assignCrmGuideStep7') || 'If needed, remove LOOP CRM then assign it again.'}</li>
+                            </ol>
                         </div>
                         <div className="flex justify-between gap-2">
                             <Button

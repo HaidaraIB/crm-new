@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, Loader, PhoneIcon, ImportLeadsModal, SmsIcon } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState } from '../components/index';
 import { TrashIcon, ChevronDownIcon, FacebookIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
@@ -652,9 +652,7 @@ export const LeadsPage = () => {
     if (leadsLoading) {
         return (
             <PageWrapper title={pageTitle}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
+                <PageLoadingState label={t('loadingLeads') || 'Loading leads'} />
             </PageWrapper>
         );
     }

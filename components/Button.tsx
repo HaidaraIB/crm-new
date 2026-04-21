@@ -16,5 +16,5 @@ export const Button = ({ children, onClick, className = '', variant = 'primary',
     ghost: 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:ring-gray-500',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   };
-  return <button type={type} onClick={onClick} className={`${baseClasses} ${variantClasses[variant]} ${className}`} disabled={disabled || loading} title={title} {...props}>{loading ? <Loader className="h-5" /> : children}</button>;
+  return <button type={type} onClick={onClick} className={`${baseClasses} ${variantClasses[variant]} ${className}`} disabled={disabled || loading} title={title} {...props}>{loading ? <Loader size="sm" tone={variant === 'primary' || variant === 'danger' ? 'light' : 'default'} /> : children}</button>;
 };

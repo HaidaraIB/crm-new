@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanEntitlementsSummary } from '../components/index';
+import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState } from '../components/index';
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
 import { formatDaysRemainingLabel, isFreeTrialPlan } from '../utils/planEntitlements';
@@ -399,9 +399,7 @@ export const BillingPage = () => {
     if (isLoading) {
         return (
             <PageWrapper title={t('billing') || 'Billing'}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
+                <PageLoadingState label={t('loadingBilling') || 'Loading billing'} />
             </PageWrapper>
         );
     }
@@ -707,9 +705,7 @@ export const BillingPage = () => {
 
                     {/* Plans List */}
                     {plansLoading ? (
-                        <div className="flex justify-center py-8">
-                            <Loader variant="primary" className="h-12" />
-                        </div>
+                        <SectionLoadingState label={t('loadingPlans') || 'Loading plans'} />
                     ) : (
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
                             {availablePlans.map((plan) => {

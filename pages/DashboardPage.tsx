@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon } from '../components/index';
+import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
@@ -506,21 +506,9 @@ export const DashboardPage = () => {
                     </div>
                 </div>
             )}
-            {/* Loading skeleton */}
+            {/* Loading state */}
             {isDashboardLoading && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6">
-                    {[...Array(10)].map((_, i) => (
-                        <Card key={i} className="h-24 border border-gray-200/50 dark:border-gray-700/50 animate-pulse">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-xl bg-gray-200 dark:bg-gray-700" />
-                                <div className="flex-1 space-y-2">
-                                    <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded" />
-                                    <div className="h-8 w-14 bg-gray-200 dark:bg-gray-700 rounded" />
-                                </div>
-                            </div>
-                        </Card>
-                    ))}
-                </div>
+                <SectionLoadingState className="py-16 mb-6" label={t('loadingDashboard') || 'Loading dashboard'} />
             )}
             {/* Payment Success Notification */}
             {showPaymentSuccess && (

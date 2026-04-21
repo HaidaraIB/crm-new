@@ -3,7 +3,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon, PageLoadingState, SectionLoadingState } from '../components/index';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
 import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, type MetaHealthResponse } from '../services/api';
@@ -110,7 +110,7 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
     if (loading) {
         return (
             <Card>
-                <div className="flex justify-center py-12"><Loader variant="primary" className="h-8" /></div>
+                <SectionLoadingState className="py-12" label={t('loading') || 'Loading'} />
             </Card>
         );
     }
@@ -1714,9 +1714,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
     if (loading) {
         return (
             <PageWrapper title={pageTitle}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
+                <PageLoadingState label={t('loadingIntegrations') || 'Loading integrations'} />
             </PageWrapper>
         );
     }
@@ -1783,7 +1781,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                                 className="rounded-lg text-sm"
                                             >
                                                 {metaHealthLoading && metaHealthAccountId === account.id
-                                                    ? (t('loadingMetaHealth') || 'Loading...')
+                                                    ? (t('loadingMetaHealth') || 'Loading')
                                                     : (t('checkMetaHealth') || 'Check Meta Health')}
                                             </Button>
                                         </>

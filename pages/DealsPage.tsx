@@ -2,7 +2,7 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Loader, TrashIcon, EditIcon, EyeIcon } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState } from '../components/index';
 import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -479,9 +479,7 @@ export const DealsPage = () => {
     if (dealsLoading) {
         return (
             <PageWrapper title={t('deals')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
+                <PageLoadingState label={t('loadingDeals') || 'Loading deals'} />
             </PageWrapper>
         );
     }

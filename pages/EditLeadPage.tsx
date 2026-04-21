@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, Loader, ArrowLeftIcon } from '../components/index';
+import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
 import { Lead, PhoneNumber } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useUpdateLead } from '../hooks/useQueries';
@@ -416,9 +416,7 @@ export const EditLeadPage = () => {
     if (loading) {
         return (
             <PageWrapper title={t('editLead') || 'Edit Lead'}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
+                <PageLoadingState label={t('loading') || 'Loading'} />
             </PageWrapper>
         );
     }

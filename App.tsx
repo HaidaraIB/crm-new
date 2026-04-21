@@ -9,6 +9,12 @@ import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLead
 
 const TheApp = () => {
     const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage } = useAppContext();
+    const isPublicLegalPath = (path: string): boolean => {
+        const normalizedPath = path.replace(/\/+$/, '') || '/';
+        return normalizedPath === '/data-deletion-policy' || normalizedPath === '/data-deletion' || normalizedPath.endsWith('/data-deletion-policy') || normalizedPath.endsWith('/data-deletion')
+            || normalizedPath === '/terms-of-service' || normalizedPath === '/terms' || normalizedPath.endsWith('/terms-of-service') || normalizedPath.endsWith('/terms')
+            || normalizedPath === '/privacy-policy' || normalizedPath === '/privacy' || normalizedPath.endsWith('/privacy-policy') || normalizedPath.endsWith('/privacy');
+    };
     
     // Track payment success message to prevent email verification message from showing
     const [hasPaymentSuccessMessage, setHasPaymentSuccessMessage] = React.useState(() => {
@@ -72,6 +78,7 @@ const TheApp = () => {
             })();
             // Never rewrite OAuth callback popup URL (with or without company prefix)
             if (currentPath.includes('oauth-callback') || oauthResultInQuery) return;
+            if (isPublicLegalPath(currentPath)) return;
             const companyFromPath = extractCompanyFromPath(currentPath);
             const pageFromPath = extractPageFromPath(currentPath);
             const subdomainSlug = getCompanySubdomainSlug();
@@ -336,10 +343,7 @@ const TheApp = () => {
         // Decode URL-encoded pathname (e.g., /all%20leads -> /all leads)
         const pathnameToCheck = decodeURIComponent(window.location.pathname).replace(/\/+$/, '') || '/';
         // Don't rewrite URL or redirect when on public legal pages (they must stay accessible at their path)
-        const isPublicLegalPath = pathnameToCheck === '/data-deletion-policy' || pathnameToCheck === '/data-deletion' || pathnameToCheck.endsWith('/data-deletion-policy') || pathnameToCheck.endsWith('/data-deletion')
-            || pathnameToCheck === '/terms-of-service' || pathnameToCheck === '/terms' || pathnameToCheck.endsWith('/terms-of-service') || pathnameToCheck.endsWith('/terms')
-            || pathnameToCheck === '/privacy-policy' || pathnameToCheck === '/privacy' || pathnameToCheck.endsWith('/privacy-policy') || pathnameToCheck.endsWith('/privacy');
-        if (isPublicLegalPath) return;
+        if (isPublicLegalPath(pathnameToCheck)) return;
         if (pathnameToCheck.includes('oauth-callback')) return;
         
         // OAuth popup callback: preserve ?connected=true&account_id=... so IntegrationsPage can show "close window" message

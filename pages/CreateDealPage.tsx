@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, PlusIcon, Loader, NumberInput, ArrowLeftIcon } from '../components/index';
+import { PageWrapper, Card, Input, Button, PlusIcon, NumberInput, ArrowLeftIcon, PageLoadingState } from '../components/index';
 import { useProjects, useUnits, useLeads, useUsers, useCreateDeal } from '../hooks/useQueries';
 import { User } from '../types';
 
@@ -320,9 +320,7 @@ export const CreateDealPage = () => {
     if (loading) {
         return (
             <PageWrapper title={t('createNewDeal')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
+                <PageLoadingState label={t('loading') || 'Loading'} />
             </PageWrapper>
         );
     }

@@ -8,6 +8,8 @@ export * from './PhoneInput';
 export * from './Checkbox';
 export * from './Modal';
 export * from './PageWrapper';
+export * from './PageLoadingState';
+export * from './SectionLoadingState';
 export * from './WeekLeadsChart';
 export * from './Header';
 export * from './Sidebar';

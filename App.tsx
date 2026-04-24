@@ -4,7 +4,7 @@ import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { Page } from './types';
-import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal } from './components/index';
+import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage } from './pages';
 
 const TheApp = () => {
@@ -222,6 +222,20 @@ const TheApp = () => {
                 window.history.replaceState({}, '', dashboardRoute);
             } else {
                 window.history.replaceState({}, '', '/dashboard');
+            }
+        }
+    }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
+
+    // Data entry: only All Leads (+ allowed pages); redirect if URL/state is outside scope
+    React.useEffect(() => {
+        if (!isLoggedIn || !currentUser || currentUser.role !== 'DataEntry') return;
+        if (!canAccessPage(currentPage)) {
+            setCurrentPage('All Leads');
+            if (currentUser?.company) {
+                const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads');
+                window.history.replaceState({}, '', route);
+            } else {
+                window.history.replaceState({}, '', '/all-leads');
             }
         }
     }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
@@ -739,6 +753,7 @@ const TheApp = () => {
             <EditLeadModal />
             <AddActionModal />
             <AddCallModal />
+            <AddVisitModal />
             <AssignLeadModal />
             <FilterDrawer />
             <ActivitiesFilterDrawer />
@@ -818,6 +833,8 @@ const TheApp = () => {
             <EditStatusModal />
             <AddCallMethodModal />
             <EditCallMethodModal />
+            <AddVisitTypeModal />
+            <EditVisitTypeModal />
         </div>
         );
     };

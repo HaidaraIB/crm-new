@@ -7,9 +7,11 @@ import { useAppContext } from '../context/AppContext';
 type DropdownProps = {
     trigger: ReactNode;
     children?: ReactNode;
+    /** Panel min width (e.g. w-56) for longer menu labels */
+    panelClassName?: string;
 };
 
-export const Dropdown = ({ trigger, children }: DropdownProps) => {
+export const Dropdown = ({ trigger, children, panelClassName }: DropdownProps) => {
     const { language } = useAppContext();
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
@@ -33,7 +35,7 @@ export const Dropdown = ({ trigger, children }: DropdownProps) => {
             </div>
             {isOpen && (
                 <div 
-                    className={`origin-top-right rtl:origin-top-left absolute ${language === 'ar' ? 'left-0' : 'right-0'} mt-2 w-48 rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-20`}
+                    className={`origin-top-right rtl:origin-top-left absolute ${language === 'ar' ? 'left-0' : 'right-0'} mt-2 min-w-[12rem] rounded-md shadow-lg bg-white dark:bg-gray-800 ring-1 ring-black ring-opacity-5 focus:outline-none z-20 ${panelClassName ?? 'w-48'}`}
                     onClick={() => setIsOpen(false)}
                 >
                     <div className="py-1" role="menu" aria-orientation="vertical" aria-labelledby="options-menu">

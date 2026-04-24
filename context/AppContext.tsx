@@ -98,6 +98,8 @@ export interface AppContextType {
   setIsAddActionModalOpen: (isOpen: boolean) => void;
   isAddCallModalOpen: boolean;
   setIsAddCallModalOpen: (isOpen: boolean) => void;
+  isAddVisitModalOpen: boolean;
+  setIsAddVisitModalOpen: (isOpen: boolean) => void;
   isAddTodoModalOpen: boolean;
   setIsAddTodoModalOpen: (isOpen: boolean) => void;
   isAssignLeadModalOpen: boolean;
@@ -370,6 +372,12 @@ export interface AppContextType {
   setIsEditCallMethodModalOpen: (isOpen: boolean) => void;
   editingCallMethod: { id: number; name: string; description?: string; color: string; is_active: boolean } | null;
   setEditingCallMethod: React.Dispatch<React.SetStateAction<{ id: number; name: string; description?: string; color: string; is_active: boolean } | null>>;
+  isAddVisitTypeModalOpen: boolean;
+  setIsAddVisitTypeModalOpen: (isOpen: boolean) => void;
+  isEditVisitTypeModalOpen: boolean;
+  setIsEditVisitTypeModalOpen: (isOpen: boolean) => void;
+  editingVisitType: { id: number; name: string; description?: string; color: string; is_active: boolean } | null;
+  setEditingVisitType: React.Dispatch<React.SetStateAction<{ id: number; name: string; description?: string; color: string; is_active: boolean } | null>>;
   isEditStatusModalOpen: boolean;
   setIsEditStatusModalOpen: (isOpen: boolean) => void;
   editingStatus: Status | null;
@@ -392,11 +400,12 @@ export const useAppContext = () => {
 };
 
 // Helper function to normalize user roles - Owner, Supervisor, Employee
-const normalizeRole = (role: string | undefined): 'Owner' | 'Supervisor' | 'Employee' => {
+const normalizeRole = (role: string | undefined): 'Owner' | 'Supervisor' | 'Employee' | 'DataEntry' => {
   if (!role || typeof role !== 'string') return 'Employee';
   const roleLower = role.toLowerCase();
   if (roleLower === 'admin' || role === 'Owner') return 'Owner';
   if (roleLower === 'supervisor' || role === 'Supervisor') return 'Supervisor';
+  if (roleLower === 'data_entry' || role === 'DataEntry') return 'DataEntry';
   if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {
     return 'Employee';
   }
@@ -610,6 +619,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [isAddActionModalOpen, setIsAddActionModalOpen] = useState(false);
   const [isAddCallModalOpen, setIsAddCallModalOpen] = useState(false);
+  const [isAddVisitModalOpen, setIsAddVisitModalOpen] = useState(false);
   const [isAddTodoModalOpen, setIsAddTodoModalOpen] = useState(false);
   const [isAssignLeadModalOpen, setIsAssignLeadModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -708,6 +718,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isAddCallMethodModalOpen, setIsAddCallMethodModalOpen] = useState(false);
   const [isEditCallMethodModalOpen, setIsEditCallMethodModalOpen] = useState(false);
   const [editingCallMethod, setEditingCallMethod] = useState<{ id: number; name: string; description?: string; color: string; is_active: boolean } | null>(null);
+  const [isAddVisitTypeModalOpen, setIsAddVisitTypeModalOpen] = useState(false);
+  const [isEditVisitTypeModalOpen, setIsEditVisitTypeModalOpen] = useState(false);
+  const [editingVisitType, setEditingVisitType] = useState<{ id: number; name: string; description?: string; color: string; is_active: boolean } | null>(null);
   const [isEditStatusModalOpen, setIsEditStatusModalOpen] = useState(false);
   const [editingStatus, setEditingStatus] = useState<Status | null>(null);
 
@@ -1084,6 +1097,17 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (!currentUser) return false;
     const role = currentUser.role;
     if (role === 'Owner' || role?.toLowerCase() === 'admin') return true;
+    if (role === 'DataEntry') {
+      switch (page) {
+        case 'All Leads':
+        case 'CreateLead':
+        case 'Profile':
+        case 'Support Center':
+          return true;
+        default:
+          return false;
+      }
+    }
     if (role !== 'Supervisor') {
       // Employee: allow Dashboard, Leads (all), Activities, Deals(?), Todos(?), Inventory (depends), etc. - keep existing sidebar logic
       return true;
@@ -1254,6 +1278,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     editingLead, setEditingLead,
     isAddActionModalOpen, setIsAddActionModalOpen,
     isAddCallModalOpen, setIsAddCallModalOpen,
+    isAddVisitModalOpen, setIsAddVisitModalOpen,
     isAddTodoModalOpen, setIsAddTodoModalOpen,
     isAssignLeadModalOpen, setIsAssignLeadModalOpen,
     isFilterDrawerOpen, setIsFilterDrawerOpen,
@@ -1368,6 +1393,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isAddCallMethodModalOpen, setIsAddCallMethodModalOpen,
     isEditCallMethodModalOpen, setIsEditCallMethodModalOpen,
     editingCallMethod, setEditingCallMethod,
+    isAddVisitTypeModalOpen, setIsAddVisitTypeModalOpen,
+    isEditVisitTypeModalOpen, setIsEditVisitTypeModalOpen,
+    editingVisitType, setEditingVisitType,
     channelTypes: [], // Will be computed from React Query data in components that need it
     isCompanySubscriptionInactive, setIsCompanySubscriptionInactive,
   };

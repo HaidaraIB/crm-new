@@ -9,6 +9,7 @@ import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI, type Create
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDaysRemainingLabel } from '../utils/planEntitlements';
+import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -485,7 +486,7 @@ export const ProfilePage = () => {
                                     <Label htmlFor="subscription-end-date">{t('subscriptionEndDate') || 'End Date'}</Label>
                                     <p className="mt-1 text-gray-700 dark:text-gray-300">
                                         {new Date(subscriptionInfo.endDate).toLocaleDateString(
-                                            language === 'ar' ? 'ar' : 'en-US',
+                                            language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
                                             { 
                                                 year: 'numeric', 
                                                 month: 'long', 

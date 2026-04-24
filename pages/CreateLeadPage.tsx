@@ -5,6 +5,7 @@ import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, Ar
 import { Lead, PhoneNumber } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useCreateLead } from '../hooks/useQueries';
+import { getCompanyRoute } from '../utils/routing';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -24,6 +25,7 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 
 export const CreateLeadPage = () => {
     const { t, setCurrentPage, currentUser } = useAppContext();
+    const isDataEntryUser = currentUser?.role === 'DataEntry';
 
     // جلب البيانات عبر React Query بدلاً من السياق
     const { data: usersResponse } = useUsers();
@@ -199,6 +201,7 @@ export const CreateLeadPage = () => {
     // This should NOT run when data updates from polling - only on initial mount
     const assignedToInitialized = useRef(false);
     useEffect(() => {
+        if (isDataEntryUser) return;
         // Only set if form is completely empty and user hasn't interacted
         // AND form hasn't been initialized yet
         if (!assignedToInitialized.current && !hasUserInteracted.current && !formInitialized.current && 
@@ -298,7 +301,7 @@ export const CreateLeadPage = () => {
                 name: formState.name,
                 phone_numbers: finalPhoneNumbers,
                 budget: formState.budget ? Number(formState.budget) : null,
-                assigned_to: formState.assignedTo ? Number(formState.assignedTo) : null,
+                assigned_to: isDataEntryUser ? null : (formState.assignedTo ? Number(formState.assignedTo) : null),
                 type: typeValue,
                 communication_way: channelId,
                 priority: priorityValue,
@@ -313,8 +316,14 @@ export const CreateLeadPage = () => {
             }
             
             await createLeadMutation.mutateAsync(leadData);
-            window.history.pushState({}, '', '/leads');
-            setCurrentPage('Leads');
+            if (isDataEntryUser && currentUser?.company) {
+                const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads');
+                window.history.pushState({}, '', route);
+                setCurrentPage('All Leads');
+            } else {
+                window.history.pushState({}, '', '/leads');
+                setCurrentPage('Leads');
+            }
         } catch (error: any) {
             console.error('Error creating lead:', error);
             
@@ -510,6 +519,7 @@ export const CreateLeadPage = () => {
                                 </div>
                             )}
                         </div>
+                        {!isDataEntryUser && (
                         <div>
                             <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                             <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
@@ -519,6 +529,7 @@ export const CreateLeadPage = () => {
                                 ))}
                             </Select>
                         </div>
+                        )}
                         <div>
                             <Label htmlFor="type">{t('type')}</Label>
                             <Select id="type" value={formState.type} onChange={handleChange}>
@@ -571,8 +582,13 @@ export const CreateLeadPage = () => {
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => {
-                            window.history.pushState({}, '', '/leads');
-                            setCurrentPage('Leads');
+                            if (isDataEntryUser && currentUser?.company) {
+                                window.history.pushState({}, '', getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads'));
+                                setCurrentPage('All Leads');
+                            } else {
+                                window.history.pushState({}, '', '/leads');
+                                setCurrentPage('Leads');
+                            }
                         }}>
                             {t('cancel')}
                         </Button>

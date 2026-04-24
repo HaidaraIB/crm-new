@@ -17,6 +17,7 @@ import { EditTemplateModal } from '../components/modals/EditTemplateModal';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components/icons';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
+import { navigateToCompanyRoute } from '../utils/routing';
 
 type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
 
@@ -62,6 +63,7 @@ function buildMetaLeadFormModalConfig(account: any, accountId: number) {
 }
 
 function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; replaceTwilio: (str: string) => string }) {
+    const { setCurrentPage, currentUser } = useAppContext();
     const [accountSid, setAccountSid] = useState('');
     const [twilioNumber, setTwilioNumber] = useState('');
     const [authToken, setAuthToken] = useState('');
@@ -127,6 +129,28 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
                         <p className="text-sm text-amber-600 dark:text-amber-400 font-medium mt-1">
                             {replaceTwilio(t('twilioOnlyNote'))}
                         </p>
+                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('twilioNewLeadSmsHint')}</p>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            className="mt-2 w-full sm:w-auto"
+                            title={t('twilioOpenNewLeadSmsSettingsHint')}
+                            onClick={() => {
+                                try {
+                                    localStorage.setItem('settingsActiveTab', 'NewLeadSms');
+                                } catch {
+                                    /* ignore */
+                                }
+                                navigateToCompanyRoute(
+                                    currentUser?.company?.name,
+                                    currentUser?.company?.domain,
+                                    'Settings',
+                                );
+                                setCurrentPage('Settings');
+                            }}
+                        >
+                            {t('twilioOpenNewLeadSmsSettings')}
+                        </Button>
                     </div>
                 </div>
 

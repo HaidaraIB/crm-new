@@ -7,11 +7,11 @@ import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOpti
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientEventsAPI,
+  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
-  getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI,
+  getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI, getVisitTypesAPI,
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
@@ -21,6 +21,7 @@ import {
   createTaskAPI, updateTaskAPI, deleteTaskAPI,
   createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI,
   createClientCallAPI, updateClientCallAPI, deleteClientCallAPI,
+  createClientVisitAPI, updateClientVisitAPI, deleteClientVisitAPI,
   createDeveloperAPI, updateDeveloperAPI, deleteDeveloperAPI,
   createProjectAPI, updateProjectAPI, deleteProjectAPI,
   createUnitAPI, updateUnitAPI, deleteUnitAPI,
@@ -36,6 +37,7 @@ import {
   createStageAPI, updateStageAPI, deleteStageAPI,
   createStatusAPI, updateStatusAPI, deleteStatusAPI,
   createCallMethodAPI, updateCallMethodAPI, deleteCallMethodAPI,
+  createVisitTypeAPI, updateVisitTypeAPI, deleteVisitTypeAPI,
   bulkAssignLeadsAPI,
   assignUnassignedClientsAPI,
 } from '../services/api';
@@ -50,6 +52,7 @@ export const queryKeys = {
   activities: (filters?: any) => ['activities', filters] as const,
   clientTasks: ['clientTasks'] as const,
   clientCalls: ['clientCalls'] as const,
+  clientVisits: ['clientVisits'] as const,
   clientEvents: (clientId?: number) => ['clientEvents', clientId] as const,
   developers: (page?: number, pageSize?: number) => ['developers', page ?? 'all', pageSize ?? 'default'] as const,
   projects: (page?: number, pageSize?: number) => ['projects', page ?? 'all', pageSize ?? 'default'] as const,
@@ -66,6 +69,7 @@ export const queryKeys = {
   stages: ['stages'] as const,
   statuses: ['statuses'] as const,
   callMethods: ['callMethods'] as const,
+  visitTypes: ['visitTypes'] as const,
   connectedAccounts: (platform?: string) => ['connectedAccounts', platform] as const,
   leadSMSMessages: (leadId?: number) => ['leadSMSMessages', leadId] as const,
   leadWhatsAppMessages: (leadId?: number) => ['leadWhatsAppMessages', leadId] as const,
@@ -195,6 +199,15 @@ export const useClientCalls = (options?: Omit<UseQueryOptions<any, Error>, 'quer
     queryKey: queryKeys.clientCalls,
     queryFn: () => getClientCallsAPI(),
     staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+export const useClientVisits = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+  return useQuery({
+    queryKey: queryKeys.clientVisits,
+    queryFn: () => getClientVisitsAPI(),
+    staleTime: 1 * 60 * 1000,
     ...options,
   });
 };
@@ -418,6 +431,15 @@ export const useCallMethods = (options?: Omit<UseQueryOptions<any, Error>, 'quer
     queryKey: queryKeys.callMethods,
     queryFn: () => getCallMethodsAPI(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    ...options,
+  });
+};
+
+export const useVisitTypes = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+  return useQuery({
+    queryKey: queryKeys.visitTypes,
+    queryFn: () => getVisitTypesAPI(),
+    staleTime: 5 * 60 * 1000,
     ...options,
   });
 };
@@ -746,6 +768,50 @@ export const useDeleteClientCall = (options?: UseMutationOptions<void, Error, nu
     mutationFn: (id: number) => deleteClientCallAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+    },
+    ...options,
+  });
+};
+
+export const useCreateClientVisit = (options?: UseMutationOptions<any, Error, any>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createClientVisitAPI(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientVisits });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      if (variables.client || variables.clientId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.clientEvents(variables.client || variables.clientId),
+        });
+      }
+    },
+    ...options,
+  });
+};
+
+export const useUpdateClientVisit = (options?: UseMutationOptions<any, Error, { id: number; data: any }>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateClientVisitAPI(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientVisits });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+    },
+    ...options,
+  });
+};
+
+export const useDeleteClientVisit = (options?: UseMutationOptions<void, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteClientVisitAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientVisits });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
@@ -1250,6 +1316,39 @@ export const useDeleteCallMethod = (options?: UseMutationOptions<void, Error, nu
     mutationFn: (id: number) => deleteCallMethodAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.callMethods });
+    },
+    ...options,
+  });
+};
+
+export const useCreateVisitType = (options?: UseMutationOptions<any, Error, any>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createVisitTypeAPI(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.visitTypes });
+    },
+    ...options,
+  });
+};
+
+export const useUpdateVisitType = (options?: UseMutationOptions<any, Error, { id: number; data: any }>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateVisitTypeAPI(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.visitTypes });
+    },
+    ...options,
+  });
+};
+
+export const useDeleteVisitType = (options?: UseMutationOptions<void, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteVisitTypeAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.visitTypes });
     },
     ...options,
   });

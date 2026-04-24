@@ -49,7 +49,14 @@ export const EditUserModal = () => {
         if (selectedUser && isEditUserModalOpen) {
             // Normalize role: API returns 'admin', 'supervisor', or 'employee'
             const r = selectedUser.role?.toLowerCase();
-            const normalizedRole = r === 'admin' || selectedUser.role === 'Owner' ? 'admin' : r === 'supervisor' ? 'supervisor' : 'employee';
+            const normalizedRole =
+                r === 'admin' || selectedUser.role === 'Owner'
+                    ? 'admin'
+                    : r === 'supervisor'
+                      ? 'supervisor'
+                      : r === 'data_entry'
+                        ? 'data_entry'
+                        : 'employee';
             
             // Get name from first_name + last_name or fallback to name
             const fullName = selectedUser.first_name || selectedUser.last_name
@@ -313,6 +320,7 @@ export const EditUserModal = () => {
                         <Label htmlFor="edit-user-role">{t('role')}</Label>
                         <Select id="edit-user-role" value={formState.role} onChange={handleChange}>
                             <option value="employee">{t('employee')}</option>
+                            <option value="data_entry">{t('dataEntry')}</option>
                             <option value="supervisor">{t('supervisor') || 'Supervisor'}</option>
                         </Select>
                         {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}

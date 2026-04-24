@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, MoonIcon, SunIcon } from '../components/index';
+import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
 
 export const TermsOfServicePage = () => {
     const { t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -97,7 +98,7 @@ export const TermsOfServicePage = () => {
                             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400">
                                 <p>
                                     {language === 'ar'
-                                        ? `آخر تحديث: ${new Date().toLocaleDateString('ar-SA')}`
+                                        ? `آخر تحديث: ${new Date().toLocaleDateString(ARABIC_DATE_LOCALE)}`
                                         : `Last updated: ${new Date().toLocaleDateString('en-US')}`}
                                 </p>
                             </div>

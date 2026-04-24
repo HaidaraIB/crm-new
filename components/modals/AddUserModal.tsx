@@ -316,6 +316,7 @@ export const AddUserModal = () => {
                         onChange={(e) => handleChange('role', e.target.value)}
                     >
                         <option value="employee">{t('employee')}</option>
+                        <option value="data_entry">{t('dataEntry')}</option>
                     </Select>
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>

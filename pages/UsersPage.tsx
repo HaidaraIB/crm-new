@@ -30,6 +30,8 @@ const getPaginationItems = (current: number, total: number): Array<number | 'ell
 
 // Helper function to translate role - only Owner and Employee are valid
 const getRoleTranslation = (role: string, t: (key: string) => string): string => {
+    const rl = (role || '').toLowerCase();
+    if (rl === 'data_entry') return t('dataEntry');
     // Normalize role: convert any old roles to Employee, keep Owner as is
     const normalizedRole = role === 'Owner' ? 'Owner' : 'Employee';
     const roleMap: Record<string, string> = {

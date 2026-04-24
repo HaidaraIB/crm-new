@@ -55,6 +55,7 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
 export const Sidebar = () => {
     const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme, canAccessPage, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
+    const isDataEntryUser = currentUser?.role === 'DataEntry';
     
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
@@ -172,6 +173,9 @@ export const Sidebar = () => {
             </div>
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
                 {SIDEBAR_ITEMS.filter((item) => {
+                    if (isDataEntryUser) {
+                        return item.name === 'Leads';
+                    }
                     // Hide Billing from main menu (it's shown in bottom section)
                     if (item.name === 'Billing') {
                         return false;
@@ -199,6 +203,9 @@ export const Sidebar = () => {
                     const itemNameKey = toCamelCase(item.name) as keyof typeof translations.en;
                     // Override subItems for Inventory based on company specialization
                     let subItems = item.name === 'Inventory' ? getInventorySubItems() : item.subItems;
+                    if (isDataEntryUser && item.name === 'Leads') {
+                        subItems = ['All Leads'];
+                    }
                     // Employees only see WhatsApp under Integrations (Chats + Template Management)
                     if (item.name === 'Integrations' && currentUser?.role?.toLowerCase() === 'employee') {
                         subItems = ['WhatsApp'];
@@ -246,7 +253,7 @@ export const Sidebar = () => {
                 })}
             </nav>
             <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700">
-                {currentUser?.role?.toLowerCase() !== 'employee' && (
+                {currentUser?.role?.toLowerCase() !== 'employee' && currentUser?.role !== 'DataEntry' && (
                     <>
                         {currentUser?.role !== 'Supervisor' && (
                             <SidebarItem

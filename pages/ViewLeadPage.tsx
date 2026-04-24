@@ -2,12 +2,12 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, DealIcon, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, Dropdown, DropdownItem, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateToLocal, formatDateTimeToLocal } from '../utils/dateUtils';
-import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useCallMethods, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
-import { ChevronDownIcon } from '../components/icons';
+import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
+import { BriefcaseIcon, ChevronDownIcon, MapPinIcon, MoreVerticalIcon } from '../components/icons';
 import { Lead } from '../types';
 
 // Status Dropdown Component (same as in LeadsPage)
@@ -205,7 +205,7 @@ const StatusDropdown = ({
 };
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
     
     // Update lead mutation
     const updateLeadMutation = useUpdateLead();
@@ -282,11 +282,19 @@ export const ViewLeadPage = () => {
     
     const { data: clientCallsResponse } = useClientCalls();
     const clientCalls = clientCallsResponse?.results || [];
+
+    const { data: clientVisitsResponse } = useClientVisits();
+    const clientVisits = clientVisitsResponse?.results || [];
     
     const { data: callMethodsData } = useCallMethods();
     const callMethods = Array.isArray(callMethodsData) 
         ? callMethodsData 
         : (callMethodsData?.results || []);
+
+    const { data: visitTypesData } = useVisitTypes();
+    const visitTypes = Array.isArray(visitTypesData)
+        ? visitTypesData
+        : (visitTypesData?.results || []);
     
     const { data: clientEventsResponse } = useClientEvents(leadId);
     const clientEvents = clientEventsResponse?.results || [];
@@ -459,6 +467,15 @@ export const ViewLeadPage = () => {
         return clientId === displayLead.id;
     }) : [];
 
+    const leadClientVisits = displayLead ? clientVisits.filter((cv: { client?: number; clientId?: number }) => {
+        const clientId = cv.client || cv.clientId;
+        return clientId === displayLead.id;
+    }) : [];
+
+    const showVisitActions =
+        currentUser?.company?.specialization === 'real_estate' ||
+        currentUser?.company?.specialization === 'services';
+
     const timelineHistory = useMemo(() => {
         if (!displayLead) return [];
 
@@ -530,6 +547,52 @@ export const ViewLeadPage = () => {
                 color: callMethod?.color,
                 callDatetime: callDateTimeFormatted, // Separate field for call datetime
                 followUpDate: followUpDateFormatted, // Separate field for follow-up date
+            };
+        });
+
+        const visits = leadClientVisits.map((cv: Record<string, unknown>) => {
+            const user = users.find(u => u.id === (cv.created_by || cv.createdBy));
+            const vt = visitTypes.find((x: { id: number }) => x.id === (cv.visit_type as number));
+            const visitTypeName = vt?.name || (cv.visit_type_name as string) || (t('visit') as string) || 'Visit';
+
+            const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
+            const timestamp = new Date(visitDateRaw).getTime();
+
+            const formatCleanDateTime = (dateString: string | null | undefined): string => {
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    if (isNaN(date.getTime())) return '';
+                    const options: Intl.DateTimeFormatOptions = {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                    };
+                    return date.toLocaleString('en-US', options);
+                } catch {
+                    return '';
+                }
+            };
+
+            const visitDt = formatCleanDateTime(visitDateRaw);
+            const upcoming = formatCleanDateTime(cv.upcoming_visit_date as string | undefined);
+
+            return {
+                id: `visit-${cv.id}`,
+                type: 'visit' as const,
+                user: user?.name || (cv.created_by_username as string) || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('visitLogged') || 'Visit logged',
+                details: (cv.summary as string) || '',
+                date: formatDateToLocal(visitDateRaw),
+                timestamp,
+                stage: visitTypeName,
+                color: vt?.color,
+                callDatetime: visitDt,
+                followUpDate: upcoming || undefined,
             };
         });
 
@@ -662,8 +725,8 @@ export const ViewLeadPage = () => {
         });
 
         // Combine and sort by date descending
-        return [...actions, ...calls, ...events, ...smsEntries, ...waEntries].sort((a, b) => b.timestamp - a.timestamp);
-    }, [displayLead, leadClientTasks, leadClientCalls, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, callMethods]);
+        return [...actions, ...calls, ...visits, ...events, ...smsEntries, ...waEntries].sort((a, b) => b.timestamp - a.timestamp);
+    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, callMethods, visitTypes]);
 
     if (!displayLead) {
         return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
@@ -697,33 +760,67 @@ export const ViewLeadPage = () => {
                 </div>
             }
             actions={
-                <div className="flex flex-wrap gap-2">
-                    <Button 
-                        variant="secondary"
-                        onClick={() => {
-                            if (displayLead) {
-                                setSelectedLeadForDeal(displayLead.id);
-                                window.history.pushState({}, '', '/create-deal');
-                                setCurrentPage('CreateDeal');
-                            }
-                        }}
-                    >
-                        <DealIcon className="w-4 h-4"/> {t('addDeal')}
+                <div className="flex items-center gap-2 shrink-0">
+                    <Button onClick={() => setIsAddActionModalOpen(true)}>
+                        <PlusIcon className="w-4 h-4 shrink-0" />
+                        <span className="whitespace-nowrap">{t('add_action')}</span>
                     </Button>
-                    <Button 
-                        variant="secondary"
-                        onClick={() => {
-                            if (displayLead) {
+                    <Dropdown
+                        panelClassName="w-56"
+                        trigger={
+                            <Button
+                                variant="secondary"
+                                type="button"
+                                className="px-3"
+                                title={t('leadOptionsMenuTitle')}
+                                aria-label={t('leadOptionsMenuTitle')}
+                                aria-haspopup="menu"
+                            >
+                                <MoreVerticalIcon className="w-5 h-5" />
+                            </Button>
+                        }
+                    >
+                        <DropdownItem
+                            onClick={() => {
+                                if (!displayLead) return;
                                 setEditingLead(displayLead);
                                 window.history.pushState({}, '', '/edit-lead');
                                 setCurrentPage('EditLead');
-                            }
-                        }}
-                    >
-                        <EditIcon className="w-4 h-4"/> {t('editClient')}
-                    </Button>
-                    <Button onClick={() => setIsAddActionModalOpen(true)}><PlusIcon className="w-4 h-4"/> {t('add_action')}</Button>
-                    <Button variant="secondary" onClick={() => setIsAddCallModalOpen(true)}><PhoneIcon className="w-4 h-4"/> {t('addCall') || 'Add Call'}</Button>
+                            }}
+                        >
+                            <span className="flex items-center gap-2 rtl:flex-row-reverse">
+                                <EditIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                                {t('editClient')}
+                            </span>
+                        </DropdownItem>
+                        <DropdownItem
+                            onClick={() => {
+                                if (!displayLead) return;
+                                setSelectedLeadForDeal(displayLead.id);
+                                window.history.pushState({}, '', '/create-deal');
+                                setCurrentPage('CreateDeal');
+                            }}
+                        >
+                            <span className="flex items-center gap-2 rtl:flex-row-reverse">
+                                <BriefcaseIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                                {t('addDeal')}
+                            </span>
+                        </DropdownItem>
+                        <DropdownItem onClick={() => setIsAddCallModalOpen(true)}>
+                            <span className="flex items-center gap-2 rtl:flex-row-reverse">
+                                <PhoneIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                                {t('addCall') || 'Add Call'}
+                            </span>
+                        </DropdownItem>
+                        {showVisitActions && (
+                            <DropdownItem onClick={() => setIsAddVisitModalOpen(true)}>
+                                <span className="flex items-center gap-2 rtl:flex-row-reverse">
+                                    <MapPinIcon className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                    {t('addVisit') || 'Add visit'}
+                                </span>
+                            </DropdownItem>
+                        )}
+                    </Dropdown>
                 </div>
             }
         >

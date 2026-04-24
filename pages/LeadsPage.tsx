@@ -256,6 +256,7 @@ export const LeadsPage = () => {
         setIsSuccessModalOpen,
         setSuccessMessage,
     } = useAppContext();
+    const isDataEntryUser = currentUser?.role === 'DataEntry';
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
     const [leadsPageSize, setLeadsPageSize] = useState(20);
     
@@ -684,7 +685,9 @@ export const LeadsPage = () => {
             actions={
                 <>
                     <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
+                    {!isDataEntryUser && (
                     <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto" disabled={filteredLeads.length === 0}><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>
+                    )}
                     <Button variant="secondary" onClick={() => setIsImportLeadsModalOpen(true)} className="w-full sm:w-auto"><span className="hidden sm:inline">{t('importLeads') || 'Import from Excel'}</span></Button>
                     <Button onClick={() => {
                         window.history.pushState({}, '', '/create-lead');
@@ -770,7 +773,9 @@ export const LeadsPage = () => {
                             <table className="w-full text-sm text-left rtl:text-right min-w-[1200px]">
                                 <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                                     <tr>
+                                        {!isDataEntryUser && (
                                         <th scope="col" className="p-2 sm:p-4 text-center whitespace-nowrap"><input type="checkbox" onChange={(e) => handleSelectAll(e.target.checked)} checked={isAllSelected} className="rounded" /></th>
+                                        )}
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('name')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('leadCompanyName')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('phone')}</th>
@@ -800,19 +805,32 @@ export const LeadsPage = () => {
                                         
                                         return (
                                             <tr key={lead.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                                {!isDataEntryUser && (
                                                 <td className="p-2 sm:p-4 text-center"><input type="checkbox" checked={checkedLeadIds.has(lead.id)} onChange={(e) => handleCheckChange(lead.id, e.target.checked)} className="rounded" /></td>
+                                                )}
                                                 <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
+                                                    {isDataEntryUser ? (
+                                                        <span>{lead.name}</span>
+                                                    ) : (
                                                     <button 
                                                         onClick={() => handleViewLead(lead)}
                                                         className="hover:text-primary-700 dark:hover:text-primary-200 transition-colors focus:outline-none"
                                                     >
                                                         {lead.name}
                                                     </button>
+                                                    )}
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 hidden lg:table-cell text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">
                                                     {(lead as any).leadCompanyName ?? (lead as any).lead_company_name ?? '-'}
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 text-center">
+                                                    {isDataEntryUser ? (
+                                                        <span className="text-sm text-gray-900 dark:text-gray-100" dir="ltr">
+                                                            {lead.phoneNumbers && lead.phoneNumbers.length > 0
+                                                                ? lead.phoneNumbers.map((pn: { phone_number: string }) => pn.phone_number).join(', ')
+                                                                : (lead.phone || '-')}
+                                                        </span>
+                                                    ) : (
                                                     <div className="flex flex-col gap-2">
                                                         {lead.phoneNumbers && lead.phoneNumbers.length > 0 ? (
                                                             lead.phoneNumbers.map((pn) => (
@@ -960,6 +978,7 @@ export const LeadsPage = () => {
                                                             )
                                                         )}
                                                     </div>
+                                                    )}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-center">
                                                     {(() => {
@@ -1090,7 +1109,7 @@ export const LeadsPage = () => {
                                                                 ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
                                                                 : 'text-gray-800 dark:text-gray-200';
                                                             
-                                                            if (availableStatuses.length === 0) {
+                                                            if (availableStatuses.length === 0 || isDataEntryUser) {
                                                                 return (
                                                                     <span 
                                                                         className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
@@ -1129,6 +1148,9 @@ export const LeadsPage = () => {
                                                             '-'}
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 text-center">
+                                                    {isDataEntryUser ? (
+                                                        <span className="text-gray-400 dark:text-gray-500">—</span>
+                                                    ) : (
                                                     <div className="flex items-center justify-center gap-1 sm:gap-2">
                                                         <button 
                                                             className="p-1 h-auto text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors" 
@@ -1147,6 +1169,7 @@ export const LeadsPage = () => {
                                                             </button>
                                                         )}
                                                     </div>
+                                                    )}
                                                 </td>
                                             </tr>
                                         );

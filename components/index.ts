@@ -18,6 +18,7 @@ export * from './Loader';
 // New components
 export * from './modals/AddActionModal';
 export * from './modals/AddCallModal';
+export * from './modals/AddVisitModal';
 export * from './modals/AddLeadModal';
 export * from './modals/EditLeadModal';
 export * from './modals/AssignLeadModal';
@@ -90,6 +91,8 @@ export * from './modals/AddStatusModal';
 export * from './modals/EditStatusModal';
 export * from './modals/AddCallMethodModal';
 export * from './modals/EditCallMethodModal';
+export * from './modals/AddVisitTypeModal';
+export * from './modals/EditVisitTypeModal';
 export * from './PaymentGatewaySelector';
 export * from './LegalLinks';
 export * from './PlanEntitlementsSummary';

@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
+import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
 import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
 
 export const DashboardPage = () => {
@@ -305,7 +306,7 @@ export const DashboardPage = () => {
         for (let i = days - 1; i >= 0; i--) {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
-            const locale = language === 'ar' ? 'ar-SA' : 'en-US';
+            const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
             const dateStr = date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
             
             const leadsCount = leads.filter(lead => {
@@ -457,7 +458,7 @@ export const DashboardPage = () => {
         const isMorning = hour >= 5 && hour < 12;
         return isMorning ? t('goodMorning') : t('goodAfternoon');
     }, [t]);
-    const todayDateStr = useMemo(() => new Date().toLocaleDateString(language === 'ar' ? 'ar-SA' : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), [language]);
+    const todayDateStr = useMemo(() => new Date().toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), [language]);
 
     const isDark = theme === 'dark';
     const tooltipContentStyle = isDark
@@ -745,7 +746,7 @@ export const DashboardPage = () => {
                                         {leadsToContactTodayList.map((item) => {
                                             const lead = item.lead;
                                             const reminderTime = item.reminderDate 
-                                                ? new Date(item.reminderDate).toLocaleTimeString(language === 'ar' ? 'ar-SA' : 'en-US', { 
+                                                ? new Date(item.reminderDate).toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', { 
                                                     hour: '2-digit', 
                                                     minute: '2-digit',
                                                     hour12: language === 'ar' ? false : true

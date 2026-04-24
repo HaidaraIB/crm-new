@@ -23,6 +23,7 @@ export const normalizeUser = (userData: any): User => {
       return 'Employee';
     }
     if (roleLower === 'employee' || role === 'Employee') return 'Employee';
+    if (roleLower === 'data_entry' || role === 'DataEntry') return 'DataEntry';
     return 'Employee';
   };
 

@@ -29,6 +29,7 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 
 export const AddLeadModal = () => {
     const { isAddLeadModalOpen, setIsAddLeadModalOpen, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const isDataEntryUser = currentUser?.role === 'DataEntry';
     
     // Fetch data using React Query
     const { data: usersResponse } = useUsers();
@@ -85,6 +86,7 @@ export const AddLeadModal = () => {
 
     // Set default assignedTo to current user when modal opens or users load
     useEffect(() => {
+        if (isDataEntryUser) return;
         if (isAddLeadModalOpen && users.length > 0) {
             const defaultUserId = currentUser?.id || users[0]?.id;
             if (defaultUserId) {
@@ -178,7 +180,7 @@ export const AddLeadModal = () => {
                 phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '',
                 phoneNumbers: finalPhoneNumbers,
                 budget: Number(formState.budget) || 0,
-                assignedTo: formState.assignedTo ? Number(formState.assignedTo) : 0,
+                ...(isDataEntryUser ? {} : { assignedTo: formState.assignedTo ? Number(formState.assignedTo) : 0 }),
                 type: formState.type,
                 communicationWay: formState.communicationWay,
                 priority: formState.priority,
@@ -187,7 +189,7 @@ export const AddLeadModal = () => {
             });
 
             // Reset form
-            const defaultUserId = currentUser?.id || users[0]?.id || '';
+            const defaultUserId = isDataEntryUser ? '' : (currentUser?.id || users[0]?.id || '');
             setFormState({
                 name: '', phone: '', budget: '', assignedTo: defaultUserId.toString(),
                 type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '',
@@ -290,6 +292,7 @@ export const AddLeadModal = () => {
                             </div>
                         )}
                     </div>
+                     {!isDataEntryUser && (
                      <div>
                         <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                         <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
@@ -297,6 +300,7 @@ export const AddLeadModal = () => {
                             {userOptions.map(user => <option key={user.id} value={user.id}>{user.name || user.username || user.email}</option>)}
                         </Select>
                     </div>
+                     )}
                     <div>
                         <Label htmlFor="type">{t('type')}</Label>
                         <Select id="type" value={formState.type} onChange={handleChange}>

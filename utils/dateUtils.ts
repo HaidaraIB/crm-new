@@ -3,6 +3,9 @@
  * Converts UTC dates from API to local timezone for display
  */
 
+/** Arabic locale with Gregorian default (ar-SA often uses Islamic calendar in Chromium). */
+export const ARABIC_DATE_LOCALE = 'ar-EG';
+
 /**
  * Converts a UTC date string (ISO format) to local date string (YYYY-MM-DD)
  * @param utcDateString - ISO date string from API (e.g., "2024-01-15T10:30:00Z")

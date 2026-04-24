@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TimelineEntry as TimelineEntryType } from '../types';
-import { ClockIcon, PhoneIcon } from './icons';
+import { ClockIcon, PhoneIcon, MapPinIcon } from './icons';
 
 type TimelineProps = {
     history: TimelineEntryType[];
@@ -121,16 +121,27 @@ export const Timeline = ({ history }: TimelineProps) => {
                                 {entry.details && (
                                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1.5">{entry.details}</p>
                                 )}
-                                {/* Display call datetime and follow-up date for calls */}
-                                {entry.type === 'call' && (entry.callDatetime || entry.followUpDate) && (
+                                {/* Call / visit datetime and follow-up or upcoming date */}
+                                {(entry.type === 'call' || entry.type === 'visit') && (entry.callDatetime || entry.followUpDate) && (
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
                                         {entry.callDatetime && (
-                                            <div className="flex items-center gap-1.5 px-2.5 py-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                                                <PhoneIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-                                                <span className="text-xs font-medium text-blue-700 dark:text-blue-300">{entry.callDatetime}</span>
+                                            <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${
+                                                entry.type === 'visit'
+                                                    ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                                                    : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                                            }`}>
+                                                {entry.type === 'visit' ? (
+                                                    <MapPinIcon className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300 flex-shrink-0" />
+                                                ) : (
+                                                    <PhoneIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                                                )}
+                                                <span className={`text-xs font-medium ${
+                                                    entry.type === 'visit'
+                                                        ? 'text-amber-800 dark:text-amber-200'
+                                                        : 'text-blue-700 dark:text-blue-300'
+                                                }`}>{entry.callDatetime}</span>
                                             </div>
                                         )}
-                                        {/* Arrow between call datetime and follow-up date */}
                                         {entry.callDatetime && entry.followUpDate && (
                                             <svg 
                                                 className="w-4 h-4 text-gray-400 dark:text-gray-500 flex-shrink-0" 

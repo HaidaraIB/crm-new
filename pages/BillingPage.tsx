@@ -5,6 +5,7 @@ import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanE
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
 import { formatDaysRemainingLabel, isFreeTrialPlan } from '../utils/planEntitlements';
+import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
 
 type SubscriptionInfo = {
     id: number;
@@ -342,7 +343,7 @@ export const BillingPage = () => {
     const formatDate = (dateString?: string) => {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleDateString(
-            language === 'ar' ? 'ar' : 'en-US',
+            language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
             { 
                 year: 'numeric', 
                 month: 'long', 

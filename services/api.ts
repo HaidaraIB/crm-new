@@ -2684,6 +2684,8 @@ export interface TwilioSettingsResponse {
   auth_token_masked?: string | null;
   sender_id: string;
   is_enabled: boolean;
+  lead_created_sms_enabled?: boolean;
+  lead_created_sms_template?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -2704,6 +2706,8 @@ export const updateTwilioSettingsAPI = async (data: {
   auth_token?: string;
   sender_id?: string;
   is_enabled?: boolean;
+  lead_created_sms_enabled?: boolean;
+  lead_created_sms_template?: string;
 }): Promise<TwilioSettingsResponse> => {
   return apiRequest<TwilioSettingsResponse>('/integrations/twilio/settings/', {
     method: 'PUT',
@@ -2916,6 +2920,63 @@ export const deleteClientCallAPI = async (clientCallId: number) => {
   }
 };
 
+// ==================== Client Visits APIs ====================
+
+/** GET /client-visits/ */
+export const getClientVisitsAPI = async () => {
+  return fetchAllPaginatedPages<any>('/client-visits/');
+};
+
+/** POST /client-visits/ */
+export const createClientVisitAPI = async (data: any) => {
+  return apiRequest<any>('/client-visits/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/** PUT /client-visits/{id}/ */
+export const updateClientVisitAPI = async (clientVisitId: number, data: any) => {
+  return apiRequest<any>(`/client-visits/${clientVisitId}/`, {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/** DELETE /client-visits/{id}/ */
+export const deleteClientVisitAPI = async (clientVisitId: number) => {
+  const token = localStorage.getItem('accessToken');
+  const response = await fetch(`${BASE_URL}/client-visits/${clientVisitId}/`, {
+    method: 'DELETE',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }),
+  });
+
+  if (response.status === 401) {
+    try {
+      await refreshTokenAPI();
+      return deleteClientVisitAPI(clientVisitId);
+    } catch {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+      localStorage.removeItem('isLoggedIn');
+      localStorage.removeItem('currentUser');
+      const protocol = window.location.protocol;
+      const hostname = window.location.hostname;
+      const port = window.location.port ? `:${window.location.port}` : '';
+      window.location.replace(`${protocol}//${hostname}${port}/login`);
+      throw new Error('Session expired. Please login again.');
+    }
+  }
+
+  if (!response.ok && response.status !== 204) {
+    const errorData = await readJsonResponse(response);
+    throw new Error(getApiErrorMessage(errorData, `API Error: ${response.status} ${response.statusText}`));
+  }
+};
+
 /**
  * GET /api/client-events/
  */
@@ -3116,6 +3177,31 @@ export const updateCallMethodAPI = async (callMethodId: number, callMethodData: 
 
 export const deleteCallMethodAPI = async (callMethodId: number) => {
   return apiRequest<void>(`/settings/call-methods/${callMethodId}/`, {
+    method: 'DELETE',
+  });
+};
+
+/** GET /settings/visit-types/ */
+export const getVisitTypesAPI = async () => {
+  return apiRequest<any[]>('/settings/visit-types/');
+};
+
+export const createVisitTypeAPI = async (visitTypeData: any) => {
+  return apiRequest<any>('/settings/visit-types/', {
+    method: 'POST',
+    body: JSON.stringify(visitTypeData),
+  });
+};
+
+export const updateVisitTypeAPI = async (visitTypeId: number, visitTypeData: any) => {
+  return apiRequest<any>(`/settings/visit-types/${visitTypeId}/`, {
+    method: 'PUT',
+    body: JSON.stringify(visitTypeData),
+  });
+};
+
+export const deleteVisitTypeAPI = async (visitTypeId: number) => {
+  return apiRequest<void>(`/settings/visit-types/${visitTypeId}/`, {
     method: 'DELETE',
   });
 };

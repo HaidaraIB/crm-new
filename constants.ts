@@ -405,6 +405,7 @@ export const translations = {
     valueRangeStart: "Min Value",
     valueRangeEnd: "Max Value",
     searchByClientNameOrId: "Search by client name or ID",
+    searchLeadsByNameOrPhone: "Search by name or phone",
     // Create Deal
     createNewDeal: "Create New Deal",
     dealInformation: "Deal Information",
@@ -2010,6 +2011,7 @@ export const translations = {
     valueRangeStart: "الحد الأدنى للقيمة",
     valueRangeEnd: "الحد الأقصى للقيمة",
     searchByClientNameOrId: "البحث باسم العميل أو المعرف",
+    searchLeadsByNameOrPhone: "البحث بالاسم أو رقم الهاتف",
     // Create Deal
     createNewDeal: "إنشاء صفقة جديدة",
     dealInformation: "معلومات الصفقة",

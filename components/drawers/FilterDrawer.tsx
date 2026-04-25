@@ -145,6 +145,16 @@ export const FilterDrawer = () => {
                     <FilterSection title={t('leadInfo')}>
                         <div className="space-y-4 pt-2">
                             <div>
+                                <FilterLabel htmlFor="leads-filter-search">{t('searchLeadsByNameOrPhone')}</FilterLabel>
+                                <FilterInput
+                                    id="leads-filter-search"
+                                    type="search"
+                                    placeholder={t('searchLeadsByNameOrPhone')}
+                                    value={localFilters.search}
+                                    onChange={(e) => handleFilterChange('search', e.target.value)}
+                                />
+                            </div>
+                            <div>
                                 <FilterLabel htmlFor="leads-filter-status">{t('status')}</FilterLabel>
                                 <FilterSelect id="leads-filter-status" value={localFilters.status} onChange={(e) => handleFilterChange('status', e.target.value)}>
                                     {leadStatuses.map(status => (

@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState } from '../components/index';
-import { TrashIcon, ChevronDownIcon, FacebookIcon } from '../components/icons';
+import { TrashIcon, ChevronDownIcon, FacebookIcon, SearchIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead } from '../types';
@@ -355,6 +355,34 @@ export const LeadsPage = () => {
     // Send WhatsApp modal (opens from table like lead details page)
     const [sendWhatsAppModal, setSendWhatsAppModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
 
+    const [leadSearchDraft, setLeadSearchDraft] = useState(leadFilters.search);
+    const leadSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        setLeadSearchDraft(leadFilters.search);
+    }, [leadFilters.search]);
+
+    useEffect(() => {
+        return () => {
+            if (leadSearchDebounceRef.current) clearTimeout(leadSearchDebounceRef.current);
+        };
+    }, []);
+
+    const handleLeadSearchInputChange = (value: string) => {
+        setLeadSearchDraft(value);
+        if (leadSearchDebounceRef.current) clearTimeout(leadSearchDebounceRef.current);
+        leadSearchDebounceRef.current = setTimeout(() => {
+            setLeadFilters((prev) => ({ ...prev, search: value }));
+            leadSearchDebounceRef.current = null;
+        }, 300);
+    };
+
+    const clearLeadSearch = () => {
+        if (leadSearchDebounceRef.current) clearTimeout(leadSearchDebounceRef.current);
+        setLeadSearchDraft('');
+        setLeadFilters((prev) => ({ ...prev, search: '' }));
+    };
+
     // Handle status change
     const handleStatusChange = async (leadId: number, newStatusId: number) => {
         setUpdatingLeadId(leadId);
@@ -684,6 +712,31 @@ export const LeadsPage = () => {
             title={pageTitle}
             actions={
                 <>
+                    <div className="relative w-full sm:w-auto sm:min-w-[200px] sm:max-w-sm flex-shrink-0">
+                        <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-500 dark:text-gray-400" aria-hidden>
+                            <SearchIcon className="h-4 w-4" />
+                        </span>
+                        <input
+                            type="search"
+                            value={leadSearchDraft}
+                            onChange={(e) => handleLeadSearchInputChange(e.target.value)}
+                            placeholder={t('searchLeadsByNameOrPhone')}
+                            dir={language === 'ar' ? 'rtl' : 'ltr'}
+                            autoComplete="off"
+                            className="w-full py-2 ps-9 pe-9 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                            aria-label={t('searchLeadsByNameOrPhone')}
+                        />
+                        {leadSearchDraft ? (
+                            <button
+                                type="button"
+                                onClick={clearLeadSearch}
+                                className="absolute inset-y-0 end-0 flex items-center pe-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                                aria-label={t('close') || 'Clear'}
+                            >
+                                <span className="text-lg leading-none px-1">&times;</span>
+                            </button>
+                        ) : null}
+                    </div>
                     <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
                     {!isDataEntryUser && (
                     <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto" disabled={filteredLeads.length === 0}><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>

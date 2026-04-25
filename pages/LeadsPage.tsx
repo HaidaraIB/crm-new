@@ -356,32 +356,27 @@ export const LeadsPage = () => {
     const [sendWhatsAppModal, setSendWhatsAppModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
 
     const [leadSearchDraft, setLeadSearchDraft] = useState(leadFilters.search);
-    const leadSearchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         setLeadSearchDraft(leadFilters.search);
     }, [leadFilters.search]);
 
-    useEffect(() => {
-        return () => {
-            if (leadSearchDebounceRef.current) clearTimeout(leadSearchDebounceRef.current);
-        };
-    }, []);
-
     const handleLeadSearchInputChange = (value: string) => {
         setLeadSearchDraft(value);
-        if (leadSearchDebounceRef.current) clearTimeout(leadSearchDebounceRef.current);
-        leadSearchDebounceRef.current = setTimeout(() => {
-            setLeadFilters((prev) => ({ ...prev, search: value }));
-            leadSearchDebounceRef.current = null;
-        }, 300);
+    };
+
+    const commitLeadSearchFromDraft = () => {
+        const q = leadSearchDraft.trim();
+        setLeadSearchDraft(q);
+        setLeadFilters((prev) => ({ ...prev, search: q }));
     };
 
     const clearLeadSearch = () => {
-        if (leadSearchDebounceRef.current) clearTimeout(leadSearchDebounceRef.current);
         setLeadSearchDraft('');
         setLeadFilters((prev) => ({ ...prev, search: '' }));
     };
+
+    const showLeadSearchClear = leadSearchDraft.length > 0 || Boolean(leadFilters.search);
 
     // Handle status change
     const handleStatusChange = async (leadId: number, newStatusId: number) => {
@@ -711,85 +706,62 @@ export const LeadsPage = () => {
         <PageWrapper 
             title={pageTitle}
             actions={
-                <>
-                    <div className="relative w-full sm:w-auto sm:min-w-[200px] sm:max-w-sm flex-shrink-0">
-                        <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-500 dark:text-gray-400" aria-hidden>
-                            <SearchIcon className="h-4 w-4" />
-                        </span>
-                        <input
-                            type="search"
-                            value={leadSearchDraft}
-                            onChange={(e) => handleLeadSearchInputChange(e.target.value)}
-                            placeholder={t('searchLeadsByNameOrPhone')}
-                            dir={language === 'ar' ? 'rtl' : 'ltr'}
-                            autoComplete="off"
-                            className="w-full py-2 ps-9 pe-9 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
-                            aria-label={t('searchLeadsByNameOrPhone')}
-                        />
-                        {leadSearchDraft ? (
-                            <button
-                                type="button"
-                                onClick={clearLeadSearch}
-                                className="absolute inset-y-0 end-0 flex items-center pe-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-                                aria-label={t('close') || 'Clear'}
-                            >
-                                <span className="text-lg leading-none px-1">&times;</span>
-                            </button>
-                        ) : null}
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:pb-0.5">
+                        <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto shrink-0"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
+                        {!isDataEntryUser && (
+                        <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={filteredLeads.length === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{t('export')}</span><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>
+                        )}
+                        <Button variant="secondary" onClick={() => setIsImportLeadsModalOpen(true)} className="w-full sm:w-auto shrink-0" title={t('importLeads') || 'Import from Excel'}><span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importLeads') || 'Import from Excel'}</span></Button>
+                        <Button onClick={() => {
+                            window.history.pushState({}, '', '/create-lead');
+                            setCurrentPage('CreateLead');
+                        }} className="w-full sm:w-auto shrink-0"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
+                        {isAdmin && (
+                            <div className="flex w-full flex-none flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => setIsAssignLeadModalOpen(true)}
+                                    disabled={checkedLeadIds.size === 0}
+                                    className="min-w-0 flex-1 sm:flex-initial sm:w-auto"
+                                    title={t('assignLead')}
+                                >
+                                    {t('assignLead')}
+                                </Button>
+                                <Button
+                                    variant="secondary"
+                                    onClick={() => {
+                                        setConfirmDeleteConfig({
+                                            title: t('assignUnassigned') || 'Assign Unassigned',
+                                            message: t('confirmAssignUnassigned') || 'Are you sure you want to assign all unassigned clients?',
+                                            itemName: '',
+                                            confirmButtonText: t('assignUnassigned') || 'Assign',
+                                            confirmButtonVariant: 'primary' as const,
+                                            showWarning: false,
+                                            showSuccessMessage: false, // Don't show default success message, mutation will handle it
+                                            onConfirm: async () => {
+                                                try {
+                                                    await assignUnassignedMutation.mutateAsync();
+                                                } catch (error: any) {
+                                                    console.error('Error assigning unassigned clients:', error);
+                                                    throw error;
+                                                }
+                                            },
+                                        });
+                                        setIsConfirmDeleteModalOpen(true);
+                                    }}
+                                    disabled={assignUnassignedMutation.isPending}
+                                    loading={assignUnassignedMutation.isPending}
+                                    className="min-w-0 flex-1 sm:flex-initial sm:w-auto"
+                                    title={t('assignUnassigned') || 'Assign Unassigned'}
+                                >
+                                    {t('assignUnassigned') || 'Assign Unassigned'}
+                                </Button>
+                            </div>
+                        )}
                     </div>
-                    <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
-                    {!isDataEntryUser && (
-                    <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto" disabled={filteredLeads.length === 0}><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>
-                    )}
-                    <Button variant="secondary" onClick={() => setIsImportLeadsModalOpen(true)} className="w-full sm:w-auto"><span className="hidden sm:inline">{t('importLeads') || 'Import from Excel'}</span></Button>
-                    <Button onClick={() => {
-                        window.history.pushState({}, '', '/create-lead');
-                        setCurrentPage('CreateLead');
-                    }} className="w-full sm:w-auto"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
-                    {isAdmin && (
-                        <>
-                            <Button 
-                                variant="secondary" 
-                                onClick={() => setIsAssignLeadModalOpen(true)} 
-                                disabled={checkedLeadIds.size === 0} 
-                                className="w-full sm:w-auto"
-                            >
-                                {t('assignLead')}
-                            </Button>
-                            <Button 
-                                variant="secondary" 
-                                onClick={() => {
-                                    setConfirmDeleteConfig({
-                                        title: t('assignUnassigned') || 'Assign Unassigned',
-                                        message: t('confirmAssignUnassigned') || 'Are you sure you want to assign all unassigned clients?',
-                                        itemName: '',
-                                        confirmButtonText: t('assignUnassigned') || 'Assign',
-                                        confirmButtonVariant: 'primary' as const,
-                                        showWarning: false,
-                                        showSuccessMessage: false, // Don't show default success message, mutation will handle it
-                                        onConfirm: async () => {
-                                            try {
-                                                await assignUnassignedMutation.mutateAsync();
-                                            } catch (error: any) {
-                                                console.error('Error assigning unassigned clients:', error);
-                                                throw error;
-                                            }
-                                        },
-                                    });
-                                    setIsConfirmDeleteModalOpen(true);
-                                }}
-                                disabled={assignUnassignedMutation.isPending}
-                                loading={assignUnassignedMutation.isPending}
-                                className="w-full sm:w-auto"
-                            >
-                                {t('assignUnassigned') || 'Assign Unassigned'}
-                            </Button>
-                        </>
-                    )}
-                </>
             }
         >
-            <div className="flex border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto scrollbar-thin">
+            <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-thin">
                 {leadStatusFilters.map(status => {
                     // Calculate count from filtered leads (without status filter)
                     const count = status === 'All' 
@@ -818,6 +790,48 @@ export const LeadsPage = () => {
                         </button>
                     )
                 })}
+            </div>
+            <div className="flex w-full max-w-2xl flex-col gap-2 mt-3 mb-4 sm:flex-row sm:items-center">
+                <div className="relative min-w-0 flex-1">
+                    <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-500 dark:text-gray-400" aria-hidden>
+                        <SearchIcon className="h-4 w-4" />
+                    </span>
+                    <input
+                        type="text"
+                        inputMode="search"
+                        enterKeyHint="search"
+                        value={leadSearchDraft}
+                        onChange={(e) => handleLeadSearchInputChange(e.target.value)}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                e.preventDefault();
+                                commitLeadSearchFromDraft();
+                            }
+                        }}
+                        placeholder={t('searchLeadsPlaceholderEnter') || 'Name or phone — press Enter to search'}
+                        dir={language === 'ar' ? 'rtl' : 'ltr'}
+                        autoComplete="off"
+                        className={`w-full min-w-0 py-2 ps-9 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${showLeadSearchClear ? 'pe-9' : 'pe-3'}`}
+                        aria-label={t('searchLeadsPlaceholderEnter') || t('searchLeadsByNameOrPhone')}
+                    />
+                    {showLeadSearchClear ? (
+                        <button
+                            type="button"
+                            onClick={clearLeadSearch}
+                            className="absolute inset-y-0 end-0 flex items-center pe-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                            aria-label={t('close') || 'Clear search'}
+                        >
+                            <span className="text-lg leading-none px-1">&times;</span>
+                        </button>
+                    ) : null}
+                </div>
+                <Button
+                    type="button"
+                    onClick={commitLeadSearchFromDraft}
+                    className="w-full shrink-0 sm:w-auto"
+                >
+                    {t('search')}
+                </Button>
             </div>
             <Card>
                 <div className="overflow-x-auto -mx-4 sm:mx-0">

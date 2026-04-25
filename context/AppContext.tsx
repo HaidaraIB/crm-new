@@ -403,7 +403,8 @@ export const useAppContext = () => {
 const normalizeRole = (role: string | undefined): 'Owner' | 'Supervisor' | 'Employee' | 'DataEntry' => {
   if (!role || typeof role !== 'string') return 'Employee';
   const roleLower = role.toLowerCase();
-  if (roleLower === 'admin' || role === 'Owner') return 'Owner';
+  // Hide backend-only super_admin from UI and treat it as Owner permissions.
+  if (roleLower === 'super_admin' || roleLower === 'admin' || role === 'Owner') return 'Owner';
   if (roleLower === 'supervisor' || role === 'Supervisor') return 'Supervisor';
   if (roleLower === 'data_entry' || role === 'DataEntry') return 'DataEntry';
   if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {

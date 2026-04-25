@@ -17,7 +17,8 @@ export const normalizeUser = (userData: any): User => {
   const normalizeRoleInternal = (role: string | undefined): string => {
     if (!role || typeof role !== 'string') return 'Employee';
     const roleLower = role.toLowerCase();
-    if (roleLower === 'admin' || role === 'Owner') return 'Owner';
+    // Keep super_admin backend-only: map to existing Owner label in frontend.
+    if (roleLower === 'super_admin' || roleLower === 'admin' || role === 'Owner') return 'Owner';
     if (roleLower === 'supervisor' || role === 'Supervisor') return 'Supervisor';
     if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {
       return 'Employee';

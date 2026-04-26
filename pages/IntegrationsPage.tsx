@@ -401,6 +401,8 @@ export const IntegrationsPage = () => {
     const [metaHealthLoading, setMetaHealthLoading] = useState(false);
     const [metaHealthData, setMetaHealthData] = useState<MetaHealthResponse | null>(null);
     const [metaHealthAccountId, setMetaHealthAccountId] = useState<number | null>(null);
+    const [testConnectionAccountId, setTestConnectionAccountId] = useState<number | null>(null);
+    const [selectLeadFormAccountId, setSelectLeadFormAccountId] = useState<number | null>(null);
     const [metaHealthSelectedPageId, setMetaHealthSelectedPageId] = useState<string>('');
     const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template'>(() => {
         try {
@@ -536,41 +538,50 @@ export const IntegrationsPage = () => {
 
     const handleSelectLeadForm = async (account: any) => {
         if (account.platform !== 'meta') return;
-        let pages = account.metadata?.pages;
-        if (!pages?.length) {
+        try {
+            setSelectLeadFormAccountId(account.id);
+            let baseAccount = account;
+            let pages = account.metadata?.pages || [];
             try {
                 const full = await getConnectedAccountAPI(account.id);
-                pages = full?.metadata?.pages || [];
+                if (full) {
+                    baseAccount = full;
+                    pages = full?.metadata?.pages || pages;
+                }
             } catch (e) {
                 console.error('Failed to load account pages:', e);
             }
-        }
-        if (!pages?.length) {
             try {
                 const res = await syncMetaPagesAPI(account.id);
-                pages = res?.pages || [];
-                if (pages?.length) queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                const syncedPages = res?.pages || [];
+                if (syncedPages.length) {
+                    pages = syncedPages;
+                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                }
             } catch (e) {
                 console.error('Failed to sync Meta pages:', e);
             }
-        }
-        if (!pages?.length) {
-            setInfoAlert({
-                title: t('noFacebookPagesFound') || 'No Facebook pages found',
-                message: t('noFacebookPagesReconnectHint') || 'No Facebook pages were found for this account. Try disconnecting and reconnecting the account.',
-            });
-            return;
-        }
-        const merged = { ...account, metadata: { ...account.metadata, pages } };
-        const cfg = buildMetaLeadFormModalConfig(merged, account.id);
-        if (cfg) {
-            setSelectLeadFormConfig(cfg);
-            setIsSelectLeadFormModalOpen(true);
+            if (!pages?.length) {
+                setInfoAlert({
+                    title: t('noFacebookPagesFound') || 'No Facebook pages found',
+                    message: t('noFacebookPagesReconnectHint') || 'No Facebook pages were found for this account. Try disconnecting and reconnecting the account.',
+                });
+                return;
+            }
+            const merged = { ...baseAccount, metadata: { ...(baseAccount.metadata || {}), pages } };
+            const cfg = buildMetaLeadFormModalConfig(merged, account.id);
+            if (cfg) {
+                setSelectLeadFormConfig(cfg);
+                setIsSelectLeadFormModalOpen(true);
+            }
+        } finally {
+            setSelectLeadFormAccountId(null);
         }
     };
 
     const handleTestConnection = async (accountId: number) => {
         try {
+            setTestConnectionAccountId(accountId);
             const result = await testConnectionMutation.mutateAsync(accountId);
             if (result.valid) {
                 setSuccessMessage(t('connectionValid') || result.message || 'Connection is valid.');
@@ -584,15 +595,17 @@ export const IntegrationsPage = () => {
         } catch (error: any) {
             const msg = error?.message || error?.data?.error || t('errorTestingConnection') || 'Failed to test connection.';
             setInfoAlert({ title: t('connectionCheck') || 'Connection check', message: msg });
+        } finally {
+            setTestConnectionAccountId(null);
         }
     };
 
     const handleCheckMetaHealth = async (accountId: number, subscribe = false, pageId?: string) => {
         try {
+            setMetaHealthAccountId(accountId);
             setMetaHealthLoading(true);
             const data = await getMetaHealthAPI(accountId, subscribe, pageId);
             setMetaHealthData(data);
-            setMetaHealthAccountId(accountId);
             const defaultPageId =
                 (pageId && data.pages.some((p) => p.id === pageId) ? pageId : '') ||
                 (data.selection.selected_page_id && data.pages.some((p) => p.id === data.selection.selected_page_id)
@@ -1790,23 +1803,26 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             <Button
                                                 variant="secondary"
                                                 onClick={() => handleTestConnection(account.id)}
-                                                disabled={testConnectionMutation.isPending}
+                                                loading={testConnectionMutation.isPending && testConnectionAccountId === account.id}
                                                 className="rounded-lg text-sm"
                                             >
-                                                {testConnectionMutation.isPending ? (t('testing') || 'Testing...') : (t('testConnection') || 'Test connection')}
+                                                {t('testConnection') || 'Test connection'}
                                             </Button>
-                                            <Button variant="secondary" onClick={() => handleSelectLeadForm(account)} className="rounded-lg text-sm">
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => handleSelectLeadForm(account)}
+                                                loading={selectLeadFormAccountId === account.id}
+                                                className="rounded-lg text-sm"
+                                            >
                                                 {t('selectLeadForm') || 'Select Lead Form'}
                                             </Button>
                                             <Button
                                                 variant="secondary"
                                                 onClick={() => handleCheckMetaHealth(account.id)}
-                                                disabled={metaHealthLoading}
+                                                loading={metaHealthLoading && metaHealthAccountId === account.id}
                                                 className="rounded-lg text-sm"
                                             >
-                                                {metaHealthLoading && metaHealthAccountId === account.id
-                                                    ? (t('loadingMetaHealth') || 'Loading')
-                                                    : (t('checkMetaHealth') || 'Check Meta Health')}
+                                                {t('checkMetaHealth') || 'Check Meta Health'}
                                             </Button>
                                         </>
                                     )}

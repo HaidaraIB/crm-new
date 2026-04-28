@@ -9,6 +9,7 @@ import { AddProductCategoryModal } from '../components/modals/AddProductCategory
 import { EditProductCategoryModal } from '../components/modals/EditProductCategoryModal';
 import { AddSupplierModal } from '../components/modals/AddSupplierModal';
 import { EditSupplierModal } from '../components/modals/EditSupplierModal';
+import { normalizeRole } from '../utils/roles';
 
 type Tab = 'products' | 'categories' | 'suppliers';
 
@@ -205,7 +206,7 @@ export const ProductsInventoryPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role?.toUpperCase() === 'ADMIN';
+    const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
 
     // If not products, show message
     if (!isProducts) {

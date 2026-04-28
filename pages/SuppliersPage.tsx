@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Supplier } from '../types';
 import { useSuppliers, useDeleteSupplier } from '../hooks/useQueries';
+import { normalizeRole } from '../utils/roles';
 
 const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -124,7 +125,8 @@ export const SuppliersPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
 
     // If not products, show message
     if (!isProducts) {

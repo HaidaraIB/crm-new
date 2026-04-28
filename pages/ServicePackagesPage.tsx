@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { ServicePackage } from '../types';
 import { useServicePackages, useDeleteServicePackage } from '../hooks/useQueries';
+import { normalizeRole } from '../utils/roles';
 
 const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: ServicePackage[], onUpdate: (pkg: ServicePackage) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -136,7 +137,8 @@ export const ServicePackagesPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
-    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_services'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_services'));
 
     // If not services, show message
     if (!isServices) {

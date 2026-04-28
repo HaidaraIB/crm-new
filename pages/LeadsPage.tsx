@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState, AssigneeFilter } from '../components/index';
 import { TrashIcon, ChevronDownIcon, FacebookIcon, SearchIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
@@ -10,6 +10,7 @@ import { Lead } from '../types';
 import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyViewLeadRoute } from '../utils/routing';
+import { normalizeRole } from '../utils/roles';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -256,7 +257,7 @@ export const LeadsPage = () => {
         setIsSuccessModalOpen,
         setSuccessMessage,
     } = useAppContext();
-    const isDataEntryUser = currentUser?.role === 'DataEntry';
+    const isDataEntryUser = normalizeRole(currentUser?.role) === 'DataEntry';
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
     const [leadsPageSize, setLeadsPageSize] = useState(20);
     
@@ -525,8 +526,9 @@ export const LeadsPage = () => {
 
     // Check if user can delete a lead (admin, supervisor with permission, or assigned employee)
     const canDeleteLead = (lead: Lead) => {
-        const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin';
-        const isSupervisorWithLeads = currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_leads');
+        const currentRole = normalizeRole(currentUser?.role);
+        const isAdmin = currentRole === 'Owner';
+        const isSupervisorWithLeads = currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_leads');
         const isAssignedEmployee = lead.assignedTo === currentUser?.id;
         return isAdmin || isSupervisorWithLeads || isAssignedEmployee;
     };
@@ -568,11 +570,15 @@ export const LeadsPage = () => {
         }
 
         if (leadFilters.assignedTo && leadFilters.assignedTo !== 'All') {
-            leads = leads.filter(l => {
-                // Use assigned_to from API if available, otherwise fallback to assignedTo
-                const assignedToId = (l as any).assigned_to || l.assignedTo;
-                return assignedToId === parseInt(leadFilters.assignedTo);
-            });
+            if (leadFilters.assignedTo === 'Unassigned') {
+                leads = leads.filter(l => !((l as any).assigned_to || l.assignedTo));
+            } else {
+                leads = leads.filter(l => {
+                    // Use assigned_to from API if available, otherwise fallback to assignedTo
+                    const assignedToId = (l as any).assigned_to || l.assignedTo;
+                    return assignedToId === parseInt(leadFilters.assignedTo);
+                });
+            }
         }
 
         if (leadFilters.communicationWay && leadFilters.communicationWay !== 'All') {
@@ -699,7 +705,14 @@ export const LeadsPage = () => {
     }
 
     // Check if current user is admin or supervisor with leads permission (for assign/bulk actions)
-    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role === 'admin' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_leads'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_leads'));
+
+    const userRole = normalizeRole(currentUser?.role);
+    const canUseAssigneeQuickFilter =
+        currentPage !== 'My Leads' &&
+        (userRole === 'Owner' ||
+            (userRole === 'Supervisor' && hasSupervisorPermission('can_manage_leads')));
 
     return (
         <>
@@ -791,47 +804,54 @@ export const LeadsPage = () => {
                     )
                 })}
             </div>
-            <div className="flex w-full max-w-2xl flex-col gap-2 mt-3 mb-4 sm:flex-row sm:items-center">
-                <div className="relative min-w-0 flex-1">
-                    <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-500 dark:text-gray-400" aria-hidden>
-                        <SearchIcon className="h-4 w-4" />
-                    </span>
-                    <input
-                        type="text"
-                        inputMode="search"
-                        enterKeyHint="search"
-                        value={leadSearchDraft}
-                        onChange={(e) => handleLeadSearchInputChange(e.target.value)}
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') {
-                                e.preventDefault();
-                                commitLeadSearchFromDraft();
-                            }
-                        }}
-                        placeholder={t('searchLeadsPlaceholderEnter') || 'Name or phone — press Enter to search'}
-                        dir={language === 'ar' ? 'rtl' : 'ltr'}
-                        autoComplete="off"
-                        className={`w-full min-w-0 py-2 ps-9 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${showLeadSearchClear ? 'pe-9' : 'pe-3'}`}
-                        aria-label={t('searchLeadsPlaceholderEnter') || t('searchLeadsByNameOrPhone')}
-                    />
-                    {showLeadSearchClear ? (
-                        <button
+            <div className="flex w-full flex-col gap-2 mt-3 mb-4">
+                <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex w-full min-w-0 gap-2">
+                        <div className="relative min-w-0 flex-1">
+                            <span className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-500 dark:text-gray-400" aria-hidden>
+                                <SearchIcon className="h-4 w-4" />
+                            </span>
+                            <input
+                                type="text"
+                                inputMode="search"
+                                enterKeyHint="search"
+                                value={leadSearchDraft}
+                                onChange={(e) => handleLeadSearchInputChange(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        commitLeadSearchFromDraft();
+                                    }
+                                }}
+                                placeholder={t('searchLeadsPlaceholderEnter') || 'Name or phone — press Enter to search'}
+                                dir={language === 'ar' ? 'rtl' : 'ltr'}
+                                autoComplete="off"
+                                className={`w-full min-w-0 py-2 ps-9 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${showLeadSearchClear ? 'pe-9' : 'pe-3'}`}
+                                aria-label={t('searchLeadsPlaceholderEnter') || t('searchLeadsByNameOrPhone')}
+                            />
+                            {showLeadSearchClear ? (
+                                <button
+                                    type="button"
+                                    onClick={clearLeadSearch}
+                                    className="absolute inset-y-0 end-0 flex items-center pe-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
+                                    aria-label={t('close') || 'Clear search'}
+                                >
+                                    <span className="text-lg leading-none px-1">&times;</span>
+                                </button>
+                            ) : null}
+                        </div>
+                        <Button
                             type="button"
-                            onClick={clearLeadSearch}
-                            className="absolute inset-y-0 end-0 flex items-center pe-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200"
-                            aria-label={t('close') || 'Clear search'}
+                            onClick={commitLeadSearchFromDraft}
+                            className="w-auto shrink-0"
                         >
-                            <span className="text-lg leading-none px-1">&times;</span>
-                        </button>
-                    ) : null}
+                            {t('search')}
+                        </Button>
+                    </div>
+                    {canUseAssigneeQuickFilter && (
+                        <AssigneeFilter />
+                    )}
                 </div>
-                <Button
-                    type="button"
-                    onClick={commitLeadSearchFromDraft}
-                    className="w-full shrink-0 sm:w-auto"
-                >
-                    {t('search')}
-                </Button>
             </div>
             <Card>
                 <div className="overflow-x-auto -mx-4 sm:mx-0">

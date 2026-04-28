@@ -10,6 +10,7 @@ import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDaysRemainingLabel } from '../utils/planEntitlements';
 import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { normalizeRole } from '../utils/roles';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -455,7 +456,7 @@ export const ProfilePage = () => {
                     </Button>
                 </Card>
 
-                {subscriptionInfo && (currentUser?.role === 'Owner' || currentUser?.role?.toLowerCase() === 'admin') && (
+                {subscriptionInfo && normalizeRole(currentUser?.role) === 'Owner' && (
                     <Card>
                         <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('subscription')}</h2>
                         <div className={`space-y-4 ${isRTL ? 'text-right' : 'text-left'}`}>

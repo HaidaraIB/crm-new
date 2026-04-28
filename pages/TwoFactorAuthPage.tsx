@@ -43,6 +43,7 @@ export const TwoFactorAuthPage = () => {
     const [token, setToken] = useState<string | null>(null);
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [trustDevice, setTrustDevice] = useState(true);
     const [subscriptionId, setSubscriptionId] = useState<number | null>(null);
 
     // Get username and password from sessionStorage (set by LoginPage)
@@ -193,6 +194,7 @@ export const TwoFactorAuthPage = () => {
                 password,
                 code: code.trim(),
                 token: token || undefined,
+                trust_device: trustDevice,
             });
             
             // Get tokens from response (API already saves them to localStorage)
@@ -443,6 +445,19 @@ export const TwoFactorAuthPage = () => {
                                     />
                                 ))}
                             </div>
+                        </div>
+                        <div>
+                            <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer">
+                                <input
+                                    type="checkbox"
+                                    checked={trustDevice}
+                                    onChange={(e) => setTrustDevice(e.target.checked)}
+                                    className="h-4 w-4 rounded border-gray-300 text-primary-600 focus:ring-primary-500"
+                                />
+                                <span>
+                                    {language === 'ar' ? 'الوثوق بهذا الجهاز لمدة 7 أيام' : 'Trust this device for 7 days'}
+                                </span>
+                            </label>
                         </div>
                         <div>
                             <Button 

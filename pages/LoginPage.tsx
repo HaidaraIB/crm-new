@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks } from '../components/index';
-import { loginAPI, getCurrentUserAPI, requestTwoFactorAuthAPI } from '../services/api';
+import { loginAPI, getCurrentUserAPI } from '../services/api';
 import { AuthHero } from '../components/AuthHero';
 
 export const LoginPage = () => {
@@ -140,18 +140,58 @@ export const LoginPage = () => {
         setIsLoading(true);
         
         try {
-            // Request 2FA code (this will verify user exists, is active, and password is correct)
-            const twoFAResponse = await requestTwoFactorAuthAPI(username, password, language);
-            
-            // Store username, password, and token in sessionStorage for 2FA page
-            sessionStorage.setItem('2fa_username', username);
-            sessionStorage.setItem('2fa_password', password);
-            sessionStorage.setItem('2fa_token', twoFAResponse.token);
-            
-            // Navigate to 2FA page (password will be verified there)
-            window.history.replaceState({}, '', '/2fa');
-            setCurrentPage('TwoFactorAuth');
-            setIsLoading(false);
+            const loginResponse: any = await loginAPI(username, password);
+
+            if (loginResponse?.requires_two_factor) {
+                sessionStorage.setItem('2fa_username', username);
+                sessionStorage.setItem('2fa_password', password);
+                if (loginResponse.token) {
+                    sessionStorage.setItem('2fa_token', loginResponse.token);
+                }
+                window.history.replaceState({}, '', '/2fa');
+                setCurrentPage('TwoFactorAuth');
+                setIsLoading(false);
+                return;
+            }
+
+            const accessToken = loginResponse?.access || localStorage.getItem('accessToken');
+            const refreshToken = loginResponse?.refresh || localStorage.getItem('refreshToken');
+            if (!accessToken || !refreshToken) {
+                throw new Error('No tokens received from server');
+            }
+
+            let userData = loginResponse?.user;
+            if (!userData) {
+                userData = await getCurrentUserAPI();
+            }
+
+            const frontendUser = {
+                id: userData.id,
+                name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
+                username: userData.username,
+                email: userData.email,
+                role: userData.role === 'admin' ? 'Owner' : userData.role === 'supervisor' ? 'Supervisor' : 'Employee',
+                phone: userData.phone || '',
+                avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
+                company: userData.company ? {
+                    id: typeof userData.company === 'object' ? userData.company.id : userData.company,
+                    name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
+                    domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
+                    specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
+                } : undefined,
+                language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
+            };
+
+            localStorage.setItem('accessToken', accessToken);
+            localStorage.setItem('refreshToken', refreshToken);
+            localStorage.removeItem('currentUser');
+            localStorage.setItem('currentUser', JSON.stringify(frontendUser));
+            localStorage.setItem('isLoggedIn', 'true');
+            setCurrentUser(frontendUser);
+            if (frontendUser.language) setLanguage(frontendUser.language);
+            setIsLoggedIn(true);
+            setCurrentPage('Dashboard');
+            window.location.href = '/dashboard';
         } catch (error: any) {
             console.error('❌ Login error:', error);
             const errorMessage = error.message || '';

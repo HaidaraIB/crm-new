@@ -6,6 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { Owner } from '../types';
 import { useOwners, useDeleteOwner } from '../hooks/useQueries';
+import { normalizeRole } from '../utils/roles';
 
 const OwnersTable = ({ owners, onEdit, onDelete, isAdmin }: { owners: Owner[], onEdit: (owner: Owner) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -81,7 +82,8 @@ export const OwnersPage = () => {
 
     // Check if user's company specialization is real_estate
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
-    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_real_estate'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_real_estate'));
 
     // If not real estate, show message
     if (!isRealEstate) {

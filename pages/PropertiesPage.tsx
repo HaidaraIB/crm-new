@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon } from '../components/index';
 import { Developer, Project, Unit } from '../types';
 import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
+import { normalizeRole } from '../utils/roles';
 
 type Tab = 'units' | 'projects' | 'developers';
 
@@ -360,7 +361,8 @@ export const PropertiesPage = () => {
         );
     }
     
-    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_real_estate'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_real_estate'));
     
     const handleFilterClick = () => {
         switch (activeTab) {

@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
 import { ProductCategory } from '../types';
 import { useProductCategories, useDeleteProductCategory } from '../hooks/useQueries';
+import { normalizeRole } from '../utils/roles';
 
 const CategoriesTable = ({ categories, onUpdate, onDelete, isAdmin, allCategories }: { categories: ProductCategory[], onUpdate: (category: ProductCategory) => void, onDelete: (id: number) => void, isAdmin: boolean, allCategories: ProductCategory[] }) => {
     const { t } = useAppContext();
@@ -135,7 +136,8 @@ export const ProductCategoriesPage = () => {
 
     // Check if user's company specialization is products
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role?.toUpperCase() === 'ADMIN' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
 
     // If not products, show message
     if (!isProducts) {

@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon } from '../components/index';
 import { User } from '../types';
 import { useUsers } from '../hooks/useQueries';
+import { getRoleTranslation, normalizeRole } from '../utils/roles';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -26,21 +27,6 @@ const getPaginationItems = (current: number, total: number): Array<number | 'ell
     if (end < total - 1) items.push('ellipsis');
     items.push(total);
     return items;
-};
-
-// Helper function to translate role - only Owner and Employee are valid
-const getRoleTranslation = (role: string, t: (key: string) => string): string => {
-    const rl = (role || '').toLowerCase();
-    if (rl === 'data_entry') return t('dataEntry');
-    // Normalize role: convert any old roles to Employee, keep Owner as is
-    const normalizedRole = role === 'Owner' ? 'Owner' : 'Employee';
-    const roleMap: Record<string, string> = {
-        'Owner': 'owner',
-        'Employee': 'employee',
-    };
-    
-    const translationKey = roleMap[normalizedRole];
-    return translationKey ? t(translationKey) : normalizedRole;
 };
 
 // Helper function to get user display name
@@ -107,9 +93,10 @@ const UserCard = ({ user }: { user: User }) => {
     };
     
     // Check if current user can manage users (Owner or Supervisor with permission)
-    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
     // Check if the displayed user is admin (Owner role) - don't allow edit/delete for admins
-    const isUserAdmin = user.role === 'Owner';
+    const isUserAdmin = normalizeRole(user.role) === 'Owner';
     
     const handleEdit = () => {
         setSelectedUser(user);
@@ -182,7 +169,12 @@ export const UsersPage = () => {
     const [usersPageSize, setUsersPageSize] = useState(20);
     
     // Fetch users using React Query
-    const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers(usersPageNumber, undefined, usersPageSize);
+    const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers(
+        usersPageNumber,
+        undefined,
+        usersPageSize,
+        { excludeRoles: ['admin', 'super_admin', 'supervisor'] }
+    );
     const allUsers = usersResponse?.results || [];
     const hasNextPage = Boolean(usersResponse?.next);
     const hasPreviousPage = Boolean(usersResponse?.previous);
@@ -195,15 +187,16 @@ export const UsersPage = () => {
         setUsersPageNumber(1);
     }, [usersPageSize]);
     
-    // Filter out Owner, Admin, and Supervisor - only show Employee users
+    // Keep only employee-facing users in case old data slips through.
     const filteredUsers = allUsers.filter(user => {
-        const roleLower = (user.role || '').toLowerCase();
-        return roleLower !== 'owner' && roleLower !== 'admin' && roleLower !== 'supervisor';
+        const normalizedRole = normalizeRole(user.role);
+        return normalizedRole !== 'Owner' && normalizedRole !== 'Supervisor';
     });
     const userCount = totalUsersCount || filteredUsers.length;
     
     // Check if current user can manage users (Owner or Supervisor with permission)
-    const isAdmin = currentUser?.role === 'Owner' || (currentUser?.role === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
 
     if (usersLoading) {
         return (

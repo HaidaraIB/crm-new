@@ -10,7 +10,25 @@ function normalizeApiBaseUrl(raw: string): string {
   return raw.replace(/\/+$/, '');
 }
 
-const BASE_URL = normalizeApiBaseUrl(import.meta.env.VITE_API_URL || '');
+function alignLocalApiHost(rawBaseUrl: string): string {
+  if (!rawBaseUrl || typeof window === 'undefined') return rawBaseUrl;
+  try {
+    const parsed = new URL(rawBaseUrl);
+    const apiHost = parsed.hostname;
+    const appHost = window.location.hostname;
+    const isLocalApi = apiHost === '127.0.0.1' || apiHost === 'localhost';
+    const isLocalApp = appHost === '127.0.0.1' || appHost === 'localhost';
+    if (isLocalApi && isLocalApp && apiHost !== appHost) {
+      parsed.hostname = appHost;
+      return parsed.toString().replace(/\/+$/, '');
+    }
+  } catch {
+    // Keep original base URL if parsing fails.
+  }
+  return rawBaseUrl;
+}
+
+const BASE_URL = alignLocalApiHost(normalizeApiBaseUrl(import.meta.env.VITE_API_URL || ''));
 /** يُرسل كـ X-API-Key — يجب أن يطابق قيمة API_KEY_WEB في الـ backend */
 const API_KEY =
   import.meta.env.VITE_API_KEY_WEB || import.meta.env.VITE_API_KEY || '';
@@ -408,6 +426,7 @@ export const loginAPI = async (username: string, password: string) => {
       'Content-Type': 'application/json',
     }),
     body: JSON.stringify({ username, password }),
+    credentials: 'include',
   });
 
   if (!response.ok) {
@@ -416,13 +435,21 @@ export const loginAPI = async (username: string, password: string) => {
   }
 
   const data = await parseSuccessJsonResponse<{
-    access: string;
-    refresh: string;
+    access?: string;
+    refresh?: string;
+    requires_two_factor?: boolean;
+    token?: string;
+    message?: string;
+    sent?: boolean;
     user?: unknown;
     [key: string]: unknown;
   }>(response);
-  localStorage.setItem('accessToken', data.access);
-  localStorage.setItem('refreshToken', data.refresh);
+  if (data.access) {
+    localStorage.setItem('accessToken', data.access);
+  }
+  if (data.refresh) {
+    localStorage.setItem('refreshToken', data.refresh);
+  }
 
   return data;
 };
@@ -1321,6 +1348,7 @@ export const verifyTwoFactorAuthAPI = async (payload: {
   password: string;
   code?: string;
   token?: string;
+  trust_device?: boolean;
 }) => {
   const response = await fetch(`${BASE_URL}/auth/verify-2fa/`, {
     method: 'POST',
@@ -1328,6 +1356,7 @@ export const verifyTwoFactorAuthAPI = async (payload: {
       'Content-Type': 'application/json',
     }),
     body: JSON.stringify(payload),
+    credentials: 'include',
   });
 
   const raw = await readJsonResponse(response);
@@ -1455,10 +1484,16 @@ export const changePasswordAPI = async (currentPassword: string, newPassword: st
  * GET /api/users/
  * Response: { count, next, previous, results: User[] }
  */
-export const getUsersAPI = async (page?: number, pageSize?: number) => {
+export const getUsersAPI = async (
+  page?: number,
+  pageSize?: number,
+  filters?: { roles?: string[]; excludeRoles?: string[] }
+) => {
   const queryParams = new URLSearchParams();
   if (page) queryParams.append('page', String(page));
   if (pageSize) queryParams.append('page_size', String(pageSize));
+  if (filters?.roles?.length) queryParams.append('roles', filters.roles.join(','));
+  if (filters?.excludeRoles?.length) queryParams.append('exclude_roles', filters.excludeRoles.join(','));
   const endpoint = `/users/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };

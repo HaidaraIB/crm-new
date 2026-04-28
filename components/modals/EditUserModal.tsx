@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { useUpdateUser } from '../../hooks/useQueries';
+import { normalizeRoleForApi } from '../../utils/roles';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -31,7 +32,7 @@ export const EditUserModal = () => {
         phone: '',
         email: '',
         password: '',
-        role: 'Employee' as string,
+        role: 'employee' as string,
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -47,16 +48,7 @@ export const EditUserModal = () => {
     // Initialize form state when modal opens or selectedUser changes
     useEffect(() => {
         if (selectedUser && isEditUserModalOpen) {
-            // Normalize role: API returns 'admin', 'supervisor', or 'employee'
-            const r = selectedUser.role?.toLowerCase();
-            const normalizedRole =
-                r === 'admin' || selectedUser.role === 'Owner'
-                    ? 'admin'
-                    : r === 'supervisor'
-                      ? 'supervisor'
-                      : r === 'data_entry'
-                        ? 'data_entry'
-                        : 'employee';
+            const normalizedRole = normalizeRoleForApi(selectedUser.role);
             
             // Get name from first_name + last_name or fallback to name
             const fullName = selectedUser.first_name || selectedUser.last_name
@@ -189,9 +181,8 @@ export const EditUserModal = () => {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
             
-            // Normalize role to lowercase for API (API expects 'admin', 'supervisor', or 'employee')
-            const currentRole = selectedUser.role?.toLowerCase();
-            const isAdmin = currentRole === 'admin' || selectedUser.role === 'Owner';
+            const currentRole = normalizeRoleForApi(selectedUser.role);
+            const isAdmin = currentRole === 'admin';
             const roleToSend = isAdmin ? 'admin' : (formState.role?.toLowerCase() || 'employee');
             
             await updateUserMutation.mutateAsync({
@@ -315,7 +306,7 @@ export const EditUserModal = () => {
                         <p className="text-gray-500 text-xs mt-1">{t('leaveBlankPassword') || 'Leave blank to keep current password'}</p>
                     )}
                 </div>
-                {(selectedUser.role?.toLowerCase() !== 'admin' && selectedUser.role !== 'Owner') && (
+                {normalizeRoleForApi(selectedUser.role) !== 'admin' && (
                     <div>
                         <Label htmlFor="edit-user-role">{t('role')}</Label>
                         <Select id="edit-user-role" value={formState.role} onChange={handleChange}>

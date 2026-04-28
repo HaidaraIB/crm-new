@@ -9,6 +9,7 @@ import { AddServicePackageModal } from '../components/modals/AddServicePackageMo
 import { EditServicePackageModal } from '../components/modals/EditServicePackageModal';
 import { AddServiceProviderModal } from '../components/modals/AddServiceProviderModal';
 import { EditServiceProviderModal } from '../components/modals/EditServiceProviderModal';
+import { normalizeRole } from '../utils/roles';
 
 type Tab = 'services' | 'packages' | 'providers';
 
@@ -206,7 +207,7 @@ export const ServicesInventoryPage = () => {
 
     // Check if user's company specialization is services
     const isServices = currentUser?.company?.specialization === 'services';
-    const isAdmin = currentUser?.role === 'Owner' || currentUser?.role?.toUpperCase() === 'ADMIN';
+    const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
 
     // If not services, show message
     if (!isServices) {

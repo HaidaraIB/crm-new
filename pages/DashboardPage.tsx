@@ -7,10 +7,11 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, Cartes
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
 import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
+import { normalizeRole, getRoleTranslation } from '../utils/roles';
 
 export const DashboardPage = () => {
     const { t, currentUser, language, setSelectedLead, setCurrentPage, theme } = useAppContext();
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
     const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
     const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
     const [chartDaysRange, setChartDaysRange] = useState<7 | 14 | 30>(7);
@@ -895,7 +896,7 @@ export const DashboardPage = () => {
                                             {user.name}
                                         </p>
                                         <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">
-                                            {user.role === 'Owner' ? t('owner') : t('employee')}
+                                            {getRoleTranslation(user.role, t)}
                                         </p>
                                         <div className="flex items-center gap-1.5 mt-1.5">
                                             <div className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-yellow-400' : 'bg-gray-400'}`}></div>

@@ -7,6 +7,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { useAddProduct, useProductCategories, useSuppliers } from '../../hooks/useQueries';
+import { normalizeRole } from '../../utils/roles';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-secondary mb-1">{children}</label>
@@ -25,7 +26,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 export const AddProductModal = () => {
     const { isAddProductModalOpen, setIsAddProductModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
-    const isAdmin = currentUser?.role?.toUpperCase() === 'ADMIN';
+    const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
     
     // Fetch data using React Query
     const { data: categoriesResponse } = useProductCategories();

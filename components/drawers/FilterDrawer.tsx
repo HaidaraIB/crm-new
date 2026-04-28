@@ -202,6 +202,7 @@ export const FilterDrawer = () => {
                                 <FilterLabel htmlFor="leads-filter-assigned">{t('assignedTo')}</FilterLabel>
                                 <FilterSelect id="leads-filter-assigned" value={localFilters.assignedTo} onChange={(e) => handleFilterChange('assignedTo', e.target.value)}>
                                     <option value="All">{t('all')}</option>
+                                    <option value="Unassigned">{t('unassigned') || 'Unassigned'}</option>
                                     {userOptions.map(user => (
                                         <option key={user.id} value={user.id.toString()}>
                                             {getUserDisplayName(user)}

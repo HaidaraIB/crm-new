@@ -45,7 +45,8 @@ import {
 // ==================== Query Keys ====================
 export const queryKeys = {
   currentUser: ['currentUser'] as const,
-  users: (page?: number, pageSize?: number) => ['users', page ?? 'all', pageSize ?? 'default'] as const,
+  users: (page?: number, pageSize?: number, filters?: { roles?: string[]; excludeRoles?: string[] }) =>
+    ['users', page ?? 'all', pageSize ?? 'default', filters?.roles?.join('|') ?? '', filters?.excludeRoles?.join('|') ?? ''] as const,
   leads: (filters?: { type?: string; priority?: string; search?: string }, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
   deals: (page?: number, pageSize?: number) => ['deals', page ?? 'all', pageSize ?? 'default'] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
@@ -93,14 +94,15 @@ export const useCurrentUser = (options?: Omit<UseQueryOptions<any, Error>, 'quer
 export const useUsers = (
   pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
   options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
-  pageSize?: number
+  pageSize?: number,
+  filters?: { roles?: string[]; excludeRoles?: string[] }
 ) => {
   const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
   const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   return useQuery({
-    queryKey: queryKeys.users(page, pageSize),
+    queryKey: queryKeys.users(page, pageSize, filters),
     queryFn: async () => {
-      const response = await getUsersAPI(page, pageSize);
+      const response = await getUsersAPI(page, pageSize, filters);
       if (response && response.results) {
         return {
           ...response,

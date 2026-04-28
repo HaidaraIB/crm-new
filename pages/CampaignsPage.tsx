@@ -6,6 +6,7 @@ import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterIcon, Edi
 import { Campaign } from '../types';
 import { CampaignsFilterDrawer } from '../components/drawers/CampaignsFilterDrawer';
 import { useCampaigns, useDeleteCampaign } from '../hooks/useQueries';
+import { normalizeRole } from '../utils/roles';
 
 const CampaignsTable = ({ campaigns, onEdit, onDelete }: { campaigns: Campaign[], onEdit: (campaign: Campaign) => void, onDelete: (id: number) => void }) => {
     const { t } = useAppContext();
@@ -107,7 +108,7 @@ export const CampaignsPage = () => {
         setIsEditCampaignModalOpen,
         currentUser 
     } = useAppContext();
-    const isAdmin = currentUser?.role === 'Owner';
+    const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
 
     // Fetch campaigns using React Query
     const { data: campaignsResponse, isLoading: campaignsLoading, error: campaignsError } = useCampaigns();

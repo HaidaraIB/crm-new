@@ -1,4 +1,5 @@
 import { User } from '../types';
+import { normalizeRole } from './roles';
 
 // Default avatar generator
 export const getAvatarUrl = (username?: string) => {
@@ -13,21 +14,6 @@ export const normalizeUser = (userData: any): User => {
   const last_name = userData.last_name || '';
   const username = userData.username || userData.email?.split('@')[0] || 'user';
   
-  // Role normalization logic
-  const normalizeRoleInternal = (role: string | undefined): string => {
-    if (!role || typeof role !== 'string') return 'Employee';
-    const roleLower = role.toLowerCase();
-    // Keep super_admin backend-only: map to existing Owner label in frontend.
-    if (roleLower === 'super_admin' || roleLower === 'admin' || role === 'Owner') return 'Owner';
-    if (roleLower === 'supervisor' || role === 'Supervisor') return 'Supervisor';
-    if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {
-      return 'Employee';
-    }
-    if (roleLower === 'employee' || role === 'Employee') return 'Employee';
-    if (roleLower === 'data_entry' || role === 'DataEntry') return 'DataEntry';
-    return 'Employee';
-  };
-
   return {
     ...userData, // Keep original fields
     id: userData.id,
@@ -36,7 +22,7 @@ export const normalizeUser = (userData: any): User => {
     name: `${first_name} ${last_name}`.trim() || username,
     username,
     email: userData.email,
-    role: normalizeRoleInternal(userData.role),
+    role: normalizeRole(userData.role),
     phone: userData.phone || '',
     profile_photo: userData.profile_photo,
     avatar: userData.profile_photo || userData.avatar || getAvatarUrl(username),

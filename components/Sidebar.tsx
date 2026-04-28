@@ -10,6 +10,7 @@ import { Page as PageType } from '../types';
 import { Button } from './Button';
 import { ChevronDownIcon, XIcon } from './icons';
 import { getIntegrationPolicyAPI } from '../services/api';
+import { normalizeRole } from '../utils/roles';
 
 type SidebarItemProps = { 
     name: string; 
@@ -55,7 +56,8 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
 export const Sidebar = () => {
     const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme, canAccessPage, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
-    const isDataEntryUser = currentUser?.role === 'DataEntry';
+    const normalizedCurrentRole = normalizeRole(currentUser?.role);
+    const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
     
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
@@ -181,20 +183,20 @@ export const Sidebar = () => {
                         return false;
                     }
                     // Supervisor: hide pages they don't have permission for
-                    if (currentUser?.role === 'Supervisor') {
+                    if (normalizedCurrentRole === 'Supervisor') {
                         if (!canAccessPage(item.name)) return false;
                         return true;
                     }
                     // Hide Users item for non-admin users
-                    if (item.name === 'Users' && currentUser?.role !== 'Owner') {
+                    if (item.name === 'Users' && normalizedCurrentRole !== 'Owner') {
                         return false;
                     }
                     // Hide Reports item for non-admin users
-                    if (item.name === 'Reports' && currentUser?.role !== 'Owner') {
+                    if (item.name === 'Reports' && normalizedCurrentRole !== 'Owner') {
                         return false;
                     }
                     // Hide Employees item for employee role
-                    if (item.name === 'Employees' && currentUser?.role?.toLowerCase() === 'employee') {
+                    if (item.name === 'Employees' && normalizedCurrentRole === 'Employee') {
                         return false;
                     }
                     return true;
@@ -207,11 +209,11 @@ export const Sidebar = () => {
                         subItems = ['All Leads'];
                     }
                     // Employees only see WhatsApp under Integrations (Chats + Template Management)
-                    if (item.name === 'Integrations' && currentUser?.role?.toLowerCase() === 'employee') {
+                    if (item.name === 'Integrations' && normalizedCurrentRole === 'Employee') {
                         subItems = ['WhatsApp'];
                     }
                     // Supervisor: filter sub-items by permission
-                    if (currentUser?.role === 'Supervisor' && subItems) {
+                    if (normalizedCurrentRole === 'Supervisor' && subItems) {
                         subItems = subItems.filter((sub) => canAccessPage(sub));
                     }
                     return (
@@ -253,9 +255,9 @@ export const Sidebar = () => {
                 })}
             </nav>
             <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700">
-                {currentUser?.role?.toLowerCase() !== 'employee' && currentUser?.role !== 'DataEntry' && (
+                {normalizedCurrentRole !== 'Employee' && normalizedCurrentRole !== 'DataEntry' && (
                     <>
-                        {currentUser?.role !== 'Supervisor' && (
+                        {normalizedCurrentRole !== 'Supervisor' && (
                             <SidebarItem
                                 name={t('billing')}
                                 icon={SIDEBAR_ITEMS.find(item => item.name === 'Billing')?.icon}

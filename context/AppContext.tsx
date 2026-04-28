@@ -7,6 +7,7 @@ import { formatStageName, getStageDisplayLabel, getStageCategory } from '../util
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI } from '../services/api';
+import { normalizeRole } from '../utils/roles';
 
 // --- Helper Functions ---
 /**
@@ -397,21 +398,6 @@ export const useAppContext = () => {
   const context = useContext(AppContext);
   if (!context) throw new Error('useAppContext must be used within an AppProvider');
   return context;
-};
-
-// Helper function to normalize user roles - Owner, Supervisor, Employee
-const normalizeRole = (role: string | undefined): 'Owner' | 'Supervisor' | 'Employee' | 'DataEntry' => {
-  if (!role || typeof role !== 'string') return 'Employee';
-  const roleLower = role.toLowerCase();
-  // Hide backend-only super_admin from UI and treat it as Owner permissions.
-  if (roleLower === 'super_admin' || roleLower === 'admin' || role === 'Owner') return 'Owner';
-  if (roleLower === 'supervisor' || role === 'Supervisor') return 'Supervisor';
-  if (roleLower === 'data_entry' || role === 'DataEntry') return 'DataEntry';
-  if (roleLower.includes('sales') || roleLower.includes('manager') || roleLower.includes('assistant')) {
-    return 'Employee';
-  }
-  if (roleLower === 'employee' || role === 'Employee') return 'Employee';
-  return 'Employee';
 };
 
 import { normalizeUser, getAvatarUrl } from '../utils/userUtils';
@@ -827,7 +813,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         const userData = await getCurrentUserAPI();
         
         // Check subscription for all users (employees and admins)
-        const isEmployee = userData.role === 'employee';
+        const isEmployee = normalizeRole(userData.role) === 'Employee';
         const subscriptionId = userData.company?.subscription?.id;
         
         // Check subscription status with end_date validation
@@ -1088,7 +1074,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   };
 
   const hasSupervisorPermission = (key: keyof import('../types').SupervisorPermissionsMap): boolean => {
-    if (!currentUser || currentUser.role !== 'Supervisor') return false;
+    if (!currentUser || normalizeRole(currentUser.role) !== 'Supervisor') return false;
     const sp = currentUser.supervisor_permissions;
     if (!sp || !sp.is_active || !sp.permissions) return false;
     return Boolean((sp.permissions as any)[key]);
@@ -1096,8 +1082,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
   const canAccessPage = (page: Page): boolean => {
     if (!currentUser) return false;
-    const role = currentUser.role;
-    if (role === 'Owner' || role?.toLowerCase() === 'admin') return true;
+    const role = normalizeRole(currentUser.role);
+    if (role === 'Owner') return true;
     if (role === 'DataEntry') {
       switch (page) {
         case 'All Leads':

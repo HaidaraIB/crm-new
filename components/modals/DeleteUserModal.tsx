@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { useDeleteUser } from '../../hooks/useQueries';
+import { normalizeRole } from '../../utils/roles';
 
 // Helper function to get user display name
 const getUserDisplayName = (user: any, t?: (key: string) => string): string => {
@@ -28,6 +29,11 @@ export const DeleteUserModal = () => {
 
         setErrorMessage('');
 
+        if (normalizeRole(selectedUser.role) === 'Supervisor') {
+            setErrorMessage(t('supervisorsDeleteFromEmployeesPageOnly'));
+            return;
+        }
+
         try {
             await deleteUserMutation.mutateAsync(selectedUser.id);
             
@@ -47,6 +53,7 @@ export const DeleteUserModal = () => {
     if (!selectedUser) return null;
 
     const displayName = getUserDisplayName(selectedUser, t);
+    const isSupervisorTarget = normalizeRole(selectedUser.role) === 'Supervisor';
 
     return (
         <Modal isOpen={isDeleteUserModalOpen} onClose={() => {
@@ -54,31 +61,42 @@ export const DeleteUserModal = () => {
             setErrorMessage('');
         }} title={t('deleteEmployee')}>
             <div className="space-y-4">
-                {errorMessage && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                        {errorMessage}
+                {isSupervisorTarget ? (
+                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-md text-sm">
+                        {t('supervisorsDeleteFromEmployeesPageOnly')}
                     </div>
+                ) : (
+                    <>
+                        {errorMessage && (
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                                {errorMessage}
+                            </div>
+                        )}
+                        <p>{t('confirmDeleteEmployee1')} <span className="font-bold">{displayName}</span>{t('confirmDeleteEmployee2')}</p>
+                    </>
                 )}
-                <p>{t('confirmDeleteEmployee1')} <span className="font-bold">{displayName}</span>{t('confirmDeleteEmployee2')}</p>
                 <div className="flex justify-end gap-2">
                     <Button 
                         variant="secondary" 
                         onClick={() => {
                             setIsDeleteUserModalOpen(false);
                             setSuccessMessage('');
+                            setErrorMessage('');
                         }}
                         disabled={isLoading}
                     >
                         {t('cancel')}
                     </Button>
-                    <Button 
-                        variant="danger" 
-                        onClick={handleDelete}
-                        loading={isLoading}
-                        disabled={isLoading}
-                    >
-                        {t('deleteEmployee')}
-                    </Button>
+                    {!isSupervisorTarget && (
+                        <Button 
+                            variant="danger" 
+                            onClick={handleDelete}
+                            loading={isLoading}
+                            disabled={isLoading}
+                        >
+                            {t('deleteEmployee')}
+                        </Button>
+                    )}
                 </div>
             </div>
         </Modal>

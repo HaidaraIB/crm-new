@@ -312,7 +312,6 @@ export const EditUserModal = () => {
                         <Select id="edit-user-role" value={formState.role} onChange={handleChange}>
                             <option value="employee">{t('employee')}</option>
                             <option value="data_entry">{t('dataEntry')}</option>
-                            <option value="supervisor">{t('supervisor') || 'Supervisor'}</option>
                         </Select>
                         {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                     </div>

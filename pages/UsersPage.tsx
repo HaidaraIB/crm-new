@@ -123,6 +123,7 @@ const UserCard = ({ user }: { user: User }) => {
     const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
     // Check if the displayed user is admin (Owner role) - don't allow edit/delete for admins
     const isUserAdmin = normalizeRole(user.role) === 'Owner';
+    const isSupervisorUser = normalizeRole(user.role) === 'Supervisor';
     
     const handleEdit = () => {
         setSelectedUser(user);
@@ -149,7 +150,7 @@ const UserCard = ({ user }: { user: User }) => {
                         </Button>
                     }>
                         <DropdownItem onClick={handleView}>{t('viewEmployee')}</DropdownItem>
-                        {!isUserAdmin && (
+                        {!isUserAdmin && !isSupervisorUser && (
                             <>
                                 <DropdownItem onClick={handleEdit}>{t('editEmployee')}</DropdownItem>
                                 <DropdownItem onClick={handleDelete}>{t('deleteEmployee')}</DropdownItem>
@@ -209,7 +210,7 @@ export const UsersPage = () => {
         usersPageNumber,
         undefined,
         usersPageSize,
-        { excludeRoles: ['admin', 'super_admin', 'supervisor'] }
+        { excludeRoles: ['admin', 'super_admin'] }
     );
     const allUsers = usersResponse?.results || [];
     const hasNextPage = Boolean(usersResponse?.next);
@@ -223,10 +224,10 @@ export const UsersPage = () => {
         setUsersPageNumber(1);
     }, [usersPageSize]);
     
-    // Keep only employee-facing users in case old data slips through.
+    // Exclude company owner from the grid; supervisors stay visible (view/manage in Settings).
     const filteredUsers = allUsers.filter(user => {
         const normalizedRole = normalizeRole(user.role);
-        return normalizedRole !== 'Owner' && normalizedRole !== 'Supervisor';
+        return normalizedRole !== 'Owner';
     });
     const userCount = totalUsersCount || filteredUsers.length;
     

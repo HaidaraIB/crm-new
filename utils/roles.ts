@@ -3,6 +3,15 @@ export type AppRole = 'Owner' | 'Supervisor' | 'Employee' | 'DataEntry';
 const normalizeRoleToken = (role?: string): string =>
   (role || '').toString().trim().toLowerCase().replace(/\s+/g, '_');
 
+/**
+ * Only these roles report presence (heartbeat). Company owners/admins and
+ * platform super-admins must not call presence APIs — they are not shown on the employees list.
+ */
+export const roleReportsPresence = (role?: string): boolean => {
+  const token = normalizeRoleToken(role);
+  return token === 'employee' || token === 'data_entry' || token === 'supervisor';
+};
+
 export const normalizeRole = (role?: string): AppRole => {
   const token = normalizeRoleToken(role);
 

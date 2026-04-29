@@ -7,7 +7,7 @@ import { formatStageName, getStageDisplayLabel, getStageCategory } from '../util
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI } from '../services/api';
-import { normalizeRole } from '../utils/roles';
+import { normalizeRole, roleReportsPresence } from '../utils/roles';
 
 // --- Helper Functions ---
 /**
@@ -1012,9 +1012,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   }, [isLoggedIn, currentUser?.company?.subscription?.id, setCurrentUserState, setIsLoggedInState]);
 
   useEffect(() => {
-    const normalizedRole = normalizeRole(currentUser?.role);
-    const shouldSendPresence = normalizedRole !== 'Owner';
-    if (!isLoggedIn || !currentUser?.id || !shouldSendPresence) return;
+    if (!isLoggedIn || !currentUser?.id) return;
+    if (!roleReportsPresence(currentUser?.role)) return;
 
     let cancelled = false;
     const sendHeartbeat = async () => {

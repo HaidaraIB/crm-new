@@ -6,7 +6,7 @@ import { translations } from '../constants';
 import { formatStageName, getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
-import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI } from '../services/api';
+import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 
 // --- Helper Functions ---
@@ -1010,6 +1010,37 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     
     return () => clearInterval(interval);
   }, [isLoggedIn, currentUser?.company?.subscription?.id, setCurrentUserState, setIsLoggedInState]);
+
+  useEffect(() => {
+    const normalizedRole = normalizeRole(currentUser?.role);
+    const shouldSendPresence = normalizedRole !== 'Owner';
+    if (!isLoggedIn || !currentUser?.id || !shouldSendPresence) return;
+
+    let cancelled = false;
+    const sendHeartbeat = async () => {
+      if (cancelled) return;
+      try {
+        await sendPresenceHeartbeatAPI('web');
+      } catch {
+        // Keep presence best-effort and silent to avoid UX noise.
+      }
+    };
+
+    sendHeartbeat();
+    const interval = setInterval(sendHeartbeat, 60 * 1000);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') {
+        sendHeartbeat();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [isLoggedIn, currentUser?.id, currentUser?.role]);
 
   const setIsLoggedIn = (loggedIn: boolean) => {
     setIsLoggedInState(loggedIn);

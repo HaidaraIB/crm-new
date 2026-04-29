@@ -39,6 +39,9 @@ export const normalizeUser = (userData: any): User => {
     emailVerified: userData.email_verified || userData.is_email_verified || userData.emailVerified || false,
     supervisor_permissions: userData.supervisor_permissions ?? undefined,
     language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
+    last_seen_at: userData.last_seen_at ?? null,
+    last_seen_source: userData.last_seen_source ?? 'unknown',
+    is_online: Boolean(userData.is_online),
   };
 };
 

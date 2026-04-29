@@ -29,6 +29,32 @@ const getPaginationItems = (current: number, total: number): Array<number | 'ell
     return items;
 };
 
+const getPresenceSourceLabel = (source: string | undefined, t: (key: any) => string): string => {
+    switch ((source || '').toLowerCase()) {
+        case 'web':
+            return t('presenceSourceWeb') || 'web';
+        case 'mobile':
+            return t('presenceSourceMobile') || 'mobile';
+        default:
+            return t('presenceSourceUnknown') || 'unknown';
+    }
+};
+
+const formatLastSeenRelative = (
+    lastSeenAt: string | null | undefined,
+    t: (key: any) => string,
+): string => {
+    if (!lastSeenAt) return t('lastSeenUnknown') || 'Unknown';
+    const parsed = new Date(lastSeenAt);
+    if (Number.isNaN(parsed.getTime())) return t('lastSeenUnknown') || 'Unknown';
+
+    const seconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
+    if (seconds < 60) return t('justNow') || 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} ${t('minutesAgo') || 'min ago'}`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} ${t('hoursAgo') || 'h ago'}`;
+    return `${Math.floor(seconds / 86400)} ${t('daysAgo') || 'd ago'}`;
+};
+
 // Helper function to get user display name
 const getUserDisplayName = (user: User): string => {
     if (user.name) return user.name;
@@ -135,6 +161,16 @@ const UserCard = ({ user }: { user: User }) => {
             <div className="flex flex-col items-center pt-4">
                 <Avatar src={user.avatar || ''} alt={getUserDisplayNameLocal(user)} className="w-20 h-20 mb-3" />
                 <h3 className="font-bold text-lg">{getUserDisplayNameLocal(user)}</h3>
+                {isAdmin && (
+                    <div className="mt-1 flex items-center gap-2">
+                        <span className={`inline-flex h-2.5 w-2.5 rounded-full ${user.is_online ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                        <span className="text-xs text-gray-600 dark:text-gray-300">
+                            {user.is_online
+                                ? `${t('online') || 'Online'} (${getPresenceSourceLabel(user.last_seen_source, t)})`
+                                : `${t('offline') || 'Offline'} • ${t('lastSeen') || 'Last seen'} ${formatLastSeenRelative(user.last_seen_at, t)}`}
+                        </span>
+                    </div>
+                )}
                 <p className="text-sm text-gray-500 dark:text-gray-400">{getRoleTranslation(user.role, t)}</p>
                 <p className="text-sm mt-1">{user.phone}</p>
                 {user.phone && (
@@ -169,7 +205,7 @@ export const UsersPage = () => {
     const [usersPageSize, setUsersPageSize] = useState(20);
     
     // Fetch users using React Query
-    const { data: usersResponse, isLoading: usersLoading, error: usersError } = useUsers(
+    const { data: usersResponse, isLoading: usersLoading, isFetching: usersFetching, error: usersError, refetch: refetchUsers } = useUsers(
         usersPageNumber,
         undefined,
         usersPageSize,
@@ -229,13 +265,25 @@ export const UsersPage = () => {
         <PageWrapper
             title={`${t('employees')}: ${userCount}`}
             actions={
-                isAdmin && filteredUsers.length > 0 && (
-                    <Button 
-                        onClick={() => setIsAddUserModalOpen(true)}
-                        className="w-full sm:w-auto"
-                    >
-                        <PlusIcon className="w-4 h-4" /> {t('createEmployee')}
-                    </Button>
+                isAdmin && (
+                    <div className="flex w-full sm:w-auto items-center gap-2">
+                        <Button
+                            variant="secondary"
+                            onClick={() => refetchUsers()}
+                            disabled={usersFetching}
+                            className="w-full sm:w-auto"
+                        >
+                            {t('refresh') || 'Refresh'}
+                        </Button>
+                        {filteredUsers.length > 0 && (
+                            <Button
+                                onClick={() => setIsAddUserModalOpen(true)}
+                                className="w-full sm:w-auto"
+                            >
+                                <PlusIcon className="w-4 h-4" /> {t('createEmployee')}
+                            </Button>
+                        )}
+                    </div>
                 )
             }
         >

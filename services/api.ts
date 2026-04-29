@@ -1498,6 +1498,13 @@ export const getUsersAPI = async (
   return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };
 
+export const sendPresenceHeartbeatAPI = async (source: 'web' | 'mobile' | 'unknown' = 'web') => {
+  return apiRequest<{ last_seen_at: string; last_seen_source: string }>('/users/presence_heartbeat/', {
+    method: 'POST',
+    body: JSON.stringify({ source }),
+  });
+};
+
 /**
  * إنشاء مستخدم جديد
  * POST /api/users/

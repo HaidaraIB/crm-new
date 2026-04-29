@@ -100,6 +100,9 @@ export interface User {
   supervisor_permissions?: SupervisorPermissionPayload | null;
   /** User preferred language (ar/en), synced with API for emails and UI */
   language?: 'ar' | 'en';
+  last_seen_at?: string | null;
+  last_seen_source?: 'web' | 'mobile' | 'unknown' | string;
+  is_online?: boolean;
 }
 
 export interface TimelineEntry {

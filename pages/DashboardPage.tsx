@@ -9,6 +9,21 @@ import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
 import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
 import { normalizeRole, getRoleTranslation } from '../utils/roles';
 
+const formatLastSeenRelative = (
+    lastSeenAt: string | null | undefined,
+    t: (key: any) => string,
+): string => {
+    if (!lastSeenAt) return t('lastSeenUnknown') || 'unknown';
+    const parsed = new Date(lastSeenAt);
+    if (Number.isNaN(parsed.getTime())) return t('lastSeenUnknown') || 'unknown';
+
+    const seconds = Math.max(0, Math.floor((Date.now() - parsed.getTime()) / 1000));
+    if (seconds < 60) return t('justNow') || 'just now';
+    if (seconds < 3600) return `${Math.floor(seconds / 60)} ${t('minutesAgo') || 'min ago'}`;
+    if (seconds < 86400) return `${Math.floor(seconds / 3600)} ${t('hoursAgo') || 'h ago'}`;
+    return `${Math.floor(seconds / 86400)} ${t('daysAgo') || 'd ago'}`;
+};
+
 export const DashboardPage = () => {
     const { t, currentUser, language, setSelectedLead, setCurrentPage, theme } = useAppContext();
     const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
@@ -26,7 +41,7 @@ export const DashboardPage = () => {
     const { data: tasksResponse, isLoading: isTasksLoading } = useTasks();
     const todos = tasksResponse?.results || [];
 
-    const { data: usersResponse, isLoading: isUsersLoading } = useUsers();
+    const { data: usersResponse, isLoading: isUsersLoading, isFetching: isUsersFetching, refetch: refetchUsers } = useUsers();
     const users = usersResponse?.results || [];
     
     const { data: clientTasksResponse, isLoading: isClientTasksLoading } = useClientTasks();
@@ -367,6 +382,32 @@ export const DashboardPage = () => {
         
         return filteredUsers;
     }, [users, clientTasks, currentUser]);
+
+    const employeePresenceList = useMemo(() => {
+        const currentCompanyId = currentUser?.company?.id || currentUser?.company_id || (currentUser?.company as any)?.id;
+        if (!currentCompanyId) return [];
+
+        return users
+            .filter((user: any) => {
+                const userCompanyId = user.company?.id || user.company_id || (user.company as any)?.id;
+                const role = normalizeRole(user.role);
+                return userCompanyId === currentCompanyId && role !== 'Owner' && role !== 'Supervisor';
+            })
+            .sort((a: any, b: any) => {
+                const aOnline = Boolean(a.is_online);
+                const bOnline = Boolean(b.is_online);
+                if (aOnline !== bOnline) return aOnline ? -1 : 1;
+                const aSeen = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
+                const bSeen = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
+                return bSeen - aSeen;
+            })
+            .slice(0, 8);
+    }, [users, currentUser]);
+
+    const onlineEmployeesCount = useMemo(
+        () => employeePresenceList.filter((u: any) => Boolean(u.is_online)).length,
+        [employeePresenceList],
+    );
     
     // Latest feedbacks from API-computed latest client activity
     const latestFeedbacks = useMemo(() => {
@@ -848,7 +889,7 @@ export const DashboardPage = () => {
             
             {/* Bottom Section */}
             {!isDashboardLoading && (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 <Card className="lg:col-span-1 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
                         <div>
@@ -915,6 +956,53 @@ export const DashboardPage = () => {
                         )}
                     </div>
                 </Card>
+                {isAdmin && (
+                    <Card className="lg:col-span-1 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                        <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
+                            <div>
+                                <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('employees')} {t('online') || 'Online'}</h2>
+                                <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                                    {onlineEmployeesCount}/{employeePresenceList.length} {t('online') || 'Online'}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => refetchUsers()}
+                                disabled={isUsersFetching}
+                                className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-60 dark:bg-gray-800 dark:hover:bg-gray-700"
+                            >
+                                {t('refresh') || 'Refresh'}
+                            </button>
+                        </div>
+                        <div className="space-y-2">
+                            {employeePresenceList.length > 0 ? (
+                                employeePresenceList.map((user: any) => (
+                                    <div key={user.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+                                        <div className="min-w-0">
+                                            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100 truncate">
+                                                {user.name || user.username || user.email}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                {getRoleTranslation(user.role, t)}
+                                            </p>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${user.is_online ? 'bg-emerald-500' : 'bg-gray-400'}`} />
+                                            <span className="text-xs text-gray-600 dark:text-gray-300">
+                                                {user.is_online
+                                                    ? (t('online') || 'Online')
+                                                    : `${t('lastSeen') || 'Last seen'} ${formatLastSeenRelative(user.last_seen_at, t)}`}
+                                            </span>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="text-center py-6 text-gray-600 dark:text-gray-400">
+                                    <p className="text-sm font-medium">{t('noEmployeesFound') || 'No employees found'}</p>
+                                </div>
+                            )}
+                        </div>
+                    </Card>
+                )}
                 <Card className="lg:col-span-2 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
                         <div>

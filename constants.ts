@@ -1284,6 +1284,10 @@ export const translations = {
     notice: "Notice",
     warning: "Warning",
     error: "Error",
+    connectivityStatusOnline: "Connection status: Online",
+    connectivityStatusOffline: "Connection status: Offline",
+    connectivityOfflineWarning: "You are offline. Your changes may not be saved until internet is restored.",
+    connectivityBackOnline: "Internet connection is back online.",
     // OAuth callback popup
     connectionSuccessful: "Connection succeeded",
     closePopupToSeeIntegrations: "You can close this window. The integrations page will update to show your connected account.",
@@ -2851,6 +2855,10 @@ export const translations = {
     notice: "تنبيه",
     warning: "تحذير",
     error: "خطأ",
+    connectivityStatusOnline: "حالة الاتصال: متصل بالإنترنت",
+    connectivityStatusOffline: "حالة الاتصال: غير متصل بالإنترنت",
+    connectivityOfflineWarning: "انقطع اتصال الإنترنت. قد لا يتم حفظ التغييرات حتى يعود الاتصال.",
+    connectivityBackOnline: "عاد اتصال الإنترنت بنجاح.",
     // OAuth callback popup
     connectionSuccessful: "تم الاتصال بنجاح",
     closePopupToSeeIntegrations: "يمكنك إغلاق هذه النافذة. ستتحدّث صفحة التكاملات لتعرض الحساب المتصل.",

@@ -8,7 +8,7 @@ import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionMod
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage } from './pages';
 
 const TheApp = () => {
-    const { isLoggedIn, language, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage } = useAppContext();
+    const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     const isPublicLegalPath = (path: string): boolean => {
         const normalizedPath = path.replace(/\/+$/, '') || '/';
         return normalizedPath === '/data-deletion-policy' || normalizedPath === '/data-deletion' || normalizedPath.endsWith('/data-deletion-policy') || normalizedPath.endsWith('/data-deletion')
@@ -29,6 +29,11 @@ const TheApp = () => {
         }
         return false;
     });
+    const [isInternetOnline, setIsInternetOnline] = React.useState<boolean>(() =>
+        typeof navigator !== 'undefined' ? navigator.onLine : true,
+    );
+    const previousInternetStatusRef = React.useRef<boolean>(isInternetOnline);
+    const probeInFlightRef = React.useRef(false);
     
     // Monitor payment success message changes
     React.useEffect(() => {
@@ -56,6 +61,89 @@ const TheApp = () => {
         
         return () => clearInterval(interval);
     }, []);
+
+    React.useEffect(() => {
+        const checkUrl = async (url: string): Promise<boolean> => {
+            const controller = new AbortController();
+            const timeoutId = window.setTimeout(() => controller.abort(), 5000);
+            try {
+                await fetch(url, {
+                    method: 'GET',
+                    cache: 'no-store',
+                    mode: 'no-cors',
+                    signal: controller.signal,
+                });
+                return true;
+            } catch {
+                return false;
+            } finally {
+                window.clearTimeout(timeoutId);
+            }
+        };
+
+        const runConnectivityProbe = async () => {
+            if (probeInFlightRef.current) return;
+            probeInFlightRef.current = true;
+            try {
+                if (!navigator.onLine) {
+                    setIsInternetOnline(false);
+                    return;
+                }
+                const ts = Date.now();
+                const probeTargets = [
+                    `https://www.gstatic.com/generate_204?ts=${ts}`,
+                    `https://cp.cloudflare.com/generate_204?ts=${ts}`,
+                    `https://www.msftconnecttest.com/connecttest.txt?ts=${ts}`,
+                ];
+                const results = await Promise.all(probeTargets.map((url) => checkUrl(url)));
+                setIsInternetOnline(results.some(Boolean));
+            } finally {
+                probeInFlightRef.current = false;
+            }
+        };
+
+        const handleOnline = () => {
+            void runConnectivityProbe();
+        };
+        const handleOffline = () => setIsInternetOnline(false);
+        const handleVisible = () => {
+            if (document.visibilityState === 'visible') {
+                void runConnectivityProbe();
+            }
+        };
+
+        window.addEventListener('online', handleOnline);
+        window.addEventListener('offline', handleOffline);
+        document.addEventListener('visibilitychange', handleVisible);
+
+        void runConnectivityProbe();
+        const intervalId = window.setInterval(() => {
+            void runConnectivityProbe();
+        }, 15000);
+
+        return () => {
+            window.removeEventListener('online', handleOnline);
+            window.removeEventListener('offline', handleOffline);
+            document.removeEventListener('visibilitychange', handleVisible);
+            window.clearInterval(intervalId);
+        };
+    }, []);
+
+    React.useEffect(() => {
+        const wasOnline = previousInternetStatusRef.current;
+        if (wasOnline === isInternetOnline) return;
+
+        if (!isInternetOnline) {
+            setAlertVariant('warning');
+            setAlertMessage(t('connectivityOfflineWarning'));
+            setIsAlertModalOpen(true);
+        } else {
+            setSuccessMessage(t('connectivityBackOnline'));
+            setIsSuccessModalOpen(true);
+        }
+
+        previousInternetStatusRef.current = isInternetOnline;
+    }, [isInternetOnline, language, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setIsSuccessModalOpen, setSuccessMessage]);
 
     // Keep URL <-> page state in sync (must run on every render in same order)
     React.useEffect(() => {
@@ -716,6 +804,9 @@ const TheApp = () => {
             )}
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header />
+                <div className={`px-4 py-2 text-xs sm:text-sm font-medium border-b ${isInternetOnline ? 'bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-900/40' : 'bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/40'}`}>
+                    {isInternetOnline ? t('connectivityStatusOnline') : t('connectivityStatusOffline')}
+                </div>
                 {/* Check if payment success message exists - if so, don't show email verification message */}
                 {!hasPaymentSuccessMessage && isLoggedIn && currentUser && currentUser.emailVerified === false && (
                     <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between gap-4">

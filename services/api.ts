@@ -485,6 +485,9 @@ export interface RegisterCompanyResponse {
  * Body: { company: { name, domain, specialization }, owner: { first_name, last_name, email, username, password }, plan_id?, billing_cycle? }
  * Response: { access, refresh, user, company, subscription? }
  */
+export type RegistrationPhoneOtpChannel = 'whatsapp' | 'twilio_sms';
+export type RegistrationEmailRequirement = { email_verification_required: boolean };
+
 export const registerPhoneSendOtpAPI = async (phone: string, language: string = 'en') => {
   const response = await fetch(`${BASE_URL}/auth/register/phone/send-otp/`, {
     method: 'POST',
@@ -496,12 +499,19 @@ export const registerPhoneSendOtpAPI = async (phone: string, language: string = 
   });
   if (!response.ok) {
     const errorData = await readJsonResponse(response);
-    throwApiError(errorData, 'Failed to send WhatsApp verification code');
+    throwApiError(errorData, 'Failed to send verification code');
   }
-  return parseSuccessJsonResponse<{ expires_in_seconds: number; phone: string }>(response);
+  return parseSuccessJsonResponse<{
+    expires_in_seconds: number;
+    phone: string;
+    channel?: RegistrationPhoneOtpChannel;
+  }>(response);
 };
 
-export const getPhoneOtpRequirementAPI = async (): Promise<{ phone_otp_required: boolean }> => {
+export const getPhoneOtpRequirementAPI = async (): Promise<{
+  phone_otp_required: boolean;
+  phone_otp_channel: RegistrationPhoneOtpChannel | null;
+}> => {
   const response = await fetch(`${BASE_URL}/auth/register/phone-otp-requirement/`, {
     method: 'GET',
     headers: getHeadersWithApiKey({
@@ -512,7 +522,56 @@ export const getPhoneOtpRequirementAPI = async (): Promise<{ phone_otp_required:
     const errorData = await readJsonResponse(response);
     throwApiError(errorData, 'Failed to load registration phone verification requirement');
   }
-  return parseSuccessJsonResponse<{ phone_otp_required: boolean }>(response);
+  return parseSuccessJsonResponse<{
+    phone_otp_required: boolean;
+    phone_otp_channel: RegistrationPhoneOtpChannel | null;
+  }>(response);
+};
+
+export const getRegistrationEmailRequirementAPI = async (): Promise<RegistrationEmailRequirement> => {
+  const response = await fetch(`${BASE_URL}/auth/register/email-verification-requirement/`, {
+    method: 'GET',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+    }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to load registration email verification requirement');
+  }
+  return parseSuccessJsonResponse<RegistrationEmailRequirement>(response);
+};
+
+export const registerEmailSendOtpAPI = async (email: string, language: string = 'en') => {
+  const response = await fetch(`${BASE_URL}/auth/register/email/send-otp/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      'Accept-Language': language,
+    }),
+    body: JSON.stringify({ email }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to send email verification code');
+  }
+  return parseSuccessJsonResponse<{ expires_in_seconds: number; email: string }>(response);
+};
+
+export const registerEmailVerifyOtpAPI = async (email: string, code: string, language: string = 'en') => {
+  const response = await fetch(`${BASE_URL}/auth/register/email/verify-otp/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      'Accept-Language': language,
+    }),
+    body: JSON.stringify({ email, code }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Email verification failed');
+  }
+  return parseSuccessJsonResponse<{ email_verification_token: string; expires_in_seconds: number }>(response);
 };
 
 export const registerPhoneVerifyOtpAPI = async (
@@ -552,6 +611,7 @@ export const registerCompanyAPI = async (data: {
     phone?: string;
   };
   phone_verification_token?: string;
+  email_verification_token?: string;
   plan_id?: number | null;
   billing_cycle?: 'monthly' | 'yearly';
 }, language: string = 'en'): Promise<RegisterCompanyResponse> => {

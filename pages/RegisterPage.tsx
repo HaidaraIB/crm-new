@@ -9,8 +9,12 @@ import {
     checkRegistrationAvailabilityAPI,
     verifyEmailAPI,
     getPhoneOtpRequirementAPI,
+    getRegistrationEmailRequirementAPI,
     registerPhoneSendOtpAPI,
     registerPhoneVerifyOtpAPI,
+    registerEmailSendOtpAPI,
+    registerEmailVerifyOtpAPI,
+    type RegistrationPhoneOtpChannel,
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { isRedundantPlanDescription } from '../utils/planEntitlements';
@@ -86,14 +90,46 @@ export const RegisterPage = () => {
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: OTP or Plan, 4: Plan when OTP required
     const [phoneOtpRequired, setPhoneOtpRequired] = useState(true);
+    const [phoneOtpChannel, setPhoneOtpChannel] = useState<RegistrationPhoneOtpChannel | null>(null);
+    const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
     const [phoneOtpCode, setPhoneOtpCode] = useState('');
+    const [emailOtpCode, setEmailOtpCode] = useState('');
     const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
+    const [emailVerificationToken, setEmailVerificationToken] = useState<string | null>(null);
     const [otpSending, setOtpSending] = useState(false);
     const [otpVerifying, setOtpVerifying] = useState(false);
     const isNextButtonLoading =
         (stepCheckLoading && (currentStep === 1 || currentStep === 2)) || otpSending;
     const otpStep = 3;
-    const planStep = phoneOtpRequired ? 4 : 3;
+    const anyOtpRequired = phoneOtpRequired || emailVerificationRequired;
+    const planStep = anyOtpRequired ? 4 : 3;
+
+    const mapRegisterPhoneOtpSendError = (e: unknown): string => {
+        const err = e as Error & { code?: string };
+        const code = err.code;
+        switch (code) {
+            case 'registration_otp_disabled':
+                return t('registrationOtpDisabled');
+            case 'phone_otp_misconfigured':
+            case 'whatsapp_otp_not_configured':
+            case 'twilio_otp_not_configured':
+                return t('phoneOtpMisconfigured');
+            case 'whatsapp_send_failed':
+                return t('otpSendFailedWhatsApp');
+            case 'twilio_send_failed':
+                return t('otpSendFailedSms');
+            case 'otp_rate_limited':
+                return t('otpRateLimitedUser');
+            default:
+                if (phoneOtpChannel === 'twilio_sms') {
+                    return err.message || t('otpSendFailedSms');
+                }
+                if (phoneOtpChannel === 'whatsapp') {
+                    return err.message || t('otpSendFailedWhatsApp');
+                }
+                return err.message || t('otpSendFailedGeneric');
+        }
+    };
 
     const normalizeErrorMessage = (value: any): string => {
         if (!value) return '';
@@ -173,6 +209,7 @@ export const RegisterPage = () => {
             name: 'companyName',
             plan_id: 'plan',
             phone_verification_token: 'phoneOtp',
+            email_verification_token: 'emailOtp',
         };
 
         Object.entries(directMap).forEach(([apiKey, uiKey]) => {
@@ -187,6 +224,9 @@ export const RegisterPage = () => {
 
         if (apiFields.phone_verification_token) {
             fieldErrors.phoneOtp = normalizeErrorMessage(apiFields.phone_verification_token);
+        }
+        if (apiFields.email_verification_token) {
+            fieldErrors.emailOtp = normalizeErrorMessage(apiFields.email_verification_token);
         }
 
         return fieldErrors;
@@ -430,10 +470,17 @@ export const RegisterPage = () => {
         let isMounted = true;
         const loadPhoneOtpRequirement = async () => {
             try {
-                const data = await getPhoneOtpRequirementAPI();
+                const [data, emailReq] = await Promise.all([
+                    getPhoneOtpRequirementAPI(),
+                    getRegistrationEmailRequirementAPI(),
+                ]);
                 if (!isMounted) return;
                 const required = !!data.phone_otp_required;
                 setPhoneOtpRequired(required);
+                setPhoneOtpChannel(
+                    required ? data.phone_otp_channel ?? 'whatsapp' : null
+                );
+                setEmailVerificationRequired(!!emailReq.email_verification_required);
                 if (!required) setCurrentStep((prev) => (prev === 4 ? 3 : prev));
             } catch {
                 // Keep secure default (required) if the requirement endpoint is unavailable.
@@ -536,9 +583,11 @@ export const RegisterPage = () => {
                 phone: phone.trim(),
             });
             if (!ownerAvailable) return;
-            if (!phoneOtpRequired) {
+            if (!anyOtpRequired) {
                 setPhoneVerificationToken(null);
                 setPhoneOtpCode('');
+                setEmailVerificationToken(null);
+                setEmailOtpCode('');
                 setCurrentStep(planStep);
                 return;
             }
@@ -546,18 +595,28 @@ export const RegisterPage = () => {
             setErrors((prev) => {
                 const next = { ...prev };
                 delete next.phoneOtp;
+                delete next.emailOtp;
                 delete next.general;
                 return next;
             });
             try {
-                await registerPhoneSendOtpAPI(phone.trim(), language);
+                const tasks: Promise<unknown>[] = [];
+                if (phoneOtpRequired) {
+                    tasks.push(registerPhoneSendOtpAPI(phone.trim(), language));
+                }
+                if (emailVerificationRequired) {
+                    tasks.push(registerEmailSendOtpAPI(email.trim(), language));
+                }
+                await Promise.all(tasks);
                 setPhoneVerificationToken(null);
                 setPhoneOtpCode('');
+                setEmailVerificationToken(null);
+                setEmailOtpCode('');
                 setCurrentStep(otpStep);
             } catch (e: any) {
                 setErrors((prev) => ({
                     ...prev,
-                    general: e.message || t('otpSendFailed') || 'Could not send WhatsApp code. Try again.',
+                    general: mapRegisterPhoneOtpSendError(e),
                 }));
             } finally {
                 setOtpSending(false);
@@ -568,29 +627,48 @@ export const RegisterPage = () => {
     };
 
     const handleVerifyPhoneOtp = async () => {
-        const code = phoneOtpCode.trim();
-        if (!/^\d{4,8}$/.test(code)) {
-            setErrors((prev) => ({
-                ...prev,
-                phoneOtp: t('verificationCodeRequired') || 'Enter the code from WhatsApp.',
-            }));
+        const phoneCode = phoneOtpCode.trim();
+        const emailCode = emailOtpCode.trim();
+        const nextErrors: Record<string, string> = {};
+        if (phoneOtpRequired && !/^\d{4,8}$/.test(phoneCode)) {
+            nextErrors.phoneOtp =
+                phoneOtpChannel === 'twilio_sms'
+                    ? t('verificationCodeHintSms')
+                    : t('verificationCodeHintWhatsApp');
+        }
+        if (emailVerificationRequired && !/^\d{4,8}$/.test(emailCode)) {
+            nextErrors.emailOtp = t('verificationCodeHintEmail') || 'Enter the code from your email.';
+        }
+        if (Object.keys(nextErrors).length > 0) {
+            setErrors((prev) => ({ ...prev, ...nextErrors }));
             return;
         }
         setOtpVerifying(true);
         setErrors((prev) => {
             const next = { ...prev };
             delete next.phoneOtp;
+            delete next.emailOtp;
             delete next.general;
             return next;
         });
         try {
-            const data = await registerPhoneVerifyOtpAPI(phone.trim(), code, language);
-            setPhoneVerificationToken(data.phone_verification_token);
-            setCurrentStep(4);
+            if (phoneOtpRequired) {
+                const data = await registerPhoneVerifyOtpAPI(phone.trim(), phoneCode, language);
+                setPhoneVerificationToken(data.phone_verification_token);
+            } else {
+                setPhoneVerificationToken(null);
+            }
+            if (emailVerificationRequired) {
+                const data = await registerEmailVerifyOtpAPI(email.trim(), emailCode, language);
+                setEmailVerificationToken(data.email_verification_token);
+            } else {
+                setEmailVerificationToken(null);
+            }
+            setCurrentStep(planStep);
         } catch (e: any) {
             setErrors((prev) => ({
                 ...prev,
-                phoneOtp: e.message || t('verificationFailed') || 'Invalid code. Try again.',
+                general: e.message || t('verificationFailed') || 'Invalid code. Try again.',
             }));
         } finally {
             setOtpVerifying(false);
@@ -600,11 +678,18 @@ export const RegisterPage = () => {
     const handleResendPhoneOtp = async () => {
         setOtpSending(true);
         try {
-            await registerPhoneSendOtpAPI(phone.trim(), language);
+            const tasks: Promise<unknown>[] = [];
+            if (phoneOtpRequired) {
+                tasks.push(registerPhoneSendOtpAPI(phone.trim(), language));
+            }
+            if (emailVerificationRequired) {
+                tasks.push(registerEmailSendOtpAPI(email.trim(), language));
+            }
+            await Promise.all(tasks);
         } catch (e: any) {
             setErrors((prev) => ({
                 ...prev,
-                general: e.message || t('otpSendFailed') || 'Could not resend code.',
+                general: mapRegisterPhoneOtpSendError(e),
             }));
         } finally {
             setOtpSending(false);
@@ -618,6 +703,8 @@ export const RegisterPage = () => {
             if (next === 2) {
                 setPhoneVerificationToken(null);
                 setPhoneOtpCode('');
+                setEmailVerificationToken(null);
+                setEmailOtpCode('');
             }
         }
     };
@@ -628,10 +715,21 @@ export const RegisterPage = () => {
             return;
         }
         if (phoneOtpRequired && !phoneVerificationToken) {
+            const msg =
+                phoneOtpChannel === 'twilio_sms'
+                    ? t('phoneVerificationRequiredSms')
+                    : phoneOtpChannel === 'whatsapp'
+                      ? t('phoneVerificationRequiredWhatsApp')
+                      : t('phoneVerificationRequiredGeneric');
             setErrors({
-                general:
-                    t('phoneVerificationRequired') ||
-                    'Verify your phone number via WhatsApp before completing registration.',
+                general: msg,
+            });
+            setCurrentStep(otpStep);
+            return;
+        }
+        if (emailVerificationRequired && !emailVerificationToken) {
+            setErrors({
+                general: t('emailVerificationRequiredGeneric') || 'Verify your email before completing registration.',
             });
             setCurrentStep(otpStep);
             return;
@@ -642,7 +740,7 @@ export const RegisterPage = () => {
                 ...prev,
                 plan: t('planRequired') || 'Please select a plan to continue',
             }));
-            setCurrentStep(4);
+            setCurrentStep(planStep);
             return;
         }
 
@@ -665,6 +763,7 @@ export const RegisterPage = () => {
                     phone: phone.trim(),
                 },
                 ...(phoneVerificationToken ? { phone_verification_token: phoneVerificationToken } : {}),
+                ...(emailVerificationToken ? { email_verification_token: emailVerificationToken } : {}),
                 plan_id: selectedPlan,
                 billing_cycle: billingCycle,
             }, language);
@@ -741,7 +840,7 @@ export const RegisterPage = () => {
                     backendFieldErrors.phone
                 ) {
                     setCurrentStep(2);
-                } else if (backendFieldErrors.phoneOtp) {
+                } else if (backendFieldErrors.phoneOtp || backendFieldErrors.emailOtp) {
                     setCurrentStep(otpStep);
                 } else if (backendFieldErrors.plan) {
                     setCurrentStep(planStep);
@@ -795,7 +894,7 @@ export const RegisterPage = () => {
 
                         {/* Progress indicator */}
                         <div className="flex items-center justify-center space-x-1 sm:space-x-2">
-                            {[1, 2, ...(phoneOtpRequired ? [3, 4] : [3])].map((stepNumber, idx, all) => (
+                            {[1, 2, ...(anyOtpRequired ? [3, 4] : [3])].map((stepNumber, idx, all) => (
                                 <React.Fragment key={stepNumber}>
                                     <div
                                         className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${
@@ -1123,16 +1222,24 @@ export const RegisterPage = () => {
                                 </div>
                             )}
 
-                            {/* Step 3: WhatsApp OTP */}
-                            {phoneOtpRequired && currentStep === otpStep && (
+                            {/* Step 3: Phone OTP (WhatsApp or SMS) */}
+                            {anyOtpRequired && currentStep === otpStep && (
                                 <div className="space-y-4">
                                     <h3 className="text-lg font-semibold text-primary">
-                                        {t('verifyPhoneWhatsApp') || 'Verify your phone (WhatsApp)'}
+                                        {phoneOtpRequired
+                                            ? (phoneOtpChannel === 'twilio_sms'
+                                                ? t('verifyPhoneSms')
+                                                : t('verifyPhoneWhatsApp'))
+                                            : (t('verifyRegistrationEmail') || 'Verify your email')}
                                     </h3>
                                     <p className="text-sm text-secondary">
-                                        {t('verifyPhoneWhatsAppHint') ||
-                                            'We sent a verification code to your WhatsApp. Enter it below.'}
+                                        {phoneOtpRequired
+                                            ? (phoneOtpChannel === 'twilio_sms'
+                                                ? t('verifyPhoneSmsHint')
+                                                : t('verifyPhoneWhatsAppHint'))
+                                            : (t('verifyRegistrationEmailHint') || 'We sent a verification code to your email. Enter it below.')}
                                     </p>
+                                    {phoneOtpRequired && (
                                     <div>
                                         <label htmlFor="phone-otp" className="block text-sm font-medium text-secondary mb-1">
                                             {t('verificationCode') || 'Verification code'}
@@ -1159,6 +1266,35 @@ export const RegisterPage = () => {
                                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phoneOtp}</p>
                                         )}
                                     </div>
+                                    )}
+                                    {emailVerificationRequired && (
+                                    <div>
+                                        <label htmlFor="email-otp" className="block text-sm font-medium text-secondary mb-1">
+                                            {t('verificationCode') || 'Verification code'}
+                                        </label>
+                                        <Input
+                                            id="email-otp"
+                                            inputMode="numeric"
+                                            autoComplete="one-time-code"
+                                            placeholder="123456"
+                                            value={emailOtpCode}
+                                            onChange={(e) => {
+                                                setEmailOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8));
+                                                if (errors.emailOtp) {
+                                                    setErrors((prev) => {
+                                                        const next = { ...prev };
+                                                        delete next.emailOtp;
+                                                        return next;
+                                                    });
+                                                }
+                                            }}
+                                            className={errors.emailOtp ? 'border-red-500' : ''}
+                                        />
+                                        {errors.emailOtp && (
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.emailOtp}</p>
+                                        )}
+                                    </div>
+                                    )}
                                     <button
                                         type="button"
                                         className="text-sm text-primary-600 dark:text-primary-400 hover:underline disabled:opacity-50"
@@ -1336,7 +1472,7 @@ export const RegisterPage = () => {
                                         {t('next') || 'Next'}
                                     </Button>
                                 )}
-                                {phoneOtpRequired && currentStep === otpStep && (
+                                {anyOtpRequired && currentStep === otpStep && (
                                     <Button
                                         onClick={handleVerifyPhoneOtp}
                                         loading={otpVerifying}

@@ -2,12 +2,13 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, Dropdown, DropdownItem, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateToLocal, formatDateTimeToLocal } from '../utils/dateUtils';
+import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
-import { BriefcaseIcon, ChevronDownIcon, MapPinIcon, MoreVerticalIcon } from '../components/icons';
+import { BriefcaseIcon, ChevronDownIcon, MapPinIcon } from '../components/icons';
 import { Lead } from '../types';
 
 // Status Dropdown Component (same as in LeadsPage)
@@ -239,6 +240,7 @@ export const ViewLeadPage = () => {
                 name: lead.name,
                 phone: lead.phone_number || lead.phone || '',
                 budget: lead.budget || 0,
+                budget_max: lead.budget_max ?? lead.budgetMax ?? null,
                 assignedTo: lead.assigned_to || 0,
                 type: lead.type || '',
                 communicationWay: lead.communication_way || '',
@@ -246,6 +248,7 @@ export const ViewLeadPage = () => {
                 status: status.id,
                 company: companyId,
                 lead_company_name: lead.lead_company_name ?? lead.leadCompanyName ?? null,
+                profession: lead.profession ?? null,
             };
             
             // Include phoneNumbers if they exist
@@ -333,19 +336,33 @@ export const ViewLeadPage = () => {
                     type: apiLead.type || '',
                     assignedTo: apiLead.assigned_to || (apiLead.assigned_to_username ? 0 : 0),
                     budget: apiLead.budget || 0,
+                    budgetMax: apiLead.budget_max ?? apiLead.budgetMax ?? undefined,
                     communicationWay: apiLead.communication_way_name || apiLead.communication_way || '',
                     priority: apiLead.priority || '',
                     createdAt: apiLead.created_at || apiLead.createdAt || '',
                     lastFeedback: apiLead.last_feedback || apiLead.lastFeedback || '',
+                    notes: apiLead.notes ?? '',
                     campaign: apiLead.campaign || null,
                     campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
                     source: apiLead.source || 'manual',
                     integration_account: apiLead.integration_account || null,
                     leadCompanyName: apiLead.lead_company_name ?? apiLead.leadCompanyName ?? undefined,
+                    profession: apiLead.profession ?? undefined,
+                    interestedDeveloper: apiLead.interested_developer ?? apiLead.interestedDeveloper ?? null,
+                    interestedProject: apiLead.interested_project ?? apiLead.interestedProject ?? null,
+                    interestedUnit: apiLead.interested_unit ?? apiLead.interestedUnit ?? null,
+                    interestedDeveloperName:
+                        apiLead.interested_developer_name ?? apiLead.interestedDeveloperName ?? null,
+                    interestedProjectName:
+                        apiLead.interested_project_name ?? apiLead.interestedProjectName ?? null,
+                    interestedUnitName: apiLead.interested_unit_name ?? apiLead.interestedUnitName ?? null,
+                    interestedUnitCode: apiLead.interested_unit_code ?? apiLead.interestedUnitCode ?? null,
                 };
                 // Store assigned_to from API for display
                 (transformedLead as any).assigned_to = apiLead.assigned_to;
                 (transformedLead as any).assigned_to_username = apiLead.assigned_to_username;
+                (transformedLead as any).created_by = apiLead.created_by;
+                (transformedLead as any).created_by_name = apiLead.created_by_name;
                 return transformedLead;
             }
         }
@@ -366,20 +383,33 @@ export const ViewLeadPage = () => {
                 type: apiLead.type || '',
                 assignedTo: apiLead.assigned_to || (apiLead.assigned_to_username ? 0 : 0),
                 budget: apiLead.budget || 0,
+                budgetMax: apiLead.budget_max ?? apiLead.budgetMax ?? undefined,
                 communicationWay: apiLead.communication_way_name || apiLead.communication_way || '',
                 priority: apiLead.priority || '',
                 createdAt: apiLead.created_at || apiLead.createdAt || '',
                 lastFeedback: apiLead.last_feedback || apiLead.lastFeedback || '',
-                notes: apiLead.notes || '',
+                notes: apiLead.notes ?? '',
                 campaign: apiLead.campaign || null,
                 campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
                 source: apiLead.source || 'manual',
                 integration_account: apiLead.integration_account || null,
                 leadCompanyName: apiLead.lead_company_name ?? apiLead.leadCompanyName ?? undefined,
+                profession: apiLead.profession ?? undefined,
+                interestedDeveloper: apiLead.interested_developer ?? apiLead.interestedDeveloper ?? null,
+                interestedProject: apiLead.interested_project ?? apiLead.interestedProject ?? null,
+                interestedUnit: apiLead.interested_unit ?? apiLead.interestedUnit ?? null,
+                interestedDeveloperName:
+                    apiLead.interested_developer_name ?? apiLead.interestedDeveloperName ?? null,
+                interestedProjectName:
+                    apiLead.interested_project_name ?? apiLead.interestedProjectName ?? null,
+                interestedUnitName: apiLead.interested_unit_name ?? apiLead.interestedUnitName ?? null,
+                interestedUnitCode: apiLead.interested_unit_code ?? apiLead.interestedUnitCode ?? null,
             };
             // Store assigned_to from API for display
             (transformedLead as any).assigned_to = apiLead.assigned_to;
             (transformedLead as any).assigned_to_username = apiLead.assigned_to_username;
+            (transformedLead as any).created_by = apiLead.created_by;
+            (transformedLead as any).created_by_name = apiLead.created_by_name;
             return transformedLead;
         }
         
@@ -760,67 +790,67 @@ export const ViewLeadPage = () => {
                 </div>
             }
             actions={
-                <div className="flex items-center gap-2 shrink-0">
-                    <Button onClick={() => setIsAddActionModalOpen(true)}>
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:pb-0.5">
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => {
+                            if (!displayLead) return;
+                            setEditingLead(displayLead);
+                            window.history.pushState({}, '', '/edit-lead');
+                            setCurrentPage('EditLead');
+                        }}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <EditIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                            {t('editClient')}
+                        </span>
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => {
+                            if (!displayLead) return;
+                            setSelectedLeadForDeal(displayLead.id);
+                            window.history.pushState({}, '', '/create-deal');
+                            setCurrentPage('CreateDeal');
+                        }}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <BriefcaseIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                            {t('addDeal')}
+                        </span>
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => setIsAddCallModalOpen(true)}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <PhoneIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                            {t('addCall') || 'Add Call'}
+                        </span>
+                    </Button>
+                    {showVisitActions && (
+                        <Button
+                            variant="secondary"
+                            type="button"
+                            className="w-full sm:w-auto shrink-0"
+                            onClick={() => setIsAddVisitModalOpen(true)}
+                        >
+                            <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                                <MapPinIcon className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                {t('addVisit') || 'Add visit'}
+                            </span>
+                        </Button>
+                    )}
+                    <Button onClick={() => setIsAddActionModalOpen(true)} className="w-full sm:w-auto shrink-0">
                         <PlusIcon className="w-4 h-4 shrink-0" />
                         <span className="whitespace-nowrap">{t('add_action')}</span>
                     </Button>
-                    <Dropdown
-                        panelClassName="w-56"
-                        trigger={
-                            <Button
-                                variant="secondary"
-                                type="button"
-                                className="px-3"
-                                title={t('leadOptionsMenuTitle')}
-                                aria-label={t('leadOptionsMenuTitle')}
-                                aria-haspopup="menu"
-                            >
-                                <MoreVerticalIcon className="w-5 h-5" />
-                            </Button>
-                        }
-                    >
-                        <DropdownItem
-                            onClick={() => {
-                                if (!displayLead) return;
-                                setEditingLead(displayLead);
-                                window.history.pushState({}, '', '/edit-lead');
-                                setCurrentPage('EditLead');
-                            }}
-                        >
-                            <span className="flex items-center gap-2 rtl:flex-row-reverse">
-                                <EditIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
-                                {t('editClient')}
-                            </span>
-                        </DropdownItem>
-                        <DropdownItem
-                            onClick={() => {
-                                if (!displayLead) return;
-                                setSelectedLeadForDeal(displayLead.id);
-                                window.history.pushState({}, '', '/create-deal');
-                                setCurrentPage('CreateDeal');
-                            }}
-                        >
-                            <span className="flex items-center gap-2 rtl:flex-row-reverse">
-                                <BriefcaseIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
-                                {t('addDeal')}
-                            </span>
-                        </DropdownItem>
-                        <DropdownItem onClick={() => setIsAddCallModalOpen(true)}>
-                            <span className="flex items-center gap-2 rtl:flex-row-reverse">
-                                <PhoneIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
-                                {t('addCall') || 'Add Call'}
-                            </span>
-                        </DropdownItem>
-                        {showVisitActions && (
-                            <DropdownItem onClick={() => setIsAddVisitModalOpen(true)}>
-                                <span className="flex items-center gap-2 rtl:flex-row-reverse">
-                                    <MapPinIcon className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
-                                    {t('addVisit') || 'Add visit'}
-                                </span>
-                            </DropdownItem>
-                        )}
-                    </Dropdown>
                 </div>
             }
         >
@@ -832,6 +862,41 @@ export const ViewLeadPage = () => {
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('leadCompanyName')}</label>
                             <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || '—'}</p>
                         </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('profession')}</label>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : '—'}</p>
+                        </div>
+                        {currentUser?.company?.specialization === 'real_estate' && (
+                            <div className="md:col-span-1 space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+                                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                                    {t('leadInventoryInterest') || 'Property interest'}
+                                </p>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedDeveloper') || 'Developer'}</label>
+                                    <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
+                                        {((displayLead as Lead).interestedDeveloperName ?? (displayLead as any).interested_developer_name) || '—'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedProject') || 'Project'}</label>
+                                    <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
+                                        {((displayLead as Lead).interestedProjectName ?? (displayLead as any).interested_project_name) || '—'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedUnit') || 'Unit'}</label>
+                                    <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
+                                        {(() => {
+                                            const un = (displayLead as Lead).interestedUnitName ?? (displayLead as any).interested_unit_name;
+                                            const uc = (displayLead as Lead).interestedUnitCode ?? (displayLead as any).interested_unit_code;
+                                            if (un && uc) return `${un} (${uc})`;
+                                            if (un) return un;
+                                            return '—';
+                                        })()}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('phoneNumbers') || 'Phone Numbers'}</label>
                             <div className="mt-2 space-y-2">
@@ -850,9 +915,9 @@ export const ViewLeadPage = () => {
                                                      pn.phone_type}
                                                 </p>
                                             </div>
-                                            <div className={language === 'ar' ? 'w-16 text-end' : 'w-16 text-start'}>
+                                            <div className={language === 'ar' ? 'min-w-[5.5rem] flex justify-end shrink-0' : 'min-w-[5.5rem] flex justify-start shrink-0'}>
                                                 {pn.is_primary ? (
-                                                    <span className="text-xs text-primary whitespace-nowrap">({t('primary') || 'Primary'})</span>
+                                                    <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap bg-primary/15 text-primary-700 ring-1 ring-inset ring-primary/30 dark:bg-primary-900/50 dark:text-primary-200 dark:ring-primary-500/40">({t('primary') || 'Primary'})</span>
                                                 ) : (
                                                     <span className="text-xs whitespace-nowrap">&nbsp;</span>
                                                 )}
@@ -887,7 +952,7 @@ export const ViewLeadPage = () => {
                                         <p className="text-base font-medium text-gray-900 dark:text-gray-100 justify-self-start">
                                             {displayLead.phone || '-'}
                                         </p>
-                                        <div className="w-16"></div>
+                                        <div className="min-w-[5.5rem] shrink-0" aria-hidden />
                                         {displayLead.phone && (
                                             <>
                                                 <button
@@ -1113,6 +1178,17 @@ export const ViewLeadPage = () => {
                                 })()}
                             </div>
                         </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('createdBy') || 'Created by'}</label>
+                            <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
+                                {(() => {
+                                    const createdById = (displayLead as any).created_by ?? displayLead.createdBy;
+                                    const apiName = (displayLead as any).created_by_name ?? displayLead.createdByName;
+                                    const creatorUser = createdById ? users.find(u => u.id === createdById) : null;
+                                    return creatorUser?.name ?? apiName ?? '-';
+                                })()}
+                            </p>
+                        </div>
                         {displayLead.campaign && (
                             <div>
                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('campaign') || 'Campaign'}</label>
@@ -1131,21 +1207,14 @@ export const ViewLeadPage = () => {
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('budget')}</label>
                             <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
-                                {displayLead.budget && displayLead.budget > 0 ? (
-                                    <span className="text-lg font-semibold">
-                                        {(() => {
-                                            const num = Number(displayLead.budget);
-                                            const formatted = num.toLocaleString('en-US', { 
-                                                minimumFractionDigits: 0, 
-                                                maximumFractionDigits: 2 
-                                            });
-                                            // Remove trailing zeros after decimal point
-                                            return formatted.replace(/\.0+$/, '');
-                                        })()}
-                                    </span>
-                                ) : (
-                                    <span className="text-gray-400 dark:text-gray-500">-</span>
-                                )}
+                                {(() => {
+                                    const s = formatLeadBudget(displayLead as any, language === 'ar' ? 'ar-IQ' : 'en-US');
+                                    return s ? (
+                                        <span className="text-lg font-semibold">{s}</span>
+                                    ) : (
+                                        <span className="text-gray-400 dark:text-gray-500">-</span>
+                                    );
+                                })()}
                             </p>
                         </div>
                         <div>
@@ -1161,6 +1230,14 @@ export const ViewLeadPage = () => {
                                 {displayLead.lastFeedback || (displayLead as any).last_feedback || '-'}
                             </p>
                         </div>
+                        {(displayLead.notes != null && String(displayLead.notes).trim() !== '') && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('notes')}</label>
+                                <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap">
+                                    {String(displayLead.notes).trim()}
+                                </p>
+                            </div>
+                        )}
                     </div>
                 </Card>
             </div>

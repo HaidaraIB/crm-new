@@ -56,7 +56,8 @@ export const queryKeys = {
   clientVisits: ['clientVisits'] as const,
   clientEvents: (clientId?: number) => ['clientEvents', clientId] as const,
   developers: (page?: number, pageSize?: number) => ['developers', page ?? 'all', pageSize ?? 'default'] as const,
-  projects: (page?: number, pageSize?: number) => ['projects', page ?? 'all', pageSize ?? 'default'] as const,
+  projects: (page?: number, pageSize?: number, developerId?: number | null) =>
+    ['projects', page ?? 'all', pageSize ?? 'default', developerId ?? 'all'] as const,
   units: (filters?: any, page?: number, pageSize?: number) => ['units', filters, page ?? 'all', pageSize ?? 'default'] as const,
   owners: ['owners'] as const,
   services: ['services'] as const,
@@ -122,9 +123,21 @@ function normalizeLead(lead: any): any {
   return {
     ...lead,
     leadCompanyName: lead.leadCompanyName ?? lead.lead_company_name ?? undefined,
+    profession: lead.profession ?? undefined,
+    budgetMax: lead.budgetMax ?? lead.budget_max ?? undefined,
     lastFeedback: lead.lastFeedback ?? lead.last_feedback ?? undefined,
     lastStage: lead.lastStage ?? lead.last_stage ?? undefined,
     lastFeedbackAt: lead.lastFeedbackAt ?? lead.last_feedback_at ?? undefined,
+    createdBy: lead.createdBy ?? lead.created_by ?? null,
+    createdByName: lead.createdByName ?? lead.created_by_name ?? null,
+    notes: lead.notes ?? undefined,
+    interestedDeveloper: lead.interestedDeveloper ?? lead.interested_developer ?? null,
+    interestedProject: lead.interestedProject ?? lead.interested_project ?? null,
+    interestedUnit: lead.interestedUnit ?? lead.interested_unit ?? null,
+    interestedDeveloperName: lead.interestedDeveloperName ?? lead.interested_developer_name ?? null,
+    interestedProjectName: lead.interestedProjectName ?? lead.interested_project_name ?? null,
+    interestedUnitName: lead.interestedUnitName ?? lead.interested_unit_name ?? null,
+    interestedUnitCode: lead.interestedUnitCode ?? lead.interested_unit_code ?? null,
   };
 }
 
@@ -247,7 +260,8 @@ export const useDevelopers = (
 export const useProjects = (
   pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
   options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
-  pageSize?: number
+  pageSize?: number,
+  developerId?: number | null
 ) => {
   const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
   const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
@@ -257,8 +271,8 @@ export const useProjects = (
   const { enabled: optionsEnabled, ...restOptions } = resolvedOptions || {};
   
   return useQuery({
-    queryKey: queryKeys.projects(page, pageSize),
-    queryFn: () => getProjectsAPI(page, pageSize),
+    queryKey: queryKeys.projects(page, pageSize, developerId),
+    queryFn: () => getProjectsAPI(page, pageSize, developerId),
     staleTime: 2 * 60 * 1000, // 2 minutes
     enabled: shouldEnable && (optionsEnabled !== false),
     ...restOptions,

@@ -803,10 +803,7 @@ const TheApp = () => {
                 ></div>
             )}
             <div className="flex-1 flex flex-col overflow-hidden">
-                <Header />
-                <div className={`px-4 py-2 text-xs sm:text-sm font-medium border-b ${isInternetOnline ? 'bg-green-50 text-green-800 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-900/40' : 'bg-red-50 text-red-800 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/40'}`}>
-                    {isInternetOnline ? t('connectivityStatusOnline') : t('connectivityStatusOffline')}
-                </div>
+                <Header isInternetOnline={isInternetOnline} />
                 {/* Check if payment success message exists - if so, don't show email verification message */}
                 {!hasPaymentSuccessMessage && isLoggedIn && currentUser && currentUser.emailVerified === false && (
                     <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between gap-4">

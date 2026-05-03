@@ -3,15 +3,34 @@ import { createPortal } from 'react-dom';
 import { useAppContext } from '../../context/AppContext';
 import { Modal, Button } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
-import { useUsers, useStatuses, useChannels, useCampaigns } from '../../hooks/useQueries';
+import { useUsers, useStatuses, useChannels, useCampaigns, useDevelopers, useProjects, useUnits } from '../../hooks/useQueries';
 import { createLeadAPI } from '../../services/api';
 import { getUserDisplayName } from '../../types';
+import { buildLeadAssigneePickerOptions } from '../../utils/roles';
+import { formatLeadBudget } from '../../utils/budgetRange';
 import { ChevronDownIcon } from '../icons';
 import ExcelJS from 'exceljs';
 
 type ImportStep = 'upload' | 'match' | 'preview' | 'importing' | 'done';
 
-export type LeadImportFieldKey = 'name' | 'phone' | 'budget' | 'type' | 'priority' | 'status' | 'communicationWay' | 'assignedTo' | 'source' | 'campaign' | 'createdAt' | 'leadCompanyName' | '';
+export type LeadImportFieldKey =
+  | 'name'
+  | 'phone'
+  | 'budget'
+  | 'type'
+  | 'priority'
+  | 'status'
+  | 'communicationWay'
+  | 'assignedTo'
+  | 'source'
+  | 'campaign'
+  | 'createdAt'
+  | 'leadCompanyName'
+  | 'profession'
+  | 'interestedDeveloper'
+  | 'interestedProject'
+  | 'interestedUnit'
+  | '';
 
 const SYSTEM_FIELDS: { value: LeadImportFieldKey; labelKey: string }[] = [
   { value: '', labelKey: 'importLeadsChooseField' },
@@ -27,12 +46,23 @@ const SYSTEM_FIELDS: { value: LeadImportFieldKey; labelKey: string }[] = [
   { value: 'campaign', labelKey: 'campaign' },
   { value: 'createdAt', labelKey: 'createdAt' },
   { value: 'leadCompanyName', labelKey: 'leadCompanyName' },
+  { value: 'profession', labelKey: 'profession' },
+  { value: 'interestedDeveloper', labelKey: 'interestedDeveloper' },
+  { value: 'interestedProject', labelKey: 'interestedProject' },
+  { value: 'interestedUnit', labelKey: 'interestedUnit' },
+];
+
+const REAL_ESTATE_IMPORT_FIELD_KEYS: LeadImportFieldKey[] = [
+  'interestedDeveloper',
+  'interestedProject',
+  'interestedUnit',
 ];
 
 export interface PreviewRow {
   name: string;
   phone: string;
   budget: number | null;
+  budget_max: number | null;
   type: 'fresh' | 'cold';
   priority: 'low' | 'medium' | 'high';
   assigned_to: number | null;
@@ -42,6 +72,13 @@ export interface PreviewRow {
   campaign_id: number | null;
   created_at: string | null;
   lead_company_name: string | null;
+  profession: string | null;
+  interested_developer: number | null;
+  interested_project: number | null;
+  interested_unit: number | null;
+  interested_dev_input?: string;
+  interested_proj_input?: string;
+  interested_unit_input?: string;
 }
 
 const normalizeHeader = (val: unknown): string =>
@@ -79,11 +116,57 @@ const SOURCE_KEYS = ['source', 'مصدر', 'المصدر', 'origin'];
 const CAMPAIGN_KEYS = ['campaign', 'حملة', 'الحملة'];
 const CREATED_AT_KEYS = ['created at', 'تاريخ الإنشاء', 'creation date', 'date', 'تاريخ', 'created_at'];
 const LEAD_COMPANY_NAME_KEYS = ['company name', 'company', 'اسم الشركة', 'شركة', 'lead company', 'company name (lead)'];
+const PROFESSION_KEYS = ['profession', 'job', 'occupation', 'career', 'المهنة', 'مهنة', 'وظيفة'];
+const DEVELOPER_KEYS = [
+  'developer',
+  'مطور',
+  'المطور',
+  'real estate developer',
+  'property developer',
+  'dev id',
+  'developer id',
+];
+const PROJECT_KEYS = [
+  'project',
+  'مشروع',
+  'المشروع',
+  'project name',
+  'اسم المشروع',
+  'development name',
+  'project id',
+];
+const UNIT_KEYS = [
+  'unit',
+  'وحدة',
+  'unit code',
+  'كود الوحدة',
+  'apartment',
+  'شقة',
+  'flat',
+  'unit id',
+];
 
 function findColumnIndex(headers: string[], keys: string[]): number {
   for (let i = 0; i < headers.length; i++) {
     const h = normalizeHeader(headers[i]);
     if (keys.some(k => h === k || h.includes(k) || k.includes(h))) return i;
+  }
+  return -1;
+}
+
+/** Stricter matching for inventory columns (avoids e.g. "project manager" matching "project"). */
+function findColumnIndexInventory(headers: string[], keys: string[]): number {
+  for (let i = 0; i < headers.length; i++) {
+    const h = normalizeHeader(headers[i]);
+    if (
+      keys.some((k) => {
+        const kn = k.toLowerCase();
+        if (h === kn) return true;
+        return h.startsWith(`${kn} `) || h.endsWith(` ${kn}`) || h.includes(` ${kn} `);
+      })
+    ) {
+      return i;
+    }
   }
   return -1;
 }
@@ -137,7 +220,10 @@ function getRowValue(row: Record<string, unknown>, colIndex: number, headers: st
   return s;
 }
 
-function getHeaderToFieldMapping(headers: string[]): Record<string, LeadImportFieldKey> {
+function getHeaderToFieldMapping(
+  headers: string[],
+  options?: { autoMapInventory?: boolean },
+): Record<string, LeadImportFieldKey> {
   const mapping: Record<string, LeadImportFieldKey> = {};
   headers.forEach((h) => { mapping[h] = ''; });
   const nameIdx = findColumnIndex(headers, NAME_KEYS);
@@ -152,6 +238,7 @@ function getHeaderToFieldMapping(headers: string[]): Record<string, LeadImportFi
   const campaignIdx = findColumnIndex(headers, CAMPAIGN_KEYS);
   const createdAtIdx = findColumnIndex(headers, CREATED_AT_KEYS);
   const leadCompanyNameIdx = findColumnIndex(headers, LEAD_COMPANY_NAME_KEYS);
+  const professionIdx = findColumnIndex(headers, PROFESSION_KEYS);
   if (nameIdx >= 0) mapping[headers[nameIdx]] = 'name';
   if (phoneIdx >= 0) mapping[headers[phoneIdx]] = 'phone';
   if (budgetIdx >= 0) mapping[headers[budgetIdx]] = 'budget';
@@ -164,6 +251,15 @@ function getHeaderToFieldMapping(headers: string[]): Record<string, LeadImportFi
   if (campaignIdx >= 0) mapping[headers[campaignIdx]] = 'campaign';
   if (createdAtIdx >= 0) mapping[headers[createdAtIdx]] = 'createdAt';
   if (leadCompanyNameIdx >= 0) mapping[headers[leadCompanyNameIdx]] = 'leadCompanyName';
+  if (professionIdx >= 0) mapping[headers[professionIdx]] = 'profession';
+  if (options?.autoMapInventory) {
+    const developerIdx = findColumnIndexInventory(headers, DEVELOPER_KEYS);
+    const projectIdx = findColumnIndexInventory(headers, PROJECT_KEYS);
+    const unitIdx = findColumnIndexInventory(headers, UNIT_KEYS);
+    if (developerIdx >= 0) mapping[headers[developerIdx]] = 'interestedDeveloper';
+    if (projectIdx >= 0) mapping[headers[projectIdx]] = 'interestedProject';
+    if (unitIdx >= 0) mapping[headers[unitIdx]] = 'interestedUnit';
+  }
   return mapping;
 }
 
@@ -171,6 +267,27 @@ function getValueByHeader(row: Record<string, unknown>, header: string): string 
   const val = row[header];
   if (val == null) return '';
   return String(val).trim();
+}
+
+/** Parses "1000", "1000-5000", "1,000 – 5,000" into budget (min) and optional budget_max. */
+function parseBudgetCell(raw: string): { budget: number | null; budget_max: number | null } {
+  const s = raw.trim();
+  if (!s) return { budget: null, budget_max: null };
+  const parts = s
+    .split(/\s*[-–—]\s*/)
+    .map((p) => p.replace(/,/g, '').trim())
+    .filter(Boolean);
+  if (parts.length === 0) return { budget: null, budget_max: null };
+  if (parts.length === 1) {
+    const n = Number(parts[0]);
+    return { budget: Number.isFinite(n) ? n : null, budget_max: null };
+  }
+  const a = Number(parts[0]);
+  const b = Number(parts[parts.length - 1]);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return { budget: null, budget_max: null };
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  return { budget: lo, budget_max: lo === hi ? null : hi };
 }
 
 function resolveStatusId(val: string, statuses: { id: number; name: string }[]): number | null {
@@ -198,6 +315,119 @@ function resolveCampaignId(val: string, campaigns: { id: number; name?: string }
   return found?.id ?? null;
 }
 
+function getDeveloperIdFromProject(p: { developer?: number | { id?: number } | null }): number | null {
+  const d = p?.developer;
+  if (d == null) return null;
+  if (typeof d === 'object') return d.id ?? null;
+  return typeof d === 'number' ? d : null;
+}
+
+function getProjectIdFromUnit(u: { project?: number | { id?: number } | null }): number | null {
+  const p = u?.project;
+  if (p == null) return null;
+  if (typeof p === 'object') return p.id ?? null;
+  return typeof p === 'number' ? p : null;
+}
+
+function resolveDeveloperId(val: string, developers: { id: number; name: string }[]): number | null {
+  const s = val.trim();
+  if (!s) return null;
+  if (/^\d+$/.test(s)) {
+    const id = Number(s);
+    return developers.some((d) => d.id === id) ? id : null;
+  }
+  const v = s.toLowerCase();
+  const exact = developers.find((d) => d.name.toLowerCase() === v);
+  if (exact) return exact.id;
+  const fuzzy = developers.find(
+    (d) =>
+      d.name.toLowerCase().includes(v) ||
+      v.includes(d.name.toLowerCase()),
+  );
+  return fuzzy?.id ?? null;
+}
+
+function resolveProjectId(
+  val: string,
+  projects: { id: number; name?: string; developer?: number | { id?: number } | null }[],
+  developerId: number | null,
+): number | null {
+  const s = val.trim();
+  if (!s) return null;
+  const pool =
+    developerId != null
+      ? projects.filter((p) => getDeveloperIdFromProject(p) === developerId)
+      : projects;
+  if (/^\d+$/.test(s)) {
+    const id = Number(s);
+    return pool.some((p) => p.id === id) ? id : null;
+  }
+  const v = s.toLowerCase();
+  const exact = pool.find((p) => (p.name || '').toLowerCase() === v);
+  if (exact) return exact.id;
+  const fuzzy = pool.find((p) => {
+    const n = (p.name || '').toLowerCase();
+    return n.includes(v) || v.includes(n);
+  });
+  return fuzzy?.id ?? null;
+}
+
+function resolveUnitId(
+  val: string,
+  units: { id: number; name?: string; code?: string; project?: number | { id?: number } | null }[],
+  projectId: number | null,
+): number | null {
+  const s = val.trim();
+  if (!s) return null;
+  const pool =
+    projectId != null ? units.filter((u) => getProjectIdFromUnit(u) === projectId) : units;
+  if (/^\d+$/.test(s)) {
+    const id = Number(s);
+    return pool.some((u) => u.id === id) ? id : null;
+  }
+  const v = s.toLowerCase();
+  const byCode = pool.find((u) => (u.code || '').toLowerCase() === v);
+  if (byCode) return byCode.id;
+  const exactName = pool.find((u) => (u.name || '').toLowerCase() === v);
+  if (exactName) return exactName.id;
+  const fuzzy = pool.find((u) => {
+    const n = (u.name || '').toLowerCase();
+    const c = (u.code || '').toLowerCase();
+    return (n && (n.includes(v) || v.includes(n))) || (c && (c.includes(v) || v.includes(c)));
+  });
+  return fuzzy?.id ?? null;
+}
+
+function resolveLeadInventoryFields(
+  devVal: string,
+  projVal: string,
+  unitVal: string,
+  developers: { id: number; name: string }[],
+  projects: { id: number; name?: string; developer?: number | { id?: number } | null }[],
+  units: { id: number; name?: string; code?: string; project?: number | { id?: number } | null }[],
+): { interested_developer: number | null; interested_project: number | null; interested_unit: number | null } {
+  let devId = resolveDeveloperId(devVal, developers);
+  let projId = resolveProjectId(projVal, projects, devId);
+  let unitId = resolveUnitId(unitVal, units, projId);
+
+  if (unitId != null) {
+    const u = units.find((x) => x.id === unitId);
+    const pid = u ? getProjectIdFromUnit(u) : null;
+    if (pid != null) projId = pid;
+  }
+  if (projId != null) {
+    const p = projects.find((x) => x.id === projId);
+    const did = p ? getDeveloperIdFromProject(p) : null;
+    if (did != null) devId = did;
+  }
+
+  return {
+    interested_developer: devId,
+    interested_project: projId,
+    interested_unit: unitId,
+  };
+}
+
 function buildPreviewRowsFromMapping(
   rawRows: Record<string, unknown>[],
   columnMapping: Record<string, LeadImportFieldKey>,
@@ -210,6 +440,10 @@ function buildPreviewRowsFromMapping(
     users: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }[];
     campaigns: { id: number; name?: string }[];
     getDisplayName: (u: any) => string;
+    isRealEstate: boolean;
+    developers: { id: number; name: string }[];
+    projects: { id: number; name?: string; developer?: number | { id?: number } | null }[];
+    units: { id: number; name?: string; code?: string; project?: number | { id?: number } | null }[];
   },
 ): PreviewRow[] {
   const headerByField: Record<string, string> = {};
@@ -220,7 +454,7 @@ function buildPreviewRowsFromMapping(
     const name = getValueByHeader(row, headerByField.name || '').trim();
     const phone = getValueByHeader(row, headerByField.phone || '').trim();
     const budgetVal = getValueByHeader(row, headerByField.budget || '');
-    const budget = budgetVal ? Number(budgetVal) || null : null;
+    const { budget, budget_max } = parseBudgetCell(budgetVal);
     let typeVal = getValueByHeader(row, headerByField.type || '').toLowerCase();
     if (typeVal && typeVal !== 'fresh' && typeVal !== 'cold') typeVal = 'fresh';
     if (!typeVal) typeVal = 'fresh';
@@ -235,16 +469,25 @@ function buildPreviewRowsFromMapping(
     const campaignVal = getValueByHeader(row, headerByField.campaign || '');
     const createdAtVal = getValueByHeader(row, headerByField.createdAt || '');
     const leadCompanyNameVal = getValueByHeader(row, headerByField.leadCompanyName || '');
+    const professionVal = getValueByHeader(row, headerByField.profession || '');
+    const devInvVal = getValueByHeader(row, headerByField.interestedDeveloper || '');
+    const projInvVal = getValueByHeader(row, headerByField.interestedProject || '');
+    const unitInvVal = getValueByHeader(row, headerByField.interestedUnit || '');
 
     const status_id = statusVal ? resolveStatusId(statusVal, opts.statuses) : (opts.defaultStatusId ?? null);
     const channel_id = channelVal ? resolveChannelId(channelVal, opts.channels) : (opts.defaultChannelId ?? null);
     const assigned_to = assignedVal ? resolveUserId(assignedVal, opts.users, opts.getDisplayName) : opts.defaultAssignedTo;
     const campaign_id = campaignVal ? resolveCampaignId(campaignVal, opts.campaigns) : null;
 
+    const inv = opts.isRealEstate
+      ? resolveLeadInventoryFields(devInvVal, projInvVal, unitInvVal, opts.developers, opts.projects, opts.units)
+      : { interested_developer: null, interested_project: null, interested_unit: null };
+
     return {
       name,
       phone,
       budget,
+      budget_max,
       type: typeVal as 'fresh' | 'cold',
       priority: priorityVal as 'low' | 'medium' | 'high',
       assigned_to,
@@ -254,6 +497,13 @@ function buildPreviewRowsFromMapping(
       campaign_id,
       created_at: createdAtVal || null,
       lead_company_name: leadCompanyNameVal ? leadCompanyNameVal : null,
+      profession: professionVal ? professionVal : null,
+      interested_developer: inv.interested_developer,
+      interested_project: inv.interested_project,
+      interested_unit: inv.interested_unit,
+      interested_dev_input: opts.isRealEstate ? devInvVal : undefined,
+      interested_proj_input: opts.isRealEstate ? projInvVal : undefined,
+      interested_unit_input: opts.isRealEstate ? unitInvVal : undefined,
     };
   });
 }
@@ -271,17 +521,24 @@ const TEMPLATE_HEADERS = [
   'Source',
   'Campaign',
   'Created At',
+  'Company name',
+  'Profession',
 ];
 
-async function downloadLeadsTemplate(): Promise<void> {
+const TEMPLATE_HEADERS_REAL_ESTATE = ['Developer', 'Project', 'Unit'];
+
+async function downloadLeadsTemplate(includeRealEstateInventory: boolean): Promise<void> {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet('Leads');
   const headerRow = sheet.getRow(1);
-  TEMPLATE_HEADERS.forEach((h, i) => {
+  const allHeaders = includeRealEstateInventory
+    ? [...TEMPLATE_HEADERS, ...TEMPLATE_HEADERS_REAL_ESTATE]
+    : [...TEMPLATE_HEADERS];
+  allHeaders.forEach((h, i) => {
     headerRow.getCell(i + 1).value = h;
   });
   headerRow.font = { bold: true };
-  TEMPLATE_HEADERS.forEach((_, i) => {
+  allHeaders.forEach((_, i) => {
     sheet.getColumn(i + 1).width = i === 1 ? 16 : i >= 7 ? 18 : 14;
   });
   const buffer = await workbook.xlsx.writeBuffer();
@@ -332,6 +589,10 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
 
   const { data: usersResponse } = useUsers();
   const users = usersResponse?.results || [];
+  const assigneePickerUsers = React.useMemo(
+    () => buildLeadAssigneePickerOptions(users, currentUser),
+    [users, currentUser]
+  );
   const { data: statusesData } = useStatuses();
   const statuses = Array.isArray(statusesData) ? statusesData : (statusesData?.results || []);
   const { data: channelsData } = useChannels();
@@ -339,11 +600,31 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
   const { data: campaignsData } = useCampaigns();
   const campaigns = Array.isArray(campaignsData) ? campaignsData : (campaignsData?.results || []);
 
+  const isRealEstateCompany = currentUser?.company?.specialization === 'real_estate';
+  const { data: developersResponse } = useDevelopers();
+  const developersList = (developersResponse?.results || []) as { id: number; name: string }[];
+  const { data: projectsResponse } = useProjects();
+  const projectsList = (projectsResponse?.results || []) as {
+    id: number;
+    name?: string;
+    developer?: number | { id?: number } | null;
+  }[];
+  const { data: unitsResponse } = useUnits({});
+  const unitsList = (unitsResponse?.results || []) as {
+    id: number;
+    name?: string;
+    code?: string;
+    project?: number | { id?: number } | null;
+  }[];
+
   const defaultStatusId = statuses.find((s: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (s.isDefault ?? s.is_default) && !s.isHidden)?.id
     || statuses.find((s: { isHidden?: boolean }) => !s.isHidden)?.id
     || statuses[0]?.id;
   const defaultChannelId = (channels.find((c: { isDefault?: boolean; is_default?: boolean }) => c.isDefault ?? c.is_default) ?? channels[0])?.id;
-  const defaultAssignedTo = currentUser?.id ?? users[0]?.id ?? null;
+  const defaultAssignedTo =
+    assigneePickerUsers.find((u) => u.id === currentUser?.id)?.id ??
+    assigneePickerUsers[0]?.id ??
+    null;
   const companyId = currentUser?.company?.id ?? null;
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -376,7 +657,11 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
       }
 
       setHeaders(headerKeys);
-      setColumnMapping(getHeaderToFieldMapping(headerKeys));
+      setColumnMapping(
+        getHeaderToFieldMapping(headerKeys, {
+          autoMapInventory: currentUser?.company?.specialization === 'real_estate',
+        }),
+      );
       setRows(rawRows);
       setPreviewRows([]);
       setFile(selectedFile);
@@ -396,7 +681,24 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
 
     for (let i = 0; i < previewRows.length; i++) {
       const row = previewRows[i];
-      const { name, phone, budget, type, priority, assigned_to, status_id, channel_id, source, campaign_id, lead_company_name: rowLeadCompanyName } = row;
+      const {
+        name,
+        phone,
+        budget,
+        budget_max,
+        type,
+        priority,
+        assigned_to,
+        status_id,
+        channel_id,
+        source,
+        campaign_id,
+        lead_company_name: rowLeadCompanyName,
+        profession: rowProfession,
+        interested_developer,
+        interested_project,
+        interested_unit,
+      } = row;
       if (!name.trim() || !phone.trim()) {
         fail++;
         errors.push(`Row ${i + 1}: ${t('importLeadsNamePhoneRequired') || 'Name and phone are required.'}`);
@@ -415,6 +717,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
         phone_numbers: phoneNumbers,
         phone_number: phone.trim(),
         budget,
+        ...(budget_max != null ? { budget_max } : {}),
         assigned_to: assigned_to ?? undefined,
         type,
         communication_way: channel_id ?? undefined,
@@ -424,7 +727,14 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
         ...(source != null && source.trim() !== '' ? { source: source.trim() } : {}),
         ...(campaign_id != null ? { campaign: campaign_id } : {}),
         ...(rowLeadCompanyName != null && String(rowLeadCompanyName).trim() !== '' ? { lead_company_name: String(rowLeadCompanyName).trim() } : {}),
+        ...(rowProfession != null && String(rowProfession).trim() !== '' ? { profession: String(rowProfession).trim() } : {}),
       };
+
+      if (isRealEstateCompany) {
+        leadData.interested_developer = interested_developer ?? null;
+        leadData.interested_project = interested_project ?? null;
+        leadData.interested_unit = interested_unit ?? null;
+      }
 
       try {
         await createLeadAPI(leadData as any);
@@ -450,6 +760,106 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
     setPreviewRows((prev) => prev.map((r) => ({ ...r, [field]: value })));
   };
 
+  const applyInventoryToAll = (
+    field: 'interested_developer' | 'interested_project' | 'interested_unit',
+    value: number | null,
+  ) => {
+    setPreviewRows((prev) =>
+      prev.map((r) => {
+        if (field === 'interested_developer') {
+          return {
+            ...r,
+            interested_developer: value,
+            interested_project: null,
+            interested_unit: null,
+            interested_dev_input: undefined,
+            interested_proj_input: undefined,
+            interested_unit_input: undefined,
+          };
+        }
+        if (field === 'interested_project') {
+          if (value == null) {
+            return {
+              ...r,
+              interested_project: null,
+              interested_unit: null,
+              interested_proj_input: undefined,
+              interested_unit_input: undefined,
+            };
+          }
+          const p = projectsList.find((x) => x.id === value);
+          const did = p ? getDeveloperIdFromProject(p) : null;
+          return {
+            ...r,
+            interested_developer: did ?? r.interested_developer,
+            interested_project: value,
+            interested_unit: null,
+            interested_proj_input: undefined,
+            interested_unit_input: undefined,
+          };
+        }
+        if (value == null) {
+          return { ...r, interested_unit: null, interested_unit_input: undefined };
+        }
+        const u = unitsList.find((x) => x.id === value);
+        const pid = u ? getProjectIdFromUnit(u) : null;
+        const p = pid != null ? projectsList.find((x) => x.id === pid) : null;
+        const did = p ? getDeveloperIdFromProject(p) : null;
+        return {
+          ...r,
+          interested_developer: did ?? r.interested_developer,
+          interested_project: pid ?? r.interested_project,
+          interested_unit: value,
+          interested_unit_input: undefined,
+        };
+      }),
+    );
+  };
+
+  const updatePreviewRowInventory = React.useCallback(
+    (idx: number, which: 'interested_developer' | 'interested_project' | 'interested_unit', rawValue: string) => {
+      const v = rawValue === '' ? null : Number(rawValue);
+      setPreviewRows((prev) => {
+        const next = [...prev];
+        const cur = { ...next[idx] };
+        if (which === 'interested_developer') {
+          cur.interested_developer = v;
+          cur.interested_project = null;
+          cur.interested_unit = null;
+          cur.interested_dev_input = undefined;
+          cur.interested_proj_input = undefined;
+          cur.interested_unit_input = undefined;
+        } else if (which === 'interested_project') {
+          cur.interested_project = v;
+          cur.interested_unit = null;
+          cur.interested_proj_input = undefined;
+          cur.interested_unit_input = undefined;
+          if (v != null) {
+            const p = projectsList.find((x) => x.id === v);
+            const did = p ? getDeveloperIdFromProject(p) : null;
+            if (did != null) cur.interested_developer = did;
+          }
+        } else {
+          cur.interested_unit = v;
+          cur.interested_unit_input = undefined;
+          if (v != null) {
+            const u = unitsList.find((x) => x.id === v);
+            const pid = u ? getProjectIdFromUnit(u) : null;
+            if (pid != null) {
+              cur.interested_project = pid;
+              const p = projectsList.find((x) => x.id === pid);
+              const did = p ? getDeveloperIdFromProject(p) : null;
+              if (did != null) cur.interested_developer = did;
+            }
+          }
+        }
+        next[idx] = cur;
+        return next;
+      });
+    },
+    [projectsList, unitsList],
+  );
+
   const handleMatchContinue = () => {
     const mappedName = headers.some((h) => columnMapping[h] === 'name');
     const mappedPhone = headers.some((h) => columnMapping[h] === 'phone');
@@ -467,6 +877,10 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
       users,
       campaigns,
       getDisplayName: getUserDisplayName,
+      isRealEstate: isRealEstateCompany,
+      developers: developersList,
+      projects: projectsList,
+      units: unitsList,
     });
     setPreviewRows(preview);
     setStep('preview');
@@ -515,8 +929,14 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {t('importLeadsDescription') || 'Upload an Excel file (.xlsx) with columns: Name and Phone. Optional: Budget, Type (fresh/cold), Priority (low/medium/high). The first row should be headers.'}
             </p>
+            {isRealEstateCompany && (
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {t('importLeadsReOptionalInventory') ||
+                  'Optional for real estate: columns Developer, Project, and Unit (names or numeric IDs; unit code supported).'}
+              </p>
+            )}
             <div className="flex flex-wrap items-center gap-3">
-              <Button variant="secondary" onClick={downloadLeadsTemplate} type="button">
+              <Button variant="secondary" onClick={() => downloadLeadsTemplate(isRealEstateCompany)} type="button">
                 {t('importLeadsDownloadTemplate') || 'Download template'}
               </Button>
               <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -596,7 +1016,12 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                             setColumnMapping((prev) => ({ ...prev, [header]: v }));
                           }}
                         >
-                          {SYSTEM_FIELDS.map((opt) => {
+                          {SYSTEM_FIELDS.filter(
+                            (opt) =>
+                              opt.value === '' ||
+                              !REAL_ESTATE_IMPORT_FIELD_KEYS.includes(opt.value as LeadImportFieldKey) ||
+                              isRealEstateCompany,
+                          ).map((opt) => {
                             const alreadySelected = opt.value !== '' && usedByOtherColumn(opt.value);
                             return (
                               <option
@@ -660,7 +1085,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                         title={t('applyToAll') || 'Apply to all'}
                       >
                         <option value="">{t('applyToAll') || 'Apply to all'}</option>
-                        {users.map((u: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }) => (
+                        {assigneePickerUsers.map((u: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }) => (
                           <option key={u.id} value={u.id}>{getUserDisplayName(u as any)}</option>
                         ))}
                       </select>
@@ -699,6 +1124,67 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                         ))}
                       </select>
                     </th>
+                    {isRealEstateCompany && (
+                      <>
+                        <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[130px]">
+                          {t('interestedDeveloper') || 'Developer'}
+                          <select
+                            className="ml-1 mt-1 block w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            value=""
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              applyInventoryToAll('interested_developer', v === '' ? null : Number(v));
+                            }}
+                            title={t('applyToAll') || 'Apply to all'}
+                          >
+                            <option value="">{t('applyToAll') || 'Apply to all'}</option>
+                            {developersList.map((d) => (
+                              <option key={d.id} value={d.id}>
+                                {d.name}
+                              </option>
+                            ))}
+                          </select>
+                        </th>
+                        <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[130px]">
+                          {t('interestedProject') || 'Project'}
+                          <select
+                            className="ml-1 mt-1 block w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            value=""
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              applyInventoryToAll('interested_project', v === '' ? null : Number(v));
+                            }}
+                            title={t('applyToAll') || 'Apply to all'}
+                          >
+                            <option value="">{t('applyToAll') || 'Apply to all'}</option>
+                            {projectsList.map((p) => (
+                              <option key={p.id} value={p.id}>
+                                {p.name || `#${p.id}`}
+                              </option>
+                            ))}
+                          </select>
+                        </th>
+                        <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[140px]">
+                          {t('interestedUnit') || 'Unit'}
+                          <select
+                            className="ml-1 mt-1 block w-full max-w-[12rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                            value=""
+                            onChange={(e) => {
+                              const v = e.target.value;
+                              applyInventoryToAll('interested_unit', v === '' ? null : Number(v));
+                            }}
+                            title={t('applyToAll') || 'Apply to all'}
+                          >
+                            <option value="">{t('applyToAll') || 'Apply to all'}</option>
+                            {unitsList.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.code ? `${u.name || ''} (${u.code})`.trim() : (u.name || `#${u.id}`)}
+                              </option>
+                            ))}
+                          </select>
+                        </th>
+                      </>
+                    )}
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
@@ -707,7 +1193,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                       <td className="px-2 py-1.5 text-gray-500">{idx + 1}</td>
                       <td className="px-2 py-1.5">{row.name}</td>
                       <td className="px-2 py-1.5">{row.phone}</td>
-                      <td className="px-2 py-1.5">{row.budget != null ? String(row.budget) : '-'}</td>
+                      <td className="px-2 py-1.5">{formatLeadBudget(row as any) || '-'}</td>
                       <td className="px-2 py-1.5">{row.type}</td>
                       <td className="px-2 py-1.5">{row.priority}</td>
                       <td className="px-2 py-1.5">
@@ -724,7 +1210,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                           }}
                         >
                           <option value="">-</option>
-                          {users.map((u: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }) => (
+                          {assigneePickerUsers.map((u: { id: number; email?: string; first_name?: string; last_name?: string; name?: string; username?: string }) => (
                             <option key={u.id} value={u.id}>{getUserDisplayName(u as any)}</option>
                           ))}
                         </select>
@@ -830,6 +1316,93 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                           ))}
                         </select>
                       </td>
+                      {isRealEstateCompany && (
+                        <>
+                          <td className="px-2 py-1.5 min-w-[120px]" title={row.interested_dev_input || ''}>
+                            <select
+                              className="w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                              value={row.interested_developer ?? ''}
+                              onChange={(e) => updatePreviewRowInventory(idx, 'interested_developer', e.target.value)}
+                            >
+                              <option value="">—</option>
+                              {developersList.map((d) => (
+                                <option key={d.id} value={d.id}>
+                                  {d.name}
+                                </option>
+                              ))}
+                            </select>
+                            {row.interested_dev_input?.trim() && row.interested_developer == null && (
+                              <span className="block text-[10px] text-amber-600 dark:text-amber-400 mt-0.5" title={row.interested_dev_input}>
+                                ?
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 min-w-[120px]" title={row.interested_proj_input || ''}>
+                            <select
+                              className="w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                              value={row.interested_project ?? ''}
+                              onChange={(e) => updatePreviewRowInventory(idx, 'interested_project', e.target.value)}
+                            >
+                              <option value="">—</option>
+                              {(() => {
+                                const base =
+                                  row.interested_developer != null
+                                    ? projectsList.filter(
+                                        (p) => getDeveloperIdFromProject(p) === row.interested_developer,
+                                      )
+                                    : projectsList;
+                                const orphan =
+                                  row.interested_project != null &&
+                                  !base.some((p) => p.id === row.interested_project)
+                                    ? projectsList.find((p) => p.id === row.interested_project)
+                                    : null;
+                                const opts = orphan ? [orphan, ...base] : base;
+                                return opts.map((p) => (
+                                  <option key={p.id} value={p.id}>
+                                    {p.name || `#${p.id}`}
+                                  </option>
+                                ));
+                              })()}
+                            </select>
+                            {row.interested_proj_input?.trim() && row.interested_project == null && (
+                              <span className="block text-[10px] text-amber-600 dark:text-amber-400 mt-0.5" title={row.interested_proj_input}>
+                                ?
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-2 py-1.5 min-w-[130px]" title={row.interested_unit_input || ''}>
+                            <select
+                              className="w-full max-w-[12rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
+                              value={row.interested_unit ?? ''}
+                              disabled={row.interested_project == null}
+                              onChange={(e) => updatePreviewRowInventory(idx, 'interested_unit', e.target.value)}
+                            >
+                              <option value="">—</option>
+                              {row.interested_project != null &&
+                                (() => {
+                                  const base = unitsList.filter(
+                                    (u) => getProjectIdFromUnit(u) === row.interested_project,
+                                  );
+                                  const orphan =
+                                    row.interested_unit != null && !base.some((u) => u.id === row.interested_unit)
+                                      ? unitsList.find((u) => u.id === row.interested_unit)
+                                      : null;
+                                  const opts = orphan ? [orphan, ...base] : base;
+                                  return opts.map((u) => (
+                                    <option key={u.id} value={u.id}>
+                                      {u.code ? `${u.name || ''} (${u.code})`.trim() : (u.name || `#${u.id}`)}
+                                    </option>
+                                  ));
+                                })()}
+                            </select>
+                            {row.interested_unit_input?.trim() && row.interested_unit == null && (
+                              <span className="block text-[10px] text-amber-600 dark:text-amber-400 mt-0.5" title={row.interested_unit_input}>
+                                ?
+                              </span>
+                            )}
+                          </td>
+                        </>
+                      )}
                     </tr>
                   ))}
                 </tbody>

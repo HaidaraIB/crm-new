@@ -8,7 +8,11 @@ import { MoonIcon, SunIcon, MenuIcon, ChevronDownIcon } from './icons';
 import { Dropdown, DropdownItem } from './Dropdown';
 import { navigateToCompanyRoute } from '../utils/routing';
 
-export const Header = () => {
+type HeaderProps = {
+    isInternetOnline: boolean;
+};
+
+export const Header = ({ isInternetOnline }: HeaderProps) => {
     const { t, theme, setTheme, language, setLanguage, setIsSidebarOpen, currentUser, setCurrentPage, setIsChangePasswordModalOpen, setIsLoggedIn } = useAppContext();
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
@@ -20,6 +24,21 @@ export const Header = () => {
                 <Button variant="ghost" className="lg:hidden p-1 -ml-2 rtl:-ml-0 rtl:-mr-2 flex-shrink-0" onClick={() => setIsSidebarOpen(true)}>
                     <MenuIcon className="h-6 w-6" />
                 </Button>
+                <div
+                    className={`hidden sm:flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold border flex-shrink-0 ${
+                        isInternetOnline
+                            ? 'bg-green-50 text-green-700 border-green-200 dark:bg-green-900/20 dark:text-green-300 dark:border-green-900/40'
+                            : 'bg-red-50 text-red-700 border-red-200 dark:bg-red-900/20 dark:text-red-300 dark:border-red-900/40'
+                    }`}
+                    role="status"
+                    aria-live="polite"
+                >
+                    <span
+                        className={`inline-block h-2 w-2 rounded-full flex-shrink-0 ${isInternetOnline ? 'bg-green-500' : 'bg-red-500'}`}
+                        aria-hidden="true"
+                    />
+                    <span>{isInternetOnline ? t('connectivityOnline') : t('connectivityOffline')}</span>
+                </div>
             </div>
             <div className={`flex items-center ${language === 'ar' ? 'gap-4' : 'space-x-4'} flex-shrink-0`}>
                 <button

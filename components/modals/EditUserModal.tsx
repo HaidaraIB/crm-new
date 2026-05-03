@@ -5,6 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
+import { EyeIcon, EyeOffIcon } from '../icons';
 import { useUpdateUser } from '../../hooks/useQueries';
 import { normalizeRoleForApi } from '../../utils/roles';
 
@@ -33,8 +34,10 @@ export const EditUserModal = () => {
         email: '',
         password: '',
         role: 'employee' as string,
+        weeklyDayOff: '' as string,
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const [passwordVisible, setPasswordVisible] = useState(false);
 
     // Helper function to get user display name
     const getUserDisplayName = (user: any): string => {
@@ -55,13 +58,17 @@ export const EditUserModal = () => {
                 ? [selectedUser.first_name, selectedUser.last_name].filter(Boolean).join(' ').trim()
                 : selectedUser.name || '';
             
+            const wdo = (selectedUser as { weekly_day_off?: number | null }).weekly_day_off;
             setFormState({
                 name: fullName,
                 phone: selectedUser.phone || '',
                 email: selectedUser.email || '',
                 password: '',
                 role: normalizedRole,
+                weeklyDayOff:
+                    wdo !== undefined && wdo !== null ? String(wdo) : '',
             });
+            setPasswordVisible(false);
         }
     }, [selectedUser, isEditUserModalOpen]);
 
@@ -160,8 +167,10 @@ export const EditUserModal = () => {
             email: '',
             password: '',
             role: 'employee',
+            weeklyDayOff: '',
         });
         setErrors({});
+        setPasswordVisible(false);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -185,17 +194,23 @@ export const EditUserModal = () => {
             const isAdmin = currentRole === 'admin';
             const roleToSend = isAdmin ? 'admin' : (formState.role?.toLowerCase() || 'employee');
             
+            const payload: Record<string, unknown> = {
+                first_name: firstName,
+                last_name: lastName,
+                username: selectedUser.username || '',
+                phone: formState.phone,
+                email: formState.email,
+                password: formState.password || undefined,
+                role: roleToSend,
+            };
+            if (roleToSend === 'employee' || roleToSend === 'data_entry') {
+                payload.weekly_day_off =
+                    formState.weeklyDayOff === '' ? null : parseInt(formState.weeklyDayOff, 10);
+            }
+
             await updateUserMutation.mutateAsync({
                 id: selectedUser.id,
-                data: {
-                    first_name: firstName,
-                    last_name: lastName,
-                    username: selectedUser.username || '', // Include username (required by API)
-                    phone: formState.phone,
-                    email: formState.email,
-                    password: formState.password || undefined,
-                    role: roleToSend,
-                }
+                data: payload as any,
             });
 
             // Close modal immediately and show success modal
@@ -293,14 +308,25 @@ export const EditUserModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="edit-user-password">{t('newUserPassword')}</Label>
-                    <Input 
-                        id="edit-user-password" 
-                        type="password" 
-                        value={formState.password} 
-                        onChange={handleChange} 
-                        placeholder={t('leaveBlankPassword')}
-                        className={errors.password ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                    <div className="relative">
+                        <Input 
+                            id="edit-user-password" 
+                            type={passwordVisible ? 'text' : 'password'}
+                            value={formState.password} 
+                            onChange={handleChange} 
+                            placeholder={t('leaveBlankPassword')}
+                            autoComplete="new-password"
+                            className={`pr-10 ${errors.password ? 'border-red-500 dark:border-red-500' : ''}`}
+                        />
+                        <button
+                            type="button"
+                            className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                            onClick={() => setPasswordVisible((v) => !v)}
+                            aria-label={passwordVisible ? (t('hidePassword') || 'Hide password') : (t('showPassword') || 'Show password')}
+                        >
+                            {passwordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                    </div>
                     {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                     {!errors.password && formState.password && (
                         <p className="text-gray-500 text-xs mt-1">{t('leaveBlankPassword') || 'Leave blank to keep current password'}</p>
@@ -314,6 +340,27 @@ export const EditUserModal = () => {
                             <option value="data_entry">{t('dataEntry')}</option>
                         </Select>
                         {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
+                    </div>
+                )}
+                {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
+                    (formState.role === 'employee' || formState.role === 'data_entry') && (
+                    <div>
+                        <Label htmlFor="edit-user-weeklyDayOff">{t('weeklyDayOff')}</Label>
+                        <Select
+                            id="edit-user-weeklyDayOff"
+                            value={formState.weeklyDayOff}
+                            onChange={handleChange}
+                        >
+                            <option value="">{t('dayOffNone')}</option>
+                            <option value="0">{t('dayOffMonday')}</option>
+                            <option value="1">{t('dayOffTuesday')}</option>
+                            <option value="2">{t('dayOffWednesday')}</option>
+                            <option value="3">{t('dayOffThursday')}</option>
+                            <option value="4">{t('dayOffFriday')}</option>
+                            <option value="5">{t('dayOffSaturday')}</option>
+                            <option value="6">{t('dayOffSunday')}</option>
+                        </Select>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
                     </div>
                 )}
                 <div className="flex justify-end gap-2">

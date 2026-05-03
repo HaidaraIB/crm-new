@@ -11,6 +11,7 @@ import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssig
 import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { normalizeRole } from '../utils/roles';
+import { formatLeadBudget, leadBudgetOverlapsFilter } from '../utils/budgetRange';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -310,6 +311,10 @@ export const LeadsPage = () => {
             // Store additional fields for display
             assigned_to: l.assigned_to,
             assigned_to_username: l.assigned_to_username,
+            leadCompanyName: l.leadCompanyName ?? l.lead_company_name,
+            profession: l.profession,
+            budgetMax: l.budgetMax ?? l.budget_max,
+            budget_max: l.budget_max,
         }));
     }, [allLeads]);
 
@@ -411,12 +416,19 @@ export const LeadsPage = () => {
                 name: lead.name,
                 phone: lead.phone,
                 budget: lead.budget,
+                budget_max: (originalLead as any).budget_max ?? (lead as any).budgetMax ?? null,
                 assignedTo: lead.assignedTo,
                 type: lead.type,
                 communicationWay: lead.communicationWay,
                 priority: lead.priority,
                 status: status.id, // Send status ID
                 company: companyId, // Include company ID
+                lead_company_name:
+                    (originalLead as any).lead_company_name ??
+                    (lead as any).leadCompanyName ??
+                    null,
+                profession: (originalLead as any).profession ?? (lead as any).profession ?? null,
+                notes: (originalLead as any).notes ?? (lead as any).notes ?? null,
             };
             
             // Include phoneNumbers if they exist
@@ -471,7 +483,7 @@ export const LeadsPage = () => {
             return {
                 name: l.name,
                 phone,
-                budget: l.budget ?? '',
+                budget: formatLeadBudget(l as any, language === 'ar' ? 'ar-IQ' : 'en-US') || (l.budget ?? ''),
                 type: l.type ?? '',
                 priority: l.priority ?? '',
                 status: ((l as any).status_name || l.status) ?? '',
@@ -479,6 +491,10 @@ export const LeadsPage = () => {
                 assignedToName: (l as any).assigned_to_username ?? '',
                 source: l.source ?? '',
                 campaign: (l as any).campaign_name ?? l.campaign_name ?? '',
+                createdByName:
+                    (l as any).created_by_name ??
+                    (l as { createdByName?: string | null }).createdByName ??
+                    '',
                 createdAt: l.createdAt ? new Date(l.createdAt).toLocaleString() : '',
             };
         });
@@ -492,6 +508,7 @@ export const LeadsPage = () => {
             { key: 'communicationWay', label: t('communicationWay') || 'Communication Way' },
             { key: 'assignedToName', label: t('assignedTo') || 'Assigned To' },
             { key: 'source', label: t('source') || 'Source' },
+            { key: 'createdByName', label: t('createdBy') || 'Created by' },
             { key: 'campaign', label: t('campaign') || 'Campaign' },
             { key: 'createdAt', label: t('createdAt') || 'Created At' },
         ];
@@ -585,17 +602,13 @@ export const LeadsPage = () => {
             leads = leads.filter(l => l.communicationWay === leadFilters.communicationWay);
         }
 
-        if (leadFilters.budgetMin) {
-            const minBudget = parseFloat(leadFilters.budgetMin);
-            if (!isNaN(minBudget)) {
-                leads = leads.filter(l => l.budget >= minBudget);
-            }
-        }
-
-        if (leadFilters.budgetMax) {
-            const maxBudget = parseFloat(leadFilters.budgetMax);
-            if (!isNaN(maxBudget)) {
-                leads = leads.filter(l => l.budget <= maxBudget);
+        if (leadFilters.budgetMin || leadFilters.budgetMax) {
+            const minBudget = leadFilters.budgetMin ? parseFloat(leadFilters.budgetMin) : -Infinity;
+            const maxBudget = leadFilters.budgetMax ? parseFloat(leadFilters.budgetMax) : Infinity;
+            if (!isNaN(minBudget) && !isNaN(maxBudget)) {
+                const lo = Math.min(minBudget, maxBudget);
+                const hi = Math.max(minBudget, maxBudget);
+                leads = leads.filter((l) => leadBudgetOverlapsFilter(l as any, lo, hi));
             }
         }
 
@@ -624,10 +637,14 @@ export const LeadsPage = () => {
         if (leadFilters.search) {
             const searchLower = leadFilters.search.toLowerCase();
             const leadCompany = (l: any) => l.leadCompanyName ?? l.lead_company_name ?? '';
+            const leadProfession = (l: any) => (l.profession != null ? String(l.profession) : '');
+            const leadNotes = (l: any) => (l.notes != null ? String(l.notes) : '');
             leads = leads.filter(l => 
                 l.name.toLowerCase().includes(searchLower) || 
                 l.phone.includes(searchLower) ||
-                (leadCompany(l) && String(leadCompany(l)).toLowerCase().includes(searchLower))
+                (leadCompany(l) && String(leadCompany(l)).toLowerCase().includes(searchLower)) ||
+                leadProfession(l).toLowerCase().includes(searchLower) ||
+                leadNotes(l).toLowerCase().includes(searchLower)
             );
         }
 
@@ -865,8 +882,10 @@ export const LeadsPage = () => {
                                         )}
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('name')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('leadCompanyName')}</th>
+                                        <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('profession')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('phone')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('source') || 'Source'}</th>
+                                        <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('createdBy') || 'Created by'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('campaign') || 'Campaign'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('type')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('priority')}</th>
@@ -910,6 +929,9 @@ export const LeadsPage = () => {
                                                 <td className="px-4 sm:px-6 py-4 hidden lg:table-cell text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">
                                                     {(lead as any).leadCompanyName ?? (lead as any).lead_company_name ?? '-'}
                                                 </td>
+                                                <td className="px-4 sm:px-6 py-4 hidden lg:table-cell text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                                    {(lead as any).profession && String((lead as any).profession).trim() !== '' ? (lead as any).profession : '-'}
+                                                </td>
                                                 <td className="px-4 sm:px-6 py-4 text-center">
                                                     {isDataEntryUser ? (
                                                         <span className="text-sm text-gray-900 dark:text-gray-100" dir="ltr">
@@ -927,9 +949,9 @@ export const LeadsPage = () => {
                                                                             <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
                                                                                 {pn.phone_number}
                                                                             </span>
-                                                                            <div className="w-16 text-right">
+                                                                            <div className="min-w-[5.5rem] flex justify-end shrink-0">
                                                                                 {pn.is_primary ? (
-                                                                                    <span className="text-xs text-primary whitespace-nowrap">
+                                                                                    <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap bg-primary/15 text-primary-700 ring-1 ring-inset ring-primary/30 dark:bg-primary-900/50 dark:text-primary-200 dark:ring-primary-500/40">
                                                                                         ({t('primary') || 'Primary'})
                                                                                     </span>
                                                                                 ) : (
@@ -965,9 +987,9 @@ export const LeadsPage = () => {
                                                                             <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
                                                                                 {pn.phone_number}
                                                                             </span>
-                                                                            <div className="w-16 text-left">
+                                                                            <div className="min-w-[5.5rem] flex justify-start shrink-0">
                                                                                 {pn.is_primary ? (
-                                                                                    <span className="text-xs text-primary whitespace-nowrap">
+                                                                                    <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap bg-primary/15 text-primary-700 ring-1 ring-inset ring-primary/30 dark:bg-primary-900/50 dark:text-primary-200 dark:ring-primary-500/40">
                                                                                         ({t('primary') || 'Primary'})
                                                                                     </span>
                                                                                 ) : (
@@ -1098,6 +1120,14 @@ export const LeadsPage = () => {
                                                         );
                                                     })()}
                                                 </td>
+                                                <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
+                                                    {(() => {
+                                                        const createdById = (lead as any).created_by ?? lead.createdBy;
+                                                        const apiName = (lead as any).created_by_name ?? lead.createdByName;
+                                                        const creatorUser = createdById ? users.find(u => u.id === createdById) : null;
+                                                        return creatorUser?.name ?? apiName ?? '-';
+                                                    })()}
+                                                </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-center">
                                                     {lead.campaign ? (
                                                         <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
@@ -1141,17 +1171,10 @@ export const LeadsPage = () => {
                                                     })()}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
-                                                    {lead.budget && lead.budget > 0 ? (
-                                                        (() => {
-                                                            const num = Number(lead.budget);
-                                                            const formatted = num.toLocaleString('en-US', { 
-                                                                minimumFractionDigits: 0, 
-                                                                maximumFractionDigits: 2 
-                                                            });
-                                                            // Remove trailing zeros after decimal point
-                                                            return formatted.replace(/\.0+$/, '');
-                                                        })()
-                                                    ) : '-'}
+                                                    {(() => {
+                                                        const s = formatLeadBudget(lead as any, language === 'ar' ? 'ar-IQ' : 'en-US');
+                                                        return s || '-';
+                                                    })()}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
                                                     {assignedUserName || '-'}

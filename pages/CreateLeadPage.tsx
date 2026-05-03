@@ -6,6 +6,9 @@ import { Lead, PhoneNumber } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useCreateLead } from '../hooks/useQueries';
 import { getCompanyRoute } from '../utils/routing';
+import { isUserOnWeeklyDayOff } from '../utils/weekOff';
+import { buildLeadAssigneePickerOptions } from '../utils/roles';
+import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -31,14 +34,12 @@ export const CreateLeadPage = () => {
     const { data: usersResponse } = useUsers();
     const users = usersResponse?.results || [];
     
-    // التأكد من تضمين الأدمن (المستخدم الحالي) في القائمة حتى لو لم يكن في قائمة المستخدمين
-    const userOptions = React.useMemo(() => {
-        const options = [...users];
-        if (currentUser && !options.find(u => u.id === currentUser.id)) {
-            options.unshift(currentUser);
-        }
-        return options;
-    }, [users, currentUser]);
+    const userOptions = React.useMemo(
+        () => buildLeadAssigneePickerOptions(users, currentUser),
+        [users, currentUser]
+    );
+
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
 
     const { data: statusesData } = useStatuses();
     const statuses = Array.isArray(statusesData)
@@ -51,6 +52,7 @@ export const CreateLeadPage = () => {
         : (channelsData?.results || []);
 
     const createLeadMutation = useCreateLead();
+    const isSubmitting = createLeadMutation.isPending;
 
     const [loading, setLoading] = useState(true);
     
@@ -74,12 +76,18 @@ export const CreateLeadPage = () => {
         name: '',
         phone: '',
         budget: '',
+        budgetMax: '',
         assignedTo: '', // Don't auto-assign to current user - allow creating unassigned leads
         type: 'fresh' as 'fresh' | 'cold' | '',
         communicationWay: '',
         priority: 'medium' as 'low' | 'medium' | 'high' | '',
         status: '',
         leadCompanyName: '',
+        profession: '',
+        notes: '',
+        interestedDeveloper: '',
+        interestedProject: '',
+        interestedUnit: '',
     });
     
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'>>>([]);
@@ -207,7 +215,8 @@ export const CreateLeadPage = () => {
         if (!assignedToInitialized.current && !hasUserInteracted.current && !formInitialized.current && 
             userOptions.length > 0 && !formState.assignedTo && 
             !formState.name && !formState.phone && phoneNumbers.length === 0 && !formState.budget) {
-            const defaultUserId = currentUser?.id || userOptions[0]?.id;
+            const defaultUserId =
+                userOptions.find((u) => u.id === currentUser?.id)?.id ?? userOptions[0]?.id;
             if (defaultUserId) {
                 assignedToInitialized.current = true;
                 setFormState(prev => ({ ...prev, assignedTo: defaultUserId.toString() }));
@@ -217,7 +226,7 @@ export const CreateLeadPage = () => {
     }, [userOptions, currentUser, formState, phoneNumbers.length]); // Re-run when users load initially
     
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         if (!hasUserInteracted.current) {
             hasUserInteracted.current = true;
@@ -301,6 +310,7 @@ export const CreateLeadPage = () => {
                 name: formState.name,
                 phone_numbers: finalPhoneNumbers,
                 budget: formState.budget ? Number(formState.budget) : null,
+                budget_max: formState.budgetMax?.trim() ? Number(formState.budgetMax) : null,
                 assigned_to: isDataEntryUser ? null : (formState.assignedTo ? Number(formState.assignedTo) : null),
                 type: typeValue,
                 communication_way: channelId,
@@ -308,6 +318,13 @@ export const CreateLeadPage = () => {
                 status: statusId,
                 company: currentUser?.company?.id || null,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
+                profession: formState.profession?.trim() || null,
+                notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
+                    interestedDeveloper: formState.interestedDeveloper,
+                    interestedProject: formState.interestedProject,
+                    interestedUnit: formState.interestedUnit,
+                }),
             };
             
             // Add phone_number for backward compatibility if we have phone numbers
@@ -336,6 +353,7 @@ export const CreateLeadPage = () => {
                     phone_number: t('phoneNumbers') || 'Phone Numbers',
                     phone_numbers: t('phoneNumbers') || 'Phone Numbers',
                     budget: t('budget') || 'Budget',
+                    budget_max: t('budgetMaxOptional') || 'Budget (max)',
                     assigned_to: t('assignedTo') || 'Assigned To',
                     type: t('type') || 'Type',
                     communication_way: t('communicationWay') || 'Communication Way',
@@ -343,6 +361,10 @@ export const CreateLeadPage = () => {
                     status: t('status') || 'Status',
                     company: t('company') || 'Company',
                     lead_company_name: t('leadCompanyName') || 'Company name',
+                    profession: t('profession') || 'Profession',
+                    interested_developer: t('interestedDeveloper') || 'Developer',
+                    interested_project: t('interestedProject') || 'Project',
+                    interested_unit: t('interestedUnit') || 'Unit',
                 };
                 
                 Object.keys(error.fields).forEach(field => {
@@ -440,8 +462,45 @@ export const CreateLeadPage = () => {
                             />
                         </div>
                         <div>
+                            <Label htmlFor="profession">{t('profession')}</Label>
+                            <Input
+                                id="profession"
+                                placeholder={t('enterProfession')}
+                                value={formState.profession}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <LeadInterestInventoryFields
+                            className="md:col-span-2 lg:col-span-3"
+                            idPrefix="create-lead-inv"
+                            value={{
+                                interestedDeveloper: formState.interestedDeveloper,
+                                interestedProject: formState.interestedProject,
+                                interestedUnit: formState.interestedUnit,
+                            }}
+                            onChange={(inv) => {
+                                hasUserInteracted.current = true;
+                                setFormState((prev) => ({ ...prev, ...inv }));
+                            }}
+                        />
+                        <div className="md:col-span-2 lg:col-span-3">
+                            <Label htmlFor="notes">{t('notes')}</Label>
+                            <textarea
+                                id="notes"
+                                rows={3}
+                                value={formState.notes}
+                                onChange={handleChange}
+                                placeholder={t('enterNotes') || 'Enter notes...'}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                            />
+                        </div>
+                        <div>
                             <Label htmlFor="budget">{t('budget')}</Label>
                             <NumberInput id="budget" name="budget" value={formState.budget} onChange={handleChange} placeholder={t('enterBudget')} min={0} step={1} />
+                        </div>
+                        <div>
+                            <Label htmlFor="budgetMax">{t('budgetMaxOptional')}</Label>
+                            <NumberInput id="budgetMax" name="budgetMax" value={formState.budgetMax} onChange={handleChange} placeholder={t('enterBudgetMax')} min={0} step={1} />
                         </div>
                         <div className="md:col-span-2 lg:col-span-3">
                             <div className="flex items-center justify-between mb-2">
@@ -524,9 +583,17 @@ export const CreateLeadPage = () => {
                             <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                             <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
                                 <option value="">{t('selectEmployee') || 'Select Employee'}</option>
-                                {userOptions.map(user => (
-                                    <option key={user.id} value={user.id}>{user.name || user.username || user.email}</option>
-                                ))}
+                                {userOptions.map(user => {
+                                    const off = isUserOnWeeklyDayOff(
+                                        { weekly_day_off: user.weekly_day_off },
+                                        companyTz
+                                    );
+                                    return (
+                                        <option key={user.id} value={user.id} disabled={off}>
+                                            {(user.name || user.username || user.email) + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                        </option>
+                                    );
+                                })}
                             </Select>
                         </div>
                         )}
@@ -589,10 +656,10 @@ export const CreateLeadPage = () => {
                                 window.history.pushState({}, '', '/leads');
                                 setCurrentPage('Leads');
                             }
-                        }}>
+                        }} disabled={isSubmitting}>
                             {t('cancel')}
                         </Button>
-                        <Button type="submit">
+                        <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>
                             {t('createLead') || 'Create Lead'}
                         </Button>
                     </div>

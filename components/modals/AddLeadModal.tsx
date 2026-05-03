@@ -10,6 +10,9 @@ import { Checkbox } from '../Checkbox';
 import { Lead, PhoneNumber } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
 import { useCreateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
+import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
+import { buildLeadAssigneePickerOptions } from '../../utils/roles';
+import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -36,19 +39,21 @@ export const AddLeadModal = () => {
     const users = usersResponse?.results || [];
 
     // Ensure admin (current user) is included in the options even if not in the users list
-    const userOptions = React.useMemo(() => {
-        const options = [...users];
-        if (currentUser && !options.find(u => u.id === currentUser.id)) {
-            options.unshift(currentUser);
-        }
-        return options;
-    }, [users, currentUser]);
+    const userOptions = React.useMemo(
+        () => buildLeadAssigneePickerOptions(users, currentUser),
+        [users, currentUser]
+    );
 
     const { data: statusesData } = useStatuses();
-    const statuses = Array.isArray(statusesData) ? statusesData : [];
+    const statuses = Array.isArray(statusesData)
+        ? statusesData
+        : (statusesData?.results || []);
 
     const { data: channelsData } = useChannels();
-    const channels = Array.isArray(channelsData) ? channelsData : [];
+    const channels = Array.isArray(channelsData)
+        ? channelsData
+        : (channelsData?.results || []);
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
 
     // Create lead mutation
     const createLeadMutation = useCreateLead();
@@ -74,12 +79,18 @@ export const AddLeadModal = () => {
         name: '',
         phone: '',
         budget: '',
+        budgetMax: '',
         assignedTo: '',
         type: '' as Lead['type'],
         communicationWay: getDefaultChannel() ?? '',
         priority: '' as Lead['priority'],
         status: getDefaultStatus() ?? '',
         leadCompanyName: '',
+        profession: '',
+        notes: '',
+        interestedDeveloper: '',
+        interestedProject: '',
+        interestedUnit: '',
     });
     
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'>>>([]);
@@ -87,8 +98,9 @@ export const AddLeadModal = () => {
     // Set default assignedTo to current user when modal opens or users load
     useEffect(() => {
         if (isDataEntryUser) return;
-        if (isAddLeadModalOpen && users.length > 0) {
-            const defaultUserId = currentUser?.id || users[0]?.id;
+        if (isAddLeadModalOpen && userOptions.length > 0) {
+            const defaultUserId =
+                userOptions.find((u) => u.id === currentUser?.id)?.id ?? userOptions[0]?.id;
             if (defaultUserId) {
                 setFormState(prev => {
                     if (!prev.assignedTo) {
@@ -98,7 +110,7 @@ export const AddLeadModal = () => {
                 });
             }
         }
-    }, [isAddLeadModalOpen, users.length, currentUser?.id]);
+    }, [isAddLeadModalOpen, userOptions, currentUser?.id]);
     
     // Update default status and channel when settings change
     useEffect(() => {
@@ -111,7 +123,7 @@ export const AddLeadModal = () => {
         }
     }, [isAddLeadModalOpen, statuses, channels]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
     };
@@ -175,24 +187,67 @@ export const AddLeadModal = () => {
         }
         
         try {
-            await createLeadMutation.mutateAsync({
+            const channelId = formState.communicationWay
+                ? (channels.find((c: { id?: number; name?: string }) =>
+                    c.id?.toString() === formState.communicationWay || c.name === formState.communicationWay)?.id ?? null)
+                : null;
+            const statusId = formState.status
+                ? (statuses.find((s: { id?: number; name?: string }) =>
+                    s.id?.toString() === formState.status || s.name === formState.status)?.id ?? null)
+                : null;
+
+            const priorityValue = formState.priority
+                ? (formState.priority.toLowerCase() as 'low' | 'medium' | 'high')
+                : null;
+            const typeValue = formState.type
+                ? (formState.type.toLowerCase() as 'fresh' | 'cold')
+                : null;
+
+            const primaryPhone =
+                finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number
+                || finalPhoneNumbers[0]?.phone_number
+                || '';
+
+            const companyId = currentUser?.company?.id;
+            if (!companyId) {
+                alert(t('companyRequired') || 'Company is required. Please log in again.');
+                return;
+            }
+
+            const leadData: Record<string, unknown> = {
                 name: formState.name,
-                phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '',
-                phoneNumbers: finalPhoneNumbers,
-                budget: Number(formState.budget) || 0,
-                ...(isDataEntryUser ? {} : { assignedTo: formState.assignedTo ? Number(formState.assignedTo) : 0 }),
-                type: formState.type,
-                communicationWay: formState.communicationWay,
-                priority: formState.priority,
-                status: formState.status,
+                phone_numbers: finalPhoneNumbers,
+                budget: formState.budget ? Number(formState.budget) : null,
+                budget_max: formState.budgetMax?.trim() ? Number(formState.budgetMax) : null,
+                type: typeValue,
+                communication_way: channelId,
+                priority: priorityValue,
+                status: statusId,
+                company: companyId,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
-            });
+                profession: formState.profession?.trim() || null,
+                notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
+                    interestedDeveloper: formState.interestedDeveloper,
+                    interestedProject: formState.interestedProject,
+                    interestedUnit: formState.interestedUnit,
+                }),
+            };
+            if (primaryPhone) {
+                leadData.phone_number = primaryPhone;
+            }
+            if (!isDataEntryUser) {
+                leadData.assigned_to = formState.assignedTo ? Number(formState.assignedTo) : null;
+            }
+
+            await createLeadMutation.mutateAsync(leadData);
 
             // Reset form
             const defaultUserId = isDataEntryUser ? '' : (currentUser?.id || users[0]?.id || '');
             setFormState({
-                name: '', phone: '', budget: '', assignedTo: defaultUserId.toString(),
-                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '',
+                name: '', phone: '', budget: '', budgetMax: '', assignedTo: defaultUserId.toString(),
+                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '', profession: '', notes: '',
+                interestedDeveloper: '', interestedProject: '', interestedUnit: '',
             });
             setPhoneNumbers([]);
             
@@ -202,6 +257,20 @@ export const AddLeadModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating lead:', error);
+            const code = error?.code || error?.error_key;
+            if (code === 'employee_weekly_day_off') {
+                alert(
+                    t('employeeWeeklyDayOffAssignError')
+                    || error?.message
+                    || 'Cannot assign to this employee on their weekly day off.'
+                );
+                return;
+            }
+            if (error?.fields?.assigned_to) {
+                const fe = error.fields.assigned_to;
+                alert(Array.isArray(fe) ? fe[0] : String(fe));
+                return;
+            }
             alert(error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.');
         }
     };
@@ -220,9 +289,27 @@ export const AddLeadModal = () => {
                         <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
                         <Input id="leadCompanyName" placeholder={t('enterLeadCompanyName')} value={formState.leadCompanyName} onChange={handleChange} />
                     </div>
+                    <div>
+                        <Label htmlFor="profession">{t('profession')}</Label>
+                        <Input id="profession" placeholder={t('enterProfession')} value={formState.profession} onChange={handleChange} />
+                    </div>
+                    <LeadInterestInventoryFields
+                        className="md:col-span-2"
+                        idPrefix="add-lead-inv"
+                        value={{
+                            interestedDeveloper: formState.interestedDeveloper,
+                            interestedProject: formState.interestedProject,
+                            interestedUnit: formState.interestedUnit,
+                        }}
+                        onChange={(inv) => setFormState((prev) => ({ ...prev, ...inv }))}
+                    />
                      <div>
                         <Label htmlFor="budget">{t('budget')}</Label>
                         <NumberInput id="budget" name="budget" value={formState.budget} onChange={handleChange} placeholder={t('enterBudget')} min={0} step={1} />
+                    </div>
+                    <div>
+                        <Label htmlFor="budgetMax">{t('budgetMaxOptional')}</Label>
+                        <NumberInput id="budgetMax" name="budgetMax" value={formState.budgetMax} onChange={handleChange} placeholder={t('enterBudgetMax')} min={0} step={1} />
                     </div>
                     <div className="md:col-span-2">
                         <div className="flex items-center justify-between mb-2">
@@ -297,7 +384,15 @@ export const AddLeadModal = () => {
                         <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                         <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
                             <option value="">{t('selectEmployee') || 'Select Employee'}</option>
-                            {userOptions.map(user => <option key={user.id} value={user.id}>{user.name || user.username || user.email}</option>)}
+                            {userOptions.map(user => {
+                                const off = isUserOnWeeklyDayOff(user, companyTz);
+                                return (
+                                    <option key={user.id} value={user.id.toString()} disabled={off}>
+                                        {(user.name || user.username || user.email || `User ${user.id}`)
+                                            + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                    </option>
+                                );
+                            })}
                         </Select>
                     </div>
                      )}
@@ -347,11 +442,21 @@ export const AddLeadModal = () => {
                         </Select>
                     </div>
                 </div>
-                {/* <div>
+                <div className="md:col-span-2">
                     <Label htmlFor="notes">{t('notes')}</Label>
-                    <textarea id="notes" rows={3} className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"></textarea>
-                </div> */}
-                <div className="flex justify-end">
+                    <textarea
+                        id="notes"
+                        rows={3}
+                        value={formState.notes}
+                        onChange={handleChange}
+                        placeholder={t('enterNotes') || 'Enter notes...'}
+                        className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                    />
+                </div>
+                <div className="flex justify-end gap-2">
+                    <Button type="button" variant="secondary" onClick={() => setIsAddLeadModalOpen(false)} disabled={isLoading}>
+                        {t('cancel')}
+                    </Button>
                     <Button type="submit" loading={isLoading} disabled={isLoading}>{t('submit')}</Button>
                 </div>
             </form>

@@ -36,6 +36,8 @@ export interface Company {
   name: string;
   domain?: string;
   specialization: 'real_estate' | 'services' | 'products';
+  /** IANA timezone for business calendar (weekly day off). */
+  timezone?: string;
   auto_assign_enabled?: boolean;
   re_assign_enabled?: boolean;
   re_assign_hours?: number;
@@ -103,6 +105,8 @@ export interface User {
   last_seen_at?: string | null;
   last_seen_source?: 'web' | 'mobile' | 'unknown' | string;
   is_online?: boolean;
+  /** 0=Mon .. 6=Sun; null/undefined = no fixed weekly day off */
+  weekly_day_off?: number | null;
 }
 
 export interface TimelineEntry {
@@ -151,6 +155,8 @@ export interface Lead {
   type: 'Fresh' | 'Cold' | 'My' | 'Rotated' | 'All';
   assignedTo: number; // User ID
   budget: number;
+  /** Upper budget bound when stored as a range (API: budget_max); omit or null for a single amount */
+  budgetMax?: number | null;
   communicationWay: string;
   priority: 'High' | 'Medium' | 'Low';
   createdAt: string;
@@ -159,12 +165,27 @@ export interface Lead {
   campaign_name?: string; // Campaign name (from API)
   source?: 'meta_lead_form' | 'whatsapp' | 'tiktok' | 'manual' | 'other' | string; // Lead source
   integration_account?: number | null; // IntegrationAccount ID
+  /** CRM user id who created the lead (API); null for integrations or legacy */
+  createdBy?: number | null;
+  /** Display name from API (full name or username) */
+  createdByName?: string | null;
   // Computed fields (not in API, calculated from ClientTasks)
   lastFeedback?: string; // From last ClientTask notes
-  notes?: string; // From last ClientTask notes
+  /** Optional notes stored on the lead record (API: notes); not the same as last task feedback */
+  notes?: string | null;
   lastStage?: string; // From last ClientTask stage or status
   lastFeedbackAt?: string; // Latest task/call timestamp from API
   leadCompanyName?: string; // Optional company name for the lead
+  /** Optional job / occupation (API: profession) */
+  profession?: string | null;
+  /** Real-estate: optional inventory interest (API: interested_developer / _project / _unit) */
+  interestedDeveloper?: number | null;
+  interestedProject?: number | null;
+  interestedUnit?: number | null;
+  interestedDeveloperName?: string | null;
+  interestedProjectName?: string | null;
+  interestedUnitName?: string | null;
+  interestedUnitCode?: string | null;
 }
 
 export interface LeadFilters {

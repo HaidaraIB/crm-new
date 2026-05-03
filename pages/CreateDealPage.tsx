@@ -4,6 +4,8 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, PlusIcon, NumberInput, ArrowLeftIcon, PageLoadingState } from '../components/index';
 import { useProjects, useUnits, useLeads, useUsers, useCreateDeal } from '../hooks/useQueries';
 import { User } from '../types';
+import { isUserOnWeeklyDayOff } from '../utils/weekOff';
+import { buildLeadAssigneePickerOptions } from '../utils/roles';
 
 // Helper function to get user display name
 const getUserDisplayName = (user: User): string => {
@@ -50,8 +52,12 @@ export const CreateDealPage = () => {
     const users = Array.isArray(usersResponse) 
         ? usersResponse 
         : (usersResponse?.results || []);
-    const userOptions = (users && users.length > 0) ? users : (currentUser ? [currentUser] : []);
-    
+    const userOptions = useMemo(
+        () => buildLeadAssigneePickerOptions(users, currentUser),
+        [users, currentUser]
+    );
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
+
     // Use React Query mutation for creating deal
     const createDealMutation = useCreateDeal();
     
@@ -432,11 +438,17 @@ export const CreateDealPage = () => {
                                 className={errors.employee ? 'border-red-500 dark:border-red-500' : ''}
                             >
                                 {userOptions.length > 0 ? (
-                                    userOptions.map(u => (
-                                        <option key={u.id} value={u.id}>
-                                            {getUserDisplayName(u)}
-                                        </option>
-                                    ))
+                                    userOptions.map(u => {
+                                        const off = isUserOnWeeklyDayOff(
+                                            { weekly_day_off: u.weekly_day_off },
+                                            companyTz
+                                        );
+                                        return (
+                                            <option key={u.id} value={u.id} disabled={off}>
+                                                {getUserDisplayName(u) + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                            </option>
+                                        );
+                                    })
                                 ) : (
                                     <option value="">{t('noUsersAvailable') || 'No users available'}</option>
                                 )}
@@ -580,17 +592,18 @@ export const CreateDealPage = () => {
                         <Button type="button" variant="secondary" onClick={() => {
                             window.history.pushState({}, '', '/deals');
                             setCurrentPage('Deals');
-                        }}>
+                        }} disabled={createDealMutation.isPending}>
                             {t('cancel')}
                         </Button>
-                        <Button 
+                        <Button
                             type="submit"
-                            onClick={(e) => {
+                            onClick={() => {
                                 // Don't prevent default - let form handle it
                             }}
                             disabled={createDealMutation.isPending}
+                            loading={createDealMutation.isPending}
                         >
-                            {createDealMutation.isPending ? (t('creating') || 'Creating...') : t('createDeal')}
+                            {t('createDeal')}
                         </Button>
                     </div>
                 </Card>

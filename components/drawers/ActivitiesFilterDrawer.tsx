@@ -7,6 +7,7 @@ import { TaskStage } from '../../types';
 import { getStageDisplayLabel } from '../../utils/taskStageMapper';
 import { useUsers, useStages } from '../../hooks/useQueries';
 import { getUserDisplayName } from '../../types';
+import { usersForOperationalEmployeeLists } from '../../utils/roles';
 
 // FIX: Made children optional to fix missing children prop error.
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
@@ -55,10 +56,10 @@ export const ActivitiesFilterDrawer = () => {
         ? usersData 
         : (usersData?.results || []);
     
-    // Ensure users list includes current user if available
-    const users = usersArray.length > 0 
-        ? usersArray 
-        : (currentUser ? [currentUser] : []);
+    const users = React.useMemo(
+        () => usersForOperationalEmployeeLists(usersArray, currentUser ?? null),
+        [usersArray, currentUser]
+    );
     
     // Fetch stages using React Query
     const { data: stagesData } = useStages();

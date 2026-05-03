@@ -32,6 +32,7 @@ export const AddUserModal = () => {
         password: '',
         phone: '',
         role: 'employee',
+        weeklyDayOff: '' as string,
     });
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -149,8 +150,11 @@ export const AddUserModal = () => {
                 role: formData.role,
                 company_id: companyIdNumber,
             };
-            
-            
+            if (formData.role === 'employee' || formData.role === 'data_entry') {
+                userData.weekly_day_off =
+                    formData.weeklyDayOff === '' ? null : parseInt(formData.weeklyDayOff, 10);
+            }
+
             await createUserMutation.mutateAsync(userData);
 
             // Reset form
@@ -161,6 +165,7 @@ export const AddUserModal = () => {
                 password: '',
                 phone: '',
                 role: 'employee',
+                weeklyDayOff: '',
             });
             setErrors({});
             
@@ -240,6 +245,7 @@ export const AddUserModal = () => {
                 password: '',
                 phone: '',
                 role: 'employee',
+                weeklyDayOff: '',
             });
             setErrors({});
         }} title={t('createEmployee')}>
@@ -320,6 +326,26 @@ export const AddUserModal = () => {
                     </Select>
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>
+                {(formData.role === 'employee' || formData.role === 'data_entry') && (
+                    <div>
+                        <Label htmlFor="add-user-weekly-day-off">{t('weeklyDayOff')}</Label>
+                        <Select
+                            id="add-user-weekly-day-off"
+                            value={formData.weeklyDayOff}
+                            onChange={(e) => handleChange('weeklyDayOff', e.target.value)}
+                        >
+                            <option value="">{t('dayOffNone')}</option>
+                            <option value="0">{t('dayOffMonday')}</option>
+                            <option value="1">{t('dayOffTuesday')}</option>
+                            <option value="2">{t('dayOffWednesday')}</option>
+                            <option value="3">{t('dayOffThursday')}</option>
+                            <option value="4">{t('dayOffFriday')}</option>
+                            <option value="5">{t('dayOffSaturday')}</option>
+                            <option value="6">{t('dayOffSunday')}</option>
+                        </Select>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
+                    </div>
+                )}
                 <div className="flex justify-end gap-2 pt-2">
                     <Button 
                         variant="secondary" 
@@ -332,6 +358,7 @@ export const AddUserModal = () => {
                                 password: '',
                                 phone: '',
                                 role: 'employee',
+                                weeklyDayOff: '',
                             });
                             setErrors({});
                             setSuccessMessage('');

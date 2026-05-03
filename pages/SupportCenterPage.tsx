@@ -187,8 +187,8 @@ export const SupportCenterPage = () => {
             {successMessage && (
               <p className="text-sm text-green-600 dark:text-green-400">{successMessage}</p>
             )}
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting ? (t('loading') || 'Sending...') : (t('submitTicket') || 'Submit')}
+            <Button type="submit" disabled={isSubmitting} loading={isSubmitting}>
+              {t('submitTicket') || 'Submit'}
             </Button>
           </form>
         </section>

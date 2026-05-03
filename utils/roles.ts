@@ -48,3 +48,40 @@ export const normalizeRoleForApi = (role?: string): ApiRole => {
   if (appRole === 'DataEntry') return 'data_entry';
   return 'employee';
 };
+
+/** Shown in manual lead/deal assignee pickers; data-entry staff are assigned via automation only. */
+export const showInLeadAssigneePicker = (role?: string): boolean => {
+  return normalizeRole(role) !== 'DataEntry';
+};
+
+/**
+ * Users shown in operational “employee” UI: assignee filters, team/report breakdowns, activity user filter.
+ * Same rule as lead assignee pickers (excludes data_entry). Use full `/users` where you only resolve names.
+ */
+export function usersForOperationalEmployeeLists<T extends { id: number; role?: string }>(
+  apiUsers: T[],
+  currentUser?: T | null
+): T[] {
+  return buildLeadAssigneePickerOptions(apiUsers, currentUser);
+}
+
+/**
+ * Company users suitable for manual assign dropdowns (excludes data_entry).
+ */
+export function buildLeadAssigneePickerOptions<T extends { id: number; role?: string }>(
+  apiUsers: T[],
+  currentUser: T | null | undefined
+): T[] {
+  const map = new Map<number, T>();
+  for (const u of apiUsers) {
+    if (showInLeadAssigneePicker(u.role)) map.set(u.id, u);
+  }
+  if (
+    currentUser &&
+    showInLeadAssigneePicker(currentUser.role) &&
+    !map.has(currentUser.id)
+  ) {
+    map.set(currentUser.id, currentUser);
+  }
+  return Array.from(map.values());
+}

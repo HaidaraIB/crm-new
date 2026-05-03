@@ -5,6 +5,7 @@ import { XIcon } from '../icons';
 import { Button } from '../Button';
 import { useUsers } from '../../hooks/useQueries';
 import { User } from '../../types';
+import { usersForOperationalEmployeeLists } from '../../utils/roles';
 
 // Helper function to get user display name
 const getUserDisplayName = (user: User): string => {
@@ -56,14 +57,18 @@ interface TeamsReportFilters {
 }
 
 export const TeamsReportFilterDrawer = () => {
-    const { isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen, t, teamsReportFilters, setTeamsReportFilters } = useAppContext();
+    const { isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen, t, teamsReportFilters, setTeamsReportFilters, currentUser } = useAppContext();
     const [localFilters, setLocalFilters] = useState<TeamsReportFilters>(teamsReportFilters);
     
     // Fetch users using React Query
     const { data: usersData, isLoading: usersLoading, error: usersError } = useUsers();
-    const users = Array.isArray(usersData) 
+    const usersRaw = Array.isArray(usersData) 
         ? usersData 
         : (usersData?.results || []);
+    const users = React.useMemo(
+        () => usersForOperationalEmployeeLists(usersRaw as User[], currentUser ?? null),
+        [usersRaw, currentUser]
+    );
 
     useEffect(() => {
         setLocalFilters(teamsReportFilters);

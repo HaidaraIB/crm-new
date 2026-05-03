@@ -7,6 +7,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { useUpdateDeal, useProjects, useUnits, useLeads, useUsers } from '../../hooks/useQueries';
 import { User } from '../../types';
+import { buildLeadAssigneePickerOptions } from '../../utils/roles';
 
 // Helper function to get user display name
 const getUserDisplayName = (user: User): string => {
@@ -60,8 +61,6 @@ export const EditDealModal = () => {
     const users = Array.isArray(usersResponse) 
         ? usersResponse 
         : (usersResponse?.results || []);
-    const userOptions = (users && users.length > 0) ? users : (currentUser ? [currentUser] : []);
-
     // Update deal mutation
     const updateDealMutation = useUpdateDeal();
     const loading = updateDealMutation.isPending;
@@ -88,6 +87,11 @@ export const EditDealModal = () => {
         salesCommissionPercentage: '',
         description: '',
     });
+
+    const userOptions = useMemo(
+        () => buildLeadAssigneePickerOptions(users, currentUser),
+        [users, currentUser]
+    );
     
     // Filter units by selected project (must be after formState declaration)
     const units = useMemo(() => {

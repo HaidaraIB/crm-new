@@ -6,6 +6,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { useUsers, useChannels, useStatuses } from '../../hooks/useQueries';
 import { getUserDisplayName } from '../../types';
+import { usersForOperationalEmployeeLists } from '../../utils/roles';
 
 // FIX: Made children optional to fix missing children prop error.
 const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
@@ -55,14 +56,10 @@ export const FilterDrawer = () => {
         ? usersResponse 
         : (usersResponse?.results || []);
     
-    // Ensure admin (current user) is included in the options even if not in the users list
-    const userOptions = React.useMemo(() => {
-        const options = [...usersArray];
-        if (currentUser && !options.find(u => u.id === currentUser.id)) {
-            options.unshift(currentUser);
-        }
-        return options;
-    }, [usersArray, currentUser]);
+    const userOptions = React.useMemo(
+        () => usersForOperationalEmployeeLists(usersArray, currentUser ?? null),
+        [usersArray, currentUser]
+    );
     
     const { data: channelsResponse } = useChannels();
     const channels = Array.isArray(channelsResponse) 

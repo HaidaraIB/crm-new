@@ -1860,10 +1860,13 @@ export const deleteDeveloperAPI = async (developerId: number) => {
  * الحصول على جميع Projects
  * GET /api/projects/
  */
-export const getProjectsAPI = async (page?: number, pageSize?: number) => {
+export const getProjectsAPI = async (page?: number, pageSize?: number, developerId?: number | null) => {
   const queryParams = new URLSearchParams();
   if (page) queryParams.append('page', String(page));
   if (pageSize) queryParams.append('page_size', String(pageSize));
+  if (developerId != null && developerId !== undefined) {
+    queryParams.append('developer', String(developerId));
+  }
   const endpoint = `/projects/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
 };
@@ -2964,7 +2967,7 @@ export const getClientCallsAPI = async () => {
 /**
  * إنشاء Client Call جديد
  * POST /api/client-calls/
- * Body: { client, call_method, notes, follow_up_date }
+ * Body: { client, call_method, notes, call_datetime?, follow_up_date? }
  */
 export const createClientCallAPI = async (clientCallData: any) => {
   return apiRequest<any>('/client-calls/', {
@@ -3320,6 +3323,7 @@ export const updateCompanyAssignmentSettingsAPI = async (
     auto_assign_enabled?: boolean;
     re_assign_enabled?: boolean;
     re_assign_hours?: number;
+    timezone?: string;
   }
 ) => {
   return apiRequest<any>(`/companies/${companyId}/update_assignment_settings/`, {

@@ -48,10 +48,6 @@ export const AddCallModal = () => {
             newErrors.notes = t('notesRequired') || 'Notes are required';
         }
 
-        if (!followUpDate || followUpDate.trim() === '') {
-            newErrors.followUpDate = t('followUpDateRequired') || 'Follow up date is required';
-        }
-
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;
     };
@@ -120,7 +116,9 @@ export const AddCallModal = () => {
                 call_method: callMethodObj.id, // API expects call_method ID (pk) not name
                 notes: notes,
                 call_datetime: callDatetime || undefined, // API expects 'call_datetime' (optional)
-                follow_up_date: followUpDate, // API expects 'follow_up_date' (required)
+                ...(followUpDate.trim()
+                    ? { follow_up_date: followUpDate }
+                    : {}),
             });
 
             // Reset form
@@ -219,7 +217,7 @@ export const AddCallModal = () => {
                     )}
                 </div>
                 <div>
-                    <Label htmlFor="followUpDate">{t('followUpDate') || 'Follow Up Date'} <span className="text-red-500">*</span></Label>
+                    <Label htmlFor="followUpDate">{t('followUpDate') || 'Follow Up Date'}</Label>
                     <input 
                         type="datetime-local" 
                         id="followUpDate" 

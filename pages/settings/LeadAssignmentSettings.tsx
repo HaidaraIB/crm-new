@@ -6,6 +6,7 @@ import { useAppContext } from '../../context/AppContext';
 import { updateCompanyAssignmentSettingsAPI } from '../../services/api';
 import { useCurrentUser, queryKeys } from '../../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
+import { IANA_TIMEZONE_GROUPS, allListedIanaZones, type TimezoneGroup } from '../../utils/ianaTimezones';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -23,6 +24,7 @@ export const LeadAssignmentSettings = () => {
     const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
     const [reAssignEnabled, setReAssignEnabled] = useState(false);
     const [reAssignHours, setReAssignHours] = useState(24);
+    const [businessTimezone, setBusinessTimezone] = useState('UTC');
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string>('');
 
@@ -32,8 +34,22 @@ export const LeadAssignmentSettings = () => {
             setAutoAssignEnabled(company.auto_assign_enabled || false);
             setReAssignEnabled(company.re_assign_enabled || false);
             setReAssignHours(company.re_assign_hours || 24);
+            setBusinessTimezone((company.timezone || 'UTC').trim() || 'UTC');
         }
     }, [company]);
+
+    const timezoneSelectGroups = React.useMemo((): TimezoneGroup[] => {
+        const listed = allListedIanaZones();
+        const current = (businessTimezone || 'UTC').trim() || 'UTC';
+        const extra: TimezoneGroup[] = [];
+        if (!listed.has(current)) {
+            extra.push({
+                label: t('savedTimezoneGroup'),
+                zones: [current],
+            });
+        }
+        return [...extra, ...IANA_TIMEZONE_GROUPS];
+    }, [businessTimezone, t]);
 
     const handleSave = async () => {
         if (!company?.id) {
@@ -49,6 +65,7 @@ export const LeadAssignmentSettings = () => {
                 auto_assign_enabled: autoAssignEnabled,
                 re_assign_enabled: reAssignEnabled,
                 re_assign_hours: reAssignHours,
+                timezone: businessTimezone.trim() || 'UTC',
             });
 
             // Invalidate and refetch current user data to get updated company settings
@@ -146,6 +163,30 @@ export const LeadAssignmentSettings = () => {
                                 </p>
                             </div>
                         )}
+                    </div>
+
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <Label htmlFor="company-timezone">{t('businessTimezone')}</Label>
+                        <select
+                            id="company-timezone"
+                            value={businessTimezone.trim() || 'UTC'}
+                            onChange={(e) => setBusinessTimezone(e.target.value)}
+                            dir="ltr"
+                            className="mt-1 max-w-md w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                        >
+                            {timezoneSelectGroups.map((group) => (
+                                <optgroup key={group.label} label={group.label}>
+                                    {group.zones.map((zone) => (
+                                        <option key={zone} value={zone}>
+                                            {zone}
+                                        </option>
+                                    ))}
+                                </optgroup>
+                            ))}
+                        </select>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            {t('businessTimezoneHelp')}
+                        </p>
                     </div>
 
                     {saveError && (

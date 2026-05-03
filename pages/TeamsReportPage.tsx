@@ -5,6 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { FilterIcon } from '../components/icons';
 import { useLeads, useDeals, useActivities, useUsers, useClientTasks, useClientCalls } from '../hooks/useQueries';
 import { User } from '../types';
+import { showInLeadAssigneePicker } from '../utils/roles';
 
 // Helper function to get user display name
 const getUserDisplayName = (user: User): string => {
@@ -57,7 +58,9 @@ export const TeamsReportPage = () => {
         const safeLeads = Array.isArray(leads) ? leads : [];
         const safeActivities = Array.isArray(activities) ? activities : [];
         const safeDeals = Array.isArray(deals) ? deals : [];
-        const safeUsers = Array.isArray(users) ? users : [];
+        const safeUsers = (Array.isArray(users) ? users : []).filter((u) =>
+            showInLeadAssigneePicker(u.role)
+        );
         const safeClientTasks = Array.isArray(clientTasks) ? clientTasks : [];
         const safeClientCalls = Array.isArray(clientCalls) ? clientCalls : [];
         

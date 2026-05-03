@@ -5,6 +5,9 @@ import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, Ar
 import { Lead, PhoneNumber } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useUpdateLead } from '../hooks/useQueries';
+import { isUserOnWeeklyDayOff } from '../utils/weekOff';
+import { buildLeadAssigneePickerOptions, showInLeadAssigneePicker } from '../utils/roles';
+import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -29,14 +32,12 @@ export const EditLeadPage = () => {
     const { data: usersResponse } = useUsers();
     const users = usersResponse?.results || [];
     
-    // Ensure admin (current user) is included in the options even if not in the users list
-    const userOptions = React.useMemo(() => {
-        const options = [...users];
-        if (currentUser && !options.find(u => u.id === currentUser.id)) {
-            options.unshift(currentUser);
-        }
-        return options;
-    }, [users, currentUser]);
+    const userOptions = React.useMemo(
+        () => buildLeadAssigneePickerOptions(users, currentUser),
+        [users, currentUser]
+    );
+
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
@@ -65,24 +66,31 @@ export const EditLeadPage = () => {
     
     // Use React Query mutation for updating lead
     const updateLeadMutation = useUpdateLead();
-    
-    const [loading, setLoading] = useState(true);
+    const isSaving = updateLeadMutation.isPending;
+
+    const [pageLoading, setPageLoading] = useState(true);
     const [formState, setFormState] = useState({
         name: '',
         phone: '',
         budget: '',
+        budgetMax: '',
         assignedTo: '',
         type: '' as 'fresh' | 'cold' | '',
         communicationWay: '',
         priority: '' as 'low' | 'medium' | 'high' | '',
         status: '',
         leadCompanyName: '',
+        profession: '',
+        notes: '',
+        interestedDeveloper: '',
+        interestedProject: '',
+        interestedUnit: '',
     });
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 100);
+        const timer = setTimeout(() => setPageLoading(false), 100);
         return () => clearTimeout(timer);
     }, []);
 
@@ -177,16 +185,54 @@ export const EditLeadPage = () => {
                 }
             }
             
+            const aid = editingLead.assignedTo;
+            let assignedToField = '';
+            if (aid) {
+                const assignee = users.find((u) => u.id === aid);
+                if (assignee && showInLeadAssigneePicker(assignee.role)) {
+                    assignedToField = String(aid);
+                }
+            }
+            if (!assignedToField && currentUser && showInLeadAssigneePicker(currentUser.role)) {
+                assignedToField = String(currentUser.id);
+            }
+
             setFormState({
                 name: editingLead.name || '',
                 phone: editingLead.phone || '',
-                budget: editingLead.budget?.toString() || '',
-                assignedTo: editingLead.assignedTo?.toString() || (currentUser?.id ? currentUser.id.toString() : ''),
+                budget: editingLead.budget != null ? String(editingLead.budget) : '',
+                budgetMax:
+                    editingLead.budgetMax != null
+                        ? String(editingLead.budgetMax)
+                        : (editingLead as any).budget_max != null
+                          ? String((editingLead as any).budget_max)
+                          : '',
+                assignedTo: assignedToField,
                 type: typeValue,
                 communicationWay: channelId || (defaultChannel != null ? defaultChannel.toString() : ''),
                 priority: priorityValue,
                 status: statusId || (defaultStatus != null ? defaultStatus.toString() : ''),
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
+                profession: editingLead.profession ?? (editingLead as any).profession ?? '',
+                notes: editingLead.notes ?? (editingLead as any).notes ?? '',
+                interestedDeveloper:
+                    (editingLead as Lead).interestedDeveloper != null
+                        ? String((editingLead as Lead).interestedDeveloper)
+                        : (editingLead as any).interested_developer != null
+                          ? String((editingLead as any).interested_developer)
+                          : '',
+                interestedProject:
+                    (editingLead as Lead).interestedProject != null
+                        ? String((editingLead as Lead).interestedProject)
+                        : (editingLead as any).interested_project != null
+                          ? String((editingLead as any).interested_project)
+                          : '',
+                interestedUnit:
+                    (editingLead as Lead).interestedUnit != null
+                        ? String((editingLead as Lead).interestedUnit)
+                        : (editingLead as any).interested_unit != null
+                          ? String((editingLead as any).interested_unit)
+                          : '',
             });
             
             // Initialize phone numbers from editingLead
@@ -207,9 +253,9 @@ export const EditLeadPage = () => {
                 setPhoneNumbers([]);
             }
         }
-    }, [editingLead, setSelectedLead, channels, statuses, currentUser, defaultChannel, defaultStatus]);
+    }, [editingLead, setSelectedLead, channels, statuses, currentUser, users, defaultChannel, defaultStatus]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => {
             return { ...prev, [id]: value };
@@ -261,7 +307,6 @@ export const EditLeadPage = () => {
         
         // Validate form before submission
         if (!validateForm()) {
-            setLoading(false);
             return;
         }
 
@@ -277,7 +322,6 @@ export const EditLeadPage = () => {
             }]
             : [];
 
-        setLoading(true);
         try {
             // Find channel and status IDs from names/IDs stored in formState
             const channelId = formState.communicationWay 
@@ -300,7 +344,6 @@ export const EditLeadPage = () => {
                 setErrors({ 
                     general: t('companyRequired') || 'Company is required. Please log in again.' 
                 });
-                setLoading(false);
                 return;
             }
             
@@ -308,6 +351,7 @@ export const EditLeadPage = () => {
                 name: formState.name,
                 phone_numbers: finalPhoneNumbers,
                 budget: formState.budget ? Number(formState.budget) : null,
+                budget_max: formState.budgetMax?.trim() ? Number(formState.budgetMax) : null,
                 assigned_to: formState.assignedTo ? Number(formState.assignedTo) : null,
                 type: typeValue,
                 communication_way: channelId,
@@ -315,6 +359,13 @@ export const EditLeadPage = () => {
                 status: statusId,
                 company: companyId,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
+                profession: formState.profession?.trim() || null,
+                notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
+                    interestedDeveloper: formState.interestedDeveloper,
+                    interestedProject: formState.interestedProject,
+                    interestedUnit: formState.interestedUnit,
+                }),
             };
             
             // Add phone_number for backward compatibility if we have phone numbers
@@ -336,9 +387,23 @@ export const EditLeadPage = () => {
                     type: updatedLead.type || '',
                     assignedTo: updatedLead.assigned_to || 0,
                     budget: updatedLead.budget || 0,
+                    budgetMax: updatedLead.budget_max ?? updatedLead.budgetMax ?? undefined,
                     communicationWay: updatedLead.communication_way_name || updatedLead.communication_way || '',
                     priority: updatedLead.priority || '',
                     createdAt: updatedLead.created_at || updatedLead.createdAt || '',
+                    leadCompanyName: updatedLead.lead_company_name ?? updatedLead.leadCompanyName ?? undefined,
+                    profession: updatedLead.profession ?? undefined,
+                    notes: updatedLead.notes ?? null,
+                    lastFeedback: updatedLead.last_feedback || updatedLead.lastFeedback || '',
+                    interestedDeveloper: updatedLead.interested_developer ?? updatedLead.interestedDeveloper ?? null,
+                    interestedProject: updatedLead.interested_project ?? updatedLead.interestedProject ?? null,
+                    interestedUnit: updatedLead.interested_unit ?? updatedLead.interestedUnit ?? null,
+                    interestedDeveloperName:
+                        updatedLead.interested_developer_name ?? updatedLead.interestedDeveloperName ?? null,
+                    interestedProjectName:
+                        updatedLead.interested_project_name ?? updatedLead.interestedProjectName ?? null,
+                    interestedUnitName: updatedLead.interested_unit_name ?? updatedLead.interestedUnitName ?? null,
+                    interestedUnitCode: updatedLead.interested_unit_code ?? updatedLead.interestedUnitCode ?? null,
                 };
                 setSelectedLead(transformedLead);
             }
@@ -358,12 +423,19 @@ export const EditLeadPage = () => {
                     phone_number: t('phoneNumbers') || 'Phone Numbers',
                     phone_numbers: t('phoneNumbers') || 'Phone Numbers',
                     budget: t('budget') || 'Budget',
+                    budget_max: t('budgetMaxOptional') || 'Budget (max)',
                     assigned_to: t('assignedTo') || 'Assigned To',
                     type: t('type') || 'Type',
                     communication_way: t('communicationWay') || 'Communication Way',
                     priority: t('priority') || 'Priority',
                     status: t('status') || 'Status',
                     company: t('company') || 'Company',
+                    lead_company_name: t('leadCompanyName') || 'Company name',
+                    profession: t('profession') || 'Profession',
+                    notes: t('notes') || 'Notes',
+                    interested_developer: t('interestedDeveloper') || 'Developer',
+                    interested_project: t('interestedProject') || 'Project',
+                    interested_unit: t('interestedUnit') || 'Unit',
                 };
                 
                 Object.keys(error.fields).forEach(field => {
@@ -386,8 +458,6 @@ export const EditLeadPage = () => {
                     general: error.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.' 
                 });
             }
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -413,7 +483,7 @@ export const EditLeadPage = () => {
         );
     }
 
-    if (loading) {
+    if (pageLoading) {
         return (
             <PageWrapper title={t('editLead') || 'Edit Lead'}>
                 <PageLoadingState label={t('loading') || 'Loading'} />
@@ -486,8 +556,42 @@ export const EditLeadPage = () => {
                             />
                         </div>
                         <div>
+                            <Label htmlFor="profession">{t('profession')}</Label>
+                            <Input
+                                id="profession"
+                                placeholder={t('enterProfession')}
+                                value={formState.profession}
+                                onChange={handleChange}
+                            />
+                        </div>
+                        <LeadInterestInventoryFields
+                            className="md:col-span-2 lg:col-span-3"
+                            idPrefix="edit-lead-inv"
+                            value={{
+                                interestedDeveloper: formState.interestedDeveloper,
+                                interestedProject: formState.interestedProject,
+                                interestedUnit: formState.interestedUnit,
+                            }}
+                            onChange={(inv) => setFormState((prev) => ({ ...prev, ...inv }))}
+                        />
+                        <div className="md:col-span-2 lg:col-span-3">
+                            <Label htmlFor="notes">{t('notes')}</Label>
+                            <textarea
+                                id="notes"
+                                rows={3}
+                                value={formState.notes}
+                                onChange={handleChange}
+                                placeholder={t('enterNotes') || 'Enter notes...'}
+                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                            />
+                        </div>
+                        <div>
                             <Label htmlFor="budget">{t('budget')}</Label>
                             <NumberInput id="budget" name="budget" value={formState.budget} onChange={handleChange} placeholder={t('enterBudget')} min={0} step={1} />
+                        </div>
+                        <div>
+                            <Label htmlFor="budgetMax">{t('budgetMaxOptional')}</Label>
+                            <NumberInput id="budgetMax" name="budgetMax" value={formState.budgetMax} onChange={handleChange} placeholder={t('enterBudgetMax')} min={0} step={1} />
                         </div>
                         <div className="md:col-span-2 lg:col-span-3">
                             <div className="flex items-center justify-between mb-2">
@@ -568,11 +672,18 @@ export const EditLeadPage = () => {
                             <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                             <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
                                 <option value="">{t('selectEmployee') || 'Select Employee'}</option>
-                                {userOptions.map(user => (
-                                    <option key={user.id} value={user.id.toString()}>
-                                        {user.name || user.username || user.email || `User ${user.id}`}
-                                    </option>
-                                ))}
+                                {userOptions.map(user => {
+                                    const off = isUserOnWeeklyDayOff(
+                                        { weekly_day_off: user.weekly_day_off },
+                                        companyTz
+                                    );
+                                    return (
+                                        <option key={user.id} value={user.id.toString()} disabled={off}>
+                                            {(user.name || user.username || user.email || `User ${user.id}`) +
+                                                (off ? ` (${t('weeklyDayOff')})` : '')}
+                                        </option>
+                                    );
+                                })}
                             </Select>
                         </div>
                         <div>
@@ -662,11 +773,11 @@ export const EditLeadPage = () => {
                             setSelectedLead(editingLead);
                             window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
                             setCurrentPage('ViewLead');
-                        }} disabled={loading}>
+                        }} disabled={isSaving}>
                             {t('cancel')}
                         </Button>
-                        <Button type="submit" disabled={loading}>
-                            {loading ? t('loading') || 'Loading...' : t('saveChanges')}
+                        <Button type="submit" disabled={isSaving} loading={isSaving}>
+                            {t('saveChanges')}
                         </Button>
                     </div>
                 </Card>

@@ -5,6 +5,8 @@ import { Button } from '../Button';
 import { Checkbox } from '../Checkbox';
 import { useUsers, useAssignLeads } from '../../hooks/useQueries';
 import { getUserDisplayName } from '../../types';
+import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
+import { buildLeadAssigneePickerOptions } from '../../utils/roles';
 
 export const AssignLeadModal = () => {
     const { isAssignLeadModalOpen, setIsAssignLeadModalOpen, checkedLeadIds, setCheckedLeadIds, t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
@@ -17,14 +19,12 @@ export const AssignLeadModal = () => {
     const { currentUser } = useAppContext();
     const users = usersResponse?.results || [];
     
-    // Ensure admin (current user) is included in the options even if not in the users list
-    const userOptions = React.useMemo(() => {
-        const options = [...users];
-        if (currentUser && !options.find(u => u.id === currentUser.id)) {
-            options.unshift(currentUser);
-        }
-        return options;
-    }, [users, currentUser]);
+    const userOptions = React.useMemo(
+        () => buildLeadAssigneePickerOptions(users, currentUser),
+        [users, currentUser]
+    );
+
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
     
     // Assign leads mutation
     const assignLeadsMutation = useAssignLeads();
@@ -80,7 +80,11 @@ export const AssignLeadModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error assigning leads:', error);
-            alert(error?.message || t('assignLeadsError') || 'Failed to assign leads. Please try again.');
+            if (error?.code === 'employee_weekly_day_off') {
+                alert(t('errorEmployeeWeeklyDayOff') || error?.message);
+            } else {
+                alert(error?.message || t('assignLeadsError') || 'Failed to assign leads. Please try again.');
+            }
         }
     };
 
@@ -111,7 +115,17 @@ export const AssignLeadModal = () => {
                                 className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 <option value="">{t('selectEmployee') || 'Select Employee'}</option>
-                                {userOptions?.map(user => <option key={user.id} value={user.id}>{getUserDisplayName(user)}</option>) || []}
+                                {userOptions?.map(user => {
+                                    const off = isUserOnWeeklyDayOff(
+                                        { weekly_day_off: user.weekly_day_off },
+                                        companyTz
+                                    );
+                                    return (
+                                        <option key={user.id} value={user.id} disabled={off}>
+                                            {getUserDisplayName(user) + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                        </option>
+                                    );
+                                }) || []}
                             </select>
                         </div>
                         <div className="flex items-center gap-2">

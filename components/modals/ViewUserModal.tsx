@@ -5,6 +5,26 @@ import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { getRoleTranslation } from '../../utils/roles';
 
+const WEEKLY_DAY_OFF_LABEL_KEYS = [
+    'dayOffMonday',
+    'dayOffTuesday',
+    'dayOffWednesday',
+    'dayOffThursday',
+    'dayOffFriday',
+    'dayOffSaturday',
+    'dayOffSunday',
+] as const;
+
+function weeklyDayOffLabel(user: { weekly_day_off?: number | null }, t: (key: string) => string): string {
+    if (user.weekly_day_off === undefined || user.weekly_day_off === null) {
+        return t('dayOffNone');
+    }
+    const idx = user.weekly_day_off;
+    if (idx < 0 || idx > 6) return String(idx);
+    const key = WEEKLY_DAY_OFF_LABEL_KEYS[idx];
+    return t(key) || String(idx);
+}
+
 // Helper function to get user display name
 const getUserDisplayName = (user: any, t?: (key: string) => string): string => {
     if (user.name) return user.name;
@@ -117,6 +137,16 @@ export const ViewUserModal = () => {
                         <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
                             {getRoleTranslation(selectedUser.role, t)}
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {t('weeklyDayOff')}
+                        </label>
+                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
+                            {weeklyDayOffLabel(selectedUser, t)}
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
                     </div>
                 </div>
 

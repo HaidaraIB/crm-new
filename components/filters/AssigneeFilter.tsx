@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useUsers } from '../../hooks/useQueries';
 import { getUserDisplayName, User } from '../../types';
+import { usersForOperationalEmployeeLists } from '../../utils/roles';
 
 export const AssigneeFilter = () => {
   const { t, leadFilters, setLeadFilters, currentUser, language } = useAppContext();
@@ -15,11 +16,7 @@ export const AssigneeFilter = () => {
     const baseUsers = Array.isArray(usersResponse)
       ? usersResponse
       : (usersResponse?.results || []);
-    const options = [...baseUsers];
-    if (currentUser && !options.some((u: User) => u.id === currentUser.id)) {
-      options.unshift(currentUser);
-    }
-    return options as User[];
+    return usersForOperationalEmployeeLists(baseUsers as User[], currentUser ?? null);
   }, [usersResponse, currentUser]);
 
   const visibleUsers = useMemo(() => {

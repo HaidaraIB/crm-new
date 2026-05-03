@@ -31,6 +31,9 @@ export const normalizeUser = (userData: any): User => {
       name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
       domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
       specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
+      timezone: typeof userData.company === 'object'
+        ? (userData.company.timezone ?? 'UTC')
+        : (userData.company_timezone as string | undefined) ?? 'UTC',
       auto_assign_enabled: typeof userData.company === 'object' ? (userData.company.auto_assign_enabled ?? false) : false,
       re_assign_enabled: typeof userData.company === 'object' ? (userData.company.re_assign_enabled ?? false) : false,
       re_assign_hours: typeof userData.company === 'object' ? (userData.company.re_assign_hours ?? 24) : 24,
@@ -42,6 +45,12 @@ export const normalizeUser = (userData: any): User => {
     last_seen_at: userData.last_seen_at ?? null,
     last_seen_source: userData.last_seen_source ?? 'unknown',
     is_online: Boolean(userData.is_online),
+    weekly_day_off:
+      'weekly_day_off' in userData && userData.weekly_day_off !== undefined
+        ? userData.weekly_day_off === null
+          ? null
+          : Number(userData.weekly_day_off)
+        : undefined,
   };
 };
 

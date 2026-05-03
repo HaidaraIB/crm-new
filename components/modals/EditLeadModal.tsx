@@ -10,6 +10,9 @@ import { Checkbox } from '../Checkbox';
 import { Lead, PhoneNumber } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
 import { useUpdateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
+import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
+import { buildLeadAssigneePickerOptions, showInLeadAssigneePicker } from '../../utils/roles';
+import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -28,29 +31,24 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 };
 
 export const EditLeadModal = () => {
-    const { isEditLeadModalOpen, setIsEditLeadModalOpen, t, editingLead, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditLeadModalOpen, setIsEditLeadModalOpen, t, editingLead, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
     
     // Fetch data using React Query
     const { data: usersResponse } = useUsers();
-    const { currentUser } = useAppContext();
     const users = usersResponse?.results || [];
 
-    // Ensure admin (current user) is included in the options even if not in the users list
-    const userOptions = React.useMemo(() => {
-        const options = [...users];
-        if (currentUser && !options.find(u => u.id === currentUser.id)) {
-            options.unshift(currentUser);
-        }
-        return options;
-    }, [users, currentUser]);
-
     const { data: statusesData } = useStatuses();
-    const statuses = statusesData || [];
+    const statuses = Array.isArray(statusesData)
+        ? statusesData
+        : (statusesData?.results || []);
 
     const { data: channelsData } = useChannels();
-    const channels = channelsData || [];
-    const chList = Array.isArray(channels) ? channels : (channels?.results || []);
-    const stList = Array.isArray(statuses) ? statuses : (statuses?.results || []);
+    const channels = Array.isArray(channelsData)
+        ? channelsData
+        : (channelsData?.results || []);
+    const chList = channels;
+    const stList = statuses;
     const defaultChannelName = React.useMemo(() => {
         if (!chList.length) return '';
         const c = chList.find((x: { isDefault?: boolean; is_default?: boolean }) => x.isDefault ?? x.is_default) || chList[0];
@@ -71,28 +69,73 @@ export const EditLeadModal = () => {
         name: '',
         phone: '',
         budget: '',
+        budgetMax: '',
         assignedTo: '',
         type: '' as Lead['type'],
         communicationWay: '',
         priority: '' as Lead['priority'],
         status: '' as Lead['status'],
         leadCompanyName: '',
+        profession: '',
+        notes: '',
+        interestedDeveloper: '',
+        interestedProject: '',
+        interestedUnit: '',
     });
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
+
+    const userOptions = React.useMemo(
+        () => buildLeadAssigneePickerOptions(users, currentUser),
+        [users, currentUser]
+    );
 
     // Initialize form state when editingLead changes
     useEffect(() => {
         if (editingLead) {
+            const aid = editingLead.assignedTo;
+            let assignedToField = '';
+            if (aid) {
+                const assignee = users.find((u) => u.id === aid);
+                if (assignee && showInLeadAssigneePicker(assignee.role)) {
+                    assignedToField = String(aid);
+                }
+            }
             setFormState({
                 name: editingLead.name || '',
                 phone: editingLead.phone || '',
-                budget: editingLead.budget?.toString() || '0',
-                assignedTo: editingLead.assignedTo?.toString() || '0',
+                budget: editingLead.budget != null ? String(editingLead.budget) : '',
+                budgetMax:
+                    editingLead.budgetMax != null
+                        ? String(editingLead.budgetMax)
+                        : (editingLead as any).budget_max != null
+                          ? String((editingLead as any).budget_max)
+                          : '',
+                assignedTo: assignedToField,
                 type: editingLead.type || '',
                 communicationWay: editingLead.communicationWay || defaultChannelName,
                 priority: editingLead.priority || '',
                 status: editingLead.status || defaultStatusName,
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
+                profession: editingLead.profession ?? (editingLead as any).profession ?? '',
+                notes: editingLead.notes ?? (editingLead as any).notes ?? '',
+                interestedDeveloper:
+                    (editingLead as Lead).interestedDeveloper != null
+                        ? String((editingLead as Lead).interestedDeveloper)
+                        : (editingLead as any).interested_developer != null
+                          ? String((editingLead as any).interested_developer)
+                          : '',
+                interestedProject:
+                    (editingLead as Lead).interestedProject != null
+                        ? String((editingLead as Lead).interestedProject)
+                        : (editingLead as any).interested_project != null
+                          ? String((editingLead as any).interested_project)
+                          : '',
+                interestedUnit:
+                    (editingLead as Lead).interestedUnit != null
+                        ? String((editingLead as Lead).interestedUnit)
+                        : (editingLead as any).interested_unit != null
+                          ? String((editingLead as any).interested_unit)
+                          : '',
             });
             // Initialize phone numbers from editingLead
             if (editingLead.phoneNumbers && editingLead.phoneNumbers.length > 0) {
@@ -112,9 +155,9 @@ export const EditLeadModal = () => {
                 setPhoneNumbers([]);
             }
         }
-    }, [editingLead, defaultChannelName, defaultStatusName]);
+    }, [editingLead, defaultChannelName, defaultStatusName, users]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
     };
@@ -185,18 +228,57 @@ export const EditLeadModal = () => {
         }
 
         try {
-            const updateData = {
+            const channelId = formState.communicationWay
+                ? (chList.find((c: { id?: number; name?: string }) =>
+                    c.id?.toString() === formState.communicationWay || c.name === formState.communicationWay)?.id ?? null)
+                : null;
+            const statusId = formState.status
+                ? (stList.find((s: { id?: number; name?: string }) =>
+                    s.id?.toString() === formState.status || s.name === formState.status)?.id ?? null)
+                : null;
+
+            const priorityValue = formState.priority
+                ? (formState.priority.toLowerCase() as 'low' | 'medium' | 'high')
+                : null;
+            const typeValue = formState.type
+                ? (formState.type.toLowerCase() as 'fresh' | 'cold')
+                : null;
+
+            const primaryPhone =
+                finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number
+                || finalPhoneNumbers[0]?.phone_number
+                || '';
+
+            const companyId = currentUser?.company?.id;
+            if (!companyId) {
+                alert(t('companyRequired') || 'Company is required. Please log in again.');
+                return;
+            }
+
+            const updateData: Record<string, unknown> = {
                 name: formState.name,
-                phone: finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || formState.phone,
-                phoneNumbers: finalPhoneNumbers,
-                budget: Number(formState.budget) || 0,
-                assignedTo: formState.assignedTo ? Number(formState.assignedTo) : 0,
-                type: formState.type,
-                communicationWay: formState.communicationWay,
-                priority: formState.priority,
-                status: formState.status,
+                phone_numbers: finalPhoneNumbers,
+                budget: formState.budget ? Number(formState.budget) : null,
+                budget_max: formState.budgetMax?.trim() ? Number(formState.budgetMax) : null,
+                assigned_to: formState.assignedTo ? Number(formState.assignedTo) : null,
+                type: typeValue,
+                communication_way: channelId,
+                priority: priorityValue,
+                status: statusId,
+                company: companyId,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
+                profession: formState.profession?.trim() || null,
+                notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
+                    interestedDeveloper: formState.interestedDeveloper,
+                    interestedProject: formState.interestedProject,
+                    interestedUnit: formState.interestedUnit,
+                }),
             };
+            if (primaryPhone) {
+                updateData.phone_number = primaryPhone;
+            }
+
             await updateLeadMutation.mutateAsync({ id: editingLead.id, data: updateData });
 
             // Close modal immediately and show success modal
@@ -205,6 +287,20 @@ export const EditLeadModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating lead:', error);
+            const code = error?.code || error?.error_key;
+            if (code === 'employee_weekly_day_off') {
+                alert(
+                    t('employeeWeeklyDayOffAssignError')
+                    || error?.message
+                    || 'Cannot assign to this employee on their weekly day off.'
+                );
+                return;
+            }
+            if (error?.fields?.assigned_to) {
+                const fe = error.fields.assigned_to;
+                alert(Array.isArray(fe) ? fe[0] : String(fe));
+                return;
+            }
             alert(error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
         }
     };
@@ -223,9 +319,38 @@ export const EditLeadModal = () => {
                         <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
                         <Input id="leadCompanyName" placeholder={t('enterLeadCompanyName')} value={formState.leadCompanyName} onChange={handleChange} />
                     </div>
+                    <div>
+                        <Label htmlFor="profession">{t('profession')}</Label>
+                        <Input id="profession" placeholder={t('enterProfession')} value={formState.profession} onChange={handleChange} />
+                    </div>
+                    <LeadInterestInventoryFields
+                        className="md:col-span-2"
+                        idPrefix="edit-lead-modal-inv"
+                        value={{
+                            interestedDeveloper: formState.interestedDeveloper,
+                            interestedProject: formState.interestedProject,
+                            interestedUnit: formState.interestedUnit,
+                        }}
+                        onChange={(inv) => setFormState((prev) => ({ ...prev, ...inv }))}
+                    />
+                    <div className="md:col-span-2">
+                        <Label htmlFor="notes">{t('notes')}</Label>
+                        <textarea
+                            id="notes"
+                            rows={3}
+                            value={formState.notes}
+                            onChange={handleChange}
+                            placeholder={t('enterNotes') || 'Enter notes...'}
+                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                        />
+                    </div>
                      <div>
                         <Label htmlFor="budget">{t('budget')}</Label>
                         <NumberInput id="budget" name="budget" value={formState.budget} onChange={handleChange} placeholder={t('enterBudget')} min={0} step={1} />
+                    </div>
+                    <div>
+                        <Label htmlFor="budgetMax">{t('budgetMaxOptional')}</Label>
+                        <NumberInput id="budgetMax" name="budgetMax" value={formState.budgetMax} onChange={handleChange} placeholder={t('enterBudgetMax')} min={0} step={1} />
                     </div>
                     <div className="md:col-span-2">
                         <div className="flex items-center justify-between mb-2">
@@ -298,8 +423,16 @@ export const EditLeadModal = () => {
                      <div>
                         <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
                         <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
-                            <option value="0">{t('selectEmployee') || 'Select Employee'}</option>
-                            {userOptions.map(user => <option key={user.id} value={user.id}>{user.name || user.username || user.email}</option>)}
+                            <option value="">{t('selectEmployee') || 'Select Employee'}</option>
+                            {userOptions.map(user => {
+                                const off = isUserOnWeeklyDayOff(user, companyTz);
+                                return (
+                                    <option key={user.id} value={user.id.toString()} disabled={off}>
+                                        {(user.name || user.username || user.email || `User ${user.id}`)
+                                            + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                    </option>
+                                );
+                            })}
                         </Select>
                     </div>
                     <div>
@@ -352,7 +485,7 @@ export const EditLeadModal = () => {
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('saveChanges')}</Button>
+                    <Button type="submit" disabled={loading} loading={loading}>{t('saveChanges')}</Button>
                 </div>
             </form>
         </Modal>

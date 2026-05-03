@@ -29,8 +29,8 @@ export const Button = ({ children, onClick, className = '', variant = 'primary',
     >
       {loading ? (
         <>
+          <span className="sr-only">Loading</span>
           <Loader size="sm" tone={loaderTone} />
-          {children}
         </>
       ) : (
         children

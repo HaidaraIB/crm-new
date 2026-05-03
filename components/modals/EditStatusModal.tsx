@@ -35,6 +35,7 @@ export const EditStatusModal = () => {
         category: 'active' as 'active' | 'inactive' | 'follow_up' | 'closed',
         color: '#808080',
         isDefault: false,
+        autoDeleteHoursRaw: '',
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -51,6 +52,14 @@ export const EditStatusModal = () => {
 
         if (!currentUser?.company?.id) {
             newErrors._general = t('companyRequired') || 'Company is required';
+        }
+
+        const raw = formState.autoDeleteHoursRaw.trim();
+        if (raw !== '') {
+            const n = parseInt(raw, 10);
+            if (!Number.isFinite(n) || n < 1) {
+                newErrors.autoDeleteHoursRaw = t('invalidNumber') || 'Enter a whole number of hours (1 or more), or leave empty';
+            }
         }
 
         setErrors(newErrors);
@@ -76,12 +85,14 @@ export const EditStatusModal = () => {
                 categoryValue = 'follow_up';
             }
             
+            const adh = (editingStatus as any).auto_delete_after_hours ?? (editingStatus as any).autoDeleteAfterHours;
             setFormState({
                 name: editingStatus.name,
                 description: editingStatus.description || '',
                 category: categoryValue as 'active' | 'inactive' | 'follow_up' | 'closed',
                 color: editingStatus.color || '#808080',
                 isDefault: (editingStatus as any).isDefault ?? (editingStatus as any).is_default ?? false,
+                autoDeleteHoursRaw: adh != null && adh !== '' ? String(adh) : '',
             });
             setErrors({});
         }
@@ -107,6 +118,9 @@ export const EditStatusModal = () => {
         }
 
         try {
+            const raw = formState.autoDeleteHoursRaw.trim();
+            const auto_delete_after_hours = raw === '' ? null : parseInt(raw, 10);
+
             await updateStatusMutation.mutateAsync({
                 id: editingStatus.id,
                 data: {
@@ -116,6 +130,7 @@ export const EditStatusModal = () => {
                     color: formState.color,
                     company: currentUser?.company?.id,
                     is_default: formState.isDefault,
+                    auto_delete_after_hours,
                 }
             });
 
@@ -140,7 +155,12 @@ export const EditStatusModal = () => {
             if (errorData.description) {
                 newErrors.description = Array.isArray(errorData.description) ? errorData.description[0] : errorData.description;
             }
-            
+            if (errorData.auto_delete_after_hours) {
+                newErrors.autoDeleteHoursRaw = Array.isArray(errorData.auto_delete_after_hours)
+                    ? errorData.auto_delete_after_hours[0]
+                    : errorData.auto_delete_after_hours;
+            }
+
             if (Object.keys(newErrors).length === 0) {
                 newErrors._general = error?.message || t('failedToUpdateStatus') || 'Failed to update status. Please try again.';
             }
@@ -200,6 +220,31 @@ export const EditStatusModal = () => {
                     {errors.category && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.category}</p>
                     )}
+                </div>
+                <div>
+                    <Label htmlFor="autoDeleteHoursRaw">{t('autoDeleteAfterHoursLabel')}</Label>
+                    <Input
+                        id="autoDeleteHoursRaw"
+                        type="text"
+                        inputMode="numeric"
+                        placeholder={t('autoDeleteHoursPlaceholder')}
+                        value={formState.autoDeleteHoursRaw}
+                        onChange={(e) => {
+                            setFormState((prev) => ({ ...prev, autoDeleteHoursRaw: e.target.value }));
+                            if (errors.autoDeleteHoursRaw) {
+                                setErrors((prev) => {
+                                    const next = { ...prev };
+                                    delete next.autoDeleteHoursRaw;
+                                    return next;
+                                });
+                            }
+                        }}
+                        className={errors.autoDeleteHoursRaw ? 'border-red-500 dark:border-red-500' : ''}
+                    />
+                    {errors.autoDeleteHoursRaw && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.autoDeleteHoursRaw}</p>
+                    )}
+                    <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('autoDeleteHelp')}</p>
                 </div>
                 <div>
                     <Label htmlFor="color">{t('color') || 'Color'}</Label>

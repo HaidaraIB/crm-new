@@ -934,6 +934,13 @@ export const translations = {
     defaultActiveStatusDesc: "Set the default status for all new leads.",
     availableStatuses: "Available Statuses",
     addStatus: "Add Status",
+    autoDeleteColumn: "Auto-delete",
+    autoDeleteOff: "Off",
+    autoDeleteAfterHoursLabel: "Hours in status before delete",
+    autoDeleteHoursPlaceholder: "e.g. 168 (leave empty to disable)",
+    autoDeleteHelp:
+        "Leads that stay in this status longer than the set number of hours are permanently deleted (hourly job). Leave empty to disable.",
+    invalidNumber: "Enter a valid positive whole number, or leave empty.",
     // Call Methods
     callMethods: "Call Methods",
     addCallMethod: "Add Call Method",
@@ -2570,6 +2577,13 @@ export const translations = {
     defaultActiveStatusDesc: "تعيين الحالة الافتراضية لجميع العملاء الجدد.",
     availableStatuses: "الحالات المتاحة",
     addStatus: "إضافة حالة",
+    autoDeleteColumn: "حذف تلقائي",
+    autoDeleteOff: "معطّل",
+    autoDeleteAfterHoursLabel: "ساعات في الحالة قبل الحذف",
+    autoDeleteHoursPlaceholder: "مثال 168 (اتركه فارغاً للتعطيل)",
+    autoDeleteHelp:
+        "يُحذف العملاء الذين يبقون في هذه الحالة أطول من العدد المحدد من الساعات نهائياً (مهمة كل ساعة). اتركه فارغاً للتعطيل.",
+    invalidNumber: "أدخل عدداً صحيحاً موجباً أو اتركه فارغاً.",
     // Call Methods
     callMethods: "طرق المكالمات",
     addCallMethod: "إضافة طريقة مكالمة",

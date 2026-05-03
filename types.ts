@@ -535,6 +535,8 @@ export interface Status {
     color: string;
     isDefault?: boolean;
     isHidden?: boolean;
+    /** Hours in this status before scheduled hard-delete; null/undefined = disabled */
+    auto_delete_after_hours?: number | null;
 }
 
 // Helper function to get user display name

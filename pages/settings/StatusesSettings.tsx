@@ -68,6 +68,8 @@ export const StatusesSettings = () => {
                 color: status.color ?? '#808080',
                 company: currentUser?.company?.id ?? (status as any).company,
                 is_default: true,
+                auto_delete_after_hours:
+                    (status as any).auto_delete_after_hours ?? (status as any).autoDeleteAfterHours ?? null,
             },
         });
     };
@@ -104,6 +106,9 @@ export const StatusesSettings = () => {
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[90px]">
                                     {t('default') || 'Default'}
                                 </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
+                                    {t('autoDeleteColumn')}
+                                </th>
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[140px]">
                                     {t('actions')}
                                 </th>
@@ -112,6 +117,7 @@ export const StatusesSettings = () => {
                         <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                             {statuses.length > 0 ? statuses.map(status => {
                                 const isDefault = (status as any).isDefault ?? (status as any).is_default;
+                                const adh = (status as any).auto_delete_after_hours ?? (status as any).autoDeleteAfterHours;
                                 return (
                                 <tr 
                                     key={status.id} 
@@ -174,6 +180,15 @@ export const StatusesSettings = () => {
                                             </button>
                                         )}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 dark:text-gray-300">
+                                        {adh != null && Number(adh) >= 1 ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">
+                                                {adh}h
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400 dark:text-gray-500">{t('autoDeleteOff')}</span>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                                             <button
@@ -198,7 +213,7 @@ export const StatusesSettings = () => {
                                 </tr>
                             ); }) : (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center">
+                                    <td colSpan={7} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noStatusesFound') || 'No statuses found'}
                                         </div>

@@ -72,6 +72,10 @@ export const LoginPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+    const [verificationGate, setVerificationGate] = useState<{
+        verifyEmailUrl?: string;
+        verifyPhoneUrl?: string;
+    } | null>(null);
 
     // Check for pending subscription ID and error message on mount
     useEffect(() => {
@@ -131,6 +135,7 @@ export const LoginPage = () => {
 
     const handleLogin = async () => {
         setError('');
+        setVerificationGate(null);
         
         if (!username.trim() || !password.trim()) {
             setError(t('pleaseEnterCredentials') || 'Please enter username and password');
@@ -189,6 +194,8 @@ export const LoginPage = () => {
             localStorage.setItem('isLoggedIn', 'true');
             setCurrentUser(frontendUser);
             if (frontendUser.language) setLanguage(frontendUser.language);
+            sessionStorage.removeItem('prelogin_username');
+            sessionStorage.removeItem('prelogin_password');
             setIsLoggedIn(true);
             setCurrentPage('Dashboard');
             window.location.href = '/dashboard';
@@ -212,6 +219,22 @@ export const LoginPage = () => {
                 } else {
                     setError(t('noActiveSubscription'));
                 }
+            } else if (
+                ['email_not_verified', 'phone_not_verified', 'email_phone_not_verified'].includes(
+                    String(error.code || '')
+                )
+            ) {
+                const verifyEmailUrl = (error as { verifyEmailUrl?: string }).verifyEmailUrl;
+                const verifyPhoneUrl = (error as { verifyPhoneUrl?: string }).verifyPhoneUrl;
+                if (verifyEmailUrl || verifyPhoneUrl) {
+                    sessionStorage.setItem('prelogin_username', username.trim());
+                    sessionStorage.setItem('prelogin_password', password);
+                }
+                setVerificationGate({
+                    verifyEmailUrl: verifyEmailUrl || undefined,
+                    verifyPhoneUrl: verifyPhoneUrl || undefined,
+                });
+                setError('');
             } else {
                 const translatedError = translateLoginError(errorMessage);
                 console.error('❌ Translated error:', translatedError);
@@ -263,6 +286,32 @@ export const LoginPage = () => {
                                 </div>
                             </div>
                         )}
+                        {verificationGate && (
+                            <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100 px-4 py-3 rounded-md text-sm space-y-2">
+                                {verificationGate.verifyEmailUrl ? (
+                                    <p className="leading-relaxed">
+                                        {t('loginVerificationEmailRequired')}{' '}
+                                        <a
+                                            href={verificationGate.verifyEmailUrl}
+                                            className="text-primary-700 dark:text-primary-300 font-semibold underline hover:opacity-90"
+                                        >
+                                            {t('verifyNow')}
+                                        </a>
+                                    </p>
+                                ) : null}
+                                {verificationGate.verifyPhoneUrl ? (
+                                    <p className="leading-relaxed">
+                                        {t('loginVerificationPhoneRequired')}{' '}
+                                        <a
+                                            href={verificationGate.verifyPhoneUrl}
+                                            className="text-primary-700 dark:text-primary-300 font-semibold underline hover:opacity-90"
+                                        >
+                                            {t('verifyNow')}
+                                        </a>
+                                    </p>
+                                ) : null}
+                            </div>
+                        )}
                         {error && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                                 <div>
@@ -301,6 +350,7 @@ export const LoginPage = () => {
                                 onChange={(e) => {
                                     setUsername(e.target.value);
                                     setError('');
+                                    setVerificationGate(null);
                                 }}
                                 onKeyPress={(e) => {
                                     if (e.key === 'Enter') {
@@ -319,6 +369,7 @@ export const LoginPage = () => {
                                 onChange={(e) => {
                                     setPassword(e.target.value);
                                     setError('');
+                                    setVerificationGate(null);
                                 }}
                                 onKeyPress={(e) => {
                                     if (e.key === 'Enter') {

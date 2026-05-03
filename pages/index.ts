@@ -9,6 +9,7 @@ export * from './ChangePlanPage';
 export * from './BillingPage';
 export * from './PaymentSuccessPage';
 export * from './VerifyEmailPage';
+export * from './VerifyPhonePage';
 export * from './ForgotPasswordPage';
 export * from './ResetPasswordPage';
 export * from './TwoFactorAuthPage';

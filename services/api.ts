@@ -142,6 +142,13 @@ function attachErrorFields(
   }
 }
 
+export type LoginVerificationAction = {
+  id?: string;
+  label?: string;
+  href?: string;
+  description?: string;
+};
+
 function throwApiError(errorData: unknown, fallbackMessage: string): never {
   const message = getErrorMessageFromBody(errorData) || fallbackMessage;
   const err: Error & {
@@ -149,6 +156,11 @@ function throwApiError(errorData: unknown, fallbackMessage: string): never {
     code?: string;
     fields?: Record<string, unknown>;
     subscriptionId?: string;
+    hint?: string;
+    actions?: LoginVerificationAction[];
+    changeCredentialsNote?: string;
+    verifyEmailUrl?: string;
+    verifyPhoneUrl?: string;
   } = new Error(message);
   err.data = errorData;
   const code = getErrorCodeFromBody(errorData);
@@ -157,6 +169,14 @@ function throwApiError(errorData: unknown, fallbackMessage: string): never {
   const raw = errorData as Record<string, unknown> | null;
   const sid = raw && (raw.subscriptionId ?? raw.subscription_id);
   if (sid != null) err.subscriptionId = String(sid);
+  if (raw && raw.success === false && raw.error && typeof raw.error === 'object') {
+    const er = raw.error as Record<string, unknown>;
+    if (typeof er.hint === 'string') err.hint = er.hint;
+    if (Array.isArray(er.actions)) err.actions = er.actions as LoginVerificationAction[];
+    if (typeof er.change_credentials_note === 'string') err.changeCredentialsNote = er.change_credentials_note;
+    if (typeof er.verify_email_url === 'string') err.verifyEmailUrl = er.verify_email_url;
+    if (typeof er.verify_phone_url === 'string') err.verifyPhoneUrl = er.verify_phone_url;
+  }
   throw err;
 }
 
@@ -1156,6 +1176,66 @@ export const verifyEmailAPI = async (payload: {
   }
 
   return unwrapApiSuccess(raw);
+};
+
+/** Pre-login (password + username): resend owner email verification — no JWT. */
+export const preLoginEmailResendAPI = async (username: string, password: string) => {
+  const response = await fetch(`${BASE_URL}/auth/pre-login/email/resend/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ username, password }),
+  });
+  const raw = await readJsonResponse(response);
+  if (!response.ok) throwApiError(raw, 'Failed to resend verification email');
+  return unwrapApiSuccess<{ sent?: boolean; expires_at?: string }>(raw);
+};
+
+/** Pre-login: change unverified email and send a new code — no JWT. */
+export const preLoginEmailChangeAPI = async (username: string, password: string, new_email: string) => {
+  const response = await fetch(`${BASE_URL}/auth/pre-login/email/change/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ username, password, new_email }),
+  });
+  const raw = await readJsonResponse(response);
+  if (!response.ok) throwApiError(raw, 'Failed to update email');
+  return unwrapApiSuccess<{ expires_at?: string }>(raw);
+};
+
+/** Pre-login: send phone OTP to number on file — no JWT. */
+export const preLoginPhoneSendOtpAPI = async (username: string, password: string) => {
+  const response = await fetch(`${BASE_URL}/auth/pre-login/phone/send-otp/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ username, password }),
+  });
+  const raw = await readJsonResponse(response);
+  if (!response.ok) throwApiError(raw, 'Failed to send verification code');
+  return unwrapApiSuccess<{ expires_in_seconds?: number; channel?: string }>(raw);
+};
+
+/** Pre-login: verify phone OTP — no JWT. */
+export const preLoginPhoneVerifyOtpAPI = async (username: string, password: string, code: string) => {
+  const response = await fetch(`${BASE_URL}/auth/pre-login/phone/verify-otp/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ username, password, code }),
+  });
+  const raw = await readJsonResponse(response);
+  if (!response.ok) throwApiError(raw, 'Verification failed');
+  return unwrapApiSuccess<Record<string, unknown>>(raw);
+};
+
+/** Pre-login: change unverified phone — no JWT. */
+export const preLoginPhoneChangeAPI = async (username: string, password: string, new_phone: string) => {
+  const response = await fetch(`${BASE_URL}/auth/pre-login/phone/change/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ username, password, new_phone }),
+  });
+  const raw = await readJsonResponse(response);
+  if (!response.ok) throwApiError(raw, 'Failed to update phone');
+  return unwrapApiSuccess<Record<string, unknown>>(raw);
 };
 
 /**

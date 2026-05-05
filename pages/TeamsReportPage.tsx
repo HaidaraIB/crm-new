@@ -1,11 +1,15 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { PageWrapper, Card, Loader, Button } from '../components/index';
+import React, { useMemo } from 'react';
+import { PageWrapper, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
-import { FilterIcon } from '../components/icons';
+import { FilterIcon, UsersIcon, TargetIcon, CheckSquareIcon, DealIcon } from '../components/icons';
 import { useLeads, useDeals, useActivities, useUsers, useClientTasks, useClientCalls } from '../hooks/useQueries';
 import { User } from '../types';
 import { showInLeadAssigneePicker } from '../utils/roles';
+import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { reportPageContainer } from '../components/reports/reportStyles';
+import { ReportHero } from '../components/reports/ReportHero';
+import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
+import { ReportTableCard, ReportTableDefaults } from '../components/reports/ReportTableCard';
 
 // Helper function to get user display name
 const getUserDisplayName = (user: User): string => {
@@ -16,9 +20,24 @@ const getUserDisplayName = (user: User): string => {
 };
 
 export const TeamsReportPage = () => {
-    const { t, teamsReportFilters, setIsTeamsReportFilterDrawerOpen } = useAppContext();
-    const { selectedTeam, leadType, startDate, endDate } = teamsReportFilters;
-    const [loading, setLoading] = useState(false);
+    const { t, teamsReportFilters, setIsTeamsReportFilterDrawerOpen, language } = useAppContext();
+    const { leadType, startDate, endDate } = teamsReportFilters;
+    const reportHeroSubtitle = useMemo(() => {
+        const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
+        let range = t('reportsAllDates');
+        if (startDate && endDate) {
+            try {
+                const s = new Date(startDate);
+                const e = new Date(endDate);
+                if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
+                    range = `${s.toLocaleDateString(locale)} — ${e.toLocaleDateString(locale)}`;
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+        return `${range}. ${t('reportsPageHint')}`;
+    }, [language, startDate, endDate, t]);
     
     // Fetch data using React Query
     const { data: leadsData } = useLeads();
@@ -163,131 +182,120 @@ export const TeamsReportPage = () => {
         alert(t('exportFunctionalityComingSoon') || 'Export functionality will be implemented soon');
     };
 
-    if (loading) {
-        return (
-            <PageWrapper title={t('teamsReport')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
-            </PageWrapper>
-        );
-    }
-
     return (
         <PageWrapper
             title={t('teamsReport')}
             actions={
-                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                    <Button variant="secondary" onClick={() => setIsTeamsReportFilterDrawerOpen(true)} className="w-full sm:w-auto">
-                        <FilterIcon className="h-4 w-4 inline-block mr-2" />
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2.5">
+                    <Button
+                        variant="secondary"
+                        onClick={() => setIsTeamsReportFilterDrawerOpen(true)}
+                        className="w-full sm:w-auto rounded-xl px-5 py-2.5 border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
+                        <FilterIcon className="h-4 w-4 shrink-0" />
                         {t('filter') || 'Filter'}
                     </Button>
-                    <Button variant="secondary" onClick={handleExport} className="w-full sm:w-auto">
+                    <Button
+                        variant="secondary"
+                        onClick={handleExport}
+                        className="w-full sm:w-auto rounded-xl px-5 py-2.5 border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
                         {t('export') || 'Export'}
                     </Button>
                 </div>
             }
         >
-            {teamStats.length > 0 ? (
-                <>
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('totalTeams') || 'Total Teams'}</p>
-                                <p className="text-2xl font-bold text-primary">{teamStats.length}</p>
-                            </div>
-                        </Card>
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('totalLeads') || 'Total Leads'}</p>
-                                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                    {teamStats.reduce((sum, team) => sum + team.totalLeads, 0)}
-                                </p>
-                            </div>
-                        </Card>
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('totalActivities') || 'Total Activities'}</p>
-                                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    {teamStats.reduce((sum, team) => sum + team.totalActivities, 0)}
-                                </p>
-                            </div>
-                        </Card>
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('totalDeals') || 'Total Deals'}</p>
-                                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                                    {teamStats.reduce((sum, team) => sum + team.totalDeals, 0)}
-                                </p>
-                            </div>
-                        </Card>
-                    </div>
+            <div className={reportPageContainer}>
+                <ReportHero
+                    title={t('teamsReport')}
+                    subtitle={reportHeroSubtitle}
+                    language={language}
+                />
 
-                    {/* Team Details Table */}
-                    <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                        <div className="p-6">
-                            <h3 className="text-lg font-semibold text-primary mb-4">{t('teamDetails') || 'Team Details'}</h3>
-                            <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
-                                <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400" style={{ minWidth: '800px' }}>
-                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                                        <tr>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('teamUser') || 'Team/User'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('totalLeads') || 'Total Leads'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('touched') || 'Touched'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('untouched') || 'Untouched'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('following') || 'Following'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('meeting') || 'Meeting'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('activities') || 'Activities'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('deals') || 'Deals'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('wonDeals') || 'Won Deals'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-gray-700">
-                                        {teamStats.map((team, index) => (
-                                            <tr key={index} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm font-medium text-gray-900 dark:text-white">{team.name}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-900 dark:text-gray-100">{team.totalLeads.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-green-600 dark:text-green-400 font-semibold">{team.touchedLeads.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-amber-600 dark:text-amber-400 font-semibold">{team.untouchedLeads.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-blue-600 dark:text-blue-400">{team.followingLeads.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-purple-600 dark:text-purple-400">{team.meetingLeads.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-900 dark:text-gray-100">{team.totalActivities.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-900 dark:text-gray-100">{team.totalDeals.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-emerald-600 dark:text-emerald-400 font-semibold">{team.wonDeals.toLocaleString()}</span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                {teamStats.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                            <ReportSummaryTile
+                                title={t('totalTeams') || 'Total Teams'}
+                                value={teamStats.length}
+                                accent="indigo"
+                                icon={<UsersIcon />}
+                            />
+                            <ReportSummaryTile
+                                title={t('totalLeads') || 'Total Leads'}
+                                value={teamStats.reduce((sum, team) => sum + team.totalLeads, 0).toLocaleString()}
+                                accent="blue"
+                                icon={<TargetIcon />}
+                            />
+                            <ReportSummaryTile
+                                title={t('totalActivities') || 'Total Activities'}
+                                value={teamStats.reduce((sum, team) => sum + team.totalActivities, 0).toLocaleString()}
+                                accent="emerald"
+                                icon={<CheckSquareIcon />}
+                            />
+                            <ReportSummaryTile
+                                title={t('totalDeals') || 'Total Deals'}
+                                value={teamStats.reduce((sum, team) => sum + team.totalDeals, 0).toLocaleString()}
+                                accent="violet"
+                                icon={<DealIcon />}
+                            />
                         </div>
-                    </Card>
-                </>
-            ) : (
-                <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                <div className="text-center py-10">
-                    <p className="text-tertiary">{t('selectFiltersPrompt')}</p>
-                </div>
-            </Card>
-            )}
+
+                        <ReportTableCard
+                            title={t('teamDetails') || 'Team Details'}
+                            empty={false}
+                            emptyMessage={t('noDataAvailable')}
+                            minWidth={900}
+                        >
+                            <thead className={`${ReportTableDefaults.theadRow}`}>
+                                <tr>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('teamUser') || 'Team/User'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('totalLeads') || 'Total Leads'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('touched') || 'Touched'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('untouched') || 'Untouched'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('following') || 'Following'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('meeting') || 'Meeting'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('activities') || 'Activities'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('deals') || 'Deals'}</th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">{t('wonDeals') || 'Won Deals'}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {teamStats.map((team, index) => (
+                                    <tr key={index} className={ReportTableDefaults.tbodyRow}>
+                                        <td className={`${ReportTableDefaults.tbodyCell} font-semibold`}>{team.name}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalLeads.toLocaleString()}</td>
+                                        <td className={`${ReportTableDefaults.tbodyCell} text-green-600 dark:text-green-400 font-semibold`}>
+                                            {team.touchedLeads.toLocaleString()}
+                                        </td>
+                                        <td className={`${ReportTableDefaults.tbodyCell} text-amber-600 dark:text-amber-400 font-semibold`}>
+                                            {team.untouchedLeads.toLocaleString()}
+                                        </td>
+                                        <td className={`${ReportTableDefaults.tbodyCell} text-blue-600 dark:text-blue-400`}>
+                                            {team.followingLeads.toLocaleString()}
+                                        </td>
+                                        <td className={`${ReportTableDefaults.tbodyCell} text-purple-600 dark:text-purple-400`}>
+                                            {team.meetingLeads.toLocaleString()}
+                                        </td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalActivities.toLocaleString()}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalDeals.toLocaleString()}</td>
+                                        <td className={`${ReportTableDefaults.tbodyCell} text-emerald-600 dark:text-emerald-400 font-semibold`}>
+                                            {team.wonDeals.toLocaleString()}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </ReportTableCard>
+                    </>
+                ) : (
+                    <ReportTableCard
+                        title={t('teamDetails') || 'Team Details'}
+                        empty
+                        emptyMessage={t('selectFiltersPrompt')}
+                        minWidth={800}
+                    />
+                )}
+            </div>
         </PageWrapper>
     );
 };

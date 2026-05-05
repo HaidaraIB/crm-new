@@ -2,12 +2,21 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState } from '../components/index';
+import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
-import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages } from '../hooks/useQueries';
+import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
 import { normalizeRole, getRoleTranslation } from '../utils/roles';
+import { MissionBar, MissionItem } from '../components/dashboard/MissionBar';
+import { SmartInsights } from '../components/dashboard/SmartInsights';
+import { HotLeadsCard, HotLeadItem } from '../components/dashboard/HotLeadsCard';
+import { StatCard } from '../components/dashboard/StatCard';
+import { ConversionFunnel } from '../components/dashboard/ConversionFunnel';
+import { ActivityFeed } from '../components/dashboard/ActivityFeed';
+import { TeamGoals } from '../components/dashboard/TeamGoals';
+import { getRechartsTooltipStyles } from '../components/dashboard/rechartsTooltipStyles';
+import { DashboardWidgetMenu } from '../components/dashboard/DashboardWidgetMenu';
 
 const formatLastSeenRelative = (
     lastSeenAt: string | null | undefined,
@@ -30,29 +39,48 @@ export const DashboardPage = () => {
     const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
     const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
     const [chartDaysRange, setChartDaysRange] = useState<7 | 14 | 30>(7);
+    const [leadSourceFilter, setLeadSourceFilter] = useState<'all' | 'meta_lead_form' | 'whatsapp' | 'manual'>('all');
+    const [teamDailyTarget] = useState(5);
 
-    // Fetch all data using React Query
-    const { data: leadsResponse, isLoading: isLeadsLoading } = useLeads();
+    // Fetch all data using React Query (larger page_size via api.ts + fewer refetch bursts)
+    const { data: leadsResponse, isLoading: isLeadsLoading } = useLeads(
+        undefined,
+        undefined,
+        dashboardHeavyListQueryOptions,
+    );
     const leads = leadsResponse?.results || [];
 
-    const { data: dealsResponse, isLoading: isDealsLoading } = useDeals();
+    const { data: dealsResponse, isLoading: isDealsLoading } = useDeals(dashboardHeavyListQueryOptions);
     const deals = dealsResponse?.results || [];
 
-    const { data: tasksResponse, isLoading: isTasksLoading } = useTasks();
+    const { data: tasksResponse, isLoading: isTasksLoading } = useTasks(undefined, dashboardHeavyListQueryOptions);
     const todos = tasksResponse?.results || [];
 
-    const { data: usersResponse, isLoading: isUsersLoading, isFetching: isUsersFetching, refetch: refetchUsers } = useUsers();
+    const { data: usersResponse, isLoading: isUsersLoading, isFetching: isUsersFetching, refetch: refetchUsers } =
+        useUsers(dashboardHeavyListQueryOptions);
     const users = usersResponse?.results || [];
     
-    const { data: clientTasksResponse, isLoading: isClientTasksLoading } = useClientTasks();
+    const { data: clientTasksResponse, isLoading: isClientTasksLoading } = useClientTasks(dashboardHeavyListQueryOptions);
     const clientTasks = clientTasksResponse?.results || [];
+    const { data: clientCallsResponse, isLoading: isClientCallsLoading } = useClientCalls(dashboardHeavyListQueryOptions);
+    const clientCalls = clientCallsResponse?.results || [];
+    const { data: clientVisitsResponse, isLoading: isClientVisitsLoading } = useClientVisits(dashboardHeavyListQueryOptions);
+    const clientVisits = clientVisitsResponse?.results || [];
 
-    const { data: stagesResponse, isLoading: isStagesLoading } = useStages();
+    const { data: stagesResponse, isLoading: isStagesLoading } = useStages(dashboardHeavyListQueryOptions);
     const stages = Array.isArray(stagesResponse) 
         ? stagesResponse 
         : (stagesResponse?.results || []);
 
-    const isDashboardLoading = isLeadsLoading || isDealsLoading || isTasksLoading || isUsersLoading || isClientTasksLoading || isStagesLoading;
+    const isDashboardLoading =
+        isLeadsLoading ||
+        isDealsLoading ||
+        isTasksLoading ||
+        isUsersLoading ||
+        isClientTasksLoading ||
+        isStagesLoading ||
+        isClientCallsLoading ||
+        isClientVisitsLoading;
 
     // Check for payment success message on mount
     useEffect(() => {
@@ -494,6 +522,265 @@ export const DashboardPage = () => {
         });
     }, [leads, clientTasks, users, t]);
 
+    const companyUserMap = useMemo(() => {
+        const map = new Map<number, any>();
+        users.forEach((u: any) => map.set(u.id, u));
+        return map;
+    }, [users]);
+
+    const missionItems = useMemo<MissionItem[]>(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const overdueFollowUps = clientTasks.filter((ct: any) => {
+            if (!ct.reminder_date) return false;
+            const d = new Date(ct.reminder_date);
+            d.setHours(0, 0, 0, 0);
+            return d < today;
+        }).length;
+        const unassignedLeads = leads.filter((lead: any) => !(lead.assigned_to || lead.assignedTo)).length;
+        const todayLeads = stats.find((s) => s.title === t('todayNewLeads'))?.value ?? 0;
+
+        const items: MissionItem[] = [
+            { id: 'contactToday', label: t('leadsToContactToday'), value: leadsToContactTodayList.length, tone: 'orange' },
+            {
+                id: 'overdue',
+                label: t('overdueFollowUps'),
+                value: overdueFollowUps,
+                tone: 'red',
+                onClick: () => {
+                    window.history.pushState({}, '', '/todos');
+                    setCurrentPage('Todos');
+                },
+            },
+            {
+                id: 'today',
+                label: t('todayNewLeads'),
+                value: Number(todayLeads),
+                tone: 'blue',
+                onClick: () => {
+                    window.history.pushState({}, '', '/leads');
+                    setCurrentPage('All Leads');
+                },
+            },
+        ];
+        if (isAdmin) {
+            items.push({
+                id: 'unassigned',
+                label: t('unassignedLeads'),
+                value: unassignedLeads,
+                tone: 'purple',
+                onClick: () => {
+                    window.history.pushState({}, '', '/leads');
+                    setCurrentPage('All Leads');
+                },
+            });
+        }
+        return items;
+    }, [clientTasks, isAdmin, leads, leadsToContactTodayList.length, setCurrentPage, stats, t]);
+
+    const funnelData = useMemo(() => {
+        const touched = leads.filter((lead: any) => ((lead.status_name || lead.status || '') as string).toLowerCase() !== 'untouched').length;
+        const meeting = clientTasks.filter((ct: any) => {
+            const stage = String(ct.stage_name || ct.stage || '').toLowerCase();
+            return stage.includes('meeting');
+        }).length;
+        const won = deals.filter((d: any) => String(d.stage || d.status).toLowerCase() === 'won' || String(d.status) === 'Won').length;
+        return [
+            { name: t('totalLeads'), value: leads.length },
+            { name: t('funnelTouched'), value: touched },
+            { name: t('funnelMeeting'), value: meeting },
+            { name: t('funnelWon'), value: won },
+        ];
+    }, [clientTasks, deals, leads, t]);
+
+    const hotLeads = useMemo<HotLeadItem[]>(() => {
+        const now = Date.now();
+        const byLeadActivity = new Map<number, number>();
+        const pushActivity = (leadId: number, dateLike: any) => {
+            const ts = new Date(dateLike || 0).getTime();
+            if (!leadId || Number.isNaN(ts)) return;
+            byLeadActivity.set(leadId, Math.max(byLeadActivity.get(leadId) || 0, ts));
+        };
+        clientTasks.forEach((ct: any) => pushActivity(ct.client || ct.clientId, ct.created_at || ct.createdAt || ct.reminder_date));
+        clientCalls.forEach((c: any) => pushActivity(c.client || c.clientId, c.created_at || c.createdAt || c.call_datetime));
+        clientVisits.forEach((v: any) => pushActivity(v.client || v.clientId, v.created_at || v.createdAt || v.visit_datetime));
+
+        const visibleLeads = leads.filter((lead: any) => {
+            if (normalizeRole(currentUser?.role) === 'Employee') {
+                return (lead.assigned_to || lead.assignedTo) === currentUser?.id;
+            }
+            return true;
+        });
+
+        return visibleLeads
+            .map((lead: any) => {
+                let score = 0;
+                const priority = String(lead.priority || '').toLowerCase();
+                if (priority === 'high') score += 30;
+                else if (priority === 'medium') score += 15;
+                const stage = String(lead.last_stage || lead.lastStage || lead.status_name || lead.status || '').toLowerCase();
+                if (['following', 'meeting', 'done_meeting', 'follow_after_meeting'].includes(stage)) score += 25;
+                if (['not_interested', 'out_of_service', 'cancellation'].includes(stage)) score -= 20;
+                const lastActivity = byLeadActivity.get(lead.id) || 0;
+                if (lastActivity && now - lastActivity <= 3 * 24 * 60 * 60 * 1000) score += 15;
+                if (!lastActivity || now - lastActivity > 7 * 24 * 60 * 60 * 1000) score -= 15;
+                if (stage === 'untouched') score -= 10;
+                const reminderToday = clientTasks.some((ct: any) => {
+                    if ((ct.client || ct.clientId) !== lead.id || !ct.reminder_date) return false;
+                    const d = new Date(ct.reminder_date);
+                    const td = new Date();
+                    return d.toDateString() === td.toDateString();
+                });
+                if (reminderToday) score += 10;
+
+                const assignedToId = lead.assigned_to || lead.assignedTo;
+                const assignedUser = companyUserMap.get(assignedToId);
+                const stageName = lead.last_stage || lead.lastStage || lead.status_name || lead.status || t('noStage');
+                const stageConfig = stages.find((s: any) => s.name?.toLowerCase().replace(/\s+/g, '_') === String(stageName).toLowerCase().replace(/\s+/g, '_'));
+                const bucket: HotLeadItem['bucket'] = score >= 60 ? 'hot' : score >= 30 ? 'warm' : 'cold';
+                return {
+                    id: lead.id,
+                    name: lead.name || `${t('lead')} #${lead.id}`,
+                    assignedUser: assignedUser?.name || assignedUser?.username || t('unknown'),
+                    stage: getStageDisplayLabel(String(stageName), t),
+                    score,
+                    bucket,
+                    notes: lead.last_feedback || lead.lastFeedback || lead.notes || '',
+                    stageColor: stageConfig?.color,
+                    onView: () => {
+                        setSelectedLead(lead);
+                        window.history.pushState({}, '', `/view-lead/${lead.id}`);
+                        setCurrentPage('ViewLead');
+                    },
+                };
+            })
+            .filter((lead) => lead.bucket !== 'cold')
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 6);
+    }, [clientCalls, clientTasks, clientVisits, companyUserMap, currentUser?.id, currentUser?.role, leads, setCurrentPage, setSelectedLead, stages, t]);
+
+    const smartInsights = useMemo(() => {
+        const insights: string[] = [];
+        if (hotLeads.length > 0) {
+            insights.push(`${hotLeads.length} ${t('hotLeads')} ${t('tipNeedsAttention')}`);
+        }
+        const overdue = missionItems.find((m) => m.id === 'overdue')?.value || 0;
+        if (overdue > 0) {
+            insights.push(`${overdue} ${t('overdueFollowUps')} - ${t('tipPaceUp')}`);
+        }
+        const unassigned = missionItems.find((m) => m.id === 'unassigned')?.value || 0;
+        if (unassigned > 0) {
+            insights.push(`${t('tipUnassignedReminder')}: ${unassigned}`);
+        }
+        return insights.slice(0, 2);
+    }, [hotLeads.length, missionItems, t]);
+
+    const trendSeries = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const mkSeries = (getter: (d: Date) => number) =>
+            Array.from({ length: 7 }).map((_, i) => {
+                const date = new Date(today);
+                date.setDate(date.getDate() - (6 - i));
+                return getter(date);
+            });
+
+        const leadsSeries = mkSeries((date) =>
+            leads.filter((lead: any) => {
+                const createdAt = new Date((lead as any).created_at || lead.createdAt || 0);
+                createdAt.setHours(0, 0, 0, 0);
+                return createdAt.getTime() === date.getTime();
+            }).length,
+        );
+        const contactSeries = mkSeries((date) =>
+            clientTasks.filter((ct: any) => {
+                const r = ct.reminder_date ? new Date(ct.reminder_date) : null;
+                if (!r) return false;
+                r.setHours(0, 0, 0, 0);
+                return r.getTime() === date.getTime();
+            }).length,
+        );
+        return { leadsSeries, contactSeries };
+    }, [clientTasks, leads]);
+
+    const activityFeedItems = useMemo(() => {
+        const events: Array<{ id: string; title: string; subtitle: string; time: string; createdAt: number }> = [];
+        clientTasks.forEach((ct: any) => {
+            const user = companyUserMap.get(ct.created_by || ct.createdBy);
+            const lead = leads.find((l: any) => l.id === (ct.client || ct.clientId));
+            const date = new Date(ct.created_at || ct.createdAt || 0).getTime();
+            events.push({
+                id: `task-${ct.id}`,
+                title: `${user?.name || t('unknown')} · ${t('activities')}`,
+                subtitle: `${lead?.name || t('lead')} · ${getStageDisplayLabel(ct.stage || ct.stage_name || 'following', t)}`,
+                time: formatLastSeenRelative(new Date(date).toISOString(), t),
+                createdAt: date,
+            });
+        });
+        clientCalls.forEach((c: any) => {
+            const user = companyUserMap.get(c.created_by || c.createdBy);
+            const lead = leads.find((l: any) => l.id === (c.client || c.clientId));
+            const date = new Date(c.created_at || c.createdAt || c.call_datetime || 0).getTime();
+            events.push({
+                id: `call-${c.id}`,
+                title: `${user?.name || t('unknown')} · ${t('call') || 'Call'}`,
+                subtitle: lead?.name || t('lead'),
+                time: formatLastSeenRelative(new Date(date).toISOString(), t),
+                createdAt: date,
+            });
+        });
+        clientVisits.forEach((v: any) => {
+            const user = companyUserMap.get(v.created_by || v.createdBy);
+            const lead = leads.find((l: any) => l.id === (v.client || v.clientId));
+            const date = new Date(v.created_at || v.createdAt || v.visit_datetime || 0).getTime();
+            events.push({
+                id: `visit-${v.id}`,
+                title: `${user?.name || t('unknown')} · ${t('visit') || 'Visit'}`,
+                subtitle: lead?.name || t('lead'),
+                time: formatLastSeenRelative(new Date(date).toISOString(), t),
+                createdAt: date,
+            });
+        });
+
+        return events.sort((a, b) => b.createdAt - a.createdAt).slice(0, 15).map(({ id, title, subtitle, time }) => ({ id, title, subtitle, time }));
+    }, [clientCalls, clientVisits, clientTasks, companyUserMap, leads, t]);
+
+    const teamGoalsRows = useMemo(() => {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        return users
+            .filter((u: any) => normalizeRole(u.role) === 'Employee' || normalizeRole(u.role) === 'DataEntry')
+            .map((u: any) => {
+                const progress = clientTasks.filter((ct: any) => {
+                    const by = ct.created_by || ct.createdBy;
+                    const created = new Date(ct.created_at || ct.createdAt || 0);
+                    created.setHours(0, 0, 0, 0);
+                    return by === u.id && created.getTime() === today.getTime();
+                }).length;
+                return { id: u.id, name: u.name || u.username || u.email, progress, target: teamDailyTarget };
+            })
+            .sort((a, b) => b.progress - a.progress);
+    }, [clientTasks, teamDailyTarget, users]);
+
+    const filteredWeekLeadsData = useMemo(() => {
+        if (leadSourceFilter === 'all') return weekLeadsData;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const data: { name: string; 'Leads Count': number }[] = [];
+        for (let i = chartDaysRange - 1; i >= 0; i--) {
+            const date = new Date(today);
+            date.setDate(date.getDate() - i);
+            const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
+            const dateStr = date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+            const count = leads.filter((lead: any) => {
+                const createdAt = new Date((lead as any).created_at || lead.createdAt || 0);
+                createdAt.setHours(0, 0, 0, 0);
+                return createdAt.getTime() === date.getTime() && String(lead.source || 'manual') === leadSourceFilter;
+            }).length;
+            data.push({ name: dateStr, 'Leads Count': count });
+        }
+        return data;
+    }, [chartDaysRange, language, leadSourceFilter, leads, weekLeadsData]);
 
     const greeting = useMemo(() => {
         const hour = new Date().getHours();
@@ -503,45 +790,187 @@ export const DashboardPage = () => {
     const todayDateStr = useMemo(() => new Date().toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), [language]);
 
     const isDark = theme === 'dark';
-    const tooltipContentStyle = isDark
-      ? { backgroundColor: 'rgba(31, 41, 55, 0.95)', border: 'none', borderRadius: '8px', padding: '12px', color: '#f3f4f6' as const, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }
-      : { backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', padding: '12px', color: '#111827' as const, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' };
-    const tooltipLabelStyle = isDark ? { color: '#9ca3af', marginBottom: '4px' } : { color: '#6b7280', marginBottom: '4px' };
-    const tooltipItemStyle = isDark ? { color: '#f3f4f6' } : { color: '#111827' };
+    const {
+        contentStyle: tooltipContentStyle,
+        labelStyle: tooltipLabelStyle,
+        itemStyle: tooltipItemStyle,
+    } = getRechartsTooltipStyles(isDark);
+
+    const showTeamGoalsSidebar = isAdmin || normalizeRole(currentUser?.role) === 'Supervisor';
+
+    const dashboardMenuAriaLabel = t('actions');
+
+    const missionBarMenuItems = useMemo(
+        () => [
+            {
+                label: t('viewAllLeads'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/leads');
+                    setCurrentPage('All Leads');
+                },
+            },
+            {
+                label: t('todos'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/todos');
+                    setCurrentPage('Todos');
+                },
+            },
+            {
+                label: t('deals'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/deals');
+                    setCurrentPage('Deals');
+                },
+            },
+        ],
+        [setCurrentPage, t],
+    );
+
+    const hotLeadsMenuItems = useMemo(
+        () => [
+            {
+                label: t('viewAllLeads'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/leads');
+                    setCurrentPage('All Leads');
+                },
+            },
+            {
+                label: t('addLead'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/create-lead');
+                    setCurrentPage('CreateLead');
+                },
+            },
+        ],
+        [setCurrentPage, t],
+    );
+
+    const weekLeadsChartMenuItems = useMemo(
+        () => [
+            {
+                label: t('viewAllLeads'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/leads');
+                    setCurrentPage('All Leads');
+                },
+            },
+            {
+                label: t('addLead'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/create-lead');
+                    setCurrentPage('CreateLead');
+                },
+            },
+        ],
+        [setCurrentPage, t],
+    );
+
+    const stagesReportMenuItems = useMemo(
+        () => [
+            {
+                label: t('viewAllLeads'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/leads');
+                    setCurrentPage('All Leads');
+                },
+            },
+            {
+                label: t('reports'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/reports');
+                    setCurrentPage('Reports');
+                },
+            },
+        ],
+        [setCurrentPage, t],
+    );
+
+    const conversionFunnelMenuItems = useMemo(
+        () => [
+            {
+                label: t('deals'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/deals');
+                    setCurrentPage('Deals');
+                },
+            },
+            {
+                label: t('viewAllLeads'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/leads');
+                    setCurrentPage('All Leads');
+                },
+            },
+        ],
+        [setCurrentPage, t],
+    );
+
+    const activityFeedMenuItems = useMemo(
+        () => [
+            {
+                label: t('activities'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/activities');
+                    setCurrentPage('Activities');
+                },
+            },
+        ],
+        [setCurrentPage, t],
+    );
+
+    const teamGoalsMenuItems = useMemo(
+        () => [
+            {
+                label: t('employeesReport'),
+                onClick: () => {
+                    window.history.pushState({}, '', '/employees-report');
+                    setCurrentPage('Employees Report');
+                },
+            },
+        ],
+        [setCurrentPage, t],
+    );
 
     return (
         <PageWrapper title={t('dashboard')}>
+            <div className="mx-auto max-w-[1600px] w-full">
             {/* Welcome & Quick Actions */}
             {!isDashboardLoading && (
-                <div className="mb-6 space-y-4">
-                    <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className={`text-sm text-gray-600 dark:text-gray-400 ${language === 'ar' ? 'font-arabic' : ''}`}>
-                            <span className="font-medium text-gray-800 dark:text-gray-200">{greeting}, {currentUser?.name || t('user')}</span>
-                            <span className="mx-2">·</span>
-                            <span>{todayDateStr}</span>
+                <div className={`mb-6 rounded-2xl bg-gradient-to-br from-white via-primary-50/40 to-blue-50/70 dark:from-gray-900 dark:via-gray-900 dark:to-primary-950/35 shadow-xl shadow-gray-200/80 dark:shadow-none dark:ring-1 dark:ring-gray-700/60 p-5 sm:p-7 ${language === 'ar' ? 'font-arabic' : ''}`}>
+                    <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                        <div>
+                            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary-700 dark:text-primary-300">
+                                LOOP CRM
+                            </p>
+                            <h2 className="mt-2 text-xl sm:text-2xl font-extrabold text-gray-900 dark:text-gray-50 tracking-tight">
+                                {greeting}, <span className="text-transparent bg-clip-text bg-gradient-to-r from-primary-600 to-blue-600 dark:from-primary-400 dark:to-blue-400">{currentUser?.name || t('user')}</span>
+                            </h2>
+                            <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">{todayDateStr}</p>
                         </div>
-                        <div className="flex flex-wrap gap-2">
+                        <div className="flex flex-wrap gap-2.5 justify-start lg:justify-end">
                             <button
                                 onClick={() => { window.history.pushState({}, '', '/leads'); setCurrentPage('All Leads'); }}
-                                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="px-5 py-2.5 rounded-xl border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-sm font-semibold shadow-sm hover:bg-white hover:shadow-md transition-all"
                             >
                                 {t('viewAllLeads')}
                             </button>
                             <button
                                 onClick={() => { window.history.pushState({}, '', '/deals'); setCurrentPage('Deals'); }}
-                                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="px-5 py-2.5 rounded-xl border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-sm font-semibold shadow-sm hover:bg-white hover:shadow-md transition-all"
                             >
                                 {t('deals')}
                             </button>
                             <button
                                 onClick={() => { window.history.pushState({}, '', '/todos'); setCurrentPage('Todos'); }}
-                                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                                className="px-5 py-2.5 rounded-xl border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-sm font-semibold shadow-sm hover:bg-white hover:shadow-md transition-all"
                             >
                                 {t('todos')}
                             </button>
                             <button
                                 onClick={() => { window.history.pushState({}, '', '/create-lead'); setCurrentPage('CreateLead'); }}
-                                className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
+                                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary-600 to-blue-600 text-white text-sm font-bold shadow-lg shadow-primary-600/25 hover:shadow-xl hover:shadow-primary-600/30 transition-all"
                             >
                                 {t('addLead')}
                             </button>
@@ -555,7 +984,7 @@ export const DashboardPage = () => {
             )}
             {/* Payment Success Notification */}
             {showPaymentSuccess && (
-                <div className={`mb-6 p-4 rounded-lg border-2 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-500/50 shadow-lg animate-slide-down ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
+                <div className={`mb-6 p-5 sm:p-6 rounded-2xl border-2 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-500/50 shadow-xl shadow-green-500/15 animate-slide-down ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
                     <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                             <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
@@ -585,70 +1014,123 @@ export const DashboardPage = () => {
                 </div>
             )}
             
-            {/* Stats Cards - grouped by section */}
             {!isDashboardLoading && (
-            <div className="space-y-6 mb-6">
-                {[
-                    { sectionKey: 'dashboardSectionToday' as const, indices: [0, 1, 2, 3, 4] },
-                    { sectionKey: 'dashboardSectionPipeline' as const, indices: [6, 8, 9, 10] },
-                    { sectionKey: 'dashboardSectionOverview' as const, indices: [5, 7] },
-                ].map(({ sectionKey, indices }) => (
-                    <div key={sectionKey}>
-                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">{t(sectionKey)}</h3>
+                <div className="space-y-6 mb-6">
+                    <MissionBar
+                        title={t('missionBar')}
+                        items={missionItems}
+                        menuItems={missionBarMenuItems}
+                        menuAriaLabel={dashboardMenuAriaLabel}
+                    />
+                    <SmartInsights title={t('smartInsights')} insights={smartInsights} />
+                    <HotLeadsCard
+                        title={t('hotLeads')}
+                        scoreLabel={t('score')}
+                        emptyLabel={t('noDataAvailable')}
+                        viewLeadLabel={t('viewLead')}
+                        leads={hotLeads}
+                        menuItems={hotLeadsMenuItems}
+                        menuAriaLabel={dashboardMenuAriaLabel}
+                    />
+
+                    <div>
+                        <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">{t('dashboardSectionToday')}</h3>
                         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-                            {indices.map(i => stats[i]).filter(Boolean).map(stat => (
-                                <div key={stat.title} className="group">
-                                    <Card className={`h-full ${stat.bgColor} border border-gray-200/50 dark:border-gray-700/50 transition-all duration-300 hover:shadow-xl hover:scale-[1.02] hover:border-gray-300 dark:hover:border-gray-600 relative overflow-hidden`}>
-                                        <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-br ${stat.gradient} opacity-5 rounded-full blur-3xl -mr-16 -mt-16 group-hover:opacity-10 transition-opacity`}></div>
-                                        <div className="relative flex items-center gap-4">
-                                            <div className={`p-3 ${stat.iconBg} rounded-xl flex-shrink-0 shadow-sm group-hover:scale-110 transition-transform duration-300`}>
-                                                <div className={stat.textColor}>{stat.icon}</div>
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 font-medium truncate mb-1.5">{stat.title}</p>
-                                                <p className={`text-3xl sm:text-4xl font-bold ${stat.textColor} leading-tight`}>{stat.value}</p>
-                                            </div>
-                                        </div>
-                                    </Card>
-                                </div>
-                            ))}
+                            <StatCard
+                                title={t('leadsToContactToday')}
+                                value={leadsToContactTodayList.length}
+                                icon={<TargetIcon className="w-6 h-6" />}
+                                accent="orange"
+                                deltaLabel={t('vsYesterday')}
+                                trendData={trendSeries.contactSeries}
+                            />
+                            <StatCard
+                                title={t('todayNewLeads')}
+                                value={stats[1]?.value || 0}
+                                icon={<UsersIcon className="w-6 h-6" />}
+                                accent="blue"
+                                deltaLabel={t('vsYesterday')}
+                                trendData={trendSeries.leadsSeries}
+                            />
+                            <StatCard
+                                title={t('todayTouchedLeads')}
+                                value={stats[2]?.value || 0}
+                                icon={<CheckIcon className="w-6 h-6" />}
+                                accent="emerald"
+                                deltaLabel={t('vsYesterday')}
+                                trendData={trendSeries.leadsSeries}
+                            />
+                            <StatCard
+                                title={t('delayedLeads')}
+                                value={stats[4]?.value || 0}
+                                icon={<ClockIcon className="w-6 h-6" />}
+                                accent="rose"
+                                deltaLabel={t('vsYesterday')}
+                                deltaPositive={false}
+                                trendData={trendSeries.contactSeries}
+                            />
                         </div>
                     </div>
-                ))}
-            </div>
+                </div>
             )}
             {/* Charts Section */}
             {!isDashboardLoading && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <Card className="lg:col-span-2 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
-                     <div className="flex flex-wrap items-center justify-between gap-3 mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
-                         <div>
-                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('weekLeadsReport')}</h2>
-                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('last7DaysPerformance')}</p>
+                <Card className="lg:col-span-2 rounded-2xl border-0 shadow-xl shadow-gray-200/70 dark:shadow-none dark:ring-1 dark:ring-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm p-5 sm:p-6 hover:shadow-2xl transition-shadow duration-300">
+                     <div className="flex flex-wrap items-start justify-between gap-4 mb-6 pb-5 border-b border-gray-100 dark:border-gray-700/80">
+                         <div className="min-w-0">
+                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50 tracking-tight">{t('weekLeadsReport')}</h2>
+                             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('last7DaysPerformance')}</p>
                          </div>
-                         <div className="flex rounded-lg border border-gray-200 dark:border-gray-600 p-0.5 bg-gray-100 dark:bg-gray-800">
+                         <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto justify-between lg:justify-end">
+                           <div className="flex flex-wrap gap-2">
+                             <div className="flex rounded-xl border border-gray-200/80 dark:border-gray-600 p-1 bg-gray-100/80 dark:bg-gray-800/80">
                              {([7, 14, 30] as const).map((days) => (
                                  <button
                                      key={days}
                                      onClick={() => setChartDaysRange(days)}
-                                     className={`px-3 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                                     className={`px-3 py-1.5 text-sm font-semibold rounded-lg transition-all ${
                                          chartDaysRange === days
-                                             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-sm'
+                                             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-md'
                                              : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                                      }`}
                                  >
                                      {days === 7 ? t('last7Days') : days === 14 ? t('last14Days') : t('last30Days')}
                                  </button>
                              ))}
+                             </div>
+                             <div className="flex rounded-xl border border-gray-200/80 dark:border-gray-600 p-1 bg-gray-100/80 dark:bg-gray-800/80">
+                             {([
+                                 { key: 'all', label: t('all') },
+                                 { key: 'meta_lead_form', label: 'Meta' },
+                                 { key: 'whatsapp', label: 'WhatsApp' },
+                                 { key: 'manual', label: t('manual') || 'Manual' },
+                             ] as const).map((source) => (
+                                 <button
+                                     key={source.key}
+                                     onClick={() => setLeadSourceFilter(source.key)}
+                                     className={`px-2.5 py-1.5 text-xs font-semibold rounded-lg transition-all ${
+                                         leadSourceFilter === source.key
+                                             ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 shadow-md'
+                                             : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
+                                     }`}
+                                 >
+                                     {source.label}
+                                 </button>
+                             ))}
+                             </div>
+                           </div>
+                           <DashboardWidgetMenu items={weekLeadsChartMenuItems} ariaLabel={dashboardMenuAriaLabel} />
                          </div>
                      </div>
-                     <div className="overflow-x-auto -mx-2 px-2">
+                     <div className="overflow-x-auto -mx-1 px-1">
                          <div className="min-w-[300px]">
                              <ResponsiveContainer width="100%" height={320}>
-                                 <AreaChart data={weekLeadsData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }} isAnimationActive>
+                                <AreaChart data={filteredWeekLeadsData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }} isAnimationActive>
                                      <defs>
                                          <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
-                                             <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
+                                             <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.35}/>
+                                             <stop offset="55%" stopColor="#6366f1" stopOpacity={0.12}/>
                                              <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                                          </linearGradient>
                                      </defs>
@@ -673,22 +1155,23 @@ export const DashboardPage = () => {
                                          type="monotone" 
                                          name={t('leadsCount')}
                                          dataKey="Leads Count" 
-                                         stroke="#3b82f6" 
+                                         stroke="#6366f1" 
                                          strokeWidth={3}
                                          fill="url(#colorLeads)"
-                                         activeDot={{ r: 6, fill: '#3b82f6' }}
+                                         activeDot={{ r: 6, fill: '#6366f1' }}
                                      />
                                  </AreaChart>
                              </ResponsiveContainer>
                          </div>
                      </div>
                 </Card>
-                <Card className="border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
+                <Card className="rounded-2xl border-0 shadow-xl shadow-gray-200/70 dark:shadow-none dark:ring-1 dark:ring-gray-700/50 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm p-5 sm:p-6 hover:shadow-2xl transition-shadow duration-300">
+                    <div className="flex items-start justify-between gap-3 mb-6 pb-4 border-b border-gray-100 dark:border-gray-700/80">
                         <div>
-                            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('stagesReport')}</h2>
-                            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('distributionByStage')}</p>
+                            <h2 className="text-xl font-bold text-gray-900 dark:text-gray-50">{t('stagesReport')}</h2>
+                            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('distributionByStage')}</p>
                         </div>
+                        <DashboardWidgetMenu items={stagesReportMenuItems} ariaLabel={dashboardMenuAriaLabel} />
                     </div>
                     {stagesReportData.length > 0 ? (
                         <div className="space-y-4">
@@ -755,9 +1238,19 @@ export const DashboardPage = () => {
                 </Card>
             </div>
             )}
+            {!isDashboardLoading && (
+                <div className="mb-6">
+                    <ConversionFunnel
+                        title={t('conversionFunnel')}
+                        items={funnelData}
+                        menuItems={conversionFunnelMenuItems}
+                        menuAriaLabel={dashboardMenuAriaLabel}
+                    />
+                </div>
+            )}
             {/* Leads to Contact Today Section */}
             {!isDashboardLoading && leadsToContactTodayList.length > 0 && (
-                <Card className="mb-6 border border-orange-200/50 dark:border-orange-700/50 shadow-sm hover:shadow-md transition-shadow bg-gradient-to-br from-orange-50/50 to-red-50/50 dark:from-orange-950/20 dark:to-red-950/20">
+                <Card className="mb-6 rounded-2xl border-0 shadow-xl shadow-orange-500/15 dark:shadow-none dark:ring-1 dark:ring-orange-900/40 bg-gradient-to-br from-orange-50/90 to-rose-50/80 dark:from-orange-950/30 dark:to-red-950/25">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-orange-200 dark:border-orange-700">
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
@@ -866,7 +1359,7 @@ export const DashboardPage = () => {
                 </Card>
             )}
             {!isDashboardLoading && leadsToContactTodayList.length === 0 && (
-                <Card className="mb-6 border border-gray-200/50 dark:border-gray-700/50 shadow-sm">
+                <Card className="mb-6 rounded-2xl border-0 shadow-xl shadow-gray-200/60 dark:shadow-none dark:ring-1 dark:ring-gray-700/50">
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-6 px-4">
                         <div className="flex items-center gap-3">
                             <div className="p-3 bg-orange-100 dark:bg-orange-900/40 rounded-xl">
@@ -889,8 +1382,41 @@ export const DashboardPage = () => {
             
             {/* Bottom Section */}
             {!isDashboardLoading && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                <ActivityFeed
+                    title={t('activityFeed')}
+                    items={activityFeedItems}
+                    emptyLabel={t('noDataAvailable')}
+                    className={showTeamGoalsSidebar ? 'lg:col-span-2' : 'lg:col-span-3'}
+                    menuItems={activityFeedMenuItems}
+                    menuAriaLabel={dashboardMenuAriaLabel}
+                />
+                {showTeamGoalsSidebar && (
+                    <TeamGoals
+                        title={t('teamGoals')}
+                        targetLabel={t('dailyTarget')}
+                        rows={teamGoalsRows}
+                        emptyLabel={t('noDataAvailable')}
+                        menuItems={teamGoalsMenuItems}
+                        menuAriaLabel={dashboardMenuAriaLabel}
+                    />
+                )}
+            </div>
+            )}
+            {!isDashboardLoading && (
+            <div className="mb-4">
+                <h3 className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400 mb-3">{t('dashboardSectionPipeline')}</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                    <StatCard title={t('pipelineValue')} value={stats[9]?.value || 0} icon={<DealIcon className="w-6 h-6" />} accent="indigo" deltaLabel={t('vsLastWeek')} trendData={trendSeries.leadsSeries} />
+                    <StatCard title={t('winRate')} value={stats[10]?.value || 0} icon={<CheckIcon className="w-6 h-6" />} accent="teal" deltaLabel={t('vsLastWeek')} trendData={trendSeries.contactSeries} />
+                    <StatCard title={t('averageDealSize')} value={deals.length ? Math.round(deals.reduce((sum: number, d: any) => sum + (Number(d.value) || 0), 0) / deals.length) : 0} icon={<DealIcon className="w-6 h-6" />} accent="amber" deltaLabel={t('vsLastWeek')} trendData={trendSeries.contactSeries} />
+                    <StatCard title={t('totalDeals')} value={stats[6]?.value || 0} icon={<DealIcon className="w-6 h-6" />} accent="violet" deltaLabel={t('vsLastWeek')} trendData={trendSeries.leadsSeries} />
+                </div>
+            </div>
+            )}
+            {!isDashboardLoading && (
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                <Card className="lg:col-span-1 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <Card className="lg:col-span-1 rounded-2xl border-0 shadow-xl shadow-gray-200/70 dark:shadow-none dark:ring-1 dark:ring-gray-700/50 hover:shadow-2xl transition-shadow duration-300">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('topUsers')}</h2>
@@ -957,7 +1483,7 @@ export const DashboardPage = () => {
                     </div>
                 </Card>
                 {isAdmin && (
-                    <Card className="lg:col-span-1 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                    <Card className="lg:col-span-1 rounded-2xl border-0 shadow-xl shadow-gray-200/70 dark:shadow-none dark:ring-1 dark:ring-gray-700/50 hover:shadow-2xl transition-shadow duration-300">
                         <div className="flex items-center justify-between mb-4 pb-3 border-b border-gray-200 dark:border-gray-700">
                             <div>
                                 <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('employees')} {t('online') || 'Online'}</h2>
@@ -1003,7 +1529,7 @@ export const DashboardPage = () => {
                         </div>
                     </Card>
                 )}
-                <Card className="lg:col-span-2 border border-gray-200/50 dark:border-gray-700/50 shadow-sm hover:shadow-md transition-shadow">
+                <Card className="lg:col-span-2 rounded-2xl border-0 shadow-xl shadow-gray-200/70 dark:shadow-none dark:ring-1 dark:ring-gray-700/50 hover:shadow-2xl transition-shadow duration-300">
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('latestFeedbacks')}</h2>
@@ -1108,6 +1634,7 @@ export const DashboardPage = () => {
                 </Card>
             </div>
             )}
+            </div>
         </PageWrapper>
     );
 };

@@ -1,12 +1,16 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { PageWrapper, Card, Loader, Button } from '../components/index';
+import React, { useMemo } from 'react';
+import { PageWrapper, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
-import { FilterIcon } from '../components/icons';
+import { FilterIcon, PhoneIcon, CheckIcon, ClockIcon, UsersIcon } from '../components/icons';
 import { useLeads, useDeals, useActivities, useUsers, useClientTasks, useClientCalls } from '../hooks/useQueries';
 import { User } from '../types';
 import { translations } from '../constants';
 import { showInLeadAssigneePicker } from '../utils/roles';
+import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { reportPageContainer } from '../components/reports/reportStyles';
+import { ReportHero } from '../components/reports/ReportHero';
+import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
+import { ReportTableCard, ReportTableDefaults } from '../components/reports/ReportTableCard';
 
 // Helper function to get user display name
 const getUserDisplayName = (user: User): string => {
@@ -32,9 +36,25 @@ const getReportColumns = (t: (key: keyof typeof translations.en) => string) => [
 ];
 
 export const EmployeesReportPage = () => {
-    const { t, employeesReportFilters, setIsEmployeesReportFilterDrawerOpen } = useAppContext();
+    const { t, employeesReportFilters, setIsEmployeesReportFilterDrawerOpen, language } = useAppContext();
     const { leadType, startDate, endDate } = employeesReportFilters;
-    const [loading, setLoading] = useState(false);
+
+    const reportHeroSubtitle = useMemo(() => {
+        const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
+        let range = t('reportsAllDates');
+        if (startDate && endDate) {
+            try {
+                const s = new Date(startDate);
+                const e = new Date(endDate);
+                if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
+                    range = `${s.toLocaleDateString(locale)} — ${e.toLocaleDateString(locale)}`;
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+        return `${range}. ${t('reportsPageHint')}`;
+    }, [language, startDate, endDate, t]);
     
     // Get translated column headers
     const reportColumns = getReportColumns(t);
@@ -184,90 +204,99 @@ export const EmployeesReportPage = () => {
         alert(t('exportFunctionalityComingSoon') || 'Export functionality will be implemented soon');
     };
 
-    if (loading) {
-        return (
-            <PageWrapper title={t('employeesReport')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
-            </PageWrapper>
-        );
-    }
-
     return (
         <PageWrapper
             title={t('employeesReport')}
             actions={
-                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                    <Button variant="secondary" onClick={() => setIsEmployeesReportFilterDrawerOpen(true)} className="w-full sm:w-auto">
-                        <FilterIcon className="h-4 w-4 inline-block mr-2" />
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2.5">
+                    <Button
+                        variant="secondary"
+                        onClick={() => setIsEmployeesReportFilterDrawerOpen(true)}
+                        className="w-full sm:w-auto rounded-xl px-5 py-2.5 border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
+                        <FilterIcon className="h-4 w-4 shrink-0" />
                         {t('filter') || 'Filter'}
                     </Button>
-                    <Button variant="secondary" onClick={handleExport} className="w-full sm:w-auto">
+                    <Button
+                        variant="secondary"
+                        onClick={handleExport}
+                        className="w-full sm:w-auto rounded-xl px-5 py-2.5 border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
                         {t('export') || 'Export'}
                     </Button>
                 </div>
             }
         >
-            {/* Summary Card */}
-            <Card className="mb-6 border border-gray-200/50 dark:border-gray-700/50">
-                <div className="p-4 flex flex-wrap items-center gap-6 text-sm">
-                    <div className="flex items-center gap-2">
-                        <strong className="text-primary">{t('totalCalls')}:</strong>
-                        <span className="text-lg font-semibold text-secondary">{totalCalls}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-                        <span className="text-secondary">{t('answered')}: {answeredCalls}</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <div className="w-3 h-3 bg-red-500 rounded-full"></div>
-                        <span className="text-secondary">{t('notAnswered')}: {notAnsweredCalls}</span>
-                    </div>
-                </div>
-            </Card>
+            <div className={reportPageContainer}>
+                <ReportHero
+                    title={t('employeesReport')}
+                    subtitle={reportHeroSubtitle}
+                    language={language}
+                />
 
-            {/* Employee Details Table */}
-            <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                <div className="p-6">
-                    <h3 className="text-lg font-semibold text-primary mb-4">{t('employeeDetails') || 'Employee Details'}</h3>
-                    <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
-                        <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400" style={{ minWidth: '1000px' }}>
-                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                    <ReportSummaryTile
+                        title={t('totalCalls')}
+                        value={totalCalls.toLocaleString()}
+                        accent="indigo"
+                        icon={<PhoneIcon />}
+                    />
+                    <ReportSummaryTile
+                        title={t('answered')}
+                        value={answeredCalls.toLocaleString()}
+                        accent="emerald"
+                        icon={<CheckIcon />}
+                    />
+                    <ReportSummaryTile
+                        title={t('notAnswered')}
+                        value={notAnsweredCalls.toLocaleString()}
+                        accent="violet"
+                        icon={<ClockIcon />}
+                    />
+                    <ReportSummaryTile
+                        title={t('employees')}
+                        value={employeeStats.length.toLocaleString()}
+                        accent="blue"
+                        icon={<UsersIcon />}
+                    />
+                </div>
+
+                <ReportTableCard
+                    title={t('employeeDetails') || 'Employee Details'}
+                    empty={employeeStats.length === 0}
+                    emptyMessage={t('noDataAvailable')}
+                    minWidth={1040}
+                >
+                    {!employeeStats.length ? null : (
+                        <>
+                            <thead className={ReportTableDefaults.theadRow}>
                                 <tr>
                                     {reportColumns.map(col => (
-                                        <th key={col.accessor} scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{col.header}</th>
+                                        <th key={col.accessor} scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                                            {col.header}
+                                        </th>
                                     ))}
                                 </tr>
                             </thead>
-                            <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-gray-700">
-                                {employeeStats.length > 0 ? (
-                                    employeeStats.map((emp) => (
-                                        <tr key={emp.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
-                                            {reportColumns.map(col => {
-                                                const value = emp[col.accessor as keyof typeof emp];
-                                                // Format numbers with toLocaleString
-                                                const displayValue = typeof value === 'number' ? value.toLocaleString() : value;
-                                                return (
-                                                    <td key={col.accessor} className="px-4 py-4 whitespace-nowrap text-center">
-                                                        <span className="text-sm text-gray-900 dark:text-gray-100">{displayValue}</span>
-                                                    </td>
-                                                );
-                                            })}
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={reportColumns.length} className="px-4 py-8 text-center text-tertiary">
-                                            {t('noDataAvailable')}
-                                        </td>
+                            <tbody>
+                                {employeeStats.map((emp) => (
+                                    <tr key={emp.id} className={ReportTableDefaults.tbodyRow}>
+                                        {reportColumns.map(col => {
+                                            const value = emp[col.accessor as keyof typeof emp];
+                                            const displayValue = typeof value === 'number' ? value.toLocaleString() : String(value ?? '');
+                                            return (
+                                                <td key={col.accessor} className={ReportTableDefaults.tbodyCell}>
+                                                    {displayValue}
+                                                </td>
+                                            );
+                                        })}
                                     </tr>
-                                )}
+                                ))}
                             </tbody>
-                        </table>
-                    </div>
-                </div>
-            </Card>
+                        </>
+                    )}
+                </ReportTableCard>
+            </div>
         </PageWrapper>
     );
 };

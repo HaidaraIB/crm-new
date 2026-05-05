@@ -403,8 +403,20 @@ function toRelativeApiEndpoint(urlOrPath: string): string | null {
   return null;
 }
 
+/** Matches backend DRF default cap (DRF_MAX_PAGE_SIZE); fewer HTTP round-trips per full sync. */
+const DEFAULT_FULL_FETCH_PAGE_SIZE = 100;
+
+function withPageSizeQuery(endpoint: string, pageSize: number): string {
+  if (/[?&]page_size=/.test(endpoint)) return endpoint;
+  const joiner = endpoint.includes('?') ? '&' : '?';
+  return `${endpoint}${joiner}page_size=${pageSize}`;
+}
+
 async function fetchAllPaginatedPages<T>(initialEndpoint: string): Promise<PaginatedResponse<T>> {
-  let endpoint: string | null = initialEndpoint;
+  let endpoint: string | null = withPageSizeQuery(
+    initialEndpoint,
+    DEFAULT_FULL_FETCH_PAGE_SIZE,
+  );
   let count = 0;
   const results: T[] = [];
   let previous: string | null = null;

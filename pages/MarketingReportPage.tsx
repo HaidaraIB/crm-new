@@ -1,14 +1,34 @@
-
-import React, { useState, useEffect, useMemo } from 'react';
-import { PageWrapper, Card, Loader, Button } from '../components/index';
+import React, { useMemo } from 'react';
+import { PageWrapper, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
-import { FilterIcon } from '../components/icons';
+import { FilterIcon, MegaphoneIcon, TargetIcon, CheckIcon, ChartIcon } from '../components/icons';
 import { useCampaigns, useLeads } from '../hooks/useQueries';
+import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { reportPageContainer } from '../components/reports/reportStyles';
+import { ReportHero } from '../components/reports/ReportHero';
+import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
+import { ReportTableCard, ReportTableDefaults } from '../components/reports/ReportTableCard';
 
 export const MarketingReportPage = () => {
-    const { t, marketingReportFilters, setIsMarketingReportFilterDrawerOpen } = useAppContext();
+    const { t, marketingReportFilters, setIsMarketingReportFilterDrawerOpen, language } = useAppContext();
     const { selectedCampaign, startDate, endDate } = marketingReportFilters;
-    const [loading, setLoading] = useState(false);
+
+    const reportHeroSubtitle = useMemo(() => {
+        const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
+        let range = t('reportsAllDates');
+        if (startDate && endDate) {
+            try {
+                const s = new Date(startDate);
+                const e = new Date(endDate);
+                if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
+                    range = `${s.toLocaleDateString(locale)} — ${e.toLocaleDateString(locale)}`;
+                }
+            } catch {
+                /* ignore */
+            }
+        }
+        return `${range}. ${t('reportsPageHint')}`;
+    }, [language, startDate, endDate, t]);
     
     // Fetch data using React Query
     const { data: campaignsData } = useCampaigns();
@@ -70,122 +90,130 @@ export const MarketingReportPage = () => {
         alert(t('exportFunctionalityComingSoon') || 'Export functionality will be implemented soon');
     };
 
-    if (loading) {
-        return (
-            <PageWrapper title={t('marketingReport')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
-                </div>
-            </PageWrapper>
-        );
-    }
+    const totalBudget = campaignStats.reduce((sum, camp) => sum + camp.budget, 0);
+    const leadsSum = campaignStats.reduce((sum, camp) => sum + camp.totalLeads, 0);
+    const avgConversion =
+        campaignStats.length > 0
+            ? (
+                  campaignStats.reduce((sum, camp) => sum + parseFloat(String(camp.conversionRate)), 0) /
+                  campaignStats.length
+              ).toFixed(1)
+            : '0';
 
     return (
         <PageWrapper
             title={t('marketingReport')}
             actions={
-                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
-                    <Button variant="secondary" onClick={() => setIsMarketingReportFilterDrawerOpen(true)} className="w-full sm:w-auto">
-                        <FilterIcon className="h-4 w-4 inline-block mr-2" />
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2.5">
+                    <Button
+                        variant="secondary"
+                        onClick={() => setIsMarketingReportFilterDrawerOpen(true)}
+                        className="w-full sm:w-auto rounded-xl px-5 py-2.5 border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
+                        <FilterIcon className="h-4 w-4 shrink-0" />
                         {t('filter') || 'Filter'}
                     </Button>
-                    <Button variant="secondary" onClick={handleExport} className="w-full sm:w-auto">
+                    <Button
+                        variant="secondary"
+                        onClick={handleExport}
+                        className="w-full sm:w-auto rounded-xl px-5 py-2.5 border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 shadow-sm hover:shadow-md"
+                    >
                         {t('export') || 'Export'}
                     </Button>
                 </div>
             }
         >
-            {campaignStats.length > 0 ? (
-                <>
-                    {/* Summary Cards */}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('totalCampaigns') || 'Total Campaigns'}</p>
-                                <p className="text-2xl font-bold text-primary">{campaignStats.length}</p>
-                            </div>
-                        </Card>
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('totalBudget') || 'Total Budget'}</p>
-                                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-                                    {campaignStats.reduce((sum, camp) => sum + camp.budget, 0).toLocaleString()}
-                                </p>
-                            </div>
-                        </Card>
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('totalLeads') || 'Total Leads'}</p>
-                                <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-                                    {campaignStats.reduce((sum, camp) => sum + camp.totalLeads, 0)}
-                                </p>
-                            </div>
-                        </Card>
-                        <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                            <div className="p-4">
-                                <p className="text-sm text-secondary mb-1">{t('avgConversionRate') || 'Avg Conversion Rate'}</p>
-                                <p className="text-2xl font-bold text-purple-600 dark:text-purple-400">
-                                    {campaignStats.length > 0 
-                                        ? (campaignStats.reduce((sum, camp) => sum + parseFloat(camp.conversionRate), 0) / campaignStats.length).toFixed(1)
-                                        : '0'
-                                    }%
-                                </p>
-                            </div>
-                        </Card>
-                    </div>
+            <div className={reportPageContainer}>
+                <ReportHero
+                    title={t('marketingReport')}
+                    subtitle={reportHeroSubtitle}
+                    language={language}
+                />
 
-                    {/* Campaign Details Table */}
-                    <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                        <div className="p-6">
-                            <h3 className="text-lg font-semibold text-primary mb-4">{t('campaignDetails') || 'Campaign Details'}</h3>
-                            <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
-                                <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400" style={{ minWidth: '800px' }}>
-                                    <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                                        <tr>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('campaign') || 'Campaign'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('budget') || 'Budget'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('totalLeads') || 'Total Leads'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('converted') || 'Converted'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('conversionRate') || 'Conversion Rate'}</th>
-                                            <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('costPerLead') || 'Cost per Lead'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-gray-700">
-                                        {campaignStats.map((campaign) => (
-                                            <tr key={campaign.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm font-medium text-gray-900 dark:text-white">{campaign.name}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-900 dark:text-gray-100">{campaign.budget.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-900 dark:text-gray-100">{campaign.totalLeads.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-green-600 dark:text-green-400 font-semibold">{campaign.convertedLeads.toLocaleString()}</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-blue-600 dark:text-blue-400 font-semibold">{campaign.conversionRate}%</span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-900 dark:text-gray-100">{parseFloat(campaign.costPerLead).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
+                {campaignStats.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                            <ReportSummaryTile
+                                title={t('totalCampaigns') || 'Total Campaigns'}
+                                value={campaignStats.length}
+                                accent="indigo"
+                                icon={<MegaphoneIcon />}
+                            />
+                            <ReportSummaryTile
+                                title={t('totalBudget') || 'Total Budget'}
+                                value={totalBudget.toLocaleString()}
+                                accent="blue"
+                                icon={<ChartIcon />}
+                            />
+                            <ReportSummaryTile
+                                title={t('totalLeads') || 'Total Leads'}
+                                value={leadsSum.toLocaleString()}
+                                accent="emerald"
+                                icon={<TargetIcon />}
+                            />
+                            <ReportSummaryTile
+                                title={t('avgConversionRate') || 'Avg Conversion Rate'}
+                                value={`${avgConversion}%`}
+                                accent="violet"
+                                icon={<CheckIcon />}
+                            />
                         </div>
-                    </Card>
-                </>
-            ) : (
-                <Card className="border border-gray-200/50 dark:border-gray-700/50">
-                    <div className="text-center py-10">
-                        <p className="text-tertiary">{t('noDataAvailable')}</p>
-                    </div>
-                </Card>
-            )}
+
+                        <ReportTableCard
+                            title={t('campaignDetails') || 'Campaign Details'}
+                            empty={false}
+                            emptyMessage={t('noDataAvailable')}
+                            minWidth={880}
+                        >
+                            <thead className={ReportTableDefaults.theadRow}>
+                                <tr>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                                        {t('campaign') || 'Campaign'}
+                                    </th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                                        {t('budget') || 'Budget'}
+                                    </th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                                        {t('totalLeads') || 'Total Leads'}
+                                    </th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                                        {t('converted') || 'Converted'}
+                                    </th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                                        {t('conversionRate') || 'Conversion Rate'}
+                                    </th>
+                                    <th scope="col" className="px-4 py-3 font-semibold whitespace-nowrap">
+                                        {t('costPerLead') || 'Cost per Lead'}
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {campaignStats.map((campaign) => (
+                                    <tr key={campaign.id} className={ReportTableDefaults.tbodyRow}>
+                                        <td className={`${ReportTableDefaults.tbodyCell} font-semibold`}>{campaign.name}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{campaign.budget.toLocaleString()}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{campaign.totalLeads.toLocaleString()}</td>
+                                        <td className={`${ReportTableDefaults.tbodyCell} text-emerald-600 dark:text-emerald-400 font-semibold`}>
+                                            {campaign.convertedLeads.toLocaleString()}
+                                        </td>
+                                        <td className={`${ReportTableDefaults.tbodyCell} text-blue-600 dark:text-blue-400 font-semibold`}>
+                                            {campaign.conversionRate}%
+                                        </td>
+                                        <td className={ReportTableDefaults.tbodyCell}>
+                                            {parseFloat(String(campaign.costPerLead)).toLocaleString(undefined, {
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2,
+                                            })}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </ReportTableCard>
+                    </>
+                ) : (
+                    <ReportTableCard title={t('campaignDetails') || 'Campaign Details'} empty emptyMessage={t('noDataAvailable')} minWidth={800} />
+                )}
+            </div>
         </PageWrapper>
     );
 };

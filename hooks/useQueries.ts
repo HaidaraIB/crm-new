@@ -78,6 +78,12 @@ export const queryKeys = {
   whatsAppConversations: ['whatsAppConversations'] as const,
 };
 
+/** Cuts refetch bursts on data-heavy views (aligns with API UserRateThrottle). */
+export const dashboardHeavyListQueryOptions = {
+  staleTime: 5 * 60 * 1000,
+  refetchOnWindowFocus: false,
+} as const satisfies Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>;
+
 // ==================== Query Hooks ====================
 
 export const useCurrentUser = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {

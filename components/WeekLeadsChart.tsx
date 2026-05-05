@@ -2,6 +2,7 @@
 import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useAppContext } from '../context/AppContext';
+import { getRechartsTooltipStyles } from './dashboard/rechartsTooltipStyles';
 
 const data = [
   { name: 'Sep 20', "Leads Count": 10 },
@@ -15,12 +16,8 @@ const data = [
 
 export const WeekLeadsChart = () => {
   const { t, theme } = useAppContext();
-  const isDark = theme === 'dark';
-  const tooltipContentStyle = isDark
-    ? { backgroundColor: 'rgba(31, 41, 55, 0.95)', border: 'none', borderRadius: '8px', color: '#f3f4f6' as const }
-    : { backgroundColor: '#ffffff', border: '1px solid #e5e7eb', borderRadius: '8px', color: '#111827' as const, boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' };
-  const tooltipLabelStyle = isDark ? { color: '#9ca3af' } : { color: '#6b7280' };
-  const tooltipItemStyle = isDark ? { color: '#f3f4f6' } : { color: '#111827' };
+  const { contentStyle: tooltipContentStyle, labelStyle: tooltipLabelStyle, itemStyle: tooltipItemStyle } =
+    getRechartsTooltipStyles(theme === 'dark');
 
   return (
     <ResponsiveContainer width="100%" height={300}>

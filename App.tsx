@@ -3,12 +3,105 @@
 import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
+import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotifications';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage } from './pages';
 
+/** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
+function CurrentPageContent({ currentPage }: { currentPage: Page }) {
+    switch (currentPage) {
+        case 'Dashboard':
+            return <DashboardPage />;
+        case 'Leads':
+        case 'All Leads':
+        case 'Fresh Leads':
+        case 'Cold Leads':
+        case 'My Leads':
+        case 'Rotated Leads':
+            return <LeadsPage key={currentPage} />;
+        case 'ViewLead':
+            return <ViewLeadPage />;
+        case 'CreateLead':
+            return <CreateLeadPage />;
+        case 'EditLead':
+            return <EditLeadPage />;
+        case 'Activities':
+            return <ActivitiesPage />;
+        case 'Inventory':
+        case 'Properties':
+            return <PropertiesPage />;
+        case 'Services':
+            return <ServicesPage />;
+        case 'Service Packages':
+            return <ServicePackagesPage />;
+        case 'Service Providers':
+            return <ServiceProvidersPage />;
+        case 'Products':
+            return <ProductsPage />;
+        case 'Product Categories':
+            return <ProductCategoriesPage />;
+        case 'Suppliers':
+            return <SuppliersPage />;
+        case 'Owners':
+            return <OwnersPage />;
+        case 'Deals':
+            return <DealsPage />;
+        case 'CreateDeal':
+            return <CreateDealPage />;
+        case 'Users':
+        case 'Employees':
+            return <UsersPage />;
+        case 'Marketing':
+        case 'Campaigns':
+            return <CampaignsPage />;
+        case 'Messaging Center':
+            return <IntegrationsPage key="MessagingCenter" />;
+        case 'Todos':
+            return <TodosPage />;
+        case 'Team Chat':
+            return <TeamChatPage />;
+        case 'Reports':
+        case 'Teams Report':
+            return <TeamsReportPage />;
+        case 'Employees Report':
+            return <EmployeesReportPage />;
+        case 'Marketing Report':
+            return <MarketingReportPage />;
+        case 'Integrations':
+        case 'Meta':
+        case 'TikTok':
+        case 'WhatsApp':
+        case 'Twilio':
+            return <IntegrationsPage key={currentPage} />;
+        case 'Billing':
+            return <BillingPage />;
+        case 'Change Plan':
+            return <ChangePlanPage />;
+        case 'Payment':
+            return <PaymentPage />;
+        case 'Subscription':
+            return <BillingPage />;
+        case 'Support Center':
+            return <SupportCenterPage />;
+        case 'Settings':
+            return <SettingsPage />;
+        case 'Profile':
+            return <ProfilePage />;
+        case 'ChangePlan':
+            return <ChangePlanPage />;
+        default:
+            return (
+                <PageWrapper title={currentPage}>
+                    <div>Content for {currentPage}</div>
+                </PageWrapper>
+            );
+    }
+}
+
 const TheApp = () => {
     const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
+    useTeamChatAwayNotifications();
     const isPublicLegalPath = (path: string): boolean => {
         const normalizedPath = path.replace(/\/+$/, '') || '/';
         return normalizedPath === '/data-deletion-policy' || normalizedPath === '/data-deletion' || normalizedPath.endsWith('/data-deletion-policy') || normalizedPath.endsWith('/data-deletion')
@@ -329,95 +422,6 @@ const TheApp = () => {
             }
         }
     }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
-    
-    // CurrentPageContent component defined inside TheApp to have access to currentPage
-    const CurrentPageContent = () => {
-        switch (currentPage) {
-        case 'Dashboard':
-            return <DashboardPage />;
-        case 'Leads':
-        case 'All Leads':
-        case 'Fresh Leads':
-        case 'Cold Leads':
-        case 'My Leads':
-        case 'Rotated Leads':
-            return <LeadsPage key={currentPage} />;
-        case 'ViewLead':
-            return <ViewLeadPage />;
-        case 'CreateLead':
-            return <CreateLeadPage />;
-        case 'EditLead':
-            return <EditLeadPage />;
-        case 'Activities':
-            return <ActivitiesPage />;
-        case 'Inventory':
-        case 'Properties':
-            return <PropertiesPage />;
-        case 'Services':
-            return <ServicesPage />;
-        case 'Service Packages':
-            return <ServicePackagesPage />;
-        case 'Service Providers':
-            return <ServiceProvidersPage />;
-        case 'Products':
-            return <ProductsPage />;
-        case 'Product Categories':
-            return <ProductCategoriesPage />;
-        case 'Suppliers':
-            return <SuppliersPage />;
-        case 'Owners':
-            return <OwnersPage />;
-        case 'Deals':
-            return <DealsPage />;
-        case 'CreateDeal':
-            return <CreateDealPage />;
-        case 'Users':
-        case 'Employees':
-            return <UsersPage />;
-        case 'Marketing':
-        case 'Campaigns':
-            return <CampaignsPage />;
-        case 'Messaging Center':
-            return <IntegrationsPage key="MessagingCenter" />;
-        case 'Todos':
-            return <TodosPage />;
-        case 'Team Chat':
-            return <TeamChatPage />;
-        case 'Reports':
-        case 'Teams Report':
-            return <TeamsReportPage />;
-        case 'Employees Report':
-            return <EmployeesReportPage />;
-        case 'Marketing Report':
-            return <MarketingReportPage />;
-        case 'Integrations':
-        case 'Meta':
-        case 'TikTok':
-        case 'WhatsApp':
-        case 'Twilio':
-            return <IntegrationsPage key={currentPage} />;
-        case 'Billing':
-            return <BillingPage />;
-        case 'Change Plan':
-            return <ChangePlanPage />;
-        case 'Payment':
-            return <PaymentPage />;
-        case 'Subscription':
-            return <BillingPage />;
-        case 'Support Center':
-            return <SupportCenterPage />;
-        case 'Settings':
-            return <SettingsPage />;
-        case 'Profile':
-            return <ProfilePage />;
-        case 'ChangePlan':
-            return <ChangePlanPage />;
-        // ... add other pages here
-        default:
-            // FIX: The PageWrapper component requires children.
-            return <PageWrapper title={currentPage}><div>Content for {currentPage}</div></PageWrapper>;
-    }
-    };
     
     // Subdomain slug for path (company.domain used in URL folder, not company name)
     const getCompanySubdomainSlug = (): string => {
@@ -843,7 +847,7 @@ const TheApp = () => {
                     </div>
                 )}
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
-                    <CurrentPageContent />
+                    <CurrentPageContent currentPage={currentPage} />
                 </main>
             </div>
             {/* Global Modals & Drawers */}

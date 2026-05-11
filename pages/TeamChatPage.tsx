@@ -3,19 +3,34 @@ import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Modal } from '../components/index';
-import { ChatBubbleIcon, CheckIcon } from '../components/icons';
 import {
+  ChatBubbleIcon,
+  CheckIcon,
+  ChevronDownIcon,
+  MicrophoneIcon,
+  PaperclipIcon,
+  SendPlaneIcon,
+  SquareFillIcon,
+} from '../components/icons';
+import {
+  getAuthenticatedBinaryRequestHeaders,
   getTenantChatConversationsAPI,
   getTenantChatEligibleUsersAPI,
   getTenantChatMessagesAPI,
+  getTenantChatPeerPresenceAPI,
   markTenantChatReadAPI,
   pinTenantChatMessageAPI,
   sendTenantChatMessageAPI,
+  postTenantChatPeerPresenceAPI,
+  sendTenantChatMessageWithAttachmentAPI,
   startTenantChatConversationAPI,
   unpinTenantChatMessageAPI,
   type TenantChatMessage,
+  type TenantChatMessageQuote,
   type TenantChatPeer,
+  type TenantChatPeerPresenceAction,
 } from '../services/api';
+import { compressImageForChat } from '../utils/compressImageForChat';
 
 function peerDisplayName(p: TenantChatPeer): string {
   const n = `${p.first_name || ''} ${p.last_name || ''}`.trim();
@@ -139,6 +154,198 @@ function computeMsgFloatingMenuGeom(
   return { top, left };
 }
 
+const THREAD_SCROLL_NEAR_BOTTOM_PX = 80;
+
+const THREAD_SCROLL_SESSION_PREFIX = 'crm.teamchat.threadScroll.v1:';
+const THREAD_SCROLL_PERSIST_DEBOUNCE_MS = 200;
+
+function clamp01(n: number): number {
+  return Math.min(1, Math.max(0, n));
+}
+
+/** Normalized scroll position so it still applies after transcript height changes. */
+function threadScrollRatio(scroller: HTMLElement): number {
+  const denom = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+  return clamp01(scroller.scrollTop / denom);
+}
+
+function applyThreadScrollRatio(scroller: HTMLElement, ratio: number): void {
+  const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
+  scroller.scrollTop = clamp01(ratio) * maxTop;
+}
+
+function readThreadScrollRatioFromSession(convId: number): number | null {
+  if (typeof sessionStorage === 'undefined') return null;
+  try {
+    const raw = sessionStorage.getItem(`${THREAD_SCROLL_SESSION_PREFIX}${convId}`);
+    if (!raw) return null;
+    const j = JSON.parse(raw) as { r?: unknown };
+    if (typeof j?.r !== 'number' || !Number.isFinite(j.r)) return null;
+    return clamp01(j.r);
+  } catch {
+    return null;
+  }
+}
+
+function writeThreadScrollRatioToSession(convId: number, ratio: number): void {
+  if (typeof sessionStorage === 'undefined') return;
+  try {
+    sessionStorage.setItem(`${THREAD_SCROLL_SESSION_PREFIX}${convId}`, JSON.stringify({ r: clamp01(ratio) }));
+  } catch {
+    //
+  }
+}
+
+function isNearThreadScrollBottom(scroller: HTMLElement): boolean {
+  return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < THREAD_SCROLL_NEAR_BOTTOM_PX;
+}
+
+/** Highest message id whose row intersects the scroll container viewport (vertically). */
+function maxIntersectingTenantMessageId(
+  scroller: HTMLElement,
+  messages: TenantChatMessage[]
+): number | null {
+  const cr = scroller.getBoundingClientRect();
+  let maxId: number | null = null;
+  for (const m of messages) {
+    const el = document.getElementById(`tenant-chat-msg-${m.id}`);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.bottom <= cr.top || r.top >= cr.bottom) continue;
+    if (maxId == null || m.id > maxId) maxId = m.id;
+  }
+  return maxId;
+}
+
+/** Peer messages with id above read cursor whose row starts below the visible bottom (Telegram-style badge). */
+function countPeerMessagesBelowViewport(
+  scroller: HTMLElement,
+  messages: TenantChatMessage[],
+  currentUserId: number,
+  readThroughId: number
+): number {
+  const cr = scroller.getBoundingClientRect();
+  const line = cr.bottom - 10;
+  let n = 0;
+  for (const m of messages) {
+    if (m.sender?.id === currentUserId) continue;
+    if (m.id <= readThroughId) continue;
+    const el = document.getElementById(`tenant-chat-msg-${m.id}`);
+    if (!el) continue;
+    const r = el.getBoundingClientRect();
+    if (r.top > line) n++;
+  }
+  return n;
+}
+
+function tenantChatQuoteLabel(q: TenantChatMessageQuote, t: (key: string) => string): string {
+  const cap = (q.body || '').trim();
+  const kind = q.attachment_kind;
+  let label = '';
+  if (kind === 'image') label = t('teamChatMediaPhoto');
+  else if (kind === 'video') label = t('teamChatMediaVideo');
+  else if (kind === 'audio') label = t('teamChatMediaAudio');
+  else if (kind === 'document') label = t('teamChatMediaDocument');
+  if (label && cap) return `${label}: ${cap}`;
+  if (cap) return cap;
+  return label || '';
+}
+
+function replyTargetSnippet(m: TenantChatMessage, t: (key: string) => string): string {
+  const cap = (m.body || '').replace(/\s+/g, ' ').trim().slice(0, 120);
+  const kind = m.attachment_kind;
+  let label = '';
+  if (kind === 'image') label = t('teamChatMediaPhoto');
+  else if (kind === 'video') label = t('teamChatMediaVideo');
+  else if (kind === 'audio') label = t('teamChatMediaAudio');
+  else if (kind === 'document') label = t('teamChatMediaDocument');
+  if (label && cap) return `${label} · ${cap}`;
+  if (cap) return cap;
+  return label || '';
+}
+
+type TenantChatBlobMediaProps = {
+  url: string;
+  kind: 'image' | 'video' | 'audio' | 'document';
+  mine: boolean;
+  filename?: string | null;
+  t: (key: string) => string;
+  /** Fires when intrinsic media layout is known (image decode, video metadata, etc.). */
+  onIntrinsicLayout?: () => void;
+};
+
+function TenantChatBlobMedia({ url, kind, mine, filename, t, onIntrinsicLayout }: TenantChatBlobMediaProps) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    setFailed(false);
+    setBlobUrl(null);
+    void (async () => {
+      try {
+        const r = await fetch(url, { headers: getAuthenticatedBinaryRequestHeaders() });
+        if (!r.ok || cancelled) return;
+        const blob = await r.blob();
+        if (cancelled) return;
+        objectUrl = URL.createObjectURL(blob);
+        setBlobUrl(objectUrl);
+      } catch {
+        if (!cancelled) setFailed(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [url]);
+
+  if (failed) {
+    return (
+      <span className={`text-xs ${mine ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
+        {t('teamChatCouldNotLoad')}
+      </span>
+    );
+  }
+  if (!blobUrl) {
+    return <span className={`text-xs ${mine ? 'text-white/70' : 'text-gray-400'}`}>…</span>;
+  }
+  const docName = filename || 'download';
+  if (kind === 'image') {
+    return (
+      <img
+        src={blobUrl}
+        alt=""
+        className="max-h-64 w-full rounded-lg object-contain"
+        onLoad={onIntrinsicLayout}
+      />
+    );
+  }
+  if (kind === 'video') {
+    return (
+      <video
+        src={blobUrl}
+        controls
+        className="max-h-64 w-full rounded-lg"
+        onLoadedMetadata={onIntrinsicLayout}
+      />
+    );
+  }
+  if (kind === 'audio') {
+    return <audio src={blobUrl} controls className="mt-1 w-full" onLoadedMetadata={onIntrinsicLayout} />;
+  }
+  return (
+    <a
+      href={blobUrl}
+      download={docName}
+      className={`inline-flex text-sm font-semibold underline ${mine ? 'text-white' : 'text-primary dark:text-primary-200'}`}
+    >
+      {t('teamChatDownload')}
+    </a>
+  );
+}
+
 export const TeamChatPage = () => {
   const { t, language, currentUser } = useAppContext();
   /** Physical edge toward avatar (flex row + RTL puts avatar on the right). */
@@ -152,11 +359,19 @@ export const TeamChatPage = () => {
   /** Forward: source message id; pick target conversation in modal. */
   const [forwardSourceId, setForwardSourceId] = useState<number | null>(null);
   const [forwardCaption, setForwardCaption] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
+  const [compressingAttachment, setCompressingAttachment] = useState(false);
+  const [voiceRecording, setVoiceRecording] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+  /** True after a short quiet period while draft has text (typing indicator for peer). */
+  const [draftTypingSignal, setDraftTypingSignal] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaChunksRef = useRef<Blob[]>([]);
+  const recordStreamRef = useRef<MediaStream | null>(null);
   const [msgActionsOpenId, setMsgActionsOpenId] = useState<number | null>(null);
   const [msgActionsMenuPos, setMsgActionsMenuPos] = useState<MsgFloatingMenuGeom | null>(null);
   const msgActionsMenuPortalRef = useRef<HTMLDivElement | null>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-
   /** Tracks one active pointer gesture (document listeners so scroll clears long-press reliably). */
   const msgGestureDisposeRef = useRef<(() => void) | null>(null);
 
@@ -249,8 +464,36 @@ export const TeamChatPage = () => {
 
   const composerRef = useRef<HTMLTextAreaElement>(null);
   const forwardCaptionRef = useRef<HTMLTextAreaElement>(null);
-  /** Avoid duplicate mark-read calls when polling returns the same latest id. */
-  const lastMarkedMessageIdRef = useRef<number | null>(null);
+  const messagesScrollRef = useRef<HTMLDivElement>(null);
+  /** Inner transcript column — height grows when images load; observed so tail-follow sees scrollHeight changes. */
+  const messagesScrollContentRef = useRef<HTMLDivElement>(null);
+  /** Server-aligned read cursor for the open thread (advances only forward). */
+  const readCursorRef = useRef(0);
+  const prevThreadIdForReadCursorRef = useRef<number | null>(null);
+  const pendingMarkReadIdRef = useRef(0);
+  const markReadDebounceTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const selectedIdRef = useRef<number | null>(null);
+  selectedIdRef.current = selectedId;
+  const [threadScrollFab, setThreadScrollFab] = useState({ show: false, peerBelow: 0 });
+  /** Last message id in the open thread — used to stick scroll to bottom when “live” tail grows. */
+  const lastMessageTailIdForScrollRef = useRef<number | null>(null);
+  /**
+   * True while the user is following the live tail (last scroll was at/near bottom). After a new
+   * message renders, scrollHeight grows but scrollTop is unchanged, so isNearThreadScrollBottom
+   * alone would be false until we jump — this ref keeps tail-follow working.
+   */
+  const pinnedToBottomRef = useRef(true);
+  /**
+   * After sending an attachment, keep snapping the tail until intrinsic media size is known.
+   * Otherwise a transient scroll event can clear pinnedToBottomRef before onLoad, and onIntrinsicLayout bails.
+   */
+  const pendingTailSnapAfterMediaRef = useRef(false);
+  /** Latest scroll ratio per conversation (updated on scroll; flushed to sessionStorage on switch / debounce). */
+  const lastScrollRatioByConvRef = useRef<Map<number, number>>(new Map());
+  const threadScrollPersistTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  /** Conv id for which initial scroll-from-storage has already run for this visit. */
+  const threadScrollRestoreAppliedRef = useRef<number | null>(null);
+  const prevSelectedIdForScrollPersistRef = useRef<number | null>(null);
   /** Max composer height (px) before scrolling; still shows full text via internal scroll. */
   const COMPOSER_MAX_H = 240;
 
@@ -274,7 +517,24 @@ export const TeamChatPage = () => {
         page_size: 100,
       }),
     enabled: selectedId != null,
-    refetchInterval: 5000,
+    /** Faster poll while a thread is open so new messages appear quickly (was 5s). */
+    refetchInterval: () =>
+      typeof document !== 'undefined' && document.hidden ? false : 1500,
+  });
+
+  const peerPresenceQuery = useQuery({
+    queryKey: ['tenant-chat-peer-presence', selectedId],
+    queryFn: async () => {
+      if (selectedId == null) throw new Error('no conversation');
+      try {
+        return await getTenantChatPeerPresenceAPI(selectedId);
+      } catch {
+        return { peer_user_id: 0, activity: null as TenantChatPeerPresenceAction | null };
+      }
+    },
+    enabled: selectedId != null,
+    refetchInterval: () =>
+      typeof document !== 'undefined' && document.hidden ? false : 1200,
   });
 
   const startConvMutation = useMutation({
@@ -290,18 +550,45 @@ export const TeamChatPage = () => {
     mutationFn: (vars: {
       convId: number;
       body: string;
+      file?: File;
       replyToMessageId?: number;
       forwardFromMessageId?: number;
-    }) =>
-      sendTenantChatMessageAPI(vars.convId, vars.body, {
+    }) => {
+      if (vars.file) {
+        return sendTenantChatMessageWithAttachmentAPI(vars.convId, vars.file, {
+          body: vars.body || undefined,
+          replyToMessageId: vars.replyToMessageId,
+        });
+      }
+      return sendTenantChatMessageAPI(vars.convId, vars.body, {
         replyToMessageId: vars.replyToMessageId,
         forwardFromMessageId: vars.forwardFromMessageId,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tenant-chat-messages', selectedId] });
-      queryClient.invalidateQueries({ queryKey: ['tenant-chat-conversations'] });
+      });
+    },
+    onSuccess: async (_data, vars) => {
+      if (vars.file) pendingTailSnapAfterMediaRef.current = true;
+      await queryClient.invalidateQueries({ queryKey: ['tenant-chat-messages', vars.convId] });
+      await queryClient.invalidateQueries({ queryKey: ['tenant-chat-conversations'] });
       setDraft('');
+      setPendingAttachment(null);
       setReplyToMessage(null);
+      /** Double rAF: first paint after React commits refetched messages, then layout (incl. placeholder). */
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const sc = messagesScrollRef.current;
+          if (sc) {
+            sc.scrollTop = sc.scrollHeight;
+            pinnedToBottomRef.current = true;
+            lastScrollRatioByConvRef.current.set(vars.convId, 1);
+            writeThreadScrollRatioToSession(vars.convId, 1);
+            processThreadScrollRef.current();
+          }
+          composerRef.current?.focus({ preventScroll: true });
+        });
+      });
+    },
+    onError: () => {
+      pendingTailSnapAfterMediaRef.current = false;
     },
   });
 
@@ -317,6 +604,53 @@ export const TeamChatPage = () => {
       setForwardCaption('');
     },
   });
+
+  useEffect(() => {
+    if (selectedId == null) {
+      setDraftTypingSignal(false);
+      return;
+    }
+    if (!draft.trim()) {
+      setDraftTypingSignal(false);
+      return;
+    }
+    const tid = window.setTimeout(() => setDraftTypingSignal(true), 550);
+    return () => window.clearTimeout(tid);
+  }, [draft, selectedId]);
+
+  const derivedLocalPresence = useMemo((): TenantChatPeerPresenceAction => {
+    if (voiceRecording) return 'recording_voice';
+    if (compressingAttachment || pendingAttachment) return 'uploading_media';
+    if (sendMutation.isPending && sendMutation.variables?.file) return 'uploading_media';
+    if (sendMutation.isPending) return 'sending_message';
+    if (draftTypingSignal && draft.trim()) return 'typing';
+    return 'idle';
+  }, [
+    voiceRecording,
+    compressingAttachment,
+    pendingAttachment,
+    sendMutation.isPending,
+    sendMutation.variables,
+    draftTypingSignal,
+    draft,
+  ]);
+
+  useEffect(() => {
+    if (selectedId == null) return;
+    const convId = selectedId;
+    const post = (a: TenantChatPeerPresenceAction) => {
+      void postTenantChatPeerPresenceAPI(convId, a).catch(() => {});
+    };
+    post(derivedLocalPresence);
+    const interval =
+      derivedLocalPresence === 'idle'
+        ? undefined
+        : window.setInterval(() => post(derivedLocalPresence), 3200);
+    return () => {
+      if (interval) window.clearInterval(interval);
+      if (derivedLocalPresence !== 'idle') post('idle');
+    };
+  }, [selectedId, derivedLocalPresence]);
 
   const conversations = convQuery.data?.results ?? [];
   const selected = useMemo(
@@ -356,6 +690,34 @@ export const TeamChatPage = () => {
   );
 
   const currentUserId = currentUser?.id ?? null;
+
+  const peerPresenceLabel = useMemo(() => {
+    const other = selected?.other_user;
+    const act = peerPresenceQuery.data?.activity;
+    if (!other || !act) return null;
+    const name = peerDisplayName(other);
+    const fill = (key: string) => t(key).replace(/\{name\}/g, name);
+    if (act === 'typing') return fill('teamChatPeerTyping');
+    if (act === 'uploading_media') return fill('teamChatPeerUploading');
+    if (act === 'recording_voice') return fill('teamChatPeerRecording');
+    if (act === 'sending_message') return fill('teamChatPeerSending');
+    return null;
+  }, [peerPresenceQuery.data?.activity, selected?.other_user, t]);
+
+  useEffect(() => {
+    if (selectedId == null) {
+      prevThreadIdForReadCursorRef.current = null;
+      return;
+    }
+    const row = conversations.find((c) => c.id === selectedId);
+    const srv = row?.last_read_message_id ?? 0;
+    if (prevThreadIdForReadCursorRef.current !== selectedId) {
+      readCursorRef.current = srv;
+      prevThreadIdForReadCursorRef.current = selectedId;
+    } else {
+      readCursorRef.current = Math.max(readCursorRef.current, srv);
+    }
+  }, [selectedId, conversations]);
 
   const openActionsMessage = useMemo(() => {
     if (msgActionsOpenId == null) return null;
@@ -425,14 +787,115 @@ export const TeamChatPage = () => {
   }, [msgActionsOpenId, openActionsMessage, recalcMsgActionsMenuPos]);
 
   useEffect(() => {
-    lastMarkedMessageIdRef.current = null;
+    if (threadScrollPersistTimerRef.current) {
+      window.clearTimeout(threadScrollPersistTimerRef.current);
+      threadScrollPersistTimerRef.current = null;
+    }
+    const prevSel = prevSelectedIdForScrollPersistRef.current;
+    prevSelectedIdForScrollPersistRef.current = selectedId;
+    if (prevSel != null && prevSel !== selectedId) {
+      const r = lastScrollRatioByConvRef.current.get(prevSel);
+      if (r !== undefined) writeThreadScrollRatioToSession(prevSel, r);
+    }
+    threadScrollRestoreAppliedRef.current = null;
+
+    if (markReadDebounceTimerRef.current) {
+      window.clearTimeout(markReadDebounceTimerRef.current);
+      markReadDebounceTimerRef.current = null;
+    }
+    pendingMarkReadIdRef.current = 0;
     setReplyToMessage(null);
     setMsgActionsOpenId(null);
     setForwardSourceId(null);
     setForwardCaption('');
+    setPendingAttachment(null);
+    setMicError(null);
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state === 'recording') {
+      try {
+        mr.stop();
+      } catch {
+        //
+      }
+    }
+    recordStreamRef.current?.getTracks().forEach((tr) => tr.stop());
+    recordStreamRef.current = null;
+    mediaRecorderRef.current = null;
+    setVoiceRecording(false);
+    setThreadScrollFab({ show: false, peerBelow: 0 });
+    lastMessageTailIdForScrollRef.current = null;
+    pinnedToBottomRef.current = true;
+    pendingTailSnapAfterMediaRef.current = false;
   }, [selectedId]);
 
+  useEffect(
+    () => () => {
+      const id = selectedIdRef.current;
+      if (id == null) return;
+      const r = lastScrollRatioByConvRef.current.get(id);
+      if (r !== undefined) writeThreadScrollRatioToSession(id, r);
+    },
+    []
+  );
+
   const pinnedInThread = selected?.pinned_messages ?? [];
+
+  const processThreadScroll = useCallback(() => {
+    if (selectedId == null || currentUserId == null || messagesQuery.isLoading) {
+      setThreadScrollFab((p) => (p.show === false && p.peerBelow === 0 ? p : { show: false, peerBelow: 0 }));
+      return;
+    }
+    const sc = messagesScrollRef.current;
+    if (!sc || messages.length === 0) {
+      setThreadScrollFab((p) => (p.show === false && p.peerBelow === 0 ? p : { show: false, peerBelow: 0 }));
+      return;
+    }
+    const last = messages[messages.length - 1];
+    const near = isNearThreadScrollBottom(sc);
+    const peerBelow = near
+      ? 0
+      : countPeerMessagesBelowViewport(sc, messages, currentUserId, readCursorRef.current);
+    setThreadScrollFab((prev) => {
+      const next = { show: !near, peerBelow };
+      if (prev.show === next.show && prev.peerBelow === next.peerBelow) return prev;
+      return next;
+    });
+
+    const markTarget = near ? last.id : maxIntersectingTenantMessageId(sc, messages);
+    if (markTarget == null || markTarget <= readCursorRef.current) return;
+
+    pendingMarkReadIdRef.current = Math.max(pendingMarkReadIdRef.current, markTarget);
+    if (markReadDebounceTimerRef.current) window.clearTimeout(markReadDebounceTimerRef.current);
+    markReadDebounceTimerRef.current = window.setTimeout(() => {
+      markReadDebounceTimerRef.current = null;
+      const pid = pendingMarkReadIdRef.current;
+      pendingMarkReadIdRef.current = 0;
+      const sid = selectedIdRef.current;
+      if (sid == null || pid <= 0 || pid <= readCursorRef.current) return;
+      markTenantChatReadAPI(sid, pid)
+        .then((d) => {
+          readCursorRef.current = d.last_read_message_id ?? pid;
+          queryClient.invalidateQueries({ queryKey: ['tenant-chat-conversations'] });
+          requestAnimationFrame(() => processThreadScrollRef.current());
+        })
+        .catch(() => {});
+    }, 160);
+  }, [currentUserId, messages, messagesQuery.isLoading, queryClient, selectedId]);
+
+  const processThreadScrollRef = useRef(processThreadScroll);
+  processThreadScrollRef.current = processThreadScroll;
+
+  /** After media intrinsic size is known, snap tail if user was following it or we just sent this attachment. */
+  const onChatMediaIntrinsicLayout = useCallback(() => {
+    const sc = messagesScrollRef.current;
+    if (!sc) return;
+    const pending = pendingTailSnapAfterMediaRef.current;
+    if (!pending && !pinnedToBottomRef.current && !isNearThreadScrollBottom(sc)) return;
+    sc.scrollTop = sc.scrollHeight;
+    pinnedToBottomRef.current = true;
+    pendingTailSnapAfterMediaRef.current = false;
+    processThreadScrollRef.current();
+  }, []);
 
   const scrollToMessageAnchor = (messageId: number) => {
     document.getElementById(`tenant-chat-msg-${messageId}`)?.scrollIntoView({
@@ -440,23 +903,125 @@ export const TeamChatPage = () => {
       block: 'center',
     });
     setMsgActionsOpenId(null);
+    window.setTimeout(() => processThreadScrollRef.current(), 450);
   };
 
-  useEffect(() => {
-    if (!selectedId || messages.length === 0 || messagesQuery.isLoading) return;
-    const last = messages[messages.length - 1];
-    if (lastMarkedMessageIdRef.current === last.id) return;
-    lastMarkedMessageIdRef.current = last.id;
-    markTenantChatReadAPI(selectedId, last.id)
-      .then(() => {
-        queryClient.invalidateQueries({ queryKey: ['tenant-chat-conversations'] });
-      })
-      .catch(() => {});
-  }, [selectedId, messages, messagesQuery.isLoading, queryClient]);
+  useLayoutEffect(() => {
+    if (selectedId == null || messagesQuery.isLoading || messages.length === 0) return;
+    if (threadScrollRestoreAppliedRef.current === selectedId) return;
+    const el = messagesScrollRef.current;
+    if (!el) return;
+
+    const ratio =
+      lastScrollRatioByConvRef.current.get(selectedId) ?? readThreadScrollRatioFromSession(selectedId);
+    if (ratio != null) {
+      applyThreadScrollRatio(el, ratio);
+      pinnedToBottomRef.current = isNearThreadScrollBottom(el);
+    } else {
+      pinnedToBottomRef.current = true;
+    }
+    threadScrollRestoreAppliedRef.current = selectedId;
+  }, [selectedId, messagesQuery.isLoading, messages.length]);
+
+  /**
+   * After new messages paint, scrollHeight grows but scrollTop stays fixed, so the viewport is no
+   * longer within THREAD_SCROLL_NEAR_BOTTOM_PX of the new bottom. Use pinnedToBottomRef (updated on
+   * scroll) so tail-follow still works. Runs before processThreadScroll so FAB / read cursor see
+   * the corrected position in the same frame.
+   */
+  useLayoutEffect(() => {
+    if (selectedId == null || messagesQuery.isLoading) return;
+    const sc = messagesScrollRef.current;
+    if (!sc || messages.length === 0) {
+      lastMessageTailIdForScrollRef.current = null;
+      return;
+    }
+    const lastId = messages[messages.length - 1].id;
+    const prevTail = lastMessageTailIdForScrollRef.current;
+    lastMessageTailIdForScrollRef.current = lastId;
+    if (prevTail == null) {
+      if (pinnedToBottomRef.current) {
+        sc.scrollTop = sc.scrollHeight;
+        pinnedToBottomRef.current = true;
+      }
+      return;
+    }
+    if (lastId === prevTail) {
+      if (pendingTailSnapAfterMediaRef.current) {
+        sc.scrollTop = sc.scrollHeight;
+        pinnedToBottomRef.current = true;
+        requestAnimationFrame(() => processThreadScrollRef.current());
+      }
+      return;
+    }
+    if (!pinnedToBottomRef.current && !isNearThreadScrollBottom(sc) && !pendingTailSnapAfterMediaRef.current)
+      return;
+    sc.scrollTop = sc.scrollHeight;
+    pinnedToBottomRef.current = true;
+  }, [messages, selectedId, messagesQuery.isLoading]);
+
+  useLayoutEffect(() => {
+    const id = requestAnimationFrame(() => processThreadScroll());
+    return () => cancelAnimationFrame(id);
+  }, [messages, selectedId, messagesQuery.isLoading, processThreadScroll]);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, selectedId]);
+    const sc = messagesScrollRef.current;
+    if (!sc) return;
+    const onScroll = () => {
+      pinnedToBottomRef.current = isNearThreadScrollBottom(sc);
+      const id = selectedIdRef.current;
+      if (id != null) {
+        const r = threadScrollRatio(sc);
+        lastScrollRatioByConvRef.current.set(id, r);
+        if (threadScrollPersistTimerRef.current) window.clearTimeout(threadScrollPersistTimerRef.current);
+        threadScrollPersistTimerRef.current = window.setTimeout(() => {
+          threadScrollPersistTimerRef.current = null;
+          const sid = selectedIdRef.current;
+          if (sid == null) return;
+          const cur = messagesScrollRef.current;
+          if (!cur) return;
+          const latest = threadScrollRatio(cur);
+          lastScrollRatioByConvRef.current.set(sid, latest);
+          writeThreadScrollRatioToSession(sid, latest);
+        }, THREAD_SCROLL_PERSIST_DEBOUNCE_MS);
+      }
+      processThreadScroll();
+    };
+    sc.addEventListener('scroll', onScroll, { passive: true });
+    const ro = new ResizeObserver(() => {
+      if (pinnedToBottomRef.current || pendingTailSnapAfterMediaRef.current) {
+        sc.scrollTop = sc.scrollHeight;
+      }
+      processThreadScroll();
+    });
+    ro.observe(sc);
+    const inner = messagesScrollContentRef.current;
+    if (inner) ro.observe(inner);
+    return () => {
+      if (threadScrollPersistTimerRef.current) {
+        window.clearTimeout(threadScrollPersistTimerRef.current);
+        threadScrollPersistTimerRef.current = null;
+      }
+      sc.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
+  }, [processThreadScroll, selectedId, messages.length, messagesQuery.isLoading]);
+
+  const scrollThreadToBottom = useCallback(() => {
+    const sc = messagesScrollRef.current;
+    if (!sc) return;
+    pinnedToBottomRef.current = true;
+    sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+    window.setTimeout(() => processThreadScrollRef.current(), 420);
+  }, []);
+
+  /** Instant jump to tail when sending while scrolled up. */
+  const scrollThreadToEndIfNotNearBottom = useCallback(() => {
+    const sc = messagesScrollRef.current;
+    if (!sc) return;
+    if (!isNearThreadScrollBottom(sc)) sc.scrollTop = sc.scrollHeight;
+  }, []);
 
   const adjustAutosizeTextArea = useCallback((el: HTMLTextAreaElement | null) => {
     if (!el) return;
@@ -495,14 +1060,90 @@ export const TeamChatPage = () => {
     return () => window.removeEventListener('keydown', onKey);
   }, [msgActionsOpenId]);
 
-  const handleSend = (e?: React.FormEvent) => {
+  const stopVoiceRecording = useCallback(() => {
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state === 'recording') {
+      try {
+        mr.stop();
+      } catch {
+        //
+      }
+    }
+  }, []);
+
+  const startVoiceRecording = useCallback(async () => {
+    if (!selectedId || voiceRecording || sendMutation.isPending) return;
+    setMicError(null);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      recordStreamRef.current = stream;
+      mediaChunksRef.current = [];
+      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+        ? 'audio/webm;codecs=opus'
+        : MediaRecorder.isTypeSupported('audio/webm')
+          ? 'audio/webm'
+          : '';
+      const mr = mime
+        ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64000 })
+        : new MediaRecorder(stream, { audioBitsPerSecond: 64000 });
+      mr.ondataavailable = (ev) => {
+        if (ev.data.size > 0) mediaChunksRef.current.push(ev.data);
+      };
+      mr.onstop = () => {
+        stream.getTracks().forEach((tr) => tr.stop());
+        recordStreamRef.current = null;
+        mediaRecorderRef.current = null;
+        setVoiceRecording(false);
+        const chunks = mediaChunksRef.current.slice();
+        mediaChunksRef.current = [];
+        const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
+        if (blob.size > 0) {
+          setPendingAttachment(new File([blob], `voice-${Date.now()}.webm`, { type: blob.type }));
+        }
+      };
+      mediaRecorderRef.current = mr;
+      mr.start(400);
+      setVoiceRecording(true);
+      window.setTimeout(() => {
+        stopVoiceRecording();
+      }, 4 * 60 * 1000);
+    } catch {
+      setMicError(t('teamChatMicDenied'));
+      setVoiceRecording(false);
+    }
+  }, [selectedId, sendMutation.isPending, stopVoiceRecording, t, voiceRecording]);
+
+  const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
-    if (!selectedId || !draft.trim() || sendMutation.isPending) return;
-    sendMutation.mutate({
-      convId: selectedId,
-      body: draft.trim(),
-      replyToMessageId: replyToMessage?.id,
-    });
+    if (!selectedId || sendMutation.isPending) return;
+    const text = draft.trim();
+    if (!text && !pendingAttachment) return;
+    scrollThreadToEndIfNotNearBottom();
+    let file = pendingAttachment;
+    if (file && file.type.startsWith('image/') && file.type !== 'image/gif') {
+      setCompressingAttachment(true);
+      try {
+        file = await compressImageForChat(file);
+      } catch {
+        //
+      } finally {
+        setCompressingAttachment(false);
+      }
+    }
+    if (file) {
+      sendMutation.mutate({
+        convId: selectedId,
+        body: text,
+        file,
+        replyToMessageId: replyToMessage?.id,
+      });
+    } else {
+      sendMutation.mutate({
+        convId: selectedId,
+        body: text,
+        replyToMessageId: replyToMessage?.id,
+      });
+    }
   };
 
   const handlePinMessage = async (messageId: number) => {
@@ -601,7 +1242,8 @@ export const TeamChatPage = () => {
                   const hasUnread = (c.unread_count ?? 0) > 0;
                   const peer = c.other_user;
                   const label = peerDisplayName(peer);
-                  const preview = c.last_message?.body?.slice(0, 80) || '';
+                  const previewFull = c.last_message?.body || '';
+                  const preview = previewFull.slice(0, 80);
                   return (
                     <li key={c.id}>
                       <button
@@ -629,12 +1271,12 @@ export const TeamChatPage = () => {
                           >
                             {label}
                           </ChatText>
-                          {preview ? (
+                          {previewFull.trim() ? (
                             <ChatText
                               className={`mt-0.5 block truncate text-xs text-gray-500 dark:text-gray-400 ${hasUnread ? 'font-semibold' : 'font-normal'}`}
                             >
                               {preview}
-                              {c.last_message && (c.last_message.body?.length || 0) > 80 ? '…' : ''}
+                              {previewFull.length > 80 ? '…' : ''}
                             </ChatText>
                           ) : (
                             <span className="mt-0.5 block text-xs font-normal italic text-gray-400 dark:text-gray-500">
@@ -742,7 +1384,22 @@ export const TeamChatPage = () => {
                 </div>
               ) : null}
 
-              <div className="custom-scrollbar flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-100/80 via-gray-50 to-transparent px-3 py-4 dark:from-gray-900 dark:via-gray-950 dark:to-transparent sm:px-5">
+              {peerPresenceLabel ? (
+                <div
+                  className="border-b border-gray-200/70 bg-gray-50/95 px-4 py-2 text-xs text-gray-600 dark:border-gray-700 dark:bg-gray-900/95 dark:text-gray-400"
+                  role="status"
+                  aria-live="polite"
+                  dir={language === 'ar' ? 'rtl' : 'ltr'}
+                >
+                  <span className="font-medium text-gray-800 dark:text-gray-200">{peerPresenceLabel}</span>
+                </div>
+              ) : null}
+
+              <div className="relative flex min-h-0 flex-1 flex-col">
+                <div
+                  ref={messagesScrollRef}
+                  className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-100/80 via-gray-50 to-transparent px-3 py-4 dark:from-gray-900 dark:via-gray-950 dark:to-transparent sm:px-5"
+                >
                 {messagesQuery.isLoading ? (
                   <div className="flex justify-center py-12">
                     <span className="inline-block size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -753,7 +1410,7 @@ export const TeamChatPage = () => {
                     {t('teamChatNoMessagesYet')}
                   </div>
                 ) : (
-                  <div className="mx-auto flex max-w-3xl flex-col gap-3">
+                  <div ref={messagesScrollContentRef} className="mx-auto flex max-w-3xl flex-col gap-3">
                     {messagesByDay.map((group) => (
                       <section key={group.dayKey} className="flex flex-col gap-3">
                         <div className="sticky top-2 z-10 flex justify-center py-1 pointer-events-none">
@@ -837,7 +1494,7 @@ export const TeamChatPage = () => {
                                           onDoubleClick={(e) => e.stopPropagation()}
                                         >
                                           <ChatText className="block text-[11px] leading-relaxed opacity-90 whitespace-pre-wrap break-words">
-                                            {m.forwarded_from.body}
+                                            {tenantChatQuoteLabel(m.forwarded_from, t)}
                                           </ChatText>
                                         </button>
                                       </div>
@@ -857,9 +1514,21 @@ export const TeamChatPage = () => {
                                           {peerDisplayName(m.reply_to.sender)}
                                         </ChatText>
                                         <ChatText className="mt-0.5 block text-[11px] opacity-90">
-                                          {m.reply_to.body}
+                                          {tenantChatQuoteLabel(m.reply_to, t)}
                                         </ChatText>
                                       </button>
+                                    ) : null}
+                                    {m.attachment_kind && m.attachment_url ? (
+                                      <div className="mb-2">
+                                        <TenantChatBlobMedia
+                                          url={m.attachment_url}
+                                          kind={m.attachment_kind}
+                                          mine={mine}
+                                          filename={m.original_filename}
+                                          t={t}
+                                          onIntrinsicLayout={onChatMediaIntrinsicLayout}
+                                        />
+                                      </div>
                                     ) : null}
                                     {m.body.trim() ? (
                                       <div dir="auto" className={`whitespace-pre-wrap break-words ${chatAutoDirClass}`}>
@@ -905,9 +1574,28 @@ export const TeamChatPage = () => {
                         </div>
                       </section>
                     ))}
-                    <div ref={messagesEndRef} />
                   </div>
                 )}
+                </div>
+                {threadScrollFab.show ? (
+                  <button
+                    type="button"
+                    onClick={scrollThreadToBottom}
+                    aria-label={
+                      threadScrollFab.peerBelow > 0
+                        ? `${t('teamChatScrollToBottom')} (${threadScrollFab.peerBelow})`
+                        : t('teamChatScrollToBottom')
+                    }
+                    className="pointer-events-auto absolute end-4 bottom-4 z-20 flex size-11 items-center justify-center rounded-full bg-gray-900/85 text-white shadow-lg ring-1 ring-black/20 backdrop-blur-sm dark:bg-black/75 dark:ring-white/15"
+                  >
+                    <ChevronDownIcon className="size-5 shrink-0 opacity-90" aria-hidden />
+                    {threadScrollFab.peerBelow > 0 ? (
+                      <span className="absolute -top-1.5 left-1/2 flex min-w-[1.25rem] -translate-x-1/2 items-center justify-center rounded-full bg-sky-500 px-1 py-0.5 text-[10px] font-bold leading-none text-white tabular-nums shadow-sm">
+                        {threadScrollFab.peerBelow > 99 ? '99+' : threadScrollFab.peerBelow}
+                      </span>
+                    ) : null}
+                  </button>
+                ) : null}
               </div>
 
               <form
@@ -921,8 +1609,15 @@ export const TeamChatPage = () => {
                         {t('teamChatReplyingTo')}
                       </p>
                       <p className="truncate text-sm text-gray-800 dark:text-gray-100">
-                        {peerDisplayName(replyToMessage.sender)} · {replyToMessage.body.replace(/\s+/g, ' ').trim().slice(0, 120)}
-                        {(replyToMessage.body || '').length > 120 ? '…' : ''}
+                        {(() => {
+                          const snippet = replyTargetSnippet(replyToMessage, t);
+                          return (
+                            <>
+                              {peerDisplayName(replyToMessage.sender)} · {snippet.slice(0, 120)}
+                              {snippet.length > 120 ? '…' : ''}
+                            </>
+                          );
+                        })()}
                       </p>
                     </div>
                     <button
@@ -935,8 +1630,59 @@ export const TeamChatPage = () => {
                     </button>
                   </div>
                 ) : null}
-                <div className="flex w-full min-w-0 items-end gap-2 sm:gap-3">
-                  <div className="min-w-0 flex-1">
+                {pendingAttachment ? (
+                  <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800/90">
+                    <PaperclipIcon className="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
+                    <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100">
+                      {pendingAttachment.name}
+                    </span>
+                    <button
+                      type="button"
+                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-black/10 dark:text-gray-400 dark:hover:bg-white/10"
+                      onClick={() => setPendingAttachment(null)}
+                      aria-label={t('teamChatClearAttachment')}
+                    >
+                      ×
+                    </button>
+                  </div>
+                ) : null}
+                {compressingAttachment ? (
+                  <p className="mx-auto mb-2 max-w-3xl text-center text-xs text-gray-500 dark:text-gray-400">
+                    {t('teamChatCompressing')}
+                  </p>
+                ) : null}
+                {micError ? (
+                  <p className="mx-auto mb-2 max-w-3xl text-center text-xs text-red-600 dark:text-red-400">{micError}</p>
+                ) : null}
+                <div className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) setPendingAttachment(f);
+                      e.target.value = '';
+                    }}
+                  />
+                  <div
+                    className={`flex min-h-11 min-w-0 flex-1 items-end gap-0.5 rounded-[1.35rem] border bg-white px-1 py-1 shadow-sm dark:bg-gray-800/95 dark:shadow-none ${
+                      voiceRecording
+                        ? 'border-red-400/70 ring-1 ring-red-400/30 dark:border-red-500/50'
+                        : 'border-gray-200/95 dark:border-gray-600'
+                    }`}
+                  >
+                    <button
+                      type="button"
+                      className="flex size-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700/80"
+                      disabled={sendMutation.isPending || voiceRecording || compressingAttachment}
+                      onClick={() => fileInputRef.current?.click()}
+                      aria-label={t('teamChatAttach')}
+                      title={t('teamChatAttach')}
+                    >
+                      <PaperclipIcon className="size-[1.35rem]" />
+                    </button>
                     <textarea
                       ref={composerRef}
                       rows={1}
@@ -944,19 +1690,49 @@ export const TeamChatPage = () => {
                       value={draft}
                       onChange={(e) => setDraft(e.target.value)}
                       onKeyDown={handleComposerKeyDown}
-                      disabled={sendMutation.isPending}
+                      disabled={sendMutation.isPending || compressingAttachment}
                       autoComplete="off"
                       dir={composerDir}
-                      className={`custom-scrollbar m-0 box-border block w-full min-h-11 max-h-[min(40vh,15rem)] resize-none overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base leading-6 text-gray-900 shadow-sm placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 ${chatAutoDirClass}`}
+                      className={`custom-scrollbar m-0 box-border max-h-[min(40vh,15rem)] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0.5 py-2 text-base leading-normal text-gray-900 shadow-none placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${chatAutoDirClass}`}
                     />
+                    <button
+                      type="button"
+                      className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-40 ${
+                        voiceRecording
+                          ? 'bg-red-500/15 text-red-600 animate-pulse dark:bg-red-500/20 dark:text-red-400'
+                          : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/80'
+                      }`}
+                      disabled={sendMutation.isPending || compressingAttachment}
+                      onClick={() => {
+                        if (voiceRecording) stopVoiceRecording();
+                        else void startVoiceRecording();
+                      }}
+                      aria-label={voiceRecording ? t('teamChatStopRecording') : t('teamChatRecordVoice')}
+                      title={voiceRecording ? t('teamChatStopRecording') : t('teamChatRecordVoice')}
+                    >
+                      {voiceRecording ? (
+                        <SquareFillIcon className="size-[1.1rem]" />
+                      ) : (
+                        <MicrophoneIcon className="size-[1.35rem]" />
+                      )}
+                    </button>
                   </div>
                   <Button
                     type="submit"
                     variant="primary"
-                    disabled={sendMutation.isPending || !draft.trim()}
-                    className="!h-11 !min-h-11 shrink-0 rounded-xl px-5 !py-0 shadow-sm shadow-primary/25"
+                    disabled={
+                      sendMutation.isPending ||
+                      compressingAttachment ||
+                      (!draft.trim() && !pendingAttachment)
+                    }
+                    className="!flex !size-11 shrink-0 !items-center !justify-center !rounded-full !p-0 !min-h-11 !min-w-11 !leading-none shadow-md shadow-primary/30"
+                    aria-label={t('teamChatSend')}
+                    title={t('teamChatSend')}
+                    onMouseDown={(ev) => {
+                      if (!sendMutation.isPending && (draft.trim() || pendingAttachment)) ev.preventDefault();
+                    }}
                   >
-                    {t('teamChatSend')}
+                    <SendPlaneIcon className="size-5" aria-hidden />
                   </Button>
                 </div>
                 {sendMutation.isError ? (

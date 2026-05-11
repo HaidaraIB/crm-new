@@ -49,6 +49,23 @@ function getHeadersWithApiKey(customHeaders: Record<string, string> = {}): Recor
   return headers;
 }
 
+/** Same auth headers as `apiRequest` for binary GETs (e.g. tenant chat attachment). */
+export function getAuthenticatedBinaryRequestHeaders(): Record<string, string> {
+  const token = typeof localStorage !== 'undefined' ? localStorage.getItem('accessToken') : null;
+  const headers: Record<string, string> = {};
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  if (API_KEY) {
+    headers['X-API-Key'] = API_KEY;
+  }
+  const uiLanguage = typeof window !== 'undefined' ? localStorage.getItem('language') : null;
+  if (uiLanguage === 'ar' || uiLanguage === 'en') {
+    headers['X-Language'] = uiLanguage;
+  }
+  return headers;
+}
+
 // --- Unified envelope (CRM-api EnvelopeJSONRenderer + success_response / exception handler) ---
 
 /**
@@ -1560,7 +1577,7 @@ export const verifyTwoFactorAuthAPI = async (payload: {
  * تحديث access token باستخدام refresh token
  * POST /api/auth/refresh/
  * Body: { refresh: string }
- * Response: { access: string }
+ * Response: { access: string, refresh?: string } — عند تفعيل ROTATE_REFRESH_TOKENS يجب حفظ refresh الجديد وإلا يُبطّل الرمز القديم بالقائمة السوداء.
  */
 export const refreshTokenAPI = async () => {
   const refreshToken = localStorage.getItem('refreshToken');
@@ -1584,8 +1601,11 @@ export const refreshTokenAPI = async () => {
     throwApiError(raw, 'Token refresh failed');
   }
 
-  const data = unwrapApiSuccess<{ access: string }>(raw);
+  const data = unwrapApiSuccess<{ access: string; refresh?: string }>(raw);
   localStorage.setItem('accessToken', data.access);
+  if (data.refresh) {
+    localStorage.setItem('refreshToken', data.refresh);
+  }
   return data;
 };
 
@@ -3522,6 +3542,8 @@ export type TenantChatMessageQuote = {
   sender: TenantChatPeer;
   body: string;
   created_at: string;
+  attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
+  attachment_url?: string | null;
 };
 
 export type TenantChatPinnedMessageSummary = {
@@ -3531,6 +3553,7 @@ export type TenantChatPinnedMessageSummary = {
   sender: TenantChatPeer;
   pinned_at: string;
   pinned_by_id: number;
+  attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
 };
 
 export type TenantChatConversation = {
@@ -3541,10 +3564,13 @@ export type TenantChatConversation = {
     body: string;
     created_at: string;
     sender_id: number;
+    attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
   } | null;
   updated_at: string;
   /** Server-computed; omit on older API responses. */
   unread_count?: number;
+  /** Current user's read cursor in this thread; omit on older API responses. */
+  last_read_message_id?: number | null;
   pinned_messages?: TenantChatPinnedMessageSummary[];
 };
 
@@ -3556,6 +3582,11 @@ export type TenantChatMessage = {
   read_by_peer?: boolean;
   reply_to?: TenantChatMessageQuote | null;
   forwarded_from?: TenantChatMessageQuote | null;
+  attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
+  attachment_mime?: string | null;
+  attachment_size?: number | null;
+  original_filename?: string | null;
+  attachment_url?: string | null;
 };
 
 export async function getTenantChatConversationsAPI(params?: { page?: number; page_size?: number }) {
@@ -3607,6 +3638,25 @@ export async function sendTenantChatMessageAPI(
   });
 }
 
+export async function sendTenantChatMessageWithAttachmentAPI(
+  conversationId: number,
+  file: File,
+  opts?: { body?: string; replyToMessageId?: number }
+) {
+  const form = new FormData();
+  form.append('file', file);
+  if (opts?.body != null && opts.body !== '') {
+    form.append('body', opts.body);
+  }
+  if (opts?.replyToMessageId != null) {
+    form.append('reply_to_message_id', String(opts.replyToMessageId));
+  }
+  return apiRequest<TenantChatMessage>(`/tenant-chat/conversations/${conversationId}/messages/`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
 export async function pinTenantChatMessageAPI(conversationId: number, messageId: number) {
   return apiRequest<{ ok: boolean }>(`/tenant-chat/conversations/${conversationId}/pin-message/`, {
     method: 'POST',
@@ -3630,6 +3680,32 @@ export async function markTenantChatReadAPI(conversationId: number, messageId: n
     {
       method: 'POST',
       body: JSON.stringify({ message_id: messageId }),
+    }
+  );
+}
+
+export type TenantChatPeerPresenceAction =
+  | 'idle'
+  | 'typing'
+  | 'uploading_media'
+  | 'recording_voice'
+  | 'sending_message';
+
+export async function getTenantChatPeerPresenceAPI(conversationId: number) {
+  return apiRequest<{ peer_user_id: number; activity: TenantChatPeerPresenceAction | null }>(
+    `/tenant-chat/conversations/${conversationId}/peer-presence/`
+  );
+}
+
+export async function postTenantChatPeerPresenceAPI(
+  conversationId: number,
+  action: TenantChatPeerPresenceAction
+) {
+  return apiRequest<{ ok: boolean; action: string }>(
+    `/tenant-chat/conversations/${conversationId}/peer-presence/`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ action }),
     }
   );
 }

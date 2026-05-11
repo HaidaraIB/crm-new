@@ -1707,6 +1707,7 @@ export const createSupervisorAPI = async (data: {
   password: string;
   first_name: string;
   last_name: string;
+  phone?: string;
   is_active?: boolean;
   can_manage_leads?: boolean;
   can_manage_deals?: boolean;
@@ -1724,7 +1725,7 @@ export const createSupervisorAPI = async (data: {
   });
 };
 
-/** PUT /api/supervisors/:id/ - update supervisor permissions and user fields */
+/** PATCH /api/supervisors/:id/ - update supervisor permissions (partial) */
 export const updateSupervisorAPI = async (id: number, data: Partial<{
   user_id: number;
   is_active: boolean;
@@ -1739,7 +1740,7 @@ export const updateSupervisorAPI = async (id: number, data: Partial<{
   can_manage_settings: boolean;
 }>) => {
   return apiRequest<any>(`/supervisors/${id}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
 };
@@ -3501,5 +3502,136 @@ export const createSupportTicketAPI = async (payload: {
   );
 };
 
+// --- Tenant internal chat (same-company DMs) ---
+
+export type TenantChatPeer = {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  role: string;
+  profile_photo?: string | null;
+  last_seen_at?: string | null;
+  last_seen_source?: string | null;
+  is_online?: boolean;
+};
+
+export type TenantChatMessageQuote = {
+  id: number;
+  sender: TenantChatPeer;
+  body: string;
+  created_at: string;
+};
+
+export type TenantChatPinnedMessageSummary = {
+  pin_id: number;
+  message_id: number;
+  body: string;
+  sender: TenantChatPeer;
+  pinned_at: string;
+  pinned_by_id: number;
+};
+
+export type TenantChatConversation = {
+  id: number;
+  other_user: TenantChatPeer;
+  last_message: {
+    id: number;
+    body: string;
+    created_at: string;
+    sender_id: number;
+  } | null;
+  updated_at: string;
+  /** Server-computed; omit on older API responses. */
+  unread_count?: number;
+  pinned_messages?: TenantChatPinnedMessageSummary[];
+};
+
+export type TenantChatMessage = {
+  id: number;
+  sender: TenantChatPeer;
+  body: string;
+  created_at: string;
+  read_by_peer?: boolean;
+  reply_to?: TenantChatMessageQuote | null;
+  forwarded_from?: TenantChatMessageQuote | null;
+};
+
+export async function getTenantChatConversationsAPI(params?: { page?: number; page_size?: number }) {
+  const search = new URLSearchParams();
+  if (params?.page != null) search.set('page', String(params.page));
+  if (params?.page_size != null) search.set('page_size', String(params.page_size));
+  const q = search.toString();
+  return apiRequest<{ count: number; next: string | null; previous: string | null; results: TenantChatConversation[] }>(
+    `/tenant-chat/conversations/${q ? `?${q}` : ''}`
+  );
+}
+
+export async function getTenantChatEligibleUsersAPI() {
+  return apiRequest<{ count: number; results: TenantChatPeer[] }>(`/tenant-chat/conversations/eligible-users/`);
+}
+
+export async function startTenantChatConversationAPI(withUserId: number) {
+  return apiRequest<TenantChatConversation>(`/tenant-chat/conversations/`, {
+    method: 'POST',
+    body: JSON.stringify({ with_user_id: withUserId }),
+  });
+}
+
+export async function getTenantChatMessagesAPI(
+  conversationId: number,
+  params?: { ordering?: 'created_at' | '-created_at'; page?: number; page_size?: number }
+) {
+  const search = new URLSearchParams();
+  if (params?.ordering) search.set('ordering', params.ordering);
+  if (params?.page != null) search.set('page', String(params.page));
+  if (params?.page_size != null) search.set('page_size', String(params.page_size));
+  const q = search.toString();
+  return apiRequest<{ count: number; next: string | null; previous: string | null; results: TenantChatMessage[] }>(
+    `/tenant-chat/conversations/${conversationId}/messages/${q ? `?${q}` : ''}`
+  );
+}
+
+export async function sendTenantChatMessageAPI(
+  conversationId: number,
+  body: string,
+  opts?: { replyToMessageId?: number; forwardFromMessageId?: number }
+) {
+  const payload: Record<string, unknown> = { body };
+  if (opts?.replyToMessageId != null) payload.reply_to_message_id = opts.replyToMessageId;
+  if (opts?.forwardFromMessageId != null) payload.forward_from_message_id = opts.forwardFromMessageId;
+  return apiRequest<TenantChatMessage>(`/tenant-chat/conversations/${conversationId}/messages/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function pinTenantChatMessageAPI(conversationId: number, messageId: number) {
+  return apiRequest<{ ok: boolean }>(`/tenant-chat/conversations/${conversationId}/pin-message/`, {
+    method: 'POST',
+    body: JSON.stringify({ message_id: messageId }),
+  });
+}
+
+export async function unpinTenantChatMessageAPI(conversationId: number, messageId: number) {
+  return apiRequest<{ ok: boolean; removed?: boolean }>(
+    `/tenant-chat/conversations/${conversationId}/unpin-message/`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ message_id: messageId }),
+    }
+  );
+}
+
+export async function markTenantChatReadAPI(conversationId: number, messageId: number) {
+  return apiRequest<{ last_read_message_id: number | null }>(
+    `/tenant-chat/conversations/${conversationId}/mark-read/`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ message_id: messageId }),
+    }
+  );
+}
 
 

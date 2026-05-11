@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Supervisor } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { EyeIcon, EyeOffIcon } from '../../components/icons';
+import { Input } from '../../components/Input';
+import { PhoneInput } from '../../components/PhoneInput';
 
 interface SupervisorModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ export interface SupervisorFormData {
   password?: string;
   first_name: string;
   last_name: string;
+  phone: string;
   is_active: boolean;
   can_manage_leads: boolean;
   can_manage_deals: boolean;
@@ -29,7 +32,7 @@ export interface SupervisorFormData {
   can_manage_settings: boolean;
 }
 
-const PERMISSION_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'password' | 'first_name' | 'last_name' | 'is_active'>)[] = [
+const PERMISSION_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'password' | 'first_name' | 'last_name' | 'phone' | 'is_active'>)[] = [
   'can_manage_leads',
   'can_manage_deals',
   'can_manage_tasks',
@@ -51,6 +54,29 @@ function getInventoryPermissionForSpecialization(spec: string | undefined): keyo
   return null;
 }
 
+const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
+  <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+    {children}
+  </label>
+);
+
+function validatePhone(phone: string, t: (key: any) => string): string | null {
+  if (!phone.trim()) {
+    return t('phoneRequired') || 'Phone is required';
+  }
+  if (!phone.startsWith('+')) {
+    return t('invalidPhoneFormat') || 'Phone number must include country code (e.g., +964...)';
+  }
+  const digitsOnly = phone.replace(/\D/g, '');
+  if (digitsOnly.length < 8) {
+    return t('invalidPhoneLength') || 'Phone number is too short';
+  }
+  if (digitsOnly.length > 15) {
+    return t('invalidPhoneLength') || 'Phone number is too long';
+  }
+  return null;
+}
+
 export const SupervisorModal: React.FC<SupervisorModalProps> = ({
   isOpen,
   onClose,
@@ -60,6 +86,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
 }) => {
   const { t, language, currentUser } = useAppContext();
   const [showPassword, setShowPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const specialization = currentUser?.company?.specialization;
   const allowedInventoryKey = getInventoryPermissionForSpecialization(specialization);
   const permissionKeysToShow = PERMISSION_KEYS.filter((key) => {
@@ -72,6 +99,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     password: '',
     first_name: '',
     last_name: '',
+    phone: '',
     is_active: true,
     can_manage_leads: false,
     can_manage_deals: false,
@@ -85,6 +113,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
   });
 
   useEffect(() => {
+    setErrors({});
     if (editingSupervisor) {
       setFormData({
         username: editingSupervisor.user.username,
@@ -92,6 +121,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         password: '',
         first_name: editingSupervisor.user.first_name,
         last_name: editingSupervisor.user.last_name,
+        phone: editingSupervisor.user.phone || '',
         is_active: editingSupervisor.is_active,
         can_manage_leads: editingSupervisor.can_manage_leads,
         can_manage_deals: editingSupervisor.can_manage_deals,
@@ -110,6 +140,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         password: '',
         first_name: '',
         last_name: '',
+        phone: '',
         is_active: true,
         can_manage_leads: false,
         can_manage_deals: false,
@@ -126,18 +157,76 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
 
   if (!isOpen) return null;
 
+  const validate = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    const first = formData.first_name.trim();
+    if (!first) {
+      newErrors.first_name = t('firstNameRequired') || 'First name is required';
+    } else if (first.length < 2) {
+      newErrors.first_name = t('nameMinLength') || 'Name must be at least 2 characters';
+    }
+
+    if (!editingSupervisor) {
+      if (!formData.username.trim()) {
+        newErrors.username = t('usernameRequired') || 'Username is required';
+      } else if (formData.username.trim().length < 3) {
+        newErrors.username = t('usernameMinLength') || 'Username must be at least 3 characters';
+      } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username.trim())) {
+        newErrors.username = t('usernameInvalidChars') || 'Username can only contain letters, numbers, and underscores';
+      }
+      if (!formData.email.trim()) {
+        newErrors.email = t('emailRequired') || 'Email is required';
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+        newErrors.email = t('invalidEmail') || 'Invalid email format';
+      }
+      const pw = formData.password || '';
+      if (!pw.trim()) {
+        newErrors.password = t('passwordRequired') || 'Password is required';
+      } else if (pw.length < 8) {
+        newErrors.password = t('passwordMinLength') || 'Password must be at least 8 characters';
+      } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(pw)) {
+        newErrors.password = t('passwordComplexity') || 'Password must contain at least one letter and one number';
+      }
+    }
+
+    const phoneErr = validatePhone(formData.phone, t);
+    if (phoneErr) newErrors.phone = phoneErr;
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validate()) return;
     if (!editingSupervisor && !formData.password) return;
     onSave(formData);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
+    if (errors[name]) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next[name];
+        return next;
+      });
+    }
     setFormData((prev) => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
     }));
+  };
+
+  const handlePhoneChange = (value: string) => {
+    if (errors.phone) {
+      setErrors((prev) => {
+        const next = { ...prev };
+        delete next.phone;
+        return next;
+      });
+    }
+    setFormData((prev) => ({ ...prev, phone: value }));
   };
 
   const permLabelKey: Record<string, string> = {
@@ -151,6 +240,8 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     can_manage_real_estate: 'supervisorsPermCanManageRealEstate',
     can_manage_settings: 'supervisorsPermCanManageSettings',
   };
+
+  const formDir = language === 'ar' ? 'rtl' : 'ltr';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={onClose}>
@@ -166,34 +257,87 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
             ×
           </button>
         </div>
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4" dir={formDir}>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">{t('firstName')}</label>
-              <input name="first_name" value={formData.first_name} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              <Label htmlFor="supervisor-first-name">{t('firstName')} *</Label>
+              <Input
+                id="supervisor-first-name"
+                name="first_name"
+                value={formData.first_name}
+                onChange={handleChange}
+              />
+              {errors.first_name && <p className="text-red-500 text-xs mt-1">{errors.first_name}</p>}
             </div>
             <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">{t('lastName')}</label>
-              <input name="last_name" value={formData.last_name} onChange={handleChange} required className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              <Label htmlFor="supervisor-last-name">{t('lastName')}</Label>
+              <Input
+                id="supervisor-last-name"
+                name="last_name"
+                value={formData.last_name}
+                onChange={handleChange}
+              />
+              {errors.last_name && <p className="text-red-500 text-xs mt-1">{errors.last_name}</p>}
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">{t('username')}</label>
-            <input name="username" value={formData.username} onChange={handleChange} required disabled={!!editingSupervisor} className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-60" />
+            <Label htmlFor="supervisor-username">{t('username')} *</Label>
+            <Input
+              id="supervisor-username"
+              name="username"
+              value={formData.username}
+              onChange={handleChange}
+              disabled={!!editingSupervisor}
+              className={editingSupervisor ? 'opacity-60' : ''}
+            />
+            {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">{t('email')}</label>
-            <input name="email" type="email" value={formData.email} onChange={handleChange} required disabled={!!editingSupervisor} className="w-full px-3 py-2 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white disabled:opacity-60" />
+            <Label htmlFor="supervisor-email">{t('email')} *</Label>
+            <Input
+              id="supervisor-email"
+              name="email"
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              disabled={!!editingSupervisor}
+              className={editingSupervisor ? 'opacity-60' : ''}
+            />
+            {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
+          </div>
+          <div>
+            <Label htmlFor="supervisor-phone">{t('phone')} *</Label>
+            <PhoneInput
+              id="supervisor-phone"
+              value={formData.phone}
+              onChange={handlePhoneChange}
+              placeholder={t('enterPhone') || 'Enter phone number'}
+              error={!!errors.phone}
+            />
+            {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
           </div>
           {!editingSupervisor && (
             <div>
-              <label className="block text-sm font-medium mb-1 text-gray-700 dark:text-gray-300">{t('password')}</label>
+              <Label htmlFor="supervisor-password">{t('password')} *</Label>
               <div className="relative">
-                <input name="password" type={showPassword ? 'text' : 'password'} value={formData.password || ''} onChange={handleChange} required className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-                <button type="button" className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300" onClick={() => setShowPassword((prev) => !prev)} aria-label={showPassword ? t('hidePassword') : t('showPassword')}>
+                <Input
+                  id="supervisor-password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  value={formData.password || ''}
+                  onChange={handleChange}
+                  className="pe-10"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                >
                   {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                 </button>
               </div>
+              {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
             </div>
           )}
           <div className="flex items-center gap-2">
@@ -213,7 +357,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
           </div>
           <div className="flex justify-end gap-2 pt-4">
             <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md dark:border-gray-600 dark:text-gray-300">
-  {t('cancel')}
+              {t('cancel')}
             </button>
             <button type="submit" disabled={isLoading} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-700 disabled:opacity-50">
               {isLoading ? t('saving') : t('save')}

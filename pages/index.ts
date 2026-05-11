@@ -30,6 +30,7 @@ export * from './MarketingReportPage';
 export * from './IntegrationsPage';
 export * from './SettingsPage';
 export * from './SupportCenterPage';
+export * from './TeamChatPage';
 export * from './ProfilePage';
 export * from './ServicesInventoryPage';
 export * from './ProductsInventoryPage';

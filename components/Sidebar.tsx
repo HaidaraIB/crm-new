@@ -1,15 +1,15 @@
 
 
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { navigateToCompanyRoute, getCompanyRoute } from '../utils/routing';
 // FIX: Import translations to be used for type casting.
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
-import { Button } from './Button';
 import { ChevronDownIcon, XIcon } from './icons';
-import { getIntegrationPolicyAPI } from '../services/api';
+import { getIntegrationPolicyAPI, getTenantChatConversationsAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 
 type SidebarItemProps = { 
@@ -20,6 +20,9 @@ type SidebarItemProps = {
     isSubItem?: boolean; 
     isOpen?: boolean; 
     onClick: () => void;
+    /** Unread count badge (e.g. team chat). Hidden when 0 or undefined. */
+    badgeCount?: number;
+    badgeAriaLabel?: string;
 };
 
 // Helper function to convert "Page Name" to "pageName"
@@ -29,7 +32,17 @@ const toCamelCase = (str: string) => {
     }).replace(/\s+/g, '');
 };
 
-const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpen, onClick }: SidebarItemProps) => {
+const SidebarItem = ({
+    name,
+    icon: Icon,
+    isActive,
+    hasSubItems,
+    isSubItem,
+    isOpen,
+    onClick,
+    badgeCount,
+    badgeAriaLabel,
+}: SidebarItemProps) => {
     const { language } = useAppContext();
     const activeClass = isActive
         ? isSubItem
@@ -38,6 +51,7 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800';
     
     const iconMargin = language === 'ar' ? 'ml-3' : 'mr-3';
+    const showBadge = badgeCount != null && badgeCount > 0;
     
     return (
         <a
@@ -45,9 +59,21 @@ const SidebarItem = ({ name, icon: Icon, isActive, hasSubItems, isSubItem, isOpe
             onClick={(e) => { e.preventDefault(); onClick(); }}
             className={`flex items-center px-4 py-2 font-medium rounded-md transition-colors duration-150 ${activeClass}`}
         >
-            {Icon && <Icon className={`w-5 h-5 ${iconMargin} ${isActive ? 'text-white' : ''}`} />}
-            <span className="flex-1 whitespace-nowrap">{name}</span>
-            {hasSubItems && <ChevronDownIcon className={`w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} />}
+            {Icon && <Icon className={`w-5 h-5 shrink-0 ${iconMargin} ${isActive ? 'text-white' : ''}`} />}
+            <span className="min-w-0 flex-1 whitespace-nowrap">{name}</span>
+            {showBadge ? (
+                <span
+                    className={`ms-2 inline-flex min-h-[1.25rem] min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums ${
+                        isActive
+                            ? 'bg-white text-primary'
+                            : 'bg-primary text-white dark:bg-primary-500'
+                    }`}
+                    aria-label={badgeAriaLabel}
+                >
+                    {badgeCount! > 99 ? '99+' : badgeCount}
+                </span>
+            ) : null}
+            {hasSubItems && <ChevronDownIcon className={`w-4 h-4 shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${language === 'ar' ? 'mr-1' : 'ml-1'}`} />}
         </a>
     );
 };
@@ -58,6 +84,21 @@ export const Sidebar = () => {
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
     const normalizedCurrentRole = normalizeRole(currentUser?.role);
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
+
+    const tenantChatUnreadQuery = useQuery({
+        queryKey: ['tenant-chat-conversations'],
+        queryFn: () => getTenantChatConversationsAPI(),
+        enabled: !!currentUser && canAccessPage('Team Chat'),
+        refetchInterval: 8000,
+    });
+    const teamChatUnreadTotal = useMemo(
+        () =>
+            (tenantChatUnreadQuery.data?.results ?? []).reduce(
+                (sum, c) => sum + (c.unread_count ?? 0),
+                0
+            ),
+        [tenantChatUnreadQuery.data]
+    );
     
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
@@ -176,7 +217,7 @@ export const Sidebar = () => {
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
                 {SIDEBAR_ITEMS.filter((item) => {
                     if (isDataEntryUser) {
-                        return item.name === 'Leads';
+                        return item.name === 'Leads' || item.name === 'Team Chat';
                     }
                     // Hide Billing from main menu (it's shown in bottom section)
                     if (item.name === 'Billing') {
@@ -225,6 +266,8 @@ export const Sidebar = () => {
                                 hasSubItems={!!subItems && subItems.length > 0}
                                 isOpen={isOpen}
                                 onClick={() => subItems && subItems.length ? handleToggleSubMenu(item.name) : void handleNavigation(item.name)}
+                                badgeCount={item.name === 'Team Chat' ? teamChatUnreadTotal : undefined}
+                                badgeAriaLabel={item.name === 'Team Chat' ? t('teamChatUnreadAria') : undefined}
                             />
                             {subItems && subItems.length > 0 && isOpen && (
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>

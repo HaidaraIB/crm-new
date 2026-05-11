@@ -1120,6 +1120,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         case 'CreateLead':
         case 'Profile':
         case 'Support Center':
+        case 'Team Chat':
           return true;
         default:
           return false;
@@ -1135,6 +1136,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'Dashboard':
       case 'Profile':
       case 'Support Center':
+      case 'Team Chat':
         return true;
       case 'Leads':
       case 'All Leads':

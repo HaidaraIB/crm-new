@@ -3,7 +3,7 @@ export type Language = 'en' | 'ar';
 export type Theme = 'light' | 'dark';
 export type Page = 
   | 'Dashboard' | 'Leads' | 'Activities' | 'Inventory' | 'Deals' 
-  | 'Users' | 'Employees' | 'Marketing' | 'Todos' | 'Reports' | 'Integrations' 
+  | 'Users' | 'Employees' | 'Marketing'   | 'Todos' | 'Team Chat' | 'Reports' | 'Integrations' 
   | 'Billing' | 'Settings' | 'ViewLead' | 'CreateDeal' | 'CreateLead' | 'EditLead' | 'Profile'
   // Sub-pages
   | 'All Leads' | 'Fresh Leads' | 'Cold Leads' | 'My Leads' | 'Rotated Leads'
@@ -69,7 +69,7 @@ export interface SupervisorPermissionPayload {
 
 export interface Supervisor {
   id: number;
-  user: { id: number; username: string; email: string; first_name: string; last_name: string };
+  user: { id: number; username: string; email: string; first_name: string; last_name: string; phone?: string };
   is_active: boolean;
   created_at: string;
   updated_at: string;

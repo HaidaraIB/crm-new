@@ -174,9 +174,8 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
                         className="flex items-center gap-2 px-3 py-2 border-r dark:border-gray-700 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors whitespace-nowrap"
                         dir="ltr"
                     >
-                        <span className="text-xl flex-shrink-0">{selectedCountry.flag}</span>
-                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 min-w-[3.5rem] text-left">
-                            {selectedCountry.dialCode}
+                        <span className="text-sm font-medium text-gray-700 dark:text-gray-300 text-left tabular-nums">
+                            {selectedCountry.code} {selectedCountry.dialCode}
                         </span>
                         <svg
                             className={`w-4 h-4 text-gray-500 transition-transform flex-shrink-0 ${isDropdownOpen ? 'rotate-180' : ''}`}

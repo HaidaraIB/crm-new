@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Supervisor } from '../../types';
 import { useAppContext } from '../../context/AppContext';
-import { getSupervisorsAPI, createSupervisorAPI, updateSupervisorAPI, deleteSupervisorAPI, toggleSupervisorActiveAPI } from '../../services/api';
+import { getSupervisorsAPI, createSupervisorAPI, updateSupervisorAPI, updateUserAPI, deleteSupervisorAPI, toggleSupervisorActiveAPI } from '../../services/api';
+import { normalizeRole } from '../../utils/roles';
 import { SupervisorModal, SupervisorFormData } from './SupervisorModal';
 import { EditIcon, TrashIcon } from '../../components/icons';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 
 export const SupervisorsSettings = () => {
+  const queryClient = useQueryClient();
   const { t, currentUser, language } = useAppContext();
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -17,7 +20,10 @@ export const SupervisorsSettings = () => {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const loadSupervisors = async () => {
-    if (currentUser?.role !== 'Owner') return;
+    if (normalizeRole(currentUser?.role) !== 'Owner') {
+      setIsLoading(false);
+      return;
+    }
     setIsLoading(true);
     try {
       const res = await getSupervisorsAPI();
@@ -49,19 +55,26 @@ export const SupervisorsSettings = () => {
     setIsSaving(true);
     try {
       if (editingSupervisor) {
-        await updateSupervisorAPI(editingSupervisor.id, {
-          user_id: editingSupervisor.user.id,
-          is_active: data.is_active,
-          can_manage_leads: data.can_manage_leads,
-          can_manage_deals: data.can_manage_deals,
-          can_manage_tasks: data.can_manage_tasks,
-          can_view_reports: data.can_view_reports,
-          can_manage_users: data.can_manage_users,
-          can_manage_products: data.can_manage_products,
-          can_manage_services: data.can_manage_services,
-          can_manage_real_estate: data.can_manage_real_estate,
-          can_manage_settings: data.can_manage_settings,
-          });
+        await Promise.all([
+          updateUserAPI(editingSupervisor.user.id, {
+            first_name: data.first_name,
+            last_name: data.last_name,
+            phone: (data.phone || '').trim(),
+          }),
+          updateSupervisorAPI(editingSupervisor.id, {
+            user_id: editingSupervisor.user.id,
+            is_active: data.is_active,
+            can_manage_leads: data.can_manage_leads,
+            can_manage_deals: data.can_manage_deals,
+            can_manage_tasks: data.can_manage_tasks,
+            can_view_reports: data.can_view_reports,
+            can_manage_users: data.can_manage_users,
+            can_manage_products: data.can_manage_products,
+            can_manage_services: data.can_manage_services,
+            can_manage_real_estate: data.can_manage_real_estate,
+            can_manage_settings: data.can_manage_settings,
+          }),
+        ]);
       } else {
         await createSupervisorAPI({
           username: data.username,
@@ -69,6 +82,7 @@ export const SupervisorsSettings = () => {
           password: data.password!,
           first_name: data.first_name,
           last_name: data.last_name,
+          phone: (data.phone || '').trim(),
           is_active: data.is_active,
           can_manage_leads: data.can_manage_leads,
           can_manage_deals: data.can_manage_deals,
@@ -104,6 +118,7 @@ export const SupervisorsSettings = () => {
     setIsDeleting(true);
     try {
       await deleteSupervisorAPI(deleteTarget.id);
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
       await loadSupervisors();
       setDeleteTarget(null);
     } catch (e) {
@@ -113,7 +128,7 @@ export const SupervisorsSettings = () => {
     }
   };
 
-  if (currentUser?.role !== 'Owner') {
+  if (normalizeRole(currentUser?.role) !== 'Owner') {
     return (
       <div className="text-gray-500 dark:text-gray-400 py-4">
         {t('supervisorsOwnerOnly')}

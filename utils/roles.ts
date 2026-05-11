@@ -4,12 +4,20 @@ const normalizeRoleToken = (role?: string): string =>
   (role || '').toString().trim().toLowerCase().replace(/\s+/g, '_');
 
 /**
- * Only these roles report presence (heartbeat). Company owners/admins and
- * platform super-admins must not call presence APIs — they are not shown on the employees list.
+ * Roles that send periodic presence heartbeats so `last_seen_at` / online status stay accurate.
+ * Owners/admins were historically excluded only because they were hidden from the employees list UI;
+ * team chat and other surfaces still need correct presence for every role.
  */
 export const roleReportsPresence = (role?: string): boolean => {
   const token = normalizeRoleToken(role);
-  return token === 'employee' || token === 'data_entry' || token === 'supervisor';
+  return (
+    token === 'employee' ||
+    token === 'data_entry' ||
+    token === 'supervisor' ||
+    token === 'admin' ||
+    token === 'owner' ||
+    token === 'super_admin'
+  );
 };
 
 export const normalizeRole = (role?: string): AppRole => {

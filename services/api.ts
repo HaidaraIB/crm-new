@@ -3713,4 +3713,46 @@ export async function postTenantChatPeerPresenceAPI(
   );
 }
 
+// --- In-app notifications (Django notifications app) ---
+
+export type AppNotification = {
+  id: number;
+  type: string;
+  type_display?: string;
+  title: string;
+  body: string;
+  read: boolean;
+  sent_at?: string | null;
+  created_at?: string | null;
+  data?: Record<string, unknown> | null;
+};
+
+export async function getNotificationsAPI(params?: { page?: number; page_size?: number; read?: boolean }) {
+  const search = new URLSearchParams();
+  if (params?.page != null) search.set('page', String(params.page));
+  if (params?.page_size != null) search.set('page_size', String(params.page_size));
+  if (params?.read !== undefined) search.set('read', params.read ? 'true' : 'false');
+  const q = search.toString();
+  return apiRequest<{ count: number; next: string | null; previous: string | null; results: AppNotification[] }>(
+    `/notifications/${q ? `?${q}` : ''}`
+  );
+}
+
+export async function getNotificationsUnreadCountAPI() {
+  return apiRequest<{ unread_count: number }>(`/notifications/unread_count/`);
+}
+
+export async function markNotificationReadAPI(notificationId: number) {
+  return apiRequest<unknown>(`/notifications/${notificationId}/mark_read/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
+
+export async function markAllNotificationsReadAPI() {
+  return apiRequest<{ count?: number }>(`/notifications/mark_all_read/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+}
 

@@ -503,7 +503,12 @@ function TenantChatBlobMedia({
   );
 }
 
-export const TeamChatPage = () => {
+export type TeamChatPageProps = {
+  variant?: 'page' | 'dialog';
+  onClose?: () => void;
+};
+
+export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = {}) => {
   const { t, language, currentUser } = useAppContext();
   /** Physical edge toward avatar (flex row + RTL puts avatar on the right). */
   const peerRowTextAlign = language === 'ar' ? 'text-right' : 'text-left';
@@ -1277,12 +1282,25 @@ export const TeamChatPage = () => {
   const forwardCaptionDir =
     forwardCaption.length > 0 ? 'auto' : language === 'ar' ? 'rtl' : 'ltr';
 
-  return (
-    <PageWrapper title={t('teamChat')}>
-      <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mb-5 leading-relaxed">
-        {t('teamChatSubtitle')}
-      </p>
+  useEffect(() => {
+    if (variant !== 'dialog' || !onClose) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      if (newChatOpen || forwardSourceId != null) return;
+      e.preventDefault();
+      onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [variant, onClose, newChatOpen, forwardSourceId]);
 
+  const shellMinH =
+    variant === 'dialog' ? 'min-h-[260px] lg:min-h-[420px]' : 'min-h-[420px] lg:min-h-[580px]';
+  const shellMaxH =
+    variant === 'dialog' ? 'lg:max-h-[calc(90vh-8.5rem)]' : 'lg:max-h-[calc(100vh-13rem)]';
+
+  const chatBody = (
+    <>
       {(convQuery.isError || messagesQuery.isError) && (
         <div
           role="alert"
@@ -1292,7 +1310,7 @@ export const TeamChatPage = () => {
         </div>
       )}
 
-      <div className={`flex flex-col lg:flex-row min-h-[420px] lg:min-h-[580px] lg:max-h-[calc(100vh-13rem)] ${shellClass}`}>
+      <div className={`flex flex-col lg:flex-row ${shellMinH} ${shellMaxH} ${shellClass}`}>
         {/* Conversation list */}
         <aside className="flex w-full flex-col border-b border-gray-200 dark:border-gray-700 lg:w-[300px] lg:shrink-0 lg:border-b-0 lg:border-e bg-gradient-to-b from-gray-50/90 to-white dark:from-gray-900/80 dark:to-gray-800 max-h-[45vh] lg:max-h-none">
           <div className="border-b border-gray-200/80 dark:border-gray-700 p-3">
@@ -2025,7 +2043,52 @@ export const TeamChatPage = () => {
           <p className="mt-2 text-sm text-red-600 dark:text-red-400">{t('teamChatCouldNotSend')}</p>
         ) : null}
       </Modal>
+    </>
+  );
 
+  if (variant === 'dialog' && onClose) {
+    return createPortal(
+      <div
+        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-4"
+        role="presentation"
+        onMouseDown={(e) => {
+          if (e.target === e.currentTarget) onClose();
+        }}
+      >
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="team-chat-dialog-title"
+          className="flex max-h-[90vh] w-full max-w-[min(72rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+            <div className="min-w-0">
+              <h2 id="team-chat-dialog-title" className="truncate text-lg font-semibold text-gray-900 dark:text-white">
+                {t('teamChat')}
+              </h2>
+              <p className="truncate text-xs text-gray-500 dark:text-gray-400">{t('teamChatSubtitle')}</p>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg px-2 py-1 text-2xl leading-none text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-white"
+              aria-label={t('close')}
+            >
+              ×
+            </button>
+          </div>
+          <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">{chatBody}</div>
+        </div>
+      </div>,
+      document.body,
+    );
+  }
+
+  return (
+    <PageWrapper title={t('teamChat')}>
+      <p className="text-sm text-gray-600 dark:text-gray-400 max-w-2xl mb-5 leading-relaxed">{t('teamChatSubtitle')}</p>
+      {chatBody}
     </PageWrapper>
   );
 };

@@ -78,6 +78,11 @@ export interface AppContextType {
   setIsLoggedIn: (isLoggedIn: boolean) => void;
   currentPage: Page;
   setCurrentPage: (page: Page) => void;
+  /** Team chat opens as an overlay dialog instead of a full main-area page. */
+  isTeamChatDialogOpen: boolean;
+  setIsTeamChatDialogOpen: (open: boolean) => void;
+  isNotificationsDialogOpen: boolean;
+  setIsNotificationsDialogOpen: (open: boolean) => void;
   t: (key: keyof typeof translations.en) => string;
   selectedLead: Lead | null;
   setSelectedLead: (lead: Lead | null) => void;
@@ -435,6 +440,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   });
   const [dataLoaded, setDataLoaded] = useState(false); // لتتبع ما إذا تم تحميل البيانات بالفعل
   const [currentPage, setCurrentPage] = useState<Page>('Dashboard');
+  const [isTeamChatDialogOpen, setIsTeamChatDialogOpen] = useState(false);
+  const [isNotificationsDialogOpen, setIsNotificationsDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [leadFilters, setLeadFilters] = useState<LeadFilters>({
     status: 'All',
@@ -1060,6 +1067,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       setCurrentUserState(null);
       setIsCompanySubscriptionInactive(false);
       setDataLoaded(false); // إعادة تعيين dataLoaded عند تسجيل الخروج
+      setIsTeamChatDialogOpen(false);
+      setIsNotificationsDialogOpen(false);
       
       // Redirect to login page on the same domain (no subdomain redirect)
       const protocol = window.location.protocol;
@@ -1283,7 +1292,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     theme, setTheme, 
     language, setLanguage: setLang, 
     isLoggedIn, setIsLoggedIn, 
-    currentPage, setCurrentPage, 
+    currentPage, setCurrentPage,
+    isTeamChatDialogOpen, setIsTeamChatDialogOpen,
+    isNotificationsDialogOpen, setIsNotificationsDialogOpen,
     t, 
     selectedLead, setSelectedLead,
     selectedLeadForDeal, setSelectedLeadForDeal,

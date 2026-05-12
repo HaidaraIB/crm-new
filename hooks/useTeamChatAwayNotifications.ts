@@ -9,9 +9,9 @@ import { playIncomingChatSound, preloadIncomingChatSound } from '../utils/chatIn
  * when total unread increases. On Team Chat, no sound (in-thread UX stays quiet).
  */
 export function useTeamChatAwayNotifications(): void {
-  const { currentPage, isLoggedIn, canAccessPage, currentUser } = useAppContext();
+  const { currentPage, isLoggedIn, canAccessPage, currentUser, isTeamChatDialogOpen } = useAppContext();
   const enabled = Boolean(isLoggedIn && currentUser && canAccessPage('Team Chat'));
-  const isOnTeamChat = currentPage === 'Team Chat';
+  const isOnTeamChat = currentPage === 'Team Chat' || isTeamChatDialogOpen;
 
   const { data } = useQuery({
     queryKey: ['tenant-chat-conversations'],

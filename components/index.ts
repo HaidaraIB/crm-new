@@ -12,6 +12,7 @@ export * from './PageLoadingState';
 export * from './SectionLoadingState';
 export * from './WeekLeadsChart';
 export * from './Header';
+export * from './NotificationsDialog';
 export * from './Sidebar';
 export * from './Loader';
 

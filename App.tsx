@@ -5,7 +5,7 @@ import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotifications';
 import { Page } from './types';
-import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal } from './components/index';
+import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage } from './pages';
 
 /** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
@@ -60,7 +60,8 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
         case 'Todos':
             return <TodosPage />;
         case 'Team Chat':
-            return <TeamChatPage />;
+            // Legacy `currentPage` only; team chat UI is the overlay dialog.
+            return <DashboardPage />;
         case 'Reports':
         case 'Teams Report':
             return <TeamsReportPage />;
@@ -100,8 +101,22 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
 }
 
 const TheApp = () => {
-    const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
+    const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, isTeamChatDialogOpen, setIsTeamChatDialogOpen, isNotificationsDialogOpen, setIsNotificationsDialogOpen, selectedLead } = useAppContext();
     useTeamChatAwayNotifications();
+    React.useEffect(() => {
+        if (!isLoggedIn || currentPage !== 'Team Chat') return;
+        setIsTeamChatDialogOpen(true);
+        setCurrentPage('Dashboard');
+        if (currentUser?.company) {
+            window.history.replaceState(
+                {},
+                '',
+                getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard'),
+            );
+        } else {
+            window.history.replaceState({}, '', '/dashboard');
+        }
+    }, [isLoggedIn, currentPage, currentUser, setCurrentPage, setIsTeamChatDialogOpen]);
     const isPublicLegalPath = (path: string): boolean => {
         const normalizedPath = path.replace(/\/+$/, '') || '/';
         return normalizedPath === '/data-deletion-policy' || normalizedPath === '/data-deletion' || normalizedPath.endsWith('/data-deletion-policy') || normalizedPath.endsWith('/data-deletion')
@@ -315,8 +330,6 @@ const TheApp = () => {
                 'messaging-center': 'Messaging Center',
                 'messaging center': 'Messaging Center',
                 'todos': 'Todos',
-                'team-chat': 'Team Chat',
-                'team chat': 'Team Chat',
                 'reports': 'Reports',
                 'teams report': 'Teams Report',
                 'teams-report': 'Teams Report',
@@ -362,6 +375,33 @@ const TheApp = () => {
 
             // Try to match page - check both with hyphens and with spaces
             const normalizedWithSpaces = normalizedPath.replace(/-/g, ' ');
+            const isTeamChatPath =
+                normalizedPath === 'team-chat' ||
+                normalizedPath === 'team chat' ||
+                normalizedWithSpaces === 'team chat';
+
+            if (isTeamChatPath) {
+                setIsTeamChatDialogOpen(true);
+                const restorePage: Page = currentPage === 'Team Chat' ? 'Dashboard' : currentPage;
+                if (currentPage === 'Team Chat') {
+                    setCurrentPage('Dashboard');
+                }
+                const restorePath =
+                    currentUser?.company
+                        ? restorePage === 'ViewLead' && selectedLead?.id != null
+                            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, selectedLead.id)
+                            : restorePage === 'ViewLead'
+                              ? getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads')
+                              : getCompanyRoute(currentUser.company.name, currentUser.company.domain, restorePage)
+                        : restorePage === 'ViewLead' && selectedLead?.id != null
+                          ? getCompanyViewLeadRoute(undefined, undefined, selectedLead.id)
+                          : restorePage === 'ViewLead'
+                            ? '/leads'
+                            : getCompanyRoute(undefined, undefined, restorePage);
+                window.history.replaceState({}, '', withCurrentSearchAndHash(restorePath));
+                return;
+            }
+
             const matchedPage = pathToPageMap[normalizedPath] || pathToPageMap[normalizedWithSpaces];
             console.log('[App] checkPathname - matchedPage:', matchedPage);
 
@@ -393,7 +433,7 @@ const TheApp = () => {
             window.removeEventListener('popstate', checkPathname);
             clearTimeout(timeout);
         };
-    }, [isLoggedIn, currentPage, setCurrentPage, currentUser]);
+    }, [isLoggedIn, currentPage, setCurrentPage, currentUser, selectedLead, setIsTeamChatDialogOpen]);
 
     // Supervisor: redirect to Dashboard if they try to access a page they don't have permission for
     React.useEffect(() => {
@@ -534,8 +574,6 @@ const TheApp = () => {
             'messaging-center': 'Messaging Center',
             'messaging center': 'Messaging Center',
             'todos': 'Todos',
-            'team-chat': 'Team Chat',
-            'team chat': 'Team Chat',
             'reports': 'Reports',
             'teams report': 'Teams Report',
             'teams-report': 'Teams Report',
@@ -595,6 +633,33 @@ const TheApp = () => {
         
         // Try to match page - check both with hyphens and with spaces
         const normalizedWithSpaces = normalizedPath.replace(/-/g, ' ');
+        const isTeamChatPath =
+            normalizedPath === 'team-chat' ||
+            normalizedPath === 'team chat' ||
+            normalizedWithSpaces === 'team chat';
+
+        if (isTeamChatPath) {
+            setIsTeamChatDialogOpen(true);
+            const restorePage: Page = currentPage === 'Team Chat' ? 'Dashboard' : currentPage;
+            if (currentPage === 'Team Chat') {
+                setCurrentPage('Dashboard');
+            }
+            const restorePath =
+                currentUser?.company
+                    ? restorePage === 'ViewLead' && selectedLead?.id != null
+                        ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, selectedLead.id)
+                        : restorePage === 'ViewLead'
+                          ? getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads')
+                          : getCompanyRoute(currentUser.company.name, currentUser.company.domain, restorePage)
+                    : restorePage === 'ViewLead' && selectedLead?.id != null
+                      ? getCompanyViewLeadRoute(undefined, undefined, selectedLead.id)
+                      : restorePage === 'ViewLead'
+                        ? '/leads'
+                        : getCompanyRoute(undefined, undefined, restorePage);
+            window.history.replaceState({}, '', withSearch(restorePath));
+            return;
+        }
+
         const matchedPage = pathToPageMap[normalizedPath] || pathToPageMap[normalizedWithSpaces];
         console.log('[App] matchedPage:', matchedPage, 'for path:', normalizedPath);
         
@@ -612,7 +677,7 @@ const TheApp = () => {
             }
             setCurrentPage('Dashboard');
         }
-    }, [isLoggedIn, currentPage, setCurrentPage]);
+    }, [isLoggedIn, currentPage, setCurrentPage, selectedLead, setIsTeamChatDialogOpen]);
     
     React.useEffect(() => {
         // Skip if already processed
@@ -937,6 +1002,12 @@ const TheApp = () => {
             <EditCallMethodModal />
             <AddVisitTypeModal />
             <EditVisitTypeModal />
+            {isTeamChatDialogOpen && canAccessPage('Team Chat') ? (
+                <TeamChatPage variant="dialog" onClose={() => setIsTeamChatDialogOpen(false)} />
+            ) : null}
+            {isNotificationsDialogOpen ? (
+                <NotificationsDialog onClose={() => setIsNotificationsDialogOpen(false)} />
+            ) : null}
         </div>
         );
     };

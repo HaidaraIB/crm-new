@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Page, Lead, User, Deal, Todo, Campaign, TimelineEntry, Activity, Developer, Project, Unit, Owner, Channel, Stage, Status, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier } from './types';
-import { ChartIcon, ChatBubbleIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon } from './components/index';
+import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon } from './components/index';
 
 export const SIDEBAR_ITEMS: {
   name: Page;
@@ -15,7 +15,6 @@ export const SIDEBAR_ITEMS: {
     { name: 'Inventory', icon: ShoppingBagIcon, subItems: ['Properties', 'Owners'] },
     { name: 'Deals', icon: HandshakeIcon },
     { name: 'Employees', icon: UsersIcon },
-    { name: 'Team Chat', icon: ChatBubbleIcon },
     { name: 'Marketing', icon: MegaphoneIcon, subItems: ['Campaigns', 'Messaging Center'] },
     { name: 'Todos', icon: CheckSquareIcon },
     { name: 'Reports', icon: FileTextIcon, subItems: ['Teams Report', 'Employees Report', 'Marketing Report'] },

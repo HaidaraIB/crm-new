@@ -1,20 +1,37 @@
 
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './Button';
-import { Input } from './Input';
-import { MoonIcon, SunIcon, MenuIcon, ChevronDownIcon } from './icons';
+import { MoonIcon, SunIcon, MenuIcon, ChevronDownIcon, ChatBubbleIcon } from './icons';
 import { Dropdown, DropdownItem } from './Dropdown';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { getTenantChatConversationsAPI } from '../services/api';
 
 type HeaderProps = {
     isInternetOnline: boolean;
 };
 
 export const Header = ({ isInternetOnline }: HeaderProps) => {
-    const { t, theme, setTheme, language, setLanguage, setIsSidebarOpen, currentUser, setCurrentPage, setIsChangePasswordModalOpen, setIsLoggedIn } = useAppContext();
+    const { t, theme, setTheme, language, setLanguage, setIsSidebarOpen, currentUser, setCurrentPage, setIsChangePasswordModalOpen, setIsLoggedIn, canAccessPage, currentPage } = useAppContext();
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
+
+    const teamChatEnabled = Boolean(currentUser && canAccessPage('Team Chat'));
+    const tenantChatUnreadQuery = useQuery({
+        queryKey: ['tenant-chat-conversations'],
+        queryFn: () => getTenantChatConversationsAPI(),
+        enabled: teamChatEnabled,
+        refetchInterval: 8000,
+    });
+    const teamChatUnreadTotal = useMemo(
+        () =>
+            (tenantChatUnreadQuery.data?.results ?? []).reduce(
+                (sum, c) => sum + (c.unread_count ?? 0),
+                0
+            ),
+        [tenantChatUnreadQuery.data]
+    );
 
     if (!currentUser) return null;
 
@@ -55,6 +72,30 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                 >
                     {theme === 'light' ? <MoonIcon className="w-5 h-5" /> : <SunIcon className="w-5 h-5" />}
                 </button>
+                {teamChatEnabled ? (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setCurrentPage('Team Chat');
+                            navigateToCompanyRoute(currentUser.company?.name, currentUser.company?.domain, 'Team Chat');
+                        }}
+                        className={`relative p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors ${
+                            currentPage === 'Team Chat' ? 'ring-2 ring-primary-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-800' : ''
+                        }`}
+                        aria-label={t('teamChat')}
+                        title={t('teamChat')}
+                    >
+                        <ChatBubbleIcon className="w-5 h-5" />
+                        {teamChatUnreadTotal > 0 ? (
+                            <span
+                                className="absolute -top-0.5 -end-0.5 inline-flex min-h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-white dark:bg-primary-500"
+                                aria-label={t('teamChatUnreadAria')}
+                            >
+                                {teamChatUnreadTotal > 99 ? '99+' : teamChatUnreadTotal}
+                            </span>
+                        ) : null}
+                    </button>
+                ) : null}
                 <Dropdown
                     trigger={
                         <button className={`flex items-center ${language === 'ar' ? 'space-x-reverse' : ''} gap-2 cursor-pointer`}>

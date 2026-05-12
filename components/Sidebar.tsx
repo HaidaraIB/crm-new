@@ -1,15 +1,14 @@
 
 
 
-import React, { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { navigateToCompanyRoute, getCompanyRoute } from '../utils/routing';
 // FIX: Import translations to be used for type casting.
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
 import { ChevronDownIcon, XIcon } from './icons';
-import { getIntegrationPolicyAPI, getTenantChatConversationsAPI } from '../services/api';
+import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 
 type SidebarItemProps = { 
@@ -85,21 +84,6 @@ export const Sidebar = () => {
     const normalizedCurrentRole = normalizeRole(currentUser?.role);
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
 
-    const tenantChatUnreadQuery = useQuery({
-        queryKey: ['tenant-chat-conversations'],
-        queryFn: () => getTenantChatConversationsAPI(),
-        enabled: !!currentUser && canAccessPage('Team Chat'),
-        refetchInterval: 8000,
-    });
-    const teamChatUnreadTotal = useMemo(
-        () =>
-            (tenantChatUnreadQuery.data?.results ?? []).reduce(
-                (sum, c) => sum + (c.unread_count ?? 0),
-                0
-            ),
-        [tenantChatUnreadQuery.data]
-    );
-    
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
 
@@ -217,7 +201,7 @@ export const Sidebar = () => {
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
                 {SIDEBAR_ITEMS.filter((item) => {
                     if (isDataEntryUser) {
-                        return item.name === 'Leads' || item.name === 'Team Chat';
+                        return item.name === 'Leads';
                     }
                     // Hide Billing from main menu (it's shown in bottom section)
                     if (item.name === 'Billing') {
@@ -266,8 +250,6 @@ export const Sidebar = () => {
                                 hasSubItems={!!subItems && subItems.length > 0}
                                 isOpen={isOpen}
                                 onClick={() => subItems && subItems.length ? handleToggleSubMenu(item.name) : void handleNavigation(item.name)}
-                                badgeCount={item.name === 'Team Chat' ? teamChatUnreadTotal : undefined}
-                                badgeAriaLabel={item.name === 'Team Chat' ? t('teamChatUnreadAria') : undefined}
                             />
                             {subItems && subItems.length > 0 && isOpen && (
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>

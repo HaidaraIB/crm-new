@@ -156,46 +156,6 @@ function computeMsgFloatingMenuGeom(
 
 const THREAD_SCROLL_NEAR_BOTTOM_PX = 80;
 
-const THREAD_SCROLL_SESSION_PREFIX = 'crm.teamchat.threadScroll.v1:';
-const THREAD_SCROLL_PERSIST_DEBOUNCE_MS = 200;
-
-function clamp01(n: number): number {
-  return Math.min(1, Math.max(0, n));
-}
-
-/** Normalized scroll position so it still applies after transcript height changes. */
-function threadScrollRatio(scroller: HTMLElement): number {
-  const denom = Math.max(1, scroller.scrollHeight - scroller.clientHeight);
-  return clamp01(scroller.scrollTop / denom);
-}
-
-function applyThreadScrollRatio(scroller: HTMLElement, ratio: number): void {
-  const maxTop = Math.max(0, scroller.scrollHeight - scroller.clientHeight);
-  scroller.scrollTop = clamp01(ratio) * maxTop;
-}
-
-function readThreadScrollRatioFromSession(convId: number): number | null {
-  if (typeof sessionStorage === 'undefined') return null;
-  try {
-    const raw = sessionStorage.getItem(`${THREAD_SCROLL_SESSION_PREFIX}${convId}`);
-    if (!raw) return null;
-    const j = JSON.parse(raw) as { r?: unknown };
-    if (typeof j?.r !== 'number' || !Number.isFinite(j.r)) return null;
-    return clamp01(j.r);
-  } catch {
-    return null;
-  }
-}
-
-function writeThreadScrollRatioToSession(convId: number, ratio: number): void {
-  if (typeof sessionStorage === 'undefined') return;
-  try {
-    sessionStorage.setItem(`${THREAD_SCROLL_SESSION_PREFIX}${convId}`, JSON.stringify({ r: clamp01(ratio) }));
-  } catch {
-    //
-  }
-}
-
 function isNearThreadScrollBottom(scroller: HTMLElement): boolean {
   return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < THREAD_SCROLL_NEAR_BOTTOM_PX;
 }
@@ -488,12 +448,6 @@ export const TeamChatPage = () => {
    * Otherwise a transient scroll event can clear pinnedToBottomRef before onLoad, and onIntrinsicLayout bails.
    */
   const pendingTailSnapAfterMediaRef = useRef(false);
-  /** Latest scroll ratio per conversation (updated on scroll; flushed to sessionStorage on switch / debounce). */
-  const lastScrollRatioByConvRef = useRef<Map<number, number>>(new Map());
-  const threadScrollPersistTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
-  /** Conv id for which initial scroll-from-storage has already run for this visit. */
-  const threadScrollRestoreAppliedRef = useRef<number | null>(null);
-  const prevSelectedIdForScrollPersistRef = useRef<number | null>(null);
   /** Max composer height (px) before scrolling; still shows full text via internal scroll. */
   const COMPOSER_MAX_H = 240;
 
@@ -579,8 +533,6 @@ export const TeamChatPage = () => {
           if (sc) {
             sc.scrollTop = sc.scrollHeight;
             pinnedToBottomRef.current = true;
-            lastScrollRatioByConvRef.current.set(vars.convId, 1);
-            writeThreadScrollRatioToSession(vars.convId, 1);
             processThreadScrollRef.current();
           }
           composerRef.current?.focus({ preventScroll: true });
@@ -787,18 +739,6 @@ export const TeamChatPage = () => {
   }, [msgActionsOpenId, openActionsMessage, recalcMsgActionsMenuPos]);
 
   useEffect(() => {
-    if (threadScrollPersistTimerRef.current) {
-      window.clearTimeout(threadScrollPersistTimerRef.current);
-      threadScrollPersistTimerRef.current = null;
-    }
-    const prevSel = prevSelectedIdForScrollPersistRef.current;
-    prevSelectedIdForScrollPersistRef.current = selectedId;
-    if (prevSel != null && prevSel !== selectedId) {
-      const r = lastScrollRatioByConvRef.current.get(prevSel);
-      if (r !== undefined) writeThreadScrollRatioToSession(prevSel, r);
-    }
-    threadScrollRestoreAppliedRef.current = null;
-
     if (markReadDebounceTimerRef.current) {
       window.clearTimeout(markReadDebounceTimerRef.current);
       markReadDebounceTimerRef.current = null;
@@ -828,17 +768,13 @@ export const TeamChatPage = () => {
     pendingTailSnapAfterMediaRef.current = false;
   }, [selectedId]);
 
-  useEffect(
-    () => () => {
-      const id = selectedIdRef.current;
-      if (id == null) return;
-      const r = lastScrollRatioByConvRef.current.get(id);
-      if (r !== undefined) writeThreadScrollRatioToSession(id, r);
-    },
-    []
-  );
-
   const pinnedInThread = selected?.pinned_messages ?? [];
+
+  /** Matches conversation-row unread badge: max of in-viewport peer-below count and server unread. */
+  const threadFabUnreadCount = Math.max(
+    threadScrollFab.peerBelow,
+    selected?.unread_count ?? 0
+  );
 
   const processThreadScroll = useCallback(() => {
     if (selectedId == null || currentUserId == null || messagesQuery.isLoading) {
@@ -906,23 +842,6 @@ export const TeamChatPage = () => {
     window.setTimeout(() => processThreadScrollRef.current(), 450);
   };
 
-  useLayoutEffect(() => {
-    if (selectedId == null || messagesQuery.isLoading || messages.length === 0) return;
-    if (threadScrollRestoreAppliedRef.current === selectedId) return;
-    const el = messagesScrollRef.current;
-    if (!el) return;
-
-    const ratio =
-      lastScrollRatioByConvRef.current.get(selectedId) ?? readThreadScrollRatioFromSession(selectedId);
-    if (ratio != null) {
-      applyThreadScrollRatio(el, ratio);
-      pinnedToBottomRef.current = isNearThreadScrollBottom(el);
-    } else {
-      pinnedToBottomRef.current = true;
-    }
-    threadScrollRestoreAppliedRef.current = selectedId;
-  }, [selectedId, messagesQuery.isLoading, messages.length]);
-
   /**
    * After new messages paint, scrollHeight grows but scrollTop stays fixed, so the viewport is no
    * longer within THREAD_SCROLL_NEAR_BOTTOM_PX of the new bottom. Use pinnedToBottomRef (updated on
@@ -970,22 +889,6 @@ export const TeamChatPage = () => {
     if (!sc) return;
     const onScroll = () => {
       pinnedToBottomRef.current = isNearThreadScrollBottom(sc);
-      const id = selectedIdRef.current;
-      if (id != null) {
-        const r = threadScrollRatio(sc);
-        lastScrollRatioByConvRef.current.set(id, r);
-        if (threadScrollPersistTimerRef.current) window.clearTimeout(threadScrollPersistTimerRef.current);
-        threadScrollPersistTimerRef.current = window.setTimeout(() => {
-          threadScrollPersistTimerRef.current = null;
-          const sid = selectedIdRef.current;
-          if (sid == null) return;
-          const cur = messagesScrollRef.current;
-          if (!cur) return;
-          const latest = threadScrollRatio(cur);
-          lastScrollRatioByConvRef.current.set(sid, latest);
-          writeThreadScrollRatioToSession(sid, latest);
-        }, THREAD_SCROLL_PERSIST_DEBOUNCE_MS);
-      }
       processThreadScroll();
     };
     sc.addEventListener('scroll', onScroll, { passive: true });
@@ -999,10 +902,6 @@ export const TeamChatPage = () => {
     const inner = messagesScrollContentRef.current;
     if (inner) ro.observe(inner);
     return () => {
-      if (threadScrollPersistTimerRef.current) {
-        window.clearTimeout(threadScrollPersistTimerRef.current);
-        threadScrollPersistTimerRef.current = null;
-      }
       sc.removeEventListener('scroll', onScroll);
       ro.disconnect();
     };
@@ -1582,16 +1481,19 @@ export const TeamChatPage = () => {
                     type="button"
                     onClick={scrollThreadToBottom}
                     aria-label={
-                      threadScrollFab.peerBelow > 0
-                        ? `${t('teamChatScrollToBottom')} (${threadScrollFab.peerBelow})`
+                      threadFabUnreadCount > 0
+                        ? `${t('teamChatScrollToBottom')} (${threadFabUnreadCount})`
                         : t('teamChatScrollToBottom')
                     }
                     className="pointer-events-auto absolute end-4 bottom-4 z-20 flex size-11 items-center justify-center rounded-full bg-gray-900/85 text-white shadow-lg ring-1 ring-black/20 backdrop-blur-sm dark:bg-black/75 dark:ring-white/15"
                   >
                     <ChevronDownIcon className="size-5 shrink-0 opacity-90" aria-hidden />
-                    {threadScrollFab.peerBelow > 0 ? (
-                      <span className="absolute -top-1.5 left-1/2 flex min-w-[1.25rem] -translate-x-1/2 items-center justify-center rounded-full bg-sky-500 px-1 py-0.5 text-[10px] font-bold leading-none text-white tabular-nums shadow-sm">
-                        {threadScrollFab.peerBelow > 99 ? '99+' : threadScrollFab.peerBelow}
+                    {threadFabUnreadCount > 0 ? (
+                      <span
+                        className="absolute -top-1.5 left-1/2 flex min-w-[1.25rem] -translate-x-1/2 items-center justify-center rounded-full bg-primary px-1 py-0.5 text-[10px] font-bold leading-none text-white tabular-nums shadow-sm dark:bg-primary-500"
+                        aria-label={t('teamChatUnreadAria')}
+                      >
+                        {threadFabUnreadCount > 99 ? '99+' : threadFabUnreadCount}
                       </span>
                     ) : null}
                   </button>

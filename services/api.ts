@@ -3585,6 +3585,9 @@ export type TenantChatMessage = {
   attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
   attachment_mime?: string | null;
   attachment_size?: number | null;
+  /** Pixel dimensions when known (images); omitted for older messages or video. */
+  attachment_width?: number | null;
+  attachment_height?: number | null;
   original_filename?: string | null;
   attachment_url?: string | null;
 };

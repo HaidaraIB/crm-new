@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Modal } from '../components/index';
 import {
+  ArrowDownToLineIcon,
   ChatBubbleIcon,
   CheckIcon,
   ChevronDownIcon,
@@ -224,24 +225,110 @@ function replyTargetSnippet(m: TenantChatMessage, t: (key: string) => string): s
   return label || '';
 }
 
+function tenantChatBinaryUrlIdentity(absoluteUrl: string): string {
+  try {
+    const u = new URL(absoluteUrl);
+    return `${u.origin}${u.pathname}`;
+  } catch {
+    return absoluteUrl;
+  }
+}
+
+const TENANT_CHAT_BLOB_CACHE_MAX = 40;
+const tenantChatBlobUrlLru = new Map<string, string>();
+
+function tenantChatBlobCacheTake(identity: string): string | null {
+  const v = tenantChatBlobUrlLru.get(identity);
+  if (v == null) return null;
+  tenantChatBlobUrlLru.delete(identity);
+  tenantChatBlobUrlLru.set(identity, v);
+  return v;
+}
+
+function tenantChatBlobCachePut(identity: string, objectUrl: string) {
+  const existing = tenantChatBlobUrlLru.get(identity);
+  if (existing != null && existing !== objectUrl) {
+    tenantChatBlobUrlLru.delete(identity);
+    URL.revokeObjectURL(existing);
+  }
+  while (tenantChatBlobUrlLru.size >= TENANT_CHAT_BLOB_CACHE_MAX) {
+    const firstKey = tenantChatBlobUrlLru.keys().next().value as string | undefined;
+    if (firstKey == null) break;
+    const old = tenantChatBlobUrlLru.get(firstKey);
+    tenantChatBlobUrlLru.delete(firstKey);
+    if (old) URL.revokeObjectURL(old);
+  }
+  tenantChatBlobUrlLru.set(identity, objectUrl);
+}
+
+/** In-flow box so aspect-ratio reserves space; absolute overlays alone collapse in flex parents. */
+function TenantChatLazyAspectSizer({ aspectRatio }: { aspectRatio: string }) {
+  return (
+    <div
+      className="pointer-events-none block w-full max-h-64"
+      style={{ aspectRatio }}
+      aria-hidden
+    />
+  );
+}
+
 type TenantChatBlobMediaProps = {
   url: string;
   kind: 'image' | 'video' | 'audio' | 'document';
   mine: boolean;
   filename?: string | null;
+  attachmentWidth?: number | null;
+  attachmentHeight?: number | null;
   t: (key: string) => string;
   /** Fires when intrinsic media layout is known (image decode, video metadata, etc.). */
   onIntrinsicLayout?: () => void;
 };
 
-function TenantChatBlobMedia({ url, kind, mine, filename, t, onIntrinsicLayout }: TenantChatBlobMediaProps) {
-  const [blobUrl, setBlobUrl] = useState<string | null>(null);
+function TenantChatBlobMedia({
+  url,
+  kind,
+  mine,
+  filename,
+  attachmentWidth,
+  attachmentHeight,
+  t,
+  onIntrinsicLayout,
+}: TenantChatBlobMediaProps) {
+  const urlIdentity = useMemo(() => tenantChatBinaryUrlIdentity(url), [url]);
+  const lazyVisual = kind === 'image' || kind === 'video';
+
+  const aspectRatioCss =
+    attachmentWidth != null &&
+    attachmentHeight != null &&
+    attachmentWidth > 0 &&
+    attachmentHeight > 0
+      ? `${attachmentWidth} / ${attachmentHeight}`
+      : '16 / 9';
+
+  const hasKnownAspect =
+    attachmentWidth != null &&
+    attachmentHeight != null &&
+    attachmentWidth > 0 &&
+    attachmentHeight > 0;
+
+  const [blobUrl, setBlobUrl] = useState<string | null>(() =>
+    lazyVisual ? tenantChatBlobCacheTake(urlIdentity) : null
+  );
   const [failed, setFailed] = useState(false);
+  const [lazyRequested, setLazyRequested] = useState(false);
+  const [lazyLoading, setLazyLoading] = useState(false);
 
   useEffect(() => {
+    setFailed(false);
+    if (lazyVisual) {
+      const cached = tenantChatBlobCacheTake(urlIdentity);
+      setBlobUrl(cached);
+      setLazyRequested(false);
+      setLazyLoading(false);
+      return;
+    }
     let cancelled = false;
     let objectUrl: string | null = null;
-    setFailed(false);
     setBlobUrl(null);
     void (async () => {
       try {
@@ -259,7 +346,50 @@ function TenantChatBlobMedia({ url, kind, mine, filename, t, onIntrinsicLayout }
       cancelled = true;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [url]);
+  }, [url, urlIdentity, lazyVisual]);
+
+  useEffect(() => {
+    if (!lazyVisual || !lazyRequested || blobUrl != null) return;
+    let cancelled = false;
+    void (async () => {
+      setLazyLoading(true);
+      try {
+        const r = await fetch(url, { headers: getAuthenticatedBinaryRequestHeaders() });
+        if (!r.ok || cancelled) {
+          if (!cancelled) {
+            setFailed(true);
+            setLazyRequested(false);
+          }
+          return;
+        }
+        const blob = await r.blob();
+        if (cancelled) return;
+        const objectUrl = URL.createObjectURL(blob);
+        tenantChatBlobCachePut(urlIdentity, objectUrl);
+        setBlobUrl(objectUrl);
+      } catch {
+        if (!cancelled) {
+          setFailed(true);
+          setLazyRequested(false);
+        }
+      } finally {
+        if (!cancelled) setLazyLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lazyVisual, lazyRequested, blobUrl, url, urlIdentity]);
+
+  const startLazyLoad = useCallback(() => {
+    const cached = tenantChatBlobCacheTake(urlIdentity);
+    if (cached != null) {
+      tenantChatBlobUrlLru.set(urlIdentity, cached);
+      setBlobUrl(cached);
+      return;
+    }
+    setLazyRequested(true);
+  }, [urlIdentity]);
 
   if (failed) {
     return (
@@ -268,11 +398,65 @@ function TenantChatBlobMedia({ url, kind, mine, filename, t, onIntrinsicLayout }
       </span>
     );
   }
+
+  const mediaShellClass = `relative w-full overflow-hidden rounded-lg max-h-64 ${
+    mine
+      ? 'bg-white/10'
+      : 'bg-gradient-to-br from-gray-200/90 to-gray-300/80 dark:from-gray-700/80 dark:to-gray-800/70'
+  }`;
+
+  if (lazyVisual && !blobUrl) {
+    return (
+      <div className={mediaShellClass}>
+        <TenantChatLazyAspectSizer aspectRatio={aspectRatioCss} />
+        <button
+          type="button"
+          className="absolute inset-0 z-10 flex w-full flex-col items-center justify-center gap-2 border-0 bg-transparent p-3 outline-none ring-primary/40 focus-visible:ring-2"
+          aria-label={t('teamChatTapToLoadAria')}
+          onClick={startLazyLoad}
+          disabled={lazyLoading}
+        >
+          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-black/50 text-white shadow-md">
+            {lazyLoading ? (
+              <span className="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            ) : (
+              <ArrowDownToLineIcon className="size-5" aria-hidden />
+            )}
+          </span>
+          <span
+            className={`pointer-events-none max-w-[90%] text-center text-[11px] font-medium leading-snug ${
+              mine ? 'text-white/90' : 'text-gray-700 dark:text-gray-200'
+            }`}
+          >
+            {t('teamChatTapToLoad')}
+          </span>
+        </button>
+      </div>
+    );
+  }
+
   if (!blobUrl) {
     return <span className={`text-xs ${mine ? 'text-white/70' : 'text-gray-400'}`}>…</span>;
   }
+
   const docName = filename || 'download';
+
+  const lazyAspectBoxClass = 'relative w-full overflow-hidden rounded-lg max-h-64';
+
   if (kind === 'image') {
+    if (hasKnownAspect) {
+      return (
+        <div className={lazyAspectBoxClass}>
+          <TenantChatLazyAspectSizer aspectRatio={aspectRatioCss} />
+          <img
+            src={blobUrl}
+            alt=""
+            className="absolute inset-0 h-full w-full object-contain"
+            onLoad={onIntrinsicLayout}
+          />
+        </div>
+      );
+    }
     return (
       <img
         src={blobUrl}
@@ -283,6 +467,19 @@ function TenantChatBlobMedia({ url, kind, mine, filename, t, onIntrinsicLayout }
     );
   }
   if (kind === 'video') {
+    if (hasKnownAspect) {
+      return (
+        <div className={lazyAspectBoxClass}>
+          <TenantChatLazyAspectSizer aspectRatio={aspectRatioCss} />
+          <video
+            src={blobUrl}
+            controls
+            className="absolute inset-0 h-full w-full object-contain"
+            onLoadedMetadata={onIntrinsicLayout}
+          />
+        </div>
+      );
+    }
     return (
       <video
         src={blobUrl}
@@ -1418,12 +1615,14 @@ export const TeamChatPage = () => {
                                       </button>
                                     ) : null}
                                     {m.attachment_kind && m.attachment_url ? (
-                                      <div className="mb-2">
+                                      <div className="mb-2 w-[min(85vw,28rem)] max-w-full">
                                         <TenantChatBlobMedia
                                           url={m.attachment_url}
                                           kind={m.attachment_kind}
                                           mine={mine}
                                           filename={m.original_filename}
+                                          attachmentWidth={m.attachment_width}
+                                          attachmentHeight={m.attachment_height}
                                           t={t}
                                           onIntrinsicLayout={onChatMediaIntrinsicLayout}
                                         />

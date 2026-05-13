@@ -971,12 +971,15 @@ export const translations = {
     newLeadSmsGoIntegrations: "Go to Integrations → SMS (Twilio)",
     newLeadSmsGoIntegrationsHint: "Opens the Twilio SMS page where you enable the integration and enter Account SID, token, and sender number.",
     leadAssignmentSettings: "Lead Assignment Settings",
-    autoRotation: "Enable Auto Rotation for Delayed Leads",
-    autoRotationDesc: "When enabled, the system automatically reassigns leads that have not been attended to within a specified time.",
-    reminderDelayTime: "Reminder Delay Time (Hours)",
-    reminderDelayTimeDesc: "This time determines how long to wait before a lead is marked as 'delayed'.",
-    reAssignEnabled: "Re-assign Inactive Clients",
-    reAssignDesc: "Automatically assign a new employee to clients who haven't been contacted within the specified time period",
+    autoRotation: "Auto-assign new leads",
+    autoRotationDesc:
+      "When enabled, new leads are automatically assigned to an available employee (typically whoever has the fewest assigned leads). Weekly day off is still respected. Includes leads from connected integrations (Meta, TikTok, WhatsApp, etc.).",
+    reminderDelayTime: "No-contact window before re-assign (hours)",
+    reminderDelayTimeDesc:
+      "How long an assigned lead may go without contact before it can be moved to another employee (only when re-assign inactive clients is enabled).",
+    reAssignEnabled: "Re-assign inactive clients",
+    reAssignDesc:
+      "When enabled, the system can periodically move assigned leads to another employee after they go without contact for the hours set above.",
     hours: "hours",
     weeklyDayOff: "Weekly day off",
     weeklyDayOffHelp:
@@ -2701,12 +2704,15 @@ export const translations = {
     newLeadSmsGoIntegrations: "الانتقال إلى التكاملات → الرسائل القصيرة (Twilio)",
     newLeadSmsGoIntegrationsHint: "يفتح صفحة Twilio لتفعيل التكامل وإدخال Account SID والرمز ورقم الإرسال.",
     leadAssignmentSettings: "إعدادات إسناد العملاء",
-    autoRotation: "تمكين التدوير التلقائي للعملاء المتأخرين",
-    autoRotationDesc: "عند التمكين، يقوم النظام تلقائيًا بإعادة تعيين العملاء الذين لم تتم متابعتهم خلال وقت محدد.",
-    reminderDelayTime: "وقت تأخير التذكير (بالساعات)",
-    reminderDelayTimeDesc: "يحدد هذا الوقت مدة الانتظار قبل تمييز العميل بأنه 'متأخر'.",
+    autoRotation: "إسناد العملاء الجدد تلقائياً",
+    autoRotationDesc:
+      "عند التمكين، يُسند النظام العملاء الجدد تلقائياً إلى موظف متاح (غالباً من لديه أقل عدد عملاء مسندين). يُحترم يوم العطلة الأسبوعي إن وُجد. يشمل العملاء الواردين من التكاملات (مثل Meta وTikTok وWhatsApp).",
+    reminderDelayTime: "مدة عدم التواصل قبل إعادة الإسناد (ساعات)",
+    reminderDelayTimeDesc:
+      "مدة بقاء العميل مسنداً دون تواصل قبل أن يصبح مؤهلاً لإعادة الإسناد التلقائي (عند تفعيل إعادة تعيين غير النشطين).",
     reAssignEnabled: "إعادة تعيين العملاء غير النشطين",
-    reAssignDesc: "تعيين موظف جديد للعميل في حال لم يتواصل معه الموظف الحالي خلال فترة محددة",
+    reAssignDesc:
+      "عند التمكين، قد يعيد النظام دورياً إسناد العملاء المسندين إلى موظف آخر بعد مرور عدد الساعات أعلاه دون أي تواصل.",
     hours: "ساعة",
     weeklyDayOff: "يوم العطلة الأسبوعي",
     weeklyDayOffHelp:

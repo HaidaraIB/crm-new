@@ -207,6 +207,20 @@ export async function readJsonResponse(response: Response): Promise<unknown> {
   }
 }
 
+/**
+ * Returns true if `v` should actually be forwarded to the backend as a filter.
+ * Drops undefined/null/empty strings and the UI "All"/"NaN" sentinels so they
+ * never reach integer/ForeignKey lookups (which would otherwise 500).
+ */
+const isMeaningfulFilterValue = (v: unknown): boolean => {
+  if (v === undefined || v === null) return false;
+  if (typeof v === 'number' && Number.isNaN(v)) return false;
+  const s = String(v).trim();
+  if (!s) return false;
+  if (s === 'All' || s === 'NaN') return false;
+  return true;
+};
+
 async function parseSuccessJsonResponse<T>(response: Response): Promise<T> {
   const raw = await readJsonResponse(response);
   return unwrapApiSuccess<T>(raw);
@@ -1977,7 +1991,7 @@ export const getProjectsAPI = async (page?: number, pageSize?: number, developer
   const queryParams = new URLSearchParams();
   if (page) queryParams.append('page', String(page));
   if (pageSize) queryParams.append('page_size', String(pageSize));
-  if (developerId != null && developerId !== undefined) {
+  if (developerId != null && !Number.isNaN(developerId as number) && isMeaningfulFilterValue(developerId)) {
     queryParams.append('developer', String(developerId));
   }
   const endpoint = `/projects/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
@@ -2037,8 +2051,8 @@ export const deleteProjectAPI = async (projectId: number) => {
  */
 export const getUnitsAPI = async (filters?: any, page?: number) => {
   const queryParams = new URLSearchParams();
-  if (filters?.project) queryParams.append('project', filters.project);
-  if (filters?.bedrooms) queryParams.append('bedrooms', filters.bedrooms);
+  if (isMeaningfulFilterValue(filters?.project)) queryParams.append('project', String(filters.project));
+  if (isMeaningfulFilterValue(filters?.bedrooms)) queryParams.append('bedrooms', String(filters.bedrooms));
   if (page) queryParams.append('page', String(page));
   if (filters?.page_size) queryParams.append('page_size', String(filters.page_size));
   const queryString = queryParams.toString();
@@ -3037,8 +3051,8 @@ export const getTikTokLeadgenConfigAPI = async () => {
  */
 export const getActivitiesAPI = async (filters?: any) => {
   const queryParams = new URLSearchParams();
-  if (filters?.deal) queryParams.append('deal', filters.deal);
-  if (filters?.stage) queryParams.append('stage', filters.stage);
+  if (isMeaningfulFilterValue(filters?.deal)) queryParams.append('deal', String(filters.deal));
+  if (isMeaningfulFilterValue(filters?.stage)) queryParams.append('stage', String(filters.stage));
   if (filters?.search) queryParams.append('search', filters.search);
   
   const queryString = queryParams.toString();

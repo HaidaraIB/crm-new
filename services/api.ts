@@ -3556,9 +3556,16 @@ export type TenantChatPinnedMessageSummary = {
   attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
 };
 
+export type TenantChatKind = 'direct' | 'company_group';
+
 export type TenantChatConversation = {
   id: number;
-  other_user: TenantChatPeer;
+  /** Omitted on older backends; treat as `direct`. */
+  kind?: TenantChatKind;
+  other_user: TenantChatPeer | null;
+  group_title?: string | null;
+  member_count?: number | null;
+  online_count?: number | null;
   last_message: {
     id: number;
     body: string;
@@ -3694,8 +3701,26 @@ export type TenantChatPeerPresenceAction =
   | 'recording_voice'
   | 'sending_message';
 
+/** DM thread: single peer activity (legacy shape). */
+export type TenantChatPeerPresenceDM = {
+  peer_user_id: number;
+  activity: TenantChatPeerPresenceAction | null;
+};
+
+/** Company-wide group: multiple peers with non-idle activity. */
+export type TenantChatPeerPresenceGroup = {
+  mode: 'group';
+  peers: Array<{
+    user_id: number;
+    activity: TenantChatPeerPresenceAction;
+    peer: TenantChatPeer;
+  }>;
+};
+
+export type TenantChatPeerPresenceResponse = TenantChatPeerPresenceDM | TenantChatPeerPresenceGroup;
+
 export async function getTenantChatPeerPresenceAPI(conversationId: number) {
-  return apiRequest<{ peer_user_id: number; activity: TenantChatPeerPresenceAction | null }>(
+  return apiRequest<TenantChatPeerPresenceResponse>(
     `/tenant-chat/conversations/${conversationId}/peer-presence/`
   );
 }

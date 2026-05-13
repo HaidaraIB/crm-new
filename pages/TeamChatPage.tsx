@@ -26,6 +26,8 @@ import {
   sendTenantChatMessageWithAttachmentAPI,
   startTenantChatConversationAPI,
   unpinTenantChatMessageAPI,
+  type TenantChatConversation,
+  type TenantChatKind,
   type TenantChatMessage,
   type TenantChatMessageQuote,
   type TenantChatPeer,
@@ -48,6 +50,65 @@ function peerInitials(p: TenantChatPeer): string {
   }
   const raw = (p.username || p.email || '?').replace(/[^a-zA-Z0-9]/g, '');
   return raw.slice(0, 2).toUpperCase() || '?';
+}
+
+function tenantChatConvKind(c: TenantChatConversation): TenantChatKind {
+  return c.kind ?? 'direct';
+}
+
+function tenantChatConvIsGroup(c: TenantChatConversation): boolean {
+  return tenantChatConvKind(c) === 'company_group';
+}
+
+function tenantChatConvTitle(c: TenantChatConversation, t: (key: string) => string): string {
+  if (tenantChatConvIsGroup(c)) {
+    const g = (c.group_title || '').trim();
+    return g || t('teamChatCompanyRoom');
+  }
+  if (!c.other_user) return '';
+  return peerDisplayName(c.other_user);
+}
+
+function tenantChatConvInitials(c: TenantChatConversation, t: (key: string) => string): string {
+  if (tenantChatConvIsGroup(c)) {
+    const raw = (c.group_title || t('teamChatCompanyRoom')).trim();
+    const letters = raw.replace(/[^\p{L}\p{N}]/gu, '');
+    if (letters.length >= 2) return letters.slice(0, 2).toUpperCase();
+    return raw.slice(0, 2).toUpperCase() || '#';
+  }
+  if (!c.other_user) return '?';
+  return peerInitials(c.other_user);
+}
+
+function tenantChatPeerRoleLabel(role: string | undefined, t: (key: string) => string): string {
+  const r = (role || '').toLowerCase();
+  if (r === 'admin') return t('teamChatRoleAdmin');
+  if (r === 'super_admin') return t('teamChatRoleSuperAdmin');
+  if (r === 'supervisor') return t('supervisor');
+  if (r === 'employee') return t('employee');
+  if (r === 'data_entry') return t('dataEntry');
+  if (!r) return '';
+  return r.replace(/_/g, ' ');
+}
+
+function tenantChatRoleBadgeClass(role: string | undefined, mine: boolean): string {
+  const base =
+    'inline-flex max-w-[9rem] shrink-0 items-center truncate rounded-full px-1.5 py-0 text-[9px] font-semibold uppercase tracking-wide';
+  const r = (role || '').toLowerCase();
+  if (mine) {
+    if (r === 'admin') return `${base} bg-amber-400/25 text-amber-50 ring-1 ring-amber-300/30`;
+    if (r === 'supervisor') return `${base} bg-violet-400/25 text-violet-50 ring-1 ring-violet-300/30`;
+    if (r === 'employee') return `${base} bg-white/15 text-white/90 ring-1 ring-white/25`;
+    if (r === 'data_entry') return `${base} bg-sky-400/25 text-sky-50 ring-1 ring-sky-300/30`;
+    if (r === 'super_admin') return `${base} bg-rose-400/25 text-rose-50 ring-1 ring-rose-300/30`;
+    return `${base} bg-white/15 text-white/85 ring-1 ring-white/20`;
+  }
+  if (r === 'admin') return `${base} bg-amber-100 text-amber-900 ring-1 ring-amber-200/80 dark:bg-amber-950/50 dark:text-amber-100 dark:ring-amber-800/60`;
+  if (r === 'supervisor') return `${base} bg-violet-100 text-violet-900 ring-1 ring-violet-200/80 dark:bg-violet-950/50 dark:text-violet-100 dark:ring-violet-800/60`;
+  if (r === 'employee') return `${base} bg-slate-100 text-slate-700 ring-1 ring-slate-200/90 dark:bg-slate-800/80 dark:text-slate-200 dark:ring-slate-600/70`;
+  if (r === 'data_entry') return `${base} bg-sky-100 text-sky-900 ring-1 ring-sky-200/80 dark:bg-sky-950/50 dark:text-sky-100 dark:ring-sky-800/60`;
+  if (r === 'super_admin') return `${base} bg-rose-100 text-rose-900 ring-1 ring-rose-200/80 dark:bg-rose-950/50 dark:text-rose-100 dark:ring-rose-800/60`;
+  return `${base} bg-gray-100 text-gray-700 ring-1 ring-gray-200/90 dark:bg-gray-800/90 dark:text-gray-200 dark:ring-gray-600/70`;
 }
 
 /** Text direction from first strong character (like Telegram), not app UI language. */
@@ -806,7 +867,15 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     };
   }, [selectedId, derivedLocalPresence]);
 
-  const conversations = convQuery.data?.results ?? [];
+  const conversations = useMemo(() => {
+    const raw = convQuery.data?.results ?? [];
+    return [...raw].sort((a, b) => {
+      const ag = tenantChatConvIsGroup(a) ? 1 : 0;
+      const bg = tenantChatConvIsGroup(b) ? 1 : 0;
+      if (ag !== bg) return bg - ag;
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
+  }, [convQuery.data?.results]);
   const selected = useMemo(
     () => conversations.find((c) => c.id === selectedId) ?? null,
     [conversations, selectedId]
@@ -846,8 +915,42 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   const currentUserId = currentUser?.id ?? null;
 
   const peerPresenceLabel = useMemo(() => {
-    const other = selected?.other_user;
-    const act = peerPresenceQuery.data?.activity;
+    if (!selected) return null;
+    const pr = peerPresenceQuery.data;
+    if (!pr) return null;
+    if ('mode' in pr && pr.mode === 'group') {
+      const peers = pr.peers || [];
+      if (peers.length === 0) return null;
+      const priority = (x: TenantChatPeerPresenceAction): number => {
+        if (x === 'recording_voice') return 4;
+        if (x === 'typing') return 3;
+        if (x === 'uploading_media') return 2;
+        if (x === 'sending_message') return 1;
+        return 0;
+      };
+      let bestAct = peers[0]!.activity;
+      let bestP = priority(bestAct);
+      for (const p of peers) {
+        const pv = priority(p.activity);
+        if (pv > bestP) {
+          bestAct = p.activity;
+          bestP = pv;
+        }
+      }
+      const same = peers.filter((p) => p.activity === bestAct);
+      const names = same.map((p) => peerDisplayName(p.peer));
+      const maxShow = 3;
+      const shown = names.slice(0, maxShow);
+      let nameStr = shown.join(', ');
+      if (names.length > maxShow) nameStr = `${nameStr} +${names.length - maxShow}`;
+      if (bestAct === 'typing') return t('teamChatGroupTyping').replace('{names}', nameStr);
+      if (bestAct === 'recording_voice') return t('teamChatGroupRecording').replace('{names}', nameStr);
+      if (bestAct === 'uploading_media') return t('teamChatGroupUploading').replace('{names}', nameStr);
+      if (bestAct === 'sending_message') return t('teamChatGroupSending').replace('{names}', nameStr);
+      return null;
+    }
+    const other = selected.other_user;
+    const act = 'activity' in pr ? pr.activity : null;
     if (!other || !act) return null;
     const name = peerDisplayName(other);
     const fill = (key: string) => t(key).replace(/\{name\}/g, name);
@@ -856,7 +959,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     if (act === 'recording_voice') return fill('teamChatPeerRecording');
     if (act === 'sending_message') return fill('teamChatPeerSending');
     return null;
-  }, [peerPresenceQuery.data?.activity, selected?.other_user, t]);
+  }, [peerPresenceQuery.data, selected, t]);
 
   useEffect(() => {
     if (selectedId == null) {
@@ -1354,8 +1457,9 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                 {conversations.map((c) => {
                   const active = c.id === selectedId;
                   const hasUnread = (c.unread_count ?? 0) > 0;
-                  const peer = c.other_user;
-                  const label = peerDisplayName(peer);
+                  const isGroup = tenantChatConvIsGroup(c);
+                  const label = tenantChatConvTitle(c, t);
+                  const initials = tenantChatConvInitials(c, t);
                   const previewFull = c.last_message?.body || '';
                   const preview = previewFull.slice(0, 80);
                   return (
@@ -1370,13 +1474,20 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                         }`}
                       >
                         <span
-                          className={`flex size-10 shrink-0 items-center justify-center rounded-xl text-xs font-semibold shadow-inner ${
+                          className={`relative flex size-10 shrink-0 items-center justify-center rounded-xl text-xs font-semibold shadow-inner ${
                             active
                               ? 'bg-primary text-white shadow-md shadow-primary/30'
                               : 'bg-gray-100 text-gray-700 ring-1 ring-gray-200/80 dark:bg-gray-700 dark:text-gray-100 dark:ring-gray-600'
                           }`}
                         >
-                          {peerInitials(peer)}
+                          {initials}
+                          {!isGroup && c.other_user?.is_online ? (
+                            <span
+                              className="absolute -bottom-0.5 -end-0.5 size-2.5 rounded-full border-2 border-white bg-emerald-400 shadow-sm dark:border-gray-900"
+                              title={t('online')}
+                              aria-hidden
+                            />
+                          ) : null}
                         </span>
                         <span className={`flex min-w-0 flex-1 items-start gap-2 ${peerRowTextAlign}`}>
                           <span className="min-w-0 flex-1">
@@ -1433,36 +1544,63 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
             <div className="relative flex min-h-0 min-w-0 flex-1 flex-col" dir="ltr" lang="und">
               <header className="flex items-center gap-3 border-b border-gray-200 dark:border-gray-700 bg-white/90 px-4 py-3 backdrop-blur-sm dark:bg-gray-900/90">
                 {selected ? (
-                  <>
-                    <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-sm font-bold text-white shadow-md shadow-primary/25">
-                      {peerInitials(selected.other_user)}
-                      {selected.other_user.is_online ? (
-                        <span
-                          className="absolute -bottom-0.5 -end-0.5 size-3 rounded-full border-2 border-white bg-emerald-400 shadow-sm dark:border-gray-900"
-                          title={t('online')}
-                          aria-hidden
-                        />
-                      ) : null}
-                    </span>
-                    <div className="min-w-0">
-                      <h2 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
-                        <ChatText>{peerDisplayName(selected.other_user)}</ChatText>
-                      </h2>
-                      <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
-                        <span className="capitalize" dir="auto">
-                          {selected.other_user.role}
-                        </span>
-                        <span className="mx-1.5 text-gray-400 dark:text-gray-500">·</span>
-                        {selected.other_user.is_online ? (
-                          <span className="font-medium text-emerald-600 dark:text-emerald-400">{t('online')}</span>
-                        ) : (
-                          <span dir="ltr">
-                            {t('lastSeen')} {formatLastSeenRelative(selected.other_user.last_seen_at, t)}
-                          </span>
-                        )}
-                      </p>
-                    </div>
-                  </>
+                  tenantChatConvIsGroup(selected) ? (
+                    <>
+                      <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-sky-600 to-primary text-sm font-bold text-white shadow-md shadow-primary/25">
+                        {tenantChatConvInitials(selected, t)}
+                      </span>
+                      <div className="min-w-0">
+                        <h2 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                          <ChatText>{tenantChatConvTitle(selected, t)}</ChatText>
+                        </h2>
+                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400" dir="ltr">
+                          {t('teamChatGroupMembersOnline')
+                            .replace('{memberCount}', String(selected.member_count ?? 0))
+                            .replace('{onlineCount}', String(selected.online_count ?? 0))}
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <span className="relative flex size-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/80 text-sm font-bold text-white shadow-md shadow-primary/25">
+                        {selected.other_user ? peerInitials(selected.other_user) : '?'}
+                        {selected.other_user?.is_online ? (
+                          <span
+                            className="absolute -bottom-0.5 -end-0.5 size-3 rounded-full border-2 border-white bg-emerald-400 shadow-sm dark:border-gray-900"
+                            title={t('online')}
+                            aria-hidden
+                          />
+                        ) : null}
+                      </span>
+                      <div className="min-w-0">
+                        <h2 className="truncate text-base font-semibold text-gray-900 dark:text-gray-100">
+                          <ChatText>
+                            {selected.other_user ? peerDisplayName(selected.other_user) : ''}
+                          </ChatText>
+                        </h2>
+                        <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          {selected.other_user ? (
+                            <>
+                              <span className="capitalize" dir="auto">
+                                {selected.other_user.role}
+                              </span>
+                              <span className="mx-1.5 text-gray-400 dark:text-gray-500">·</span>
+                              {selected.other_user.is_online ? (
+                                <span className="font-medium text-emerald-600 dark:text-emerald-400">
+                                  {t('online')}
+                                </span>
+                              ) : (
+                                <span dir="ltr">
+                                  {t('lastSeen')}{' '}
+                                  {formatLastSeenRelative(selected.other_user.last_seen_at, t)}
+                                </span>
+                              )}
+                            </>
+                          ) : null}
+                        </p>
+                      </div>
+                    </>
+                  )
                 ) : null}
               </header>
 
@@ -1482,7 +1620,19 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                           className="min-w-0 flex-1 truncate text-start text-gray-800 dark:text-gray-100"
                           onClick={() => scrollToMessageAnchor(pin.message_id)}
                         >
-                          <span className="font-semibold">{peerDisplayName(pin.sender)}:</span> {pin.body}
+                          <span className="inline-flex min-w-0 items-center gap-1 font-semibold">
+                            <span className="truncate">{peerDisplayName(pin.sender)}</span>
+                            {selected && tenantChatConvIsGroup(selected) ? (
+                              <span
+                                className={tenantChatRoleBadgeClass(pin.sender.role, false)}
+                                title={pin.sender.role}
+                              >
+                                {tenantChatPeerRoleLabel(pin.sender.role, t)}
+                              </span>
+                            ) : null}
+                            <span className="shrink-0 font-semibold">:</span>
+                          </span>{' '}
+                          {pin.body}
                         </button>
                         <button
                           type="button"
@@ -1578,10 +1728,18 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                   <div className={`rounded-2xl px-4 py-2.5 text-sm leading-relaxed shadow-sm ${bubbleBase}`}>
                                     {!mine && (
                                       <div
-                                        className="mb-1 text-xs font-semibold text-primary dark:text-primary-200"
+                                        className="mb-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-primary dark:text-primary-200"
                                         dir="auto"
                                       >
-                                        {peerDisplayName(m.sender as TenantChatPeer)}
+                                        <span className="min-w-0 truncate">{peerDisplayName(m.sender as TenantChatPeer)}</span>
+                                        {selected && tenantChatConvIsGroup(selected) ? (
+                                          <span
+                                            className={tenantChatRoleBadgeClass((m.sender as TenantChatPeer).role, false)}
+                                            title={(m.sender as TenantChatPeer).role}
+                                          >
+                                            {tenantChatPeerRoleLabel((m.sender as TenantChatPeer).role, t)}
+                                          </span>
+                                        ) : null}
                                       </div>
                                     )}
                                     {m.forwarded_from ? (
@@ -1624,9 +1782,19 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                         }}
                                         onDoubleClick={(e) => e.stopPropagation()}
                                       >
-                                        <ChatText className="block text-[11px] font-semibold opacity-95">
-                                          {peerDisplayName(m.reply_to.sender)}
-                                        </ChatText>
+                                        <div className="flex flex-wrap items-center gap-1">
+                                          <ChatText className="text-[11px] font-semibold opacity-95">
+                                            {peerDisplayName(m.reply_to.sender)}
+                                          </ChatText>
+                                          {selected && tenantChatConvIsGroup(selected) ? (
+                                            <span
+                                              className={tenantChatRoleBadgeClass(m.reply_to.sender.role, mine)}
+                                              title={m.reply_to.sender.role}
+                                            >
+                                              {tenantChatPeerRoleLabel(m.reply_to.sender.role, t)}
+                                            </span>
+                                          ) : null}
+                                        </div>
                                         <ChatText className="mt-0.5 block text-[11px] opacity-90">
                                           {tenantChatQuoteLabel(m.reply_to, t)}
                                         </ChatText>
@@ -1730,11 +1898,24 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                       <p className="truncate text-sm text-gray-800 dark:text-gray-100">
                         {(() => {
                           const snippet = replyTargetSnippet(replyToMessage, t);
+                          const showBadge = selected && tenantChatConvIsGroup(selected);
                           return (
-                            <>
-                              {peerDisplayName(replyToMessage.sender)} · {snippet.slice(0, 120)}
-                              {snippet.length > 120 ? '…' : ''}
-                            </>
+                            <span className="inline-flex min-w-0 max-w-full flex-wrap items-center gap-1.5 align-middle">
+                              <span className="truncate">{peerDisplayName(replyToMessage.sender)}</span>
+                              {showBadge ? (
+                                <span
+                                  className={tenantChatRoleBadgeClass(replyToMessage.sender.role, false)}
+                                  title={replyToMessage.sender.role}
+                                >
+                                  {tenantChatPeerRoleLabel(replyToMessage.sender.role, t)}
+                                </span>
+                              ) : null}
+                              <span className="shrink-0 text-gray-500 dark:text-gray-400">·</span>
+                              <span className="min-w-0 truncate">
+                                {snippet.slice(0, 120)}
+                                {snippet.length > 120 ? '…' : ''}
+                              </span>
+                            </span>
                           );
                         })()}
                       </p>
@@ -2030,9 +2211,9 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                       }}
                     >
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-xs font-bold text-primary">
-                        {peerInitials(c.other_user)}
+                        {tenantChatConvInitials(c, t)}
                       </span>
-                      <span className="min-w-0 flex-1 truncate font-medium">{peerDisplayName(c.other_user)}</span>
+                      <span className="min-w-0 flex-1 truncate font-medium">{tenantChatConvTitle(c, t)}</span>
                     </button>
                   </li>
                 ))}

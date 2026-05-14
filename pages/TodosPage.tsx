@@ -6,8 +6,7 @@ import { Todo, TaskStage } from '../types';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { isSameDay } from '../utils/dateUtils';
 import { useTasks, useUpdateTask, useDeleteTask, useStages, useDeals, useClientTasks, useClientCalls, useDeleteClientTask, useDeleteClientCall, useCallMethods } from '../hooks/useQueries';
-
-type FilterType = 'all' | TaskStage;
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 // Map stage categories to icons
@@ -561,20 +560,16 @@ export const TodosPage = () => {
                     <div className="flex items-center gap-2 mb-4 border-b border-gray-200 dark:border-gray-700">
                         <button
                             onClick={() => setActiveTab('active')}
-                            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                                activeTab === 'active'
-                                    ? 'border-primary text-gray-900 dark:text-gray-100'
-                                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            className={`px-4 py-2 text-sm transition-colors ${
+                                activeTab === 'active' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
                             }`}
                         >
                             {t('active')} ({todos.length})
                         </button>
                         <button
                             onClick={() => setActiveTab('completed')}
-                            className={`px-4 py-2 font-medium text-sm border-b-2 transition-colors ${
-                                activeTab === 'completed'
-                                    ? 'border-primary text-gray-900 dark:text-gray-100'
-                                    : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'
+                            className={`px-4 py-2 text-sm transition-colors ${
+                                activeTab === 'completed' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
                             }`}
                         >
                             {t('completed')} ({completedTodos.length})

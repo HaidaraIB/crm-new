@@ -11,6 +11,7 @@ import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssig
 import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { normalizeRole } from '../utils/roles';
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { formatLeadBudget, leadBudgetOverlapsFilter } from '../utils/budgetRange';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -808,7 +809,7 @@ export const LeadsPage = () => {
                         <button 
                             key={status}
                             onClick={() => setActiveStatusFilter(status)}
-                            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium whitespace-nowrap flex-shrink-0 flex items-center gap-2 ${activeStatusFilter === status ? 'border-b-2 border-primary text-gray-900 dark:text-gray-100' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100'}`}
+                            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap flex-shrink-0 flex items-center gap-2 transition-colors ${activeStatusFilter === status ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                         >
                            {statusConfig?.color && (
                                <div 

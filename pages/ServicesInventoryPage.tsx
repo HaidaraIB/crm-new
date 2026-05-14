@@ -10,6 +10,7 @@ import { EditServicePackageModal } from '../components/modals/EditServicePackage
 import { AddServiceProviderModal } from '../components/modals/AddServiceProviderModal';
 import { EditServiceProviderModal } from '../components/modals/EditServiceProviderModal';
 import { normalizeRole } from '../utils/roles';
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 
 type Tab = 'services' | 'packages' | 'providers';
 
@@ -342,9 +343,9 @@ export const ServicesInventoryPage = () => {
         <PageWrapper title={t('services')} actions={pageActions}>
             <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
                 <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('services')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'services' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('services')}</button>
-                    <button onClick={() => setActiveTab('packages')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'packages' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('servicePackages')}</button>
-                    <button onClick={() => setActiveTab('providers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'providers' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('serviceProviders')}</button>
+                    <button onClick={() => setActiveTab('services')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'services' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('services')}</button>
+                    <button onClick={() => setActiveTab('packages')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'packages' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('servicePackages')}</button>
+                    <button onClick={() => setActiveTab('providers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'providers' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('serviceProviders')}</button>
                 </nav>
             </div>
             {renderContent()}

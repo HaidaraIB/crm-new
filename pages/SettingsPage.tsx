@@ -11,6 +11,7 @@ import { SupervisorsSettings } from './settings/SupervisorsSettings';
 import { NewLeadSmsSettings } from './settings/NewLeadSmsSettings';
 import { useAppContext } from '../context/AppContext';
 import { normalizeRole } from '../utils/roles';
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 
 type SettingsTab =
     | 'Channels'
@@ -105,52 +106,52 @@ export const SettingsPage = () => {
                 <nav className="-mb-px flex space-x-4 rtl:space-x-reverse flex-wrap" aria-label="Tabs">
                     <button
                         onClick={() => setActiveTab('Channels')}
-                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'Channels' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Channels' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('channels')}
                     </button>
                     <button
                         onClick={() => setActiveTab('Stages')}
-                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'Stages' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Stages' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('stages')}
                     </button>
                     <button
                         onClick={() => setActiveTab('Statuses')}
-                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'Statuses' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Statuses' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('statuses')}
                     </button>
                     <button
                         onClick={() => setActiveTab('CallMethods')}
-                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'CallMethods' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'CallMethods' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('callMethods') || 'Call Methods'}
                     </button>
                     {showVisitTypes && (
                         <button
                             onClick={() => setActiveTab('VisitTypes')}
-                            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'VisitTypes' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                            className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'VisitTypes' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                         >
                             {t('visitTypes') || 'Visit types'}
                         </button>
                     )}
                     <button
                         onClick={() => setActiveTab('LeadAssignment')}
-                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'LeadAssignment' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'LeadAssignment' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('leadAssignmentSettings')}
                     </button>
                     <button
                         onClick={() => setActiveTab('NewLeadSms')}
-                        className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'NewLeadSms' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'NewLeadSms' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('newLeadSmsSettings')}
                     </button>
                     {normalizeRole(currentUser?.role) === 'Owner' && (
                         <button
                             onClick={() => setActiveTab('Supervisors')}
-                            className={`whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm ${activeTab === 'Supervisors' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}
+                            className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Supervisors' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                         >
                             {t('supervisorsTitle')}
                         </button>

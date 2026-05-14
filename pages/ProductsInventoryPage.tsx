@@ -10,6 +10,7 @@ import { EditProductCategoryModal } from '../components/modals/EditProductCatego
 import { AddSupplierModal } from '../components/modals/AddSupplierModal';
 import { EditSupplierModal } from '../components/modals/EditSupplierModal';
 import { normalizeRole } from '../utils/roles';
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 
 type Tab = 'products' | 'categories' | 'suppliers';
 
@@ -341,9 +342,9 @@ export const ProductsInventoryPage = () => {
         <PageWrapper title={t('products')} actions={pageActions}>
             <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
                 <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('products')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'products' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('products')}</button>
-                    <button onClick={() => setActiveTab('categories')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'categories' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('productCategories')}</button>
-                    <button onClick={() => setActiveTab('suppliers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'suppliers' ? 'border-primary text-gray-900 dark:text-gray-100' : 'border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:border-gray-300'}`}>{t('suppliers')}</button>
+                    <button onClick={() => setActiveTab('products')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'products' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('products')}</button>
+                    <button onClick={() => setActiveTab('categories')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'categories' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('productCategories')}</button>
+                    <button onClick={() => setActiveTab('suppliers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'suppliers' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('suppliers')}</button>
                 </nav>
             </div>
             {renderContent()}

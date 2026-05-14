@@ -6,6 +6,7 @@ import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Dropdown, DropdownItem
 import { Developer, Project, Unit } from '../types';
 import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 
 type Tab = 'units' | 'projects' | 'developers';
 
@@ -814,9 +815,9 @@ export const PropertiesPage = () => {
         <PageWrapper title={t('properties')} actions={pageActions}>
             <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
                 <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
-                    <button onClick={() => setActiveTab('units')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'units' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>{t('units')}</button>
-                    <button onClick={() => setActiveTab('projects')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'projects' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>{t('projects')}</button>
-                    <button onClick={() => setActiveTab('developers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 border-b-2 font-medium text-xs sm:text-sm flex-shrink-0 ${activeTab === 'developers' ? 'border-primary text-primary' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'}`}>{t('developers')}</button>
+                    <button onClick={() => setActiveTab('units')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'units' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('units')}</button>
+                    <button onClick={() => setActiveTab('projects')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'projects' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('projects')}</button>
+                    <button onClick={() => setActiveTab('developers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'developers' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('developers')}</button>
                 </nav>
             </div>
             {renderContent()}

@@ -4,6 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Input, Button, Modal } from '../components/index';
 import { EyeIcon, RefreshIcon } from '../components/icons';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
+import { withLatinDigits } from '../utils/dateUtils';
 
 type TicketAttachment = { id: number; file: string; url: string; created_at: string };
 
@@ -265,7 +266,7 @@ export const SupportCenterPage = () => {
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
                         {ticket.created_at
-                          ? new Date(ticket.created_at).toLocaleDateString()
+                          ? new Date(ticket.created_at).toLocaleDateString(undefined, withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }))
                           : '—'}
                       </td>
                       <td className="px-4 py-3">
@@ -328,14 +329,14 @@ export const SupportCenterPage = () => {
                 <div className="rounded-lg bg-gray-50 dark:bg-gray-700/40 p-3 border border-gray-100 dark:border-gray-600/40">
                   <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('date') || 'Date'}</p>
                   <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    {selectedTicket.created_at ? new Date(selectedTicket.created_at).toLocaleString() : '—'}
+                    {selectedTicket.created_at ? new Date(selectedTicket.created_at).toLocaleString(undefined, withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' })) : '—'}
                   </p>
                 </div>
                 {selectedTicket.updated_at && (
                   <div className="sm:col-span-2 rounded-lg bg-gray-50 dark:bg-gray-700/40 p-3 border border-gray-100 dark:border-gray-600/40">
                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('updatedAt') || 'Last updated'}</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                      {new Date(selectedTicket.updated_at).toLocaleString()}
+                      {new Date(selectedTicket.updated_at).toLocaleString(undefined, withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))}
                     </p>
                   </div>
                 )}

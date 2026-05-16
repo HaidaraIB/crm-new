@@ -3,7 +3,7 @@ import { PageWrapper, Button } from '../components/index';
 import { useAppContext } from '../context/AppContext';
 import { FilterIcon, MegaphoneIcon, TargetIcon, CheckIcon, ChartIcon } from '../components/icons';
 import { useCampaigns, useLeads } from '../hooks/useQueries';
-import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { reportPageContainer } from '../components/reports/reportStyles';
 import { ReportHero } from '../components/reports/ReportHero';
 import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
@@ -21,7 +21,7 @@ export const MarketingReportPage = () => {
                 const s = new Date(startDate);
                 const e = new Date(endDate);
                 if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
-                    range = `${s.toLocaleDateString(locale)} — ${e.toLocaleDateString(locale)}`;
+                    range = `${s.toLocaleDateString(locale, withLatinDigits())} — ${e.toLocaleDateString(locale, withLatinDigits())}`;
                 }
             } catch {
                 /* ignore */
@@ -141,13 +141,13 @@ export const MarketingReportPage = () => {
                             />
                             <ReportSummaryTile
                                 title={t('totalBudget') || 'Total Budget'}
-                                value={totalBudget.toLocaleString()}
+                                value={totalBudget.toLocaleString(undefined, withLatinDigits())}
                                 accent="blue"
                                 icon={<ChartIcon />}
                             />
                             <ReportSummaryTile
                                 title={t('totalLeads') || 'Total Leads'}
-                                value={leadsSum.toLocaleString()}
+                                value={leadsSum.toLocaleString(undefined, withLatinDigits())}
                                 accent="emerald"
                                 icon={<TargetIcon />}
                             />
@@ -191,19 +191,19 @@ export const MarketingReportPage = () => {
                                 {campaignStats.map((campaign) => (
                                     <tr key={campaign.id} className={ReportTableDefaults.tbodyRow}>
                                         <td className={`${ReportTableDefaults.tbodyCell} font-semibold`}>{campaign.name}</td>
-                                        <td className={ReportTableDefaults.tbodyCell}>{campaign.budget.toLocaleString()}</td>
-                                        <td className={ReportTableDefaults.tbodyCell}>{campaign.totalLeads.toLocaleString()}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{campaign.budget.toLocaleString(undefined, withLatinDigits())}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{campaign.totalLeads.toLocaleString(undefined, withLatinDigits())}</td>
                                         <td className={`${ReportTableDefaults.tbodyCell} text-emerald-600 dark:text-emerald-400 font-semibold`}>
-                                            {campaign.convertedLeads.toLocaleString()}
+                                            {campaign.convertedLeads.toLocaleString(undefined, withLatinDigits())}
                                         </td>
                                         <td className={`${ReportTableDefaults.tbodyCell} text-blue-600 dark:text-blue-400 font-semibold`}>
                                             {campaign.conversionRate}%
                                         </td>
                                         <td className={ReportTableDefaults.tbodyCell}>
-                                            {parseFloat(String(campaign.costPerLead)).toLocaleString(undefined, {
+                                            {parseFloat(String(campaign.costPerLead)).toLocaleString(undefined, withLatinDigits({
                                                 minimumFractionDigits: 2,
                                                 maximumFractionDigits: 2,
-                                            })}
+                                            }))}
                                         </td>
                                     </tr>
                                 ))}

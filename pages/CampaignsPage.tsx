@@ -7,9 +7,10 @@ import { Campaign } from '../types';
 import { CampaignsFilterDrawer } from '../components/drawers/CampaignsFilterDrawer';
 import { useCampaigns, useDeleteCampaign } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 
 const CampaignsTable = ({ campaigns, onEdit, onDelete }: { campaigns: Campaign[], onEdit: (campaign: Campaign) => void, onDelete: (id: number) => void }) => {
-    const { t } = useAppContext();
+    const { t, language } = useAppContext();
     
     return (
         <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
@@ -29,10 +30,10 @@ const CampaignsTable = ({ campaigns, onEdit, onDelete }: { campaigns: Campaign[]
                         // Format budget
                         const formattedBudget = campaign.budget && campaign.budget > 0 ? (() => {
                             const num = Number(campaign.budget);
-                            const formatted = num.toLocaleString('en-US', { 
+                            const formatted = num.toLocaleString('en-US', withLatinDigits({ 
                                 minimumFractionDigits: 0, 
                                 maximumFractionDigits: 2 
-                            });
+                            }));
                             return formatted.replace(/\.0+$/, '');
                         })() : '-';
                         
@@ -40,7 +41,7 @@ const CampaignsTable = ({ campaigns, onEdit, onDelete }: { campaigns: Campaign[]
                         const formattedDate = campaign.createdAt ? (() => {
                             try {
                                 const date = new Date(campaign.createdAt);
-                                return date.toLocaleDateString();
+                                return date.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }));
                             } catch {
                                 return campaign.createdAt;
                             }

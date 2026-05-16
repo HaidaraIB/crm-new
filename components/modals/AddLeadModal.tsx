@@ -11,7 +11,7 @@ import { Lead, PhoneNumber } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
 import { useCreateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
 import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
-import { buildLeadAssigneePickerOptions } from '../../utils/roles';
+import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole } from '../../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -32,7 +32,7 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 
 export const AddLeadModal = () => {
     const { isAddLeadModalOpen, setIsAddLeadModalOpen, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
-    const isDataEntryUser = currentUser?.role === 'DataEntry';
+    const isDataEntryUser = isDataEntryOnlyRole(currentUser?.role);
     
     // Fetch data using React Query
     const { data: usersResponse } = useUsers();
@@ -87,6 +87,7 @@ export const AddLeadModal = () => {
         status: getDefaultStatus() ?? '',
         leadCompanyName: '',
         profession: '',
+        residence: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -226,6 +227,7 @@ export const AddLeadModal = () => {
                 company: companyId,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
                 profession: formState.profession?.trim() || null,
+                residence: formState.residence?.trim() || null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
@@ -246,7 +248,7 @@ export const AddLeadModal = () => {
             const defaultUserId = isDataEntryUser ? '' : (currentUser?.id || users[0]?.id || '');
             setFormState({
                 name: '', phone: '', budget: '', budgetMax: '', assignedTo: defaultUserId.toString(),
-                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '', profession: '', notes: '',
+                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '', profession: '', residence: '', notes: '',
                 interestedDeveloper: '', interestedProject: '', interestedUnit: '',
             });
             setPhoneNumbers([]);
@@ -292,6 +294,10 @@ export const AddLeadModal = () => {
                     <div>
                         <Label htmlFor="profession">{t('profession')}</Label>
                         <Input id="profession" placeholder={t('enterProfession')} value={formState.profession} onChange={handleChange} />
+                    </div>
+                    <div>
+                        <Label htmlFor="residence">{t('residence')}</Label>
+                        <Input id="residence" placeholder={t('enterResidence')} value={formState.residence} onChange={handleChange} />
                     </div>
                     <LeadInterestInventoryFields
                         className="md:col-span-2"

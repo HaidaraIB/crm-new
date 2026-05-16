@@ -5,7 +5,7 @@ import { FilterIcon, UsersIcon, TargetIcon, CheckSquareIcon, DealIcon } from '..
 import { useLeads, useDeals, useActivities, useUsers, useClientTasks, useClientCalls } from '../hooks/useQueries';
 import { User } from '../types';
 import { showInLeadAssigneePicker } from '../utils/roles';
-import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { reportPageContainer } from '../components/reports/reportStyles';
 import { ReportHero } from '../components/reports/ReportHero';
 import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
@@ -30,7 +30,7 @@ export const TeamsReportPage = () => {
                 const s = new Date(startDate);
                 const e = new Date(endDate);
                 if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
-                    range = `${s.toLocaleDateString(locale)} — ${e.toLocaleDateString(locale)}`;
+                    range = `${s.toLocaleDateString(locale, withLatinDigits())} — ${e.toLocaleDateString(locale, withLatinDigits())}`;
                 }
             } catch {
                 /* ignore */
@@ -223,19 +223,19 @@ export const TeamsReportPage = () => {
                             />
                             <ReportSummaryTile
                                 title={t('totalLeads') || 'Total Leads'}
-                                value={teamStats.reduce((sum, team) => sum + team.totalLeads, 0).toLocaleString()}
+                                value={teamStats.reduce((sum, team) => sum + team.totalLeads, 0).toLocaleString(undefined, withLatinDigits())}
                                 accent="blue"
                                 icon={<TargetIcon />}
                             />
                             <ReportSummaryTile
                                 title={t('totalActivities') || 'Total Activities'}
-                                value={teamStats.reduce((sum, team) => sum + team.totalActivities, 0).toLocaleString()}
+                                value={teamStats.reduce((sum, team) => sum + team.totalActivities, 0).toLocaleString(undefined, withLatinDigits())}
                                 accent="emerald"
                                 icon={<CheckSquareIcon />}
                             />
                             <ReportSummaryTile
                                 title={t('totalDeals') || 'Total Deals'}
-                                value={teamStats.reduce((sum, team) => sum + team.totalDeals, 0).toLocaleString()}
+                                value={teamStats.reduce((sum, team) => sum + team.totalDeals, 0).toLocaleString(undefined, withLatinDigits())}
                                 accent="violet"
                                 icon={<DealIcon />}
                             />
@@ -264,23 +264,23 @@ export const TeamsReportPage = () => {
                                 {teamStats.map((team, index) => (
                                     <tr key={index} className={ReportTableDefaults.tbodyRow}>
                                         <td className={`${ReportTableDefaults.tbodyCell} font-semibold`}>{team.name}</td>
-                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalLeads.toLocaleString()}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalLeads.toLocaleString(undefined, withLatinDigits())}</td>
                                         <td className={`${ReportTableDefaults.tbodyCell} text-green-600 dark:text-green-400 font-semibold`}>
-                                            {team.touchedLeads.toLocaleString()}
+                                            {team.touchedLeads.toLocaleString(undefined, withLatinDigits())}
                                         </td>
                                         <td className={`${ReportTableDefaults.tbodyCell} text-amber-600 dark:text-amber-400 font-semibold`}>
-                                            {team.untouchedLeads.toLocaleString()}
+                                            {team.untouchedLeads.toLocaleString(undefined, withLatinDigits())}
                                         </td>
                                         <td className={`${ReportTableDefaults.tbodyCell} text-blue-600 dark:text-blue-400`}>
-                                            {team.followingLeads.toLocaleString()}
+                                            {team.followingLeads.toLocaleString(undefined, withLatinDigits())}
                                         </td>
                                         <td className={`${ReportTableDefaults.tbodyCell} text-purple-600 dark:text-purple-400`}>
-                                            {team.meetingLeads.toLocaleString()}
+                                            {team.meetingLeads.toLocaleString(undefined, withLatinDigits())}
                                         </td>
-                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalActivities.toLocaleString()}</td>
-                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalDeals.toLocaleString()}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalActivities.toLocaleString(undefined, withLatinDigits())}</td>
+                                        <td className={ReportTableDefaults.tbodyCell}>{team.totalDeals.toLocaleString(undefined, withLatinDigits())}</td>
                                         <td className={`${ReportTableDefaults.tbodyCell} text-emerald-600 dark:text-emerald-400 font-semibold`}>
-                                            {team.wonDeals.toLocaleString()}
+                                            {team.wonDeals.toLocaleString(undefined, withLatinDigits())}
                                         </td>
                                     </tr>
                                 ))}

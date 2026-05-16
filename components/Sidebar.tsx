@@ -83,6 +83,7 @@ export const Sidebar = () => {
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
     const normalizedCurrentRole = normalizeRole(currentUser?.role);
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
+    const isReceptionUser = normalizedCurrentRole === 'Reception';
 
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
@@ -155,6 +156,9 @@ export const Sidebar = () => {
                 return ['Properties', 'Owners'];
             case 'services':
                 return ['Services', 'Service Packages', 'Service Providers'];
+            case 'medical':
+                // Same pages as services; labels come from medical inventory terminology overrides.
+                return ['Services', 'Service Packages', 'Service Providers'];
             case 'products':
                 return ['Products', 'Product Categories', 'Suppliers'];
             default:
@@ -203,6 +207,9 @@ export const Sidebar = () => {
                     if (isDataEntryUser) {
                         return item.name === 'Leads';
                     }
+                    if (isReceptionUser) {
+                        return item.name === 'Leads' || item.name === 'Activities';
+                    }
                     // Hide Billing from main menu (it's shown in bottom section)
                     if (item.name === 'Billing') {
                         return false;
@@ -221,7 +228,7 @@ export const Sidebar = () => {
                         return false;
                     }
                     // Hide Employees item for employee role
-                    if (item.name === 'Employees' && normalizedCurrentRole === 'Employee') {
+                    if (item.name === 'Employees' && (normalizedCurrentRole === 'Employee' || normalizedCurrentRole === 'Doctor')) {
                         return false;
                     }
                     return true;
@@ -233,8 +240,11 @@ export const Sidebar = () => {
                     if (isDataEntryUser && item.name === 'Leads') {
                         subItems = ['All Leads'];
                     }
+                    if (isReceptionUser && item.name === 'Leads') {
+                        subItems = ['All Leads', 'CreateLead'];
+                    }
                     // Employees only see WhatsApp under Integrations (Chats + Template Management)
-                    if (item.name === 'Integrations' && normalizedCurrentRole === 'Employee') {
+                    if (item.name === 'Integrations' && (normalizedCurrentRole === 'Employee' || normalizedCurrentRole === 'Doctor')) {
                         subItems = ['WhatsApp'];
                     }
                     // Supervisor: filter sub-items by permission
@@ -280,7 +290,7 @@ export const Sidebar = () => {
                 })}
             </nav>
             <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700">
-                {normalizedCurrentRole !== 'Employee' && normalizedCurrentRole !== 'DataEntry' && (
+                {normalizedCurrentRole !== 'Employee' && normalizedCurrentRole !== 'DataEntry' && normalizedCurrentRole !== 'Doctor' && normalizedCurrentRole !== 'Reception' && (
                     <>
                         {normalizedCurrentRole !== 'Supervisor' && (
                             <SidebarItem

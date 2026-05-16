@@ -4,6 +4,8 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Card } from '../Card';
+import { MarqueeText } from '../MarqueeText';
+import { withLatinDigits } from '../../utils/dateUtils';
 import { useUsers, useLeads, useProjects, useUnits } from '../../hooks/useQueries';
 import { User } from '../../types';
 
@@ -82,7 +84,7 @@ export const ViewDealModal = () => {
         try {
             const date = new Date(dateStr);
             if (!isNaN(date.getTime())) {
-                return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                return date.toLocaleDateString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }));
             }
         } catch (e) {
             // Ignore parsing errors
@@ -95,7 +97,7 @@ export const ViewDealModal = () => {
         try {
             const date = new Date(dateStr);
             if (!isNaN(date.getTime())) {
-                return date.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                return date.toLocaleString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }));
             }
         } catch (e) {
             // Ignore parsing errors
@@ -129,6 +131,18 @@ export const ViewDealModal = () => {
     const safeDiscountPercentage = isNaN(discountPercentage) ? 0 : discountPercentage;
     const safeSalesCommissionPercentage = isNaN(salesCommissionPercentage) ? 0 : salesCommissionPercentage;
     const safeSalesCommissionAmount = isNaN(salesCommissionAmount) ? 0 : salesCommissionAmount;
+
+    const formatMoney = (n: number) => {
+        if (!(n > 0)) return '-';
+        const formatted = n.toLocaleString('en-US', withLatinDigits({
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 2,
+        }));
+        return formatted.replace(/\.0+$/, '');
+    };
+
+    const moneyValueClass =
+        'text-primary-700 dark:text-primary-100 tabular-nums';
 
     // Format stage
     const formatStage = (stage: string | undefined): string => {
@@ -205,13 +219,21 @@ export const ViewDealModal = () => {
                 {/* Header Card with Key Info */}
                 <Card>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('clientName') || 'Client Name'}</p>
-                            <p className="text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap">{viewingDeal.clientName || '-'}</p>
+                            <MarqueeText
+                                text={viewingDeal.clientName || '-'}
+                                className="w-full"
+                                contentClassName="text-base font-semibold text-gray-900 dark:text-white"
+                            />
                         </div>
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('lead') || 'Lead'}</p>
-                            <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{lead?.name || '-'}</p>
+                            <MarqueeText
+                                text={lead?.name || '-'}
+                                className="w-full"
+                                contentClassName="text-base font-medium text-gray-900 dark:text-white"
+                            />
                         </div>
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('stage') || 'Stage'}</p>
@@ -225,23 +247,19 @@ export const ViewDealModal = () => {
                                 {formatStatus(viewingDeal.status)}
                             </span>
                         </div>
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('totalValue') || 'Total Value'}</p>
-                            <p className="text-lg font-bold text-primary whitespace-nowrap">
-                                {safeTotalValue > 0 ? (() => {
-                                    const formatted = safeTotalValue.toLocaleString('en-US', { 
-                                        minimumFractionDigits: 0, 
-                                        maximumFractionDigits: 2 
-                                    });
-                                    return formatted.replace(/\.0+$/, '');
-                                })() : '-'}
+                            <p className={`text-lg font-bold whitespace-nowrap ${moneyValueClass}`}>
+                                {formatMoney(safeTotalValue)}
                             </p>
                         </div>
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('paymentMethod') || 'Payment Method'}</p>
-                            <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {formatPaymentMethod((viewingDeal as any).paymentMethod || (viewingDeal as any).payment_method)}
-                            </p>
+                            <MarqueeText
+                                text={formatPaymentMethod((viewingDeal as any).paymentMethod || (viewingDeal as any).payment_method)}
+                                className="w-full"
+                                contentClassName="text-base font-medium text-gray-900 dark:text-white"
+                            />
                         </div>
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('startDate') || 'Start Date'}</p>
@@ -257,27 +275,39 @@ export const ViewDealModal = () => {
                         </div>
                         {isRealEstate && (
                             <>
-                                <div className="text-center">
+                                <div className="min-w-0 text-center">
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('project') || 'Project'}</p>
-                                    <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{project?.name || (viewingDeal as any).project_name || viewingDeal.project || '-'}</p>
+                                    <MarqueeText
+                                        text={String(project?.name || (viewingDeal as any).project_name || viewingDeal.project || '-')}
+                                        className="w-full"
+                                        contentClassName="text-base font-medium text-gray-900 dark:text-white"
+                                    />
                                 </div>
-                                <div className="text-center">
+                                <div className="min-w-0 text-center">
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('unit') || 'Unit'}</p>
-                                    <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">{unit?.code || (viewingDeal as any).unit_code || viewingDeal.unit || '-'}</p>
+                                    <MarqueeText
+                                        text={String(unit?.code || (viewingDeal as any).unit_code || viewingDeal.unit || '-')}
+                                        className="w-full"
+                                        contentClassName="text-base font-medium text-gray-900 dark:text-white"
+                                    />
                                 </div>
                             </>
                         )}
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('startedBy') || 'Started By'}</p>
-                            <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {startedByUser ? getUserDisplayName(startedByUser, t) : '-'}
-                            </p>
+                            <MarqueeText
+                                text={startedByUser ? getUserDisplayName(startedByUser, t) : '-'}
+                                className="w-full"
+                                contentClassName="text-base font-medium text-gray-900 dark:text-white"
+                            />
                         </div>
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('closedBy') || 'Closed By'}</p>
-                            <p className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {closedByUser ? getUserDisplayName(closedByUser, t) : '-'}
-                            </p>
+                            <MarqueeText
+                                text={closedByUser ? getUserDisplayName(closedByUser, t) : '-'}
+                                className="w-full"
+                                contentClassName="text-base font-medium text-gray-900 dark:text-white"
+                            />
                         </div>
                     </div>
                 </Card>
@@ -293,10 +323,10 @@ export const ViewDealModal = () => {
                                 <span className="text-sm text-gray-600 dark:text-gray-400">{t('originalValue') || 'Original Value'}</span>
                                 <span className="text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap text-right">
                                     {safeOriginalValue > 0 ? (() => {
-                                        const formatted = safeOriginalValue.toLocaleString('en-US', { 
+                                        const formatted = safeOriginalValue.toLocaleString('en-US', withLatinDigits({ 
                                             minimumFractionDigits: 0, 
                                             maximumFractionDigits: 2 
-                                        });
+                                        }));
                                         return formatted.replace(/\.0+$/, '');
                                     })() : '-'}
                                 </span>
@@ -309,24 +339,18 @@ export const ViewDealModal = () => {
                                 <span className="text-sm text-gray-600 dark:text-gray-400">{t('discountAmount') || 'Discount Amount'}</span>
                                 <span className="text-base font-medium text-gray-900 dark:text-white whitespace-nowrap text-right">
                                     {safeDiscountAmount > 0 ? (() => {
-                                        const formatted = safeDiscountAmount.toLocaleString('en-US', { 
+                                        const formatted = safeDiscountAmount.toLocaleString('en-US', withLatinDigits({ 
                                             minimumFractionDigits: 0, 
                                             maximumFractionDigits: 2 
-                                        });
+                                        }));
                                         return formatted.replace(/\.0+$/, '');
                                     })() : '-'}
                                 </span>
                             </div>
-                            <div className="flex justify-between items-center py-2 bg-primary/10 dark:bg-primary/20 rounded-lg px-3">
-                                <span className="text-sm font-semibold text-gray-900 dark:text-white">{t('totalValue') || 'Total Value'}</span>
-                                <span className="text-lg font-bold text-primary whitespace-nowrap text-right">
-                                    {safeTotalValue > 0 ? (() => {
-                                        const formatted = safeTotalValue.toLocaleString('en-US', { 
-                                            minimumFractionDigits: 0, 
-                                            maximumFractionDigits: 2 
-                                        });
-                                        return formatted.replace(/\.0+$/, '');
-                                    })() : '-'}
+                            <div className="flex justify-between items-center gap-3 py-2 rounded-lg px-3 bg-primary/10 dark:bg-slate-900/95 dark:ring-1 dark:ring-inset dark:ring-primary-400/45">
+                                <span className="text-sm font-semibold text-gray-900 dark:text-white shrink-0">{t('totalValue') || 'Total Value'}</span>
+                                <span className={`text-lg font-bold whitespace-nowrap text-right ${moneyValueClass}`}>
+                                    {formatMoney(safeTotalValue)}
                                 </span>
                             </div>
                         </div>
@@ -341,10 +365,10 @@ export const ViewDealModal = () => {
                                 <span className="text-sm text-gray-600 dark:text-gray-400">{t('salesCommissionAmount') || t('salesCommissionAmount') || 'Sales Commission Amount'}</span>
                                 <span className="text-base font-semibold text-gray-900 dark:text-white whitespace-nowrap text-right">
                                     {safeSalesCommissionAmount > 0 ? (() => {
-                                        const formatted = safeSalesCommissionAmount.toLocaleString('en-US', { 
+                                        const formatted = safeSalesCommissionAmount.toLocaleString('en-US', withLatinDigits({
                                             minimumFractionDigits: 0, 
                                             maximumFractionDigits: 2 
-                                        });
+                                        }));
                                         return formatted.replace(/\.0+$/, '');
                                     })() : '-'}
                                 </span>
@@ -367,27 +391,33 @@ export const ViewDealModal = () => {
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('closedDate') || 'Closed Date'}</p>
                             <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">{formatDate(closedDate)}</p>
                         </div>
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('startedBy') || 'Started By'}</p>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {startedByUser ? getUserDisplayName(startedByUser, t) : '-'}
-                            </p>
+                            <MarqueeText
+                                text={startedByUser ? getUserDisplayName(startedByUser, t) : '-'}
+                                className="w-full"
+                                contentClassName="text-sm font-medium text-gray-900 dark:text-white"
+                            />
                         </div>
-                        <div className="text-center">
+                        <div className="min-w-0 text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('closedBy') || 'Closed By'}</p>
-                            <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                {closedByUser ? getUserDisplayName(closedByUser, t) : '-'}
-                            </p>
+                            <MarqueeText
+                                text={closedByUser ? getUserDisplayName(closedByUser, t) : '-'}
+                                className="w-full"
+                                contentClassName="text-sm font-medium text-gray-900 dark:text-white"
+                            />
                         </div>
                         {viewingDeal.employee && (
-                            <div className="text-center">
+                            <div className="min-w-0 text-center">
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('employee') || 'Employee'}</p>
-                                <p className="text-sm font-medium text-gray-900 dark:text-white whitespace-nowrap">
-                                    {(() => {
+                                <MarqueeText
+                                    text={(() => {
                                         const employee = users.find((u: any) => u.id === viewingDeal.employee);
                                         return employee ? getUserDisplayName(employee, t) : '-';
                                     })()}
-                                </p>
+                                    className="w-full"
+                                    contentClassName="text-sm font-medium text-gray-900 dark:text-white"
+                                />
                             </div>
                         )}
                     </div>

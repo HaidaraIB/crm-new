@@ -5,9 +5,9 @@ import { useAppContext } from '../context/AppContext';
 import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
-import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
-import { normalizeRole, getRoleTranslation } from '../utils/roles';
+import { normalizeRole, getRoleTranslation, isAssignedClinicalAppRole } from '../utils/roles';
 import { MissionBar, MissionItem } from '../components/dashboard/MissionBar';
 import { SmartInsights } from '../components/dashboard/SmartInsights';
 import { HotLeadsCard, HotLeadItem } from '../components/dashboard/HotLeadsCard';
@@ -351,7 +351,7 @@ export const DashboardPage = () => {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
-            const dateStr = date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+            const dateStr = date.toLocaleDateString(locale, withLatinDigits({ month: 'short', day: 'numeric' }));
             
             const leadsCount = leads.filter(lead => {
                 const createdAt = (lead as any).created_at || lead.createdAt;
@@ -454,7 +454,12 @@ export const DashboardPage = () => {
 
                 return {
                     id: lead.id,
-                    date: createdAt ? new Date(createdAt).toLocaleDateString() : '',
+                    date: createdAt
+                        ? new Date(createdAt).toLocaleDateString(
+                              language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+                              withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }),
+                          )
+                        : '',
                     user: user?.name || lead.assigned_to_username || t('unknown'),
                     lead: lead.name || '',
                     stage: lead.last_stage || lead.lastStage || '',
@@ -462,7 +467,7 @@ export const DashboardPage = () => {
                     leadObj: lead ?? null,
                 };
             });
-    }, [leads, users, t]);
+    }, [leads, users, t, language]);
     
     // Leads to contact today - detailed list
     const leadsToContactTodayList = useMemo(() => {
@@ -606,7 +611,7 @@ export const DashboardPage = () => {
         clientVisits.forEach((v: any) => pushActivity(v.client || v.clientId, v.created_at || v.createdAt || v.visit_datetime));
 
         const visibleLeads = leads.filter((lead: any) => {
-            if (normalizeRole(currentUser?.role) === 'Employee') {
+            if (isAssignedClinicalAppRole(currentUser?.role)) {
                 return (lead.assigned_to || lead.assignedTo) === currentUser?.id;
             }
             return true;
@@ -749,7 +754,10 @@ export const DashboardPage = () => {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         return users
-            .filter((u: any) => normalizeRole(u.role) === 'Employee' || normalizeRole(u.role) === 'DataEntry')
+            .filter((u: any) => {
+                const ur = normalizeRole(u.role);
+                return ur === 'Employee' || ur === 'Doctor' || ur === 'DataEntry';
+            })
             .map((u: any) => {
                 const progress = clientTasks.filter((ct: any) => {
                     const by = ct.created_by || ct.createdBy;
@@ -771,7 +779,7 @@ export const DashboardPage = () => {
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
-            const dateStr = date.toLocaleDateString(locale, { month: 'short', day: 'numeric' });
+            const dateStr = date.toLocaleDateString(locale, withLatinDigits({ month: 'short', day: 'numeric' }));
             const count = leads.filter((lead: any) => {
                 const createdAt = new Date((lead as any).created_at || lead.createdAt || 0);
                 createdAt.setHours(0, 0, 0, 0);
@@ -787,7 +795,14 @@ export const DashboardPage = () => {
         const isMorning = hour >= 5 && hour < 12;
         return isMorning ? t('goodMorning') : t('goodAfternoon');
     }, [t]);
-    const todayDateStr = useMemo(() => new Date().toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }), [language]);
+    const todayDateStr = useMemo(
+        () =>
+            new Date().toLocaleDateString(
+                language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+                withLatinDigits({ weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' }),
+            ),
+        [language],
+    );
 
     const isDark = theme === 'dark';
     const {
@@ -1281,11 +1296,11 @@ export const DashboardPage = () => {
                                         {leadsToContactTodayList.map((item) => {
                                             const lead = item.lead;
                                             const reminderTime = item.reminderDate 
-                                                ? new Date(item.reminderDate).toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', { 
+                                                ? new Date(item.reminderDate).toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ 
                                                     hour: '2-digit', 
                                                     minute: '2-digit',
                                                     hour12: language === 'ar' ? false : true
-                                                })
+                                                }))
                                                 : '';
                                             
                                             return (
@@ -1463,7 +1478,7 @@ export const DashboardPage = () => {
                                             {user.name}
                                         </p>
                                         <p className="text-xs text-gray-600 dark:text-gray-400 truncate mt-0.5">
-                                            {getRoleTranslation(user.role, t)}
+                                            {getRoleTranslation(user.role, t, currentUser?.company?.specialization)}
                                         </p>
                                         <div className="flex items-center gap-1.5 mt-1.5">
                                             <div className={`w-2 h-2 rounded-full ${index === 0 ? 'bg-yellow-400' : 'bg-gray-400'}`}></div>
@@ -1508,7 +1523,7 @@ export const DashboardPage = () => {
                                                 {user.name || user.username || user.email}
                                             </p>
                                             <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                {getRoleTranslation(user.role, t)}
+                                                {getRoleTranslation(user.role, t, currentUser?.company?.specialization)}
                                             </p>
                                         </div>
                                         <div className="flex items-center gap-2">

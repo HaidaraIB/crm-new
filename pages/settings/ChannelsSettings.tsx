@@ -5,6 +5,7 @@ import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/in
 import { Channel } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useChannels, useDeleteChannel, useUpdateChannel } from '../../hooks/useQueries';
+import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
 
 
 export const ChannelsSettings = () => {
@@ -172,14 +173,12 @@ export const ChannelsSettings = () => {
                                                 {t('default')}
                                             </span>
                                         ) : (
-                                            <button
-                                                type="button"
-                                                className="text-xs text-primary hover:underline"
+                                            <SetAsDefaultButton
                                                 onClick={() => handleSetDefaultChannel(channel)}
                                                 disabled={updateChannelMutation.isPending}
                                             >
                                                 {t('setAsDefault') || 'Set as default'}
-                                            </button>
+                                            </SetAsDefaultButton>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">

@@ -11,6 +11,7 @@ import { AddSupplierModal } from '../components/modals/AddSupplierModal';
 import { EditSupplierModal } from '../components/modals/EditSupplierModal';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
+import { withLatinDigits } from '../utils/dateUtils';
 
 type Tab = 'products' | 'categories' | 'suppliers';
 
@@ -40,8 +41,8 @@ const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Pr
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{product.code}</td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{product.name}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{product.category}</td>
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{product.price.toLocaleString()}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{product.cost.toLocaleString()}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{product.price.toLocaleString(undefined, withLatinDigits())}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{product.cost.toLocaleString(undefined, withLatinDigits())}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${product.stock > 10 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : product.stock > 0 ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
                                             {product.stock}

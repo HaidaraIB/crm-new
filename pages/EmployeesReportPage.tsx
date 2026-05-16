@@ -6,7 +6,7 @@ import { useLeads, useDeals, useActivities, useUsers, useClientTasks, useClientC
 import { User } from '../types';
 import { translations } from '../constants';
 import { showInLeadAssigneePicker } from '../utils/roles';
-import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { reportPageContainer } from '../components/reports/reportStyles';
 import { ReportHero } from '../components/reports/ReportHero';
 import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
@@ -47,7 +47,7 @@ export const EmployeesReportPage = () => {
                 const s = new Date(startDate);
                 const e = new Date(endDate);
                 if (!Number.isNaN(s.getTime()) && !Number.isNaN(e.getTime())) {
-                    range = `${s.toLocaleDateString(locale)} — ${e.toLocaleDateString(locale)}`;
+                    range = `${s.toLocaleDateString(locale, withLatinDigits())} — ${e.toLocaleDateString(locale, withLatinDigits())}`;
                 }
             } catch {
                 /* ignore */
@@ -237,25 +237,25 @@ export const EmployeesReportPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     <ReportSummaryTile
                         title={t('totalCalls')}
-                        value={totalCalls.toLocaleString()}
+                        value={totalCalls.toLocaleString(undefined, withLatinDigits())}
                         accent="indigo"
                         icon={<PhoneIcon />}
                     />
                     <ReportSummaryTile
                         title={t('answered')}
-                        value={answeredCalls.toLocaleString()}
+                        value={answeredCalls.toLocaleString(undefined, withLatinDigits())}
                         accent="emerald"
                         icon={<CheckIcon />}
                     />
                     <ReportSummaryTile
                         title={t('notAnswered')}
-                        value={notAnsweredCalls.toLocaleString()}
+                        value={notAnsweredCalls.toLocaleString(undefined, withLatinDigits())}
                         accent="violet"
                         icon={<ClockIcon />}
                     />
                     <ReportSummaryTile
                         title={t('employees')}
-                        value={employeeStats.length.toLocaleString()}
+                        value={employeeStats.length.toLocaleString(undefined, withLatinDigits())}
                         accent="blue"
                         icon={<UsersIcon />}
                     />
@@ -283,7 +283,7 @@ export const EmployeesReportPage = () => {
                                     <tr key={emp.id} className={ReportTableDefaults.tbodyRow}>
                                         {reportColumns.map(col => {
                                             const value = emp[col.accessor as keyof typeof emp];
-                                            const displayValue = typeof value === 'number' ? value.toLocaleString() : String(value ?? '');
+                                            const displayValue = typeof value === 'number' ? value.toLocaleString(undefined, withLatinDigits()) : String(value ?? '');
                                             return (
                                                 <td key={col.accessor} className={ReportTableDefaults.tbodyCell}>
                                                     {displayValue}

@@ -38,7 +38,8 @@ export const SettingsPage = () => {
     const { t, currentUser } = useAppContext();
     const showVisitTypes =
         currentUser?.company?.specialization === 'real_estate' ||
-        currentUser?.company?.specialization === 'services';
+        currentUser?.company?.specialization === 'services' ||
+        currentUser?.company?.specialization === 'medical';
 
     const tabs: SettingsTab[] = useMemo(
         () => [

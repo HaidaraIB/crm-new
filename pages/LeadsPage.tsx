@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState, AssigneeFilter } from '../components/index';
-import { TrashIcon, ChevronDownIcon, FacebookIcon, SearchIcon } from '../components/icons';
+import { TrashIcon, ChevronDownIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead } from '../types';
@@ -13,6 +13,7 @@ import { getCompanyViewLeadRoute } from '../utils/routing';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { formatLeadBudget, leadBudgetOverlapsFilter } from '../utils/budgetRange';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -260,6 +261,10 @@ export const LeadsPage = () => {
         setSuccessMessage,
     } = useAppContext();
     const isDataEntryUser = normalizeRole(currentUser?.role) === 'DataEntry';
+    const isMedicalCompany = useMemo(
+        () => String(currentUser?.company?.specialization || '').toLowerCase() === 'medical',
+        [currentUser?.company?.specialization],
+    );
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
     const [leadsPageSize, setLeadsPageSize] = useState(20);
     
@@ -496,7 +501,12 @@ export const LeadsPage = () => {
                     (l as any).created_by_name ??
                     (l as { createdByName?: string | null }).createdByName ??
                     '',
-                createdAt: l.createdAt ? new Date(l.createdAt).toLocaleString() : '',
+                createdAt: l.createdAt
+                    ? new Date(l.createdAt).toLocaleString(
+                          language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+                          withLatinDigits({ dateStyle: 'short', timeStyle: 'short' }),
+                      )
+                    : '',
             };
         });
         const columns = [
@@ -884,6 +894,11 @@ export const LeadsPage = () => {
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('name')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('leadCompanyName')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('profession')}</th>
+                                        {isMedicalCompany && (
+                                            <th scope="col" className="px-4 sm:px-6 py-3 hidden md:table-cell text-center whitespace-nowrap">
+                                                {t('patientFileNumber')}
+                                            </th>
+                                        )}
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('phone')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('source') || 'Source'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('createdBy') || 'Created by'}</th>
@@ -933,6 +948,13 @@ export const LeadsPage = () => {
                                                 <td className="px-4 sm:px-6 py-4 hidden lg:table-cell text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">
                                                     {(lead as any).profession && String((lead as any).profession).trim() !== '' ? (lead as any).profession : '-'}
                                                 </td>
+                                                {isMedicalCompany && (
+                                                    <td className="px-4 sm:px-6 py-4 hidden md:table-cell text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                                                        {(lead as Lead).patientFileNumber ??
+                                                            (lead as any).patient_file_number ??
+                                                            '-'}
+                                                    </td>
+                                                )}
                                                 <td className="px-4 sm:px-6 py-4 text-center">
                                                     {isDataEntryUser ? (
                                                         <span className="text-sm text-gray-900 dark:text-gray-100" dir="ltr">
@@ -1110,6 +1132,7 @@ export const LeadsPage = () => {
                                                         } else if (source === 'tiktok') {
                                                             return (
                                                                 <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                                    <TikTokIcon className="w-3 h-3 text-gray-900 dark:text-white" />
                                                                     {t('tiktokSource') || 'TikTok'}
                                                                 </span>
                                                             );
@@ -1253,9 +1276,9 @@ export const LeadsPage = () => {
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
                                                     {(lead as any).created_at ? 
-                                                        new Date((lead as any).created_at).toLocaleDateString() : 
+                                                        new Date((lead as any).created_at).toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : 
                                                         lead.createdAt ? 
-                                                            new Date(lead.createdAt).toLocaleDateString() : 
+                                                            new Date(lead.createdAt).toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : 
                                                             '-'}
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 text-center">

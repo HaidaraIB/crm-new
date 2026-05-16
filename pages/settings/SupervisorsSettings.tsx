@@ -150,7 +150,14 @@ export const SupervisorsSettings = () => {
 
   const inventoryPermKeys: (keyof Supervisor)[] = ['can_manage_products', 'can_manage_services', 'can_manage_real_estate'];
   const specialization = currentUser?.company?.specialization;
-  const allowedInventoryKey = specialization === 'real_estate' ? 'can_manage_real_estate' : specialization === 'products' ? 'can_manage_products' : specialization === 'services' ? 'can_manage_services' : null;
+  const allowedInventoryKey =
+      specialization === 'real_estate'
+          ? 'can_manage_real_estate'
+          : specialization === 'products'
+              ? 'can_manage_products'
+              : specialization === 'services' || specialization === 'medical'
+                  ? 'can_manage_services'
+                  : null;
   const allPermKeys = Object.keys(permissionLabels) as (keyof Supervisor)[];
   const permKeys = allPermKeys.filter((k) => {
     if (inventoryPermKeys.includes(k)) return k === allowedInventoryKey;

@@ -7,6 +7,7 @@ import { Developer, Project, Unit } from '../types';
 import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
+import { withLatinDigits } from '../utils/dateUtils';
 
 type Tab = 'units' | 'projects' | 'developers';
 
@@ -163,10 +164,10 @@ const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: Unit[], onU
                                 // Format price like budget: comma-separated with trailing zeros removed
                                 const formattedPrice = (() => {
                                     const num = Number(unit.price);
-                                    const formatted = num.toLocaleString('en-US', { 
+                                    const formatted = num.toLocaleString('en-US', withLatinDigits({ 
                                         minimumFractionDigits: 0, 
                                         maximumFractionDigits: 2 
-                                    });
+                                    }));
                                     return formatted.replace(/\.0+$/, '');
                                 })();
                                 

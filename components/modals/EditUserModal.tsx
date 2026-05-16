@@ -1,6 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { isMedicalSpecialization } from '../../utils/medicalTranslationOverrides';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
@@ -22,7 +23,12 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 );
 
 export const EditUserModal = () => {
-    const { isEditUserModalOpen, setIsEditUserModalOpen, selectedUser, t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isEditUserModalOpen, setIsEditUserModalOpen, selectedUser, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+
+    const isMedicalCompany = useMemo(
+        () => isMedicalSpecialization(currentUser?.company?.specialization),
+        [currentUser?.company?.specialization]
+    );
     
     // Update user mutation
     const updateUserMutation = useUpdateUser();
@@ -53,6 +59,22 @@ export const EditUserModal = () => {
         if (selectedUser && isEditUserModalOpen) {
             const normalizedRole = normalizeRoleForApi(selectedUser.role);
             
+            // Medical: doctor/reception only. Non-medical: employee/data_entry only (no clinic role labels).
+            let roleForForm = normalizedRole;
+            if (isMedicalCompany) {
+                if (normalizedRole === 'data_entry' || normalizedRole === 'reception') {
+                    roleForForm = 'reception';
+                } else if (normalizedRole === 'employee' || normalizedRole === 'doctor') {
+                    roleForForm = 'doctor';
+                }
+            } else {
+                if (normalizedRole === 'doctor') {
+                    roleForForm = 'employee';
+                } else if (normalizedRole === 'reception') {
+                    roleForForm = 'data_entry';
+                }
+            }
+            
             // Get name from first_name + last_name or fallback to name
             const fullName = selectedUser.first_name || selectedUser.last_name
                 ? [selectedUser.first_name, selectedUser.last_name].filter(Boolean).join(' ').trim()
@@ -64,13 +86,13 @@ export const EditUserModal = () => {
                 phone: selectedUser.phone || '',
                 email: selectedUser.email || '',
                 password: '',
-                role: normalizedRole,
+                role: roleForForm,
                 weeklyDayOff:
                     wdo !== undefined && wdo !== null ? String(wdo) : '',
             });
             setPasswordVisible(false);
         }
-    }, [selectedUser, isEditUserModalOpen]);
+    }, [selectedUser, isEditUserModalOpen, isMedicalCompany]);
 
     const validatePhone = (phone: string): string | null => {
         if (!phone.trim()) {
@@ -166,7 +188,7 @@ export const EditUserModal = () => {
             phone: '',
             email: '',
             password: '',
-            role: 'employee',
+            role: isMedicalCompany ? 'doctor' : 'employee',
             weeklyDayOff: '',
         });
         setErrors({});
@@ -203,7 +225,12 @@ export const EditUserModal = () => {
                 password: formState.password || undefined,
                 role: roleToSend,
             };
-            if (roleToSend === 'employee' || roleToSend === 'data_entry') {
+            if (
+                roleToSend === 'employee' ||
+                roleToSend === 'data_entry' ||
+                roleToSend === 'doctor' ||
+                roleToSend === 'reception'
+            ) {
                 payload.weekly_day_off =
                     formState.weeklyDayOff === '' ? null : parseInt(formState.weeklyDayOff, 10);
             }
@@ -336,14 +363,23 @@ export const EditUserModal = () => {
                     <div>
                         <Label htmlFor="edit-user-role">{t('role')}</Label>
                         <Select id="edit-user-role" value={formState.role} onChange={handleChange}>
-                            <option value="employee">{t('employee')}</option>
-                            <option value="data_entry">{t('dataEntry')}</option>
+                            {isMedicalCompany ? (
+                                <>
+                                    <option value="doctor">{t('doctor')}</option>
+                                    <option value="reception">{t('reception')}</option>
+                                </>
+                            ) : (
+                                <>
+                                    <option value="employee">{t('employee')}</option>
+                                    <option value="data_entry">{t('dataEntry')}</option>
+                                </>
+                            )}
                         </Select>
                         {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                     </div>
                 )}
                 {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
-                    (formState.role === 'employee' || formState.role === 'data_entry') && (
+                    (formState.role === 'employee' || formState.role === 'data_entry' || formState.role === 'doctor' || formState.role === 'reception') && (
                     <div>
                         <Label htmlFor="edit-user-weeklyDayOff">{t('weeklyDayOff')}</Label>
                         <Select

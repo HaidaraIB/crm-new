@@ -5,6 +5,7 @@
 
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
+import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
 import { normalizeUser } from '../utils/userUtils';
 import {
   getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientEventsAPI,
@@ -130,6 +131,8 @@ function normalizeLead(lead: any): any {
     ...lead,
     leadCompanyName: lead.leadCompanyName ?? lead.lead_company_name ?? undefined,
     profession: lead.profession ?? undefined,
+    residence: lead.residence ?? undefined,
+    patientFileNumber: lead.patientFileNumber ?? lead.patient_file_number ?? undefined,
     budgetMax: lead.budgetMax ?? lead.budget_max ?? undefined,
     lastFeedback: lead.lastFeedback ?? lead.last_feedback ?? undefined,
     lastStage: lead.lastStage ?? lead.last_stage ?? undefined,
@@ -325,7 +328,7 @@ export const useOwners = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey'
 export const useServices = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
   const { currentUser } = useAppContext();
   const specialization = currentUser?.company?.specialization;
-  const shouldEnable = specialization === 'services';
+  const shouldEnable = companyHasServiceInventory(specialization);
   const { enabled: optionsEnabled, ...restOptions } = options || {};
   
   return useQuery({
@@ -340,7 +343,7 @@ export const useServices = (options?: Omit<UseQueryOptions<any, Error>, 'queryKe
 export const useServicePackages = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
   const { currentUser } = useAppContext();
   const specialization = currentUser?.company?.specialization;
-  const shouldEnable = specialization === 'services';
+  const shouldEnable = companyHasServiceInventory(specialization);
   const { enabled: optionsEnabled, ...restOptions } = options || {};
   
   return useQuery({
@@ -355,7 +358,7 @@ export const useServicePackages = (options?: Omit<UseQueryOptions<any, Error>, '
 export const useServiceProviders = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
   const { currentUser } = useAppContext();
   const specialization = currentUser?.company?.specialization;
-  const shouldEnable = specialization === 'services';
+  const shouldEnable = companyHasServiceInventory(specialization);
   const { enabled: optionsEnabled, ...restOptions } = options || {};
   
   return useQuery({

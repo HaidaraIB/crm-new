@@ -7,6 +7,7 @@ import {
     type CreatePaymentSessionResult,
     type CheckPaymentStatusResponse,
 } from '../services/api';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 
 type FibPaymentData = {
     payment_id: string;
@@ -279,7 +280,7 @@ export const PaymentPage = () => {
                     {fibPaymentData.valid_until && (
                         <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-2">
                             {language === 'ar' ? 'صالح حتى: ' : 'Valid until: '}
-                            {new Date(fibPaymentData.valid_until).toLocaleString()}
+                            {new Date(fibPaymentData.valid_until).toLocaleString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))}
                         </p>
                     )}
                 </Card>

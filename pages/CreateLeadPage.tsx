@@ -7,7 +7,7 @@ import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useCreateLead } from '../hooks/useQueries';
 import { getCompanyRoute } from '../utils/routing';
 import { isUserOnWeeklyDayOff } from '../utils/weekOff';
-import { buildLeadAssigneePickerOptions } from '../utils/roles';
+import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole, normalizeRole } from '../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -28,7 +28,11 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 
 export const CreateLeadPage = () => {
     const { t, setCurrentPage, currentUser } = useAppContext();
-    const isDataEntryUser = currentUser?.role === 'DataEntry';
+    const isDataEntryUser = isDataEntryOnlyRole(currentUser?.role);
+    const postCreateNavigateToAllLeads =
+        isDataEntryUser || normalizeRole(currentUser?.role) === 'Reception';
+    const isMedicalCompany =
+        String(currentUser?.company?.specialization || '').toLowerCase() === 'medical';
 
     // جلب البيانات عبر React Query بدلاً من السياق
     const { data: usersResponse } = useUsers();
@@ -84,6 +88,7 @@ export const CreateLeadPage = () => {
         status: '',
         leadCompanyName: '',
         profession: '',
+        residence: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -319,6 +324,7 @@ export const CreateLeadPage = () => {
                 company: currentUser?.company?.id || null,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
                 profession: formState.profession?.trim() || null,
+                residence: formState.residence?.trim() ? formState.residence.trim() : null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
@@ -333,7 +339,7 @@ export const CreateLeadPage = () => {
             }
             
             await createLeadMutation.mutateAsync(leadData);
-            if (isDataEntryUser && currentUser?.company) {
+            if (postCreateNavigateToAllLeads && currentUser?.company) {
                 const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads');
                 window.history.pushState({}, '', route);
                 setCurrentPage('All Leads');
@@ -365,6 +371,7 @@ export const CreateLeadPage = () => {
                     interested_developer: t('interestedDeveloper') || 'Developer',
                     interested_project: t('interestedProject') || 'Project',
                     interested_unit: t('interestedUnit') || 'Unit',
+                    residence: t('residence') || 'Residence',
                 };
                 
                 Object.keys(error.fields).forEach(field => {
@@ -470,6 +477,17 @@ export const CreateLeadPage = () => {
                                 onChange={handleChange}
                             />
                         </div>
+                        {isMedicalCompany && (
+                            <div>
+                                <Label htmlFor="residence">{t('residence')}</Label>
+                                <Input
+                                    id="residence"
+                                    placeholder={t('enterResidence')}
+                                    value={formState.residence}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        )}
                         <LeadInterestInventoryFields
                             className="md:col-span-2 lg:col-span-3"
                             idPrefix="create-lead-inv"
@@ -649,7 +667,7 @@ export const CreateLeadPage = () => {
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => {
-                            if (isDataEntryUser && currentUser?.company) {
+                            if (postCreateNavigateToAllLeads && currentUser?.company) {
                                 window.history.pushState({}, '', getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads'));
                                 setCurrentPage('All Leads');
                             } else {

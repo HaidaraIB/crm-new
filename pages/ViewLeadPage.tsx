@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
-import { formatDateToLocal, formatDateTimeToLocal } from '../utils/dateUtils';
+import { formatDateToLocal, formatDateTimeToLocal, withLatinDigits } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import { BriefcaseIcon, ChevronDownIcon, MapPinIcon } from '../components/icons';
@@ -504,7 +504,8 @@ export const ViewLeadPage = () => {
 
     const showVisitActions =
         currentUser?.company?.specialization === 'real_estate' ||
-        currentUser?.company?.specialization === 'services';
+        currentUser?.company?.specialization === 'services' ||
+        currentUser?.company?.specialization === 'medical';
 
     const timelineHistory = useMemo(() => {
         if (!displayLead) return [];
@@ -555,7 +556,7 @@ export const ViewLeadPage = () => {
                         minute: '2-digit',
                         hour12: true
                     };
-                    return date.toLocaleString('en-US', options);
+                    return date.toLocaleString('en-US', withLatinDigits(options));
                 } catch {
                     return '';
                 }
@@ -601,7 +602,7 @@ export const ViewLeadPage = () => {
                         minute: '2-digit',
                         hour12: true,
                     };
-                    return date.toLocaleString('en-US', options);
+                    return date.toLocaleString('en-US', withLatinDigits(options));
                 } catch {
                     return '';
                 }
@@ -866,6 +867,16 @@ export const ViewLeadPage = () => {
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('profession')}</label>
                             <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : '—'}</p>
                         </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('residence')}</label>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : '—'}</p>
+                        </div>
+                        {(displayLead as Lead).patientFileNumber != null && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('patientFileNumber')}</label>
+                                <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead as Lead).patientFileNumber ?? (displayLead as any).patient_file_number}</p>
+                            </div>
+                        )}
                         {currentUser?.company?.specialization === 'real_estate' && (
                             <div className="md:col-span-1 space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
                                 <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">

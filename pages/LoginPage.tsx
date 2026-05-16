@@ -182,7 +182,7 @@ export const LoginPage = () => {
                     id: typeof userData.company === 'object' ? userData.company.id : userData.company,
                     name: userData.company_name || (typeof userData.company === 'object' ? userData.company.name : 'Unknown Company'),
                     domain: userData.company_domain || (typeof userData.company === 'object' ? userData.company.domain : undefined),
-                    specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products',
+                    specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products' | 'medical',
                 } : undefined,
                 language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
             };

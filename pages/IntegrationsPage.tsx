@@ -3,7 +3,8 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Modal, PlusIcon, FacebookIcon, TikTokIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, SmsIcon, PageLoadingState, SectionLoadingState } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState } from '../components/index';
+import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
 import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, type MetaHealthResponse } from '../services/api';
@@ -18,6 +19,7 @@ import { StartNewConversationModal } from '../components/modals/StartNewConversa
 import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components/icons';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 
 type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
 
@@ -30,10 +32,10 @@ type PlatformDetails = {
 
 const templateCategoryKey: Record<string, string> = { auth: 'categoryAuth', marketing: 'categoryMarketing', utility: 'categoryUtility' };
 
-const platformConfig: Record<string, { name: string, icon: React.FC<React.SVGProps<SVGSVGElement>>, dataKey: keyof ReturnType<typeof useAppContext>['connectedAccounts'] }> = {
-    'Meta': { name: 'Meta', icon: FacebookIcon, dataKey: 'facebook' },
-    'TikTok': { name: 'TikTok', icon: TikTokIcon, dataKey: 'tiktok' },
-    'WhatsApp': { name: 'WhatsApp', icon: WhatsappIcon, dataKey: 'whatsapp' },
+const platformConfig: Record<string, { name: string; dataKey: keyof ReturnType<typeof useAppContext>['connectedAccounts'] }> = {
+    Meta: { name: 'Meta', dataKey: 'facebook' },
+    TikTok: { name: 'TikTok', dataKey: 'tiktok' },
+    WhatsApp: { name: 'WhatsApp', dataKey: 'whatsapp' },
 };
 
 /** Build props for SelectLeadFormModal from IntegrationAccount metadata.pages */
@@ -121,7 +123,7 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
         <Card>
             <div className="max-w-2xl space-y-6">
                 <div className="flex items-center gap-3">
-                    <SmsIcon className="w-10 h-10 text-primary" />
+                    <IntegrationPlatformIcon platform="sms" size="lg" variant="inline" />
                     <div>
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                             {replaceTwilio(t('twilioSmsIntegration'))}
@@ -473,7 +475,6 @@ export const IntegrationsPage = () => {
         if (!config) return null;
         return {
             name: config.name,
-            icon: config.icon,
             dataKey: dataKey,
         };
     }, [dataKey]);
@@ -505,7 +506,8 @@ export const IntegrationsPage = () => {
         return <PageWrapper title={t('integrations')}><div>{t('unknownIntegration')}</div></PageWrapper>;
     }
 
-    const { name, icon: Icon } = platform;
+    const { name } = platform;
+    const integrationPlatform = integrationPlatformFromDataKey(dataKey);
     const pageTitle = `${name} ${t('integration')}`;
 
     // Handlers for Connect / Edit / Disconnect (must be defined before any early return so WhatsApp "accounts" tab can use them)
@@ -748,7 +750,7 @@ export const IntegrationsPage = () => {
         const statusRaw = String(leadgenConfig?.integration_status || 'disconnected');
         const isConnected = statusRaw === 'connected';
         const lastReceivedAt = leadgenConfig?.last_received_at
-            ? new Date(leadgenConfig.last_received_at).toLocaleString()
+            ? new Date(leadgenConfig.last_received_at).toLocaleString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))
             : null;
         const setupSteps = [
             { step: 1, text: t('tiktokStep1') || 'Copy the Webhook URL below (it is unique to your company).' },
@@ -762,7 +764,7 @@ export const IntegrationsPage = () => {
                 <Card>
                     <div className="max-w-2xl space-y-6">
                         <div className="flex items-center gap-3">
-                            <TikTokIcon className="w-10 h-10 text-primary" />
+                            <IntegrationPlatformIcon platform="tiktok" size="lg" variant="inline" />
                             <div>
                                 <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
                                     {t('tiktokLeadGen') || 'TikTok Lead Gen'}
@@ -867,7 +869,7 @@ export const IntegrationsPage = () => {
             }
             const body = messageInput.trim();
             setMessageInput('');
-            setOptimisticMessages((prev) => [...prev, { body, direction: 'out' as const, time: new Date().toLocaleTimeString() }]);
+            setOptimisticMessages((prev) => [...prev, { body, direction: 'out' as const, time: new Date().toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' })) }]);
             try {
                 const payload: { to: string; message: string; client_id?: number } = { to, message: body };
                 if (typeof selectedChatClient.id === 'number') payload.client_id = selectedChatClient.id;
@@ -965,7 +967,9 @@ export const IntegrationsPage = () => {
                     title={
                         <div>
                             <div className="flex items-center gap-2">
-                                <MegaphoneIcon className="w-8 h-8 text-primary" />
+                                <span className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/12 dark:bg-primary/25 ring-1 ring-primary/25 dark:ring-primary/40 flex items-center justify-center">
+                                    <MegaphoneIcon className={`w-7 h-7 ${marketingAccentIconClass}`} />
+                                </span>
                                 <span>{t('messagingCenter')}</span>
                             </div>
                             <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('messagingCenterDesc')}</p>
@@ -978,14 +982,14 @@ export const IntegrationsPage = () => {
                             onClick={() => setMessagingCenterTabPersisted('campaign')}
                             className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${messagingCenterTab === 'campaign' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                         >
-                            <MegaphoneIcon className="w-4 h-4" /> {t('messageCampaign')}
+                            <MegaphoneIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'campaign' ? 'text-white' : marketingAccentIconClass}`} /> {t('messageCampaign')}
                         </button>
                         <button
                             type="button"
                             onClick={() => setMessagingCenterTabPersisted('template')}
                             className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${messagingCenterTab === 'template' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
                         >
-                            <FileTextIcon className="w-4 h-4" /> {t('template') || 'Template'}
+                            <FileTextIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'template' ? 'text-white' : marketingAccentIconClass}`} /> {t('template')}
                         </button>
                     </div>
                     {messagingCenterTab === 'template' ? (
@@ -1061,8 +1065,8 @@ export const IntegrationsPage = () => {
                                 <div className="flex flex-col">
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia') || 'Send via'}</label>
                                     <div className="flex gap-2 mb-3">
-                                        <button type="button" onClick={() => setCampaignChannel('whatsapp')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><WhatsappIcon className="w-4 h-4" /> {t('campaignViaWhatsApp') || 'WhatsApp'}</button>
-                                        <button type="button" onClick={() => setCampaignChannel('sms')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><SmsIcon className="w-4 h-4" /> {t('campaignViaSms') || 'SMS'}</button>
+                                        <button type="button" onClick={() => setCampaignChannel('whatsapp')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" /> {t('campaignViaWhatsApp') || 'WhatsApp'}</button>
+                                        <button type="button" onClick={() => setCampaignChannel('sms')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><IntegrationPlatformIcon platform="sms" size="sm" variant="inline" /> {t('campaignViaSms') || 'SMS'}</button>
                                     </div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('quickTemplates')}</label>
                                     {(() => {
@@ -1095,7 +1099,7 @@ export const IntegrationsPage = () => {
                 title={
                     <div>
                         <div className="flex items-center gap-2">
-                            <WhatsappIcon className="w-8 h-8 text-primary" />
+                            <IntegrationPlatformIcon platform="whatsapp" size="md" variant="inline" />
                             <span>{t('messagingCenter')}</span>
                         </div>
                         <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('messagingCenterDesc')}</p>
@@ -1116,7 +1120,7 @@ export const IntegrationsPage = () => {
                         onClick={() => setWhatsAppTabPersisted('chats')}
                         className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'chats' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                     >
-                        <WhatsappIcon className="w-4 h-4" /> {t('chats')}
+                        <WhatsappIcon className={`w-4 h-4 ${effectiveTab === 'chats' ? 'text-white' : integrationIconInAccentButtonClass}`} /> {t('chats')}
                     </button>
                     {!isEmployee && (
                         <button
@@ -1191,7 +1195,7 @@ export const IntegrationsPage = () => {
                                                     .map((wa: any) => ({
                                                         body: wa.body,
                                                         direction: (wa.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
-                                                        time: new Date(wa.created_at).toLocaleTimeString(),
+                                                        time: new Date(wa.created_at).toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' })),
                                                     }))
                                                     .reverse(),
                                                 ...optimisticMessages,
@@ -1435,7 +1439,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                     <div className="space-y-4">
                         <div>
                             <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <MegaphoneIcon className="w-5 h-5 text-primary" /> {t('messageCampaign')}
+                                <MegaphoneIcon className={`w-5 h-5 shrink-0 ${marketingAccentIconClass}`} /> {t('messageCampaign')}
                             </h2>
                             <p className="text-sm text-gray-500 dark:text-gray-400">{t('messageCampaignDesc')}</p>
                         </div>
@@ -1548,9 +1552,9 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                         <button
                                             type="button"
                                             onClick={() => setCampaignChannel('whatsapp')}
-                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
+                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                                         >
-                                            <WhatsappIcon className="w-4 h-4" />
+                                            <IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" />
                                             {t('campaignViaWhatsApp') || 'WhatsApp'}
                                         </button>
                                         <button
@@ -1558,7 +1562,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             onClick={() => setCampaignChannel('sms')}
                                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                                         >
-                                            <SmsIcon className="w-4 h-4" />
+                                            <IntegrationPlatformIcon platform="sms" size="sm" variant="inline" />
                                             {t('campaignViaSms') || 'SMS'}
                                         </button>
                                     </div>
@@ -1673,7 +1677,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                 {accounts.map((account) => (
                                     <li key={account.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
                                         <div className="flex items-center gap-3 mb-2 sm:mb-0">
-                                            <WhatsappIcon className="w-8 h-8 text-primary" />
+                                            <IntegrationPlatformIcon platform="whatsapp" size="md" />
                                             <div>
                                                 <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
                                                 <span className={`flex items-center text-xs ${account.status === 'Connected' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -1700,7 +1704,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                             </ul>
                         ) : (
                             <div className="text-center py-16">
-                                <WhatsappIcon className="w-16 h-16 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                                <IntegrationPlatformIcon platform="whatsapp" size="xl" variant="muted" className="mx-auto mb-4" />
                                 <h3 className="text-lg font-semibold">{t('noAccountsConnected')}</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mt-1">{t('connectAccountPrompt')}</p>
                                 <p className="text-gray-400 dark:text-gray-500 mt-2 text-sm">{t('addAccountThenConnectHint')}</p>
@@ -1775,9 +1779,9 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                 className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/80 transition-colors duration-200 first:rounded-t-lg last:rounded-b-lg"
                             >
                                 <div className="flex items-center gap-4 min-w-0">
-                                    <div className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/10 dark:bg-primary/20 flex items-center justify-center ring-1 ring-primary/20 dark:ring-primary/30">
-                                        <Icon className="w-6 h-6 text-primary" />
-                                    </div>
+                                    {integrationPlatform && (
+                                        <IntegrationPlatformIcon platform={integrationPlatform} size="md" />
+                                    )}
                                     <div className="min-w-0">
                                         <p className="font-semibold text-gray-900 dark:text-white truncate">{account.name}</p>
                                         <span
@@ -1846,9 +1850,9 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                     </ul>
                 ) : (
                     <div className="text-center py-16 px-6">
-                        <div className="w-20 h-20 mx-auto mb-5 rounded-2xl bg-gray-100 dark:bg-gray-700/50 flex items-center justify-center">
-                            <Icon className="w-10 h-10 text-gray-400 dark:text-gray-500" />
-                        </div>
+                        {integrationPlatform && (
+                            <IntegrationPlatformIcon platform={integrationPlatform} size="xl" variant="muted" className="mx-auto mb-5" />
+                        )}
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('noAccountsConnected')}</h3>
                         <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-sm mx-auto">{t('connectAccountPrompt')}</p>
                         {(platformParam === 'whatsapp' || platformParam === 'meta') && (

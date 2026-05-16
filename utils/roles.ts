@@ -1,4 +1,6 @@
-export type AppRole = 'Owner' | 'Supervisor' | 'Employee' | 'DataEntry';
+import { isMedicalSpecialization } from './medicalTranslationOverrides';
+
+export type AppRole = 'Owner' | 'Supervisor' | 'Employee' | 'DataEntry' | 'Reception' | 'Doctor';
 
 const normalizeRoleToken = (role?: string): string =>
   (role || '').toString().trim().toLowerCase().replace(/\s+/g, '_');
@@ -13,6 +15,8 @@ export const roleReportsPresence = (role?: string): boolean => {
   return (
     token === 'employee' ||
     token === 'data_entry' ||
+    token === 'doctor' ||
+    token === 'reception' ||
     token === 'supervisor' ||
     token === 'admin' ||
     token === 'owner' ||
@@ -32,34 +36,65 @@ export const normalizeRole = (role?: string): AppRole => {
   if (token === 'data_entry' || token === 'dataentry') {
     return 'DataEntry';
   }
+  if (token === 'reception') {
+    return 'Reception';
+  }
+  if (token === 'doctor') {
+    return 'Doctor';
+  }
   return 'Employee';
 };
 
-export const getRoleTranslation = (role: string, t: (key: string) => string): string => {
-  const normalizedRole = normalizeRole(role);
+/**
+ * @param companySpecialization When not `medical`, clinic API roles `doctor` / `reception` are labeled like `employee` / `data_entry` so non-medical tenants never see clinic wording.
+ */
+export const getRoleTranslation = (
+  role: string,
+  t: (key: string) => string,
+  companySpecialization?: string | null,
+): string => {
+  let normalizedRole = normalizeRole(role);
+  if (!isMedicalSpecialization(companySpecialization)) {
+    if (normalizedRole === 'Doctor') normalizedRole = 'Employee';
+    if (normalizedRole === 'Reception') normalizedRole = 'DataEntry';
+  }
   const translationKeyByRole: Record<AppRole, string> = {
     Owner: 'owner',
     Supervisor: 'supervisor',
     Employee: 'employee',
     DataEntry: 'dataEntry',
+    Reception: 'reception',
+    Doctor: 'doctor',
   };
   const translationKey = translationKeyByRole[normalizedRole];
   return translationKey ? t(translationKey) : t('employee');
 };
 
-export type ApiRole = 'admin' | 'supervisor' | 'employee' | 'data_entry';
+export type ApiRole = 'admin' | 'supervisor' | 'employee' | 'data_entry' | 'reception' | 'doctor';
 
 export const normalizeRoleForApi = (role?: string): ApiRole => {
   const appRole = normalizeRole(role);
   if (appRole === 'Owner') return 'admin';
   if (appRole === 'Supervisor') return 'supervisor';
   if (appRole === 'DataEntry') return 'data_entry';
+  if (appRole === 'Reception') return 'reception';
+  if (appRole === 'Doctor') return 'doctor';
   return 'employee';
 };
 
-/** Shown in manual lead/deal assignee pickers; data-entry staff are assigned via automation only. */
+/** True only for `data_entry` (restricted UI / no assignee) — not reception or doctor. */
+export const isDataEntryOnlyRole = (role?: string): boolean => normalizeRole(role) === 'DataEntry';
+
+/** Same lead-assignment scope as API “clinical staff” (employee or doctor). */
+export const isAssignedClinicalAppRole = (role?: string): boolean => {
+  const r = normalizeRole(role);
+  return r === 'Employee' || r === 'Doctor';
+};
+
+/** Shown in manual lead/deal assignee pickers; data-entry and reception are not assignees. */
 export const showInLeadAssigneePicker = (role?: string): boolean => {
-  return normalizeRole(role) !== 'DataEntry';
+  const ar = normalizeRole(role);
+  return ar !== 'DataEntry' && ar !== 'Reception';
 };
 
 /**

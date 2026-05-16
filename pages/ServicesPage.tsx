@@ -5,6 +5,8 @@ import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, Filte
 import { Service } from '../types';
 import { useServices, useDeleteService } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
+import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
+import { withLatinDigits } from '../utils/dateUtils';
 
 const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -13,10 +15,10 @@ const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Se
     const formatPrice = (price: number | undefined | null): string => {
         if (price === undefined || price === null || isNaN(Number(price))) return '-';
         const num = Number(price);
-        const formatted = num.toLocaleString('en-US', { 
+        const formatted = num.toLocaleString('en-US', withLatinDigits({ 
             minimumFractionDigits: 0, 
             maximumFractionDigits: 2 
-        });
+        }));
         return formatted.replace(/\.0+$/, '');
     };
     
@@ -136,8 +138,8 @@ export const ServicesPage = () => {
     // Delete service mutation
     const deleteServiceMutation = useDeleteService();
 
-    // Check if user's company specialization is services
-    const isServices = currentUser?.company?.specialization === 'services';
+    // Check if user's company uses service inventory (services or medical)
+    const isServices = companyHasServiceInventory(currentUser?.company?.specialization);
     const currentRole = normalizeRole(currentUser?.role);
     const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_services'));
 

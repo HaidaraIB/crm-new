@@ -6,6 +6,7 @@ import { PageWrapper, Button, Card, FilterIcon, PlusIcon, TrashIcon, EditIcon, E
 import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
+import { withLatinDigits } from '../utils/dateUtils';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -67,7 +68,7 @@ const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, u
                                         try {
                                             const date = new Date(dateStr);
                                             if (!isNaN(date.getTime())) {
-                                                return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
+                                                return date.toLocaleDateString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }));
                                             }
                                         } catch (e) {
                                             // Ignore parsing errors
@@ -132,10 +133,10 @@ const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, u
                                     // Format value like budget: comma-separated with trailing zeros removed
                                     const formattedValue = (() => {
                                         const num = Number(deal.value);
-                                        const formatted = num.toLocaleString('en-US', { 
+                                        const formatted = num.toLocaleString('en-US', withLatinDigits({ 
                                             minimumFractionDigits: 0, 
                                             maximumFractionDigits: 2 
-                                        });
+                                        }));
                                         return formatted.replace(/\.0+$/, '');
                                     })();
 
@@ -458,8 +459,8 @@ export const DealsPage = () => {
             status: deal.status ?? '',
             paymentMethod: deal.paymentMethod ?? '',
             value: deal.value ?? '',
-            startDate: deal.startDate ? new Date(deal.startDate).toLocaleDateString() : '',
-            closedDate: deal.closedDate ? new Date(deal.closedDate).toLocaleDateString() : '',
+            startDate: deal.startDate ? new Date(deal.startDate).toLocaleDateString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : '',
+            closedDate: deal.closedDate ? new Date(deal.closedDate).toLocaleDateString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : '',
         }));
         const columns = [
             { key: 'id', label: t('dealId') || 'ID' },

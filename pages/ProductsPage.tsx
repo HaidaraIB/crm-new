@@ -5,6 +5,7 @@ import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, Filte
 import { Product } from '../types';
 import { useProducts, useDeleteProduct } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
+import { withLatinDigits } from '../utils/dateUtils';
 
 const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Product[], onUpdate: (product: Product) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -13,10 +14,10 @@ const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Pr
     const formatNumber = (num: number | undefined | null): string => {
         if (num === undefined || num === null || isNaN(Number(num))) return '-';
         const number = Number(num);
-        const formatted = number.toLocaleString('en-US', { 
+        const formatted = number.toLocaleString('en-US', withLatinDigits({ 
             minimumFractionDigits: 0, 
             maximumFractionDigits: 2 
-        });
+        }));
         return formatted.replace(/\.0+$/, '');
     };
     

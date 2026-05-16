@@ -449,9 +449,11 @@ const TheApp = () => {
         }
     }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
 
-    // Data entry: only All Leads (+ allowed pages); redirect if URL/state is outside scope
+    // Data entry / reception: restricted pages; redirect if URL/state is outside scope
     React.useEffect(() => {
-        if (!isLoggedIn || !currentUser || currentUser.role !== 'DataEntry') return;
+        if (!isLoggedIn || !currentUser) return;
+        const r = currentUser.role;
+        if (r !== 'DataEntry' && r !== 'Reception') return;
         if (!canAccessPage(currentPage)) {
             setCurrentPage('All Leads');
             if (currentUser?.company) {

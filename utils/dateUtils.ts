@@ -3,8 +3,12 @@
  * Converts UTC dates from API to local timezone for display
  */
 
+import { withLatinDigits } from './latinNumerals';
+
 /** Arabic locale with Gregorian default (ar-SA often uses Islamic calendar in Chromium). */
 export const ARABIC_DATE_LOCALE = 'ar-EG';
+
+export { withLatinDigits, LATIN_DIGITS } from './latinNumerals';
 
 /**
  * Converts a UTC date string (ISO format) to local date string (YYYY-MM-DD)
@@ -41,19 +45,19 @@ export const formatDateToLocal = (utcDateString: string | null | undefined): str
  */
 export const formatDateTimeToLocal = (utcDateString: string | null | undefined): string => {
     if (!utcDateString) {
-        return new Date().toLocaleString();
+        return new Date().toLocaleString(undefined, withLatinDigits());
     }
-    
+
     try {
         const date = new Date(utcDateString);
         if (isNaN(date.getTime())) {
-            return new Date().toLocaleString();
+            return new Date().toLocaleString(undefined, withLatinDigits());
         }
-        
-        return date.toLocaleString();
+
+        return date.toLocaleString(undefined, withLatinDigits());
     } catch (error) {
         console.error('Error formatting date time:', error);
-        return new Date().toLocaleString();
+        return new Date().toLocaleString(undefined, withLatinDigits());
     }
 };
 
@@ -67,20 +71,21 @@ export const formatDateToLocalCustom = (
     utcDateString: string | null | undefined,
     options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' }
 ): string => {
+    const opts = withLatinDigits(options);
     if (!utcDateString) {
-        return new Date().toLocaleDateString(undefined, options);
+        return new Date().toLocaleDateString(undefined, opts);
     }
-    
+
     try {
         const date = new Date(utcDateString);
         if (isNaN(date.getTime())) {
-            return new Date().toLocaleDateString(undefined, options);
+            return new Date().toLocaleDateString(undefined, opts);
         }
-        
-        return date.toLocaleDateString(undefined, options);
+
+        return date.toLocaleDateString(undefined, opts);
     } catch (error) {
         console.error('Error formatting date:', error);
-        return new Date().toLocaleDateString(undefined, options);
+        return new Date().toLocaleDateString(undefined, opts);
     }
 };
 
@@ -91,19 +96,19 @@ export const formatDateToLocalCustom = (
  */
 export const formatTimeToLocal = (utcDateString: string | null | undefined): string => {
     if (!utcDateString) {
-        return new Date().toLocaleTimeString();
+        return new Date().toLocaleTimeString(undefined, withLatinDigits());
     }
-    
+
     try {
         const date = new Date(utcDateString);
         if (isNaN(date.getTime())) {
-            return new Date().toLocaleTimeString();
+            return new Date().toLocaleTimeString(undefined, withLatinDigits());
         }
-        
-        return date.toLocaleTimeString();
+
+        return date.toLocaleTimeString(undefined, withLatinDigits());
     } catch (error) {
         console.error('Error formatting time:', error);
-        return new Date().toLocaleTimeString();
+        return new Date().toLocaleTimeString(undefined, withLatinDigits());
     }
 };
 

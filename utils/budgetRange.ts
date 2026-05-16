@@ -1,3 +1,5 @@
+import { withLatinDigits } from './latinNumerals';
+
 /** Lead budget from API (camelCase or snake_case). */
 export function getLeadBudgetBounds(lead: {
   budget?: number | string | null;
@@ -22,10 +24,10 @@ export function getLeadBudgetBounds(lead: {
 }
 
 function formatNum(n: number, locale: string): string {
-  const formatted = n.toLocaleString(locale, {
+  const formatted = n.toLocaleString(locale, withLatinDigits({
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
-  });
+  }));
   return formatted.replace(/\.0+$/, '');
 }
 

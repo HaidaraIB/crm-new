@@ -172,7 +172,7 @@ const UserCard = ({ user }: { user: User }) => {
                         </span>
                     </div>
                 )}
-                <p className="text-sm text-gray-500 dark:text-gray-400">{getRoleTranslation(user.role, t)}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400">{getRoleTranslation(user.role, t, currentUser?.company?.specialization)}</p>
                 <p className="text-sm mt-1">{user.phone}</p>
                 {user.phone && (
                     <div className="flex items-center justify-center gap-2 mt-4">

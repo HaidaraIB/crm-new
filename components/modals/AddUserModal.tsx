@@ -1,6 +1,7 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { isMedicalSpecialization } from '../../utils/medicalTranslationOverrides';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
@@ -20,6 +21,12 @@ const Select = ({ id, children, value, onChange }: { id: string; children?: Reac
 
 export const AddUserModal = () => {
     const { isAddUserModalOpen, setIsAddUserModalOpen, t, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+
+    const isMedicalCompany = useMemo(
+        () => isMedicalSpecialization(currentUser?.company?.specialization),
+        [currentUser?.company?.specialization]
+    );
+    const defaultStaffRole = isMedicalCompany ? 'doctor' : 'employee';
     
     // Create user mutation
     const createUserMutation = useCreateUser();
@@ -34,6 +41,11 @@ export const AddUserModal = () => {
         role: 'employee',
         weeklyDayOff: '' as string,
     });
+
+    useEffect(() => {
+        if (!isAddUserModalOpen) return;
+        setFormData((prev) => ({ ...prev, role: defaultStaffRole }));
+    }, [isAddUserModalOpen, defaultStaffRole]);
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -150,7 +162,12 @@ export const AddUserModal = () => {
                 role: formData.role,
                 company_id: companyIdNumber,
             };
-            if (formData.role === 'employee' || formData.role === 'data_entry') {
+            if (
+                formData.role === 'employee' ||
+                formData.role === 'data_entry' ||
+                formData.role === 'doctor' ||
+                formData.role === 'reception'
+            ) {
                 userData.weekly_day_off =
                     formData.weeklyDayOff === '' ? null : parseInt(formData.weeklyDayOff, 10);
             }
@@ -164,7 +181,7 @@ export const AddUserModal = () => {
                 email: '',
                 password: '',
                 phone: '',
-                role: 'employee',
+                role: defaultStaffRole,
                 weeklyDayOff: '',
             });
             setErrors({});
@@ -244,7 +261,7 @@ export const AddUserModal = () => {
                 email: '',
                 password: '',
                 phone: '',
-                role: 'employee',
+                role: defaultStaffRole,
                 weeklyDayOff: '',
             });
             setErrors({});
@@ -321,12 +338,21 @@ export const AddUserModal = () => {
                         value={formData.role}
                         onChange={(e) => handleChange('role', e.target.value)}
                     >
-                        <option value="employee">{t('employee')}</option>
-                        <option value="data_entry">{t('dataEntry')}</option>
+                        {isMedicalCompany ? (
+                            <>
+                                <option value="doctor">{t('doctor')}</option>
+                                <option value="reception">{t('reception')}</option>
+                            </>
+                        ) : (
+                            <>
+                                <option value="employee">{t('employee')}</option>
+                                <option value="data_entry">{t('dataEntry')}</option>
+                            </>
+                        )}
                     </Select>
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>
-                {(formData.role === 'employee' || formData.role === 'data_entry') && (
+                {(formData.role === 'employee' || formData.role === 'data_entry' || formData.role === 'doctor' || formData.role === 'reception') && (
                     <div>
                         <Label htmlFor="add-user-weekly-day-off">{t('weeklyDayOff')}</Label>
                         <Select
@@ -357,7 +383,7 @@ export const AddUserModal = () => {
                                 email: '',
                                 password: '',
                                 phone: '',
-                                role: 'employee',
+                                role: defaultStaffRole,
                                 weeklyDayOff: '',
                             });
                             setErrors({});

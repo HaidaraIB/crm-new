@@ -10,7 +10,9 @@ import { EditServicePackageModal } from '../components/modals/EditServicePackage
 import { AddServiceProviderModal } from '../components/modals/AddServiceProviderModal';
 import { EditServiceProviderModal } from '../components/modals/EditServiceProviderModal';
 import { normalizeRole } from '../utils/roles';
+import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
+import { withLatinDigits } from '../utils/dateUtils';
 
 type Tab = 'services' | 'packages' | 'providers';
 
@@ -38,7 +40,7 @@ const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Se
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{service.code}</td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{service.name}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{service.category}</td>
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{service.price.toLocaleString()}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{service.price.toLocaleString(undefined, withLatinDigits())}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{service.duration}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${service.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}`}>
@@ -93,7 +95,7 @@ const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: Se
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{pkg.code}</td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{pkg.name}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm max-w-xs truncate">{pkg.description}</td>
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{pkg.price.toLocaleString()}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{pkg.price.toLocaleString(undefined, withLatinDigits())}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{pkg.duration}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${pkg.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}`}>
@@ -207,7 +209,7 @@ export const ServicesInventoryPage = () => {
     }, []);
 
     // Check if user's company specialization is services
-    const isServices = currentUser?.company?.specialization === 'services';
+    const isServices = companyHasServiceInventory(currentUser?.company?.specialization);
     const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
 
     // If not services, show message

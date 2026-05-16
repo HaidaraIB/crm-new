@@ -231,6 +231,20 @@
             background-color: transparent !important;
             background: transparent !important;
         }
+
+        /* Continuous horizontal marquee (deal modal and other long labels) */
+        .deal-marquee-inner {
+            animation: deal-marquee var(--deal-marquee-duration, 18s) linear infinite;
+        }
+        @keyframes deal-marquee {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-50%); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+            .deal-marquee-inner {
+                animation: none;
+            }
+        }
     </style>
   <script type="importmap">
 {

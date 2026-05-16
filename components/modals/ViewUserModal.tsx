@@ -78,7 +78,7 @@ const Avatar = ({ src, alt, className }: { src: string; alt: string; className?:
 };
 
 export const ViewUserModal = () => {
-    const { isViewUserModalOpen, setIsViewUserModalOpen, selectedUser, t } = useAppContext();
+    const { isViewUserModalOpen, setIsViewUserModalOpen, selectedUser, t, currentUser } = useAppContext();
 
     if (!selectedUser) return null;
 
@@ -95,7 +95,7 @@ export const ViewUserModal = () => {
                         className="w-24 h-24 mb-4" 
                     />
                     <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-1">{displayName}</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">{getRoleTranslation(selectedUser.role, t)}</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{getRoleTranslation(selectedUser.role, t, currentUser?.company?.specialization)}</p>
                 </div>
 
                 {/* User Details */}
@@ -135,7 +135,7 @@ export const ViewUserModal = () => {
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('role')}</label>
                         <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
-                            {getRoleTranslation(selectedUser.role, t)}
+                            {getRoleTranslation(selectedUser.role, t, currentUser?.company?.specialization)}
                         </div>
                     </div>
 

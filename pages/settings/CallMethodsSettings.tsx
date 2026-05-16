@@ -4,6 +4,7 @@ import React from 'react';
 import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/index';
 import { useAppContext } from '../../context/AppContext';
 import { useCallMethods, useDeleteCallMethod, useUpdateCallMethod } from '../../hooks/useQueries';
+import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
 
 export interface CallMethod {
   id: number;
@@ -143,14 +144,12 @@ export const CallMethodsSettings = () => {
                                                 {t('default')}
                                             </span>
                                         ) : (
-                                            <button
-                                                type="button"
-                                                className="text-xs text-primary hover:underline"
+                                            <SetAsDefaultButton
                                                 onClick={() => handleSetDefaultCallMethod(callMethod)}
                                                 disabled={updateCallMethodMutation.isPending}
                                             >
                                                 {t('setAsDefault') || 'Set as default'}
-                                            </button>
+                                            </SetAsDefaultButton>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">

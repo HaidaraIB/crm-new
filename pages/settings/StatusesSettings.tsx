@@ -4,6 +4,7 @@ import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/in
 import { Status } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useStatuses, useDeleteStatus, useUpdateStatus } from '../../hooks/useQueries';
+import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
 
 export const StatusesSettings = () => {
     const { 
@@ -170,14 +171,12 @@ export const StatusesSettings = () => {
                                                 {t('default')}
                                             </span>
                                         ) : (
-                                            <button
-                                                type="button"
-                                                className="text-xs text-primary hover:underline"
+                                            <SetAsDefaultButton
                                                 onClick={() => handleSetDefaultStatus(status)}
                                                 disabled={updateStatusMutation.isPending}
                                             >
                                                 {t('setAsDefault') || 'Set as default'}
-                                            </button>
+                                            </SetAsDefaultButton>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 dark:text-gray-300">

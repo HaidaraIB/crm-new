@@ -11,6 +11,7 @@ import {
     type CreatePaymentSessionResult,
 } from '../services/api';
 import { isRedundantPlanDescription, isFreeTrialPlan } from '../utils/planEntitlements';
+import { withLatinDigits } from '../utils/dateUtils';
 
 type PublicPlan = {
     id: number;
@@ -212,10 +213,10 @@ export const ChangePlanPage = () => {
         if (price === 0) {
             return t('free') || 'Free';
         }
-        const formattedPrice = new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', {
+        const formattedPrice = new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', withLatinDigits({
             style: 'currency',
             currency: 'USD',
-        }).format(price);
+        })).format(price);
         return `${formattedPrice}/${billingCycle === 'monthly' ? t('month') || 'month' : t('year') || 'year'}`;
     };
 
@@ -352,10 +353,10 @@ export const ChangePlanPage = () => {
                                 <div className="space-y-1">
                                     <p>
                                         <strong>{t('estimatedDue') || 'Estimated due now'}:</strong>{' '}
-                                        {new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', {
+                                        {new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', withLatinDigits({
                                             style: 'currency',
                                             currency: 'USD',
-                                        }).format(Number(preview.amount_usd))}{' '}
+                                        })).format(Number(preview.amount_usd))}{' '}
                                         ({preview.intent})
                                     </p>
                                     {typeof preview.days_remaining_in_period === 'number' && (

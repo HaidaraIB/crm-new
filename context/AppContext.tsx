@@ -3,6 +3,12 @@
 import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
 import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
+import {
+  isMedicalSpecialization,
+  medicalTranslationOverrides,
+} from '../utils/medicalTranslationOverrides';
+import { getDealTerminologyOverride } from '../utils/dealTerminologyBySpecialization';
+import { getInventoryTerminologyOverride } from '../utils/inventoryTerminologyBySpecialization';
 import { formatStageName, getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
@@ -820,7 +826,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         const userData = await getCurrentUserAPI();
         
         // Check subscription for all users (employees and admins)
-        const isEmployee = normalizeRole(userData.role) === 'Employee';
+        const isEmployee =
+          normalizeRole(userData.role) === 'Employee' ||
+          normalizeRole(userData.role) === 'Doctor';
         const subscriptionId = userData.company?.subscription?.id;
         
         // Check subscription status with end_date validation
@@ -1135,6 +1143,21 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           return false;
       }
     }
+    if (role === 'Reception') {
+      switch (page) {
+        case 'All Leads':
+        case 'CreateLead':
+        case 'ViewLead':
+        case 'EditLead':
+        case 'Activities':
+        case 'Profile':
+        case 'Support Center':
+        case 'Team Chat':
+          return true;
+        default:
+          return false;
+      }
+    }
     if (role !== 'Supervisor') {
       // Employee: allow Dashboard, Leads (all), Activities, Deals(?), Todos(?), Inventory (depends), etc. - keep existing sidebar logic
       return true;
@@ -1281,7 +1304,31 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   }, [theme, language]);
 
   const t = (key: keyof typeof translations.en) => {
-    return translations[language][key] || translations.en[key];
+    const base = translations[language][key] || translations.en[key];
+    const lang: 'en' | 'ar' = language === 'ar' ? 'ar' : 'en';
+    const dealOverride = getDealTerminologyOverride(
+      currentUser?.company?.specialization,
+      lang,
+      key
+    );
+    const afterDeal =
+      dealOverride !== undefined && dealOverride !== '' ? dealOverride : base;
+    const invOverride = getInventoryTerminologyOverride(
+      currentUser?.company?.specialization,
+      lang,
+      key
+    );
+    const afterInventory =
+      invOverride !== undefined && invOverride !== '' ? invOverride : afterDeal;
+    if (!isMedicalSpecialization(currentUser?.company?.specialization)) {
+      return afterInventory;
+    }
+    const overrides =
+      language === 'ar'
+        ? medicalTranslationOverrides.ar
+        : medicalTranslationOverrides.en;
+    const over = overrides[key];
+    return over !== undefined && over !== '' ? over : afterInventory;
   };
 
   // --- CRUD Functions removed - now using React Query hooks in components ---

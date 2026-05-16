@@ -77,6 +77,7 @@ export const EditLeadModal = () => {
         status: '' as Lead['status'],
         leadCompanyName: '',
         profession: '',
+        residence: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -117,6 +118,7 @@ export const EditLeadModal = () => {
                 status: editingLead.status || defaultStatusName,
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
                 profession: editingLead.profession ?? (editingLead as any).profession ?? '',
+                residence: (editingLead as Lead).residence ?? (editingLead as any).residence ?? '',
                 notes: editingLead.notes ?? (editingLead as any).notes ?? '',
                 interestedDeveloper:
                     (editingLead as Lead).interestedDeveloper != null
@@ -268,6 +270,7 @@ export const EditLeadModal = () => {
                 company: companyId,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
                 profession: formState.profession?.trim() || null,
+                residence: formState.residence?.trim() || null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
@@ -322,6 +325,10 @@ export const EditLeadModal = () => {
                     <div>
                         <Label htmlFor="profession">{t('profession')}</Label>
                         <Input id="profession" placeholder={t('enterProfession')} value={formState.profession} onChange={handleChange} />
+                    </div>
+                    <div>
+                        <Label htmlFor="residence">{t('residence')}</Label>
+                        <Input id="residence" placeholder={t('enterResidence')} value={formState.residence} onChange={handleChange} />
                     </div>
                     <LeadInterestInventoryFields
                         className="md:col-span-2"

@@ -5,6 +5,7 @@ import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, Filte
 import { ServiceProvider } from '../types';
 import { useServiceProviders, useDeleteServiceProvider } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
+import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
 
 const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers: ServiceProvider[], onUpdate: (provider: ServiceProvider) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -129,7 +130,7 @@ export const ServiceProvidersPage = () => {
     const deleteServiceProviderMutation = useDeleteServiceProvider();
 
     // Check if user's company specialization is services
-    const isServices = currentUser?.company?.specialization === 'services';
+    const isServices = companyHasServiceInventory(currentUser?.company?.specialization);
     const currentRole = normalizeRole(currentUser?.role);
     const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_services'));
 

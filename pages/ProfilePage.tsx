@@ -9,7 +9,7 @@ import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI, type Create
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDaysRemainingLabel } from '../utils/planEntitlements';
-import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole } from '../utils/roles';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -488,13 +488,13 @@ export const ProfilePage = () => {
                                     <p className="mt-1 text-gray-700 dark:text-gray-300">
                                         {new Date(subscriptionInfo.endDate).toLocaleDateString(
                                             language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
-                                            { 
+                                            withLatinDigits({
                                                 year: 'numeric', 
                                                 month: 'long', 
                                                 day: 'numeric',
                                                 hour: 'numeric',
                                                 minute: '2-digit'
-                                            }
+                                            })
                                         )}
                                     </p>
                                     {(() => {

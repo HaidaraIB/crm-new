@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
 import { Lead, PhoneNumber } from '../types';
@@ -27,6 +27,11 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 
 export const EditLeadPage = () => {
     const { t, setCurrentPage, editingLead, setSelectedLead, currentUser } = useAppContext();
+
+    const isMedicalCompany = useMemo(
+        () => String(currentUser?.company?.specialization || '').toLowerCase() === 'medical',
+        [currentUser?.company?.specialization],
+    );
     
     // Fetch data using React Query hooks
     const { data: usersResponse } = useUsers();
@@ -81,6 +86,7 @@ export const EditLeadPage = () => {
         status: '',
         leadCompanyName: '',
         profession: '',
+        residence: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -214,6 +220,7 @@ export const EditLeadPage = () => {
                 status: statusId || (defaultStatus != null ? defaultStatus.toString() : ''),
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
                 profession: editingLead.profession ?? (editingLead as any).profession ?? '',
+                residence: (editingLead as Lead).residence ?? (editingLead as any).residence ?? '',
                 notes: editingLead.notes ?? (editingLead as any).notes ?? '',
                 interestedDeveloper:
                     (editingLead as Lead).interestedDeveloper != null
@@ -360,6 +367,7 @@ export const EditLeadPage = () => {
                 company: companyId,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
                 profession: formState.profession?.trim() || null,
+                residence: formState.residence?.trim() ? formState.residence.trim() : null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
@@ -393,6 +401,9 @@ export const EditLeadPage = () => {
                     createdAt: updatedLead.created_at || updatedLead.createdAt || '',
                     leadCompanyName: updatedLead.lead_company_name ?? updatedLead.leadCompanyName ?? undefined,
                     profession: updatedLead.profession ?? undefined,
+                    residence: updatedLead.residence ?? (updatedLead as any).residence ?? undefined,
+                    patientFileNumber:
+                        updatedLead.patient_file_number ?? updatedLead.patientFileNumber ?? undefined,
                     notes: updatedLead.notes ?? null,
                     lastFeedback: updatedLead.last_feedback || updatedLead.lastFeedback || '',
                     interestedDeveloper: updatedLead.interested_developer ?? updatedLead.interestedDeveloper ?? null,
@@ -432,6 +443,7 @@ export const EditLeadPage = () => {
                     company: t('company') || 'Company',
                     lead_company_name: t('leadCompanyName') || 'Company name',
                     profession: t('profession') || 'Profession',
+                    residence: t('residence') || 'Residence',
                     notes: t('notes') || 'Notes',
                     interested_developer: t('interestedDeveloper') || 'Developer',
                     interested_project: t('interestedProject') || 'Project',
@@ -564,6 +576,34 @@ export const EditLeadPage = () => {
                                 onChange={handleChange}
                             />
                         </div>
+                        {isMedicalCompany && (
+                            <>
+                                <div>
+                                    <Label htmlFor="residence">{t('residence')}</Label>
+                                    <Input
+                                        id="residence"
+                                        placeholder={t('enterResidence')}
+                                        value={formState.residence}
+                                        onChange={handleChange}
+                                    />
+                                </div>
+                                <div>
+                                    <Label htmlFor="patientFileDisplay">{t('patientFileNumber')}</Label>
+                                    <Input
+                                        id="patientFileDisplay"
+                                        readOnly
+                                        className="bg-gray-100 dark:bg-gray-600 cursor-not-allowed"
+                                        value={
+                                            String(
+                                                (editingLead as Lead).patientFileNumber ??
+                                                    (editingLead as any).patient_file_number ??
+                                                    '',
+                                            )
+                                        }
+                                    />
+                                </div>
+                            </>
+                        )}
                         <LeadInterestInventoryFields
                             className="md:col-span-2 lg:col-span-3"
                             idPrefix="edit-lead-inv"

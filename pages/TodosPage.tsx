@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, Loader, PlusIcon, EditIcon, TrashIcon, EditTodoModal } from '../components/index';
 import { Todo, TaskStage } from '../types';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
-import { isSameDay } from '../utils/dateUtils';
+import { isSameDay, ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { useTasks, useUpdateTask, useDeleteTask, useStages, useDeals, useClientTasks, useClientCalls, useDeleteClientTask, useDeleteClientCall, useCallMethods } from '../hooks/useQueries';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -540,8 +540,8 @@ export const TodosPage = () => {
                                         className={`w-full flex justify-between items-center p-2 rounded-md text-left transition-colors ${isSelected ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                                     >
                                         <div className="flex flex-col">
-                                            <span className={`font-semibold text-sm ${isSelected ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>{day.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { weekday: 'short' })}</span>
-                                            <span className={`text-xs ${isSelected ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>{day.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { day: 'numeric', month: 'short' })}</span>
+                                            <span className={`font-semibold text-sm ${isSelected ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>{day.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ weekday: 'short' }))}</span>
+                                            <span className={`text-xs ${isSelected ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>{day.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ day: 'numeric', month: 'short' }))}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {isToday && <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">{t('today')}</span>}
@@ -707,13 +707,13 @@ export const TodosPage = () => {
                                                 try {
                                                     const date = new Date(reminderDate);
                                                     if (isNaN(date.getTime())) return String(reminderDate);
-                                                    return date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
+                                                    return date.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({
                                                         year: 'numeric',
                                                         month: 'short',
                                                         day: 'numeric',
                                                         hour: '2-digit',
                                                         minute: '2-digit'
-                                                    });
+                                                    }));
                                                 } catch {
                                                     return String(reminderDate);
                                                 }
@@ -725,13 +725,13 @@ export const TodosPage = () => {
                                                 try {
                                                     const date = new Date(createdAt);
                                                     if (isNaN(date.getTime())) return String(createdAt);
-                                                    return date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
+                                                    return date.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({
                                                         year: 'numeric',
                                                         month: 'short',
                                                         day: 'numeric',
                                                         hour: '2-digit',
                                                         minute: '2-digit'
-                                                    });
+                                                    }));
                                                 } catch {
                                                     return String(createdAt);
                                                 }
@@ -945,7 +945,7 @@ export const TodosPage = () => {
                             <Card className="text-center py-10">
                             <p className="text-gray-600 dark:text-gray-400">
                                 {selectedDate 
-                                    ? `${t('noTasksForDate')} ${selectedDate.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}.`
+                                    ? `${t('noTasksForDate')} ${selectedDate.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits())}.`
                                     : (t('noTasksFound') || 'No tasks found.')
                                 }
                             </p>

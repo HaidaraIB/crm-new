@@ -18,6 +18,7 @@ import {
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { isRedundantPlanDescription } from '../utils/planEntitlements';
+import { withLatinDigits } from '../utils/dateUtils';
 
 type PublicPlan = {
     id: number;
@@ -44,7 +45,7 @@ export const RegisterPage = () => {
     // Company information
     const [companyName, setCompanyName] = useState('');
     const [companyDomain, setCompanyDomain] = useState('');
-    const [specialization, setSpecialization] = useState<'real_estate' | 'services' | 'products'>('real_estate');
+    const [specialization, setSpecialization] = useState<'real_estate' | 'services' | 'products' | 'medical'>('real_estate');
 
     // Owner information
     const [firstName, setFirstName] = useState('');
@@ -239,10 +240,10 @@ export const RegisterPage = () => {
         if (isFreeOrTrial || !price) {
             return t('free') || 'Free';
         }
-        return new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', {
+        return new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', withLatinDigits({
             style: 'currency',
             currency: 'USD',
-        }).format(price);
+        })).format(price);
     };
 
     const selectedPlanDetails = selectedPlan ? plans.find((p) => p.id === selectedPlan) : undefined;
@@ -788,7 +789,7 @@ export const RegisterPage = () => {
                     id: response.company.id,
                     name: response.company.name,
                     domain: response.company.domain || companyDomain,
-                    specialization: response.company.specialization as 'real_estate' | 'services' | 'products',
+                    specialization: response.company.specialization as 'real_estate' | 'services' | 'products' | 'medical',
                 },
                 language: userLang,
             };
@@ -997,13 +998,16 @@ export const RegisterPage = () => {
                                         <select
                                             id="specialization"
                                             value={specialization}
-                                            onChange={(e) => setSpecialization(e.target.value as 'real_estate' | 'services' | 'products')}
+                                            onChange={(e) =>
+                                                setSpecialization(e.target.value as 'real_estate' | 'services' | 'products' | 'medical')
+                                            }
                                             dir={language === 'ar' ? 'rtl' : 'ltr'}
                                             className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                                         >
                                             <option value="real_estate">{t('realEstate') || 'Real Estate'}</option>
                                             <option value="services">{t('services') || 'Services'}</option>
                                             <option value="products">{t('products') || 'Products'}</option>
+                                            <option value="medical">{t('medicalServices') || 'Medical services'}</option>
                                         </select>
                                     </div>
                                 </div>
@@ -1543,7 +1547,7 @@ export const RegisterPage = () => {
                                 {verificationExpiresAt && (
                                     <p className="mt-1 text-xs text-primary-700 dark:text-primary-300">
                                         {t('verificationExpiresAt') || 'Code expires at'}{' '}
-                                        {new Date(verificationExpiresAt).toLocaleString()}
+                                        {new Date(verificationExpiresAt).toLocaleString(undefined, withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))}
                                     </p>
                                 )}
                             </div>

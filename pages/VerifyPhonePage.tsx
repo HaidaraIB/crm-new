@@ -131,7 +131,7 @@ export const VerifyPhonePage = () => {
                               (typeof userData.company === 'object' ? userData.company.domain : undefined),
                           specialization: (typeof userData.company === 'object'
                               ? userData.company.specialization
-                              : 'real_estate') as 'real_estate' | 'services' | 'products',
+                              : 'real_estate') as 'real_estate' | 'services' | 'products' | 'medical',
                       }
                     : undefined,
             };

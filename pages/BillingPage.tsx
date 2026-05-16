@@ -5,7 +5,7 @@ import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanE
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
 import { formatDaysRemainingLabel, isFreeTrialPlan } from '../utils/planEntitlements';
-import { ARABIC_DATE_LOCALE } from '../utils/dateUtils';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 
 type SubscriptionInfo = {
     id: number;
@@ -344,11 +344,11 @@ export const BillingPage = () => {
         if (!dateString) return '-';
         return new Date(dateString).toLocaleDateString(
             language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
-            { 
-                year: 'numeric', 
-                month: 'long', 
-                day: 'numeric' 
-            }
+            withLatinDigits({
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+            }),
         );
     };
 
@@ -356,11 +356,11 @@ export const BillingPage = () => {
 
     /** Comma thousands separator, no trailing fraction zeros (e.g. 99, 99.5, 1,234.56). */
     const formatMoneyAmount = (amount: number) =>
-        new Intl.NumberFormat('en-US', {
+        new Intl.NumberFormat('en-US', withLatinDigits({
             minimumFractionDigits: 0,
             maximumFractionDigits: 2,
             useGrouping: true,
-        }).format(amount);
+        })).format(amount);
 
     /** Localized amount + currency label (LTR English string; Arabic uses {@link renderPricePeriodLine}). */
     const formatPriceLocalized = (amount: number) => {

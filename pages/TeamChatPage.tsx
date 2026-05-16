@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
+import { withLatinDigits } from '../utils/dateUtils';
 import { PageWrapper, Button, Modal } from '../components/index';
 import {
   ArrowDownToLineIcon,
@@ -159,11 +160,11 @@ function formatChatDaySeparator(
   if (dayStart.getTime() === today.getTime()) return t('teamChatDayToday');
   if (dayStart.getTime() === yesterday.getTime()) return t('teamChatDayYesterday');
   const sameYear = dayStart.getFullYear() === now.getFullYear();
-  return dayStart.toLocaleDateString(loc, {
+  return dayStart.toLocaleDateString(loc, withLatinDigits({
     month: 'long',
     day: 'numeric',
     ...(sameYear ? {} : { year: 'numeric' }),
-  });
+  }));
 }
 
 const TEAM_CHAT_MSG_LONG_PRESS_MS = 520;
@@ -2073,10 +2074,10 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                       }`}
                                     >
                                       <span className="text-[10px]">
-                                        {new Date(m.created_at).toLocaleString(language === 'ar' ? 'ar' : undefined, {
+                                        {new Date(m.created_at).toLocaleString(language === 'ar' ? 'ar' : undefined, withLatinDigits({
                                           hour: '2-digit',
                                           minute: '2-digit',
-                                        })}
+                                        }))}
                                       </span>
                                       {mine ? (
                                         <span

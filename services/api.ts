@@ -663,7 +663,7 @@ export const registerCompanyAPI = async (data: {
   company: {
     name: string;
     domain: string;
-    specialization: 'real_estate' | 'services' | 'products';
+    specialization: 'real_estate' | 'services' | 'products' | 'medical';
   };
   owner: {
     first_name: string;

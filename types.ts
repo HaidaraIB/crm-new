@@ -35,7 +35,7 @@ export interface Company {
   id: number;
   name: string;
   domain?: string;
-  specialization: 'real_estate' | 'services' | 'products';
+  specialization: 'real_estate' | 'services' | 'products' | 'medical';
   /** IANA timezone for business calendar (weekly day off). */
   timezone?: string;
   auto_assign_enabled?: boolean;
@@ -178,6 +178,10 @@ export interface Lead {
   leadCompanyName?: string; // Optional company name for the lead
   /** Optional job / occupation (API: profession) */
   profession?: string | null;
+  /** Clinic / medical: residence (API: residence) */
+  residence?: string | null;
+  /** Per-company patient file number (API: patient_file_number), read-only from API */
+  patientFileNumber?: number | null;
   /** Real-estate: optional inventory interest (API: interested_developer / _project / _unit) */
   interestedDeveloper?: number | null;
   interestedProject?: number | null;

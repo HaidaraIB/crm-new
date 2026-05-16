@@ -4,6 +4,7 @@ import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/in
 import { Stage } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useStages, useDeleteStage, useUpdateStage } from '../../hooks/useQueries';
+import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
 
 export const StagesSettings = () => {
     const { 
@@ -134,14 +135,12 @@ export const StagesSettings = () => {
                                                 {t('default')}
                                             </span>
                                         ) : (
-                                            <button
-                                                type="button"
-                                                className="text-xs text-primary hover:underline"
+                                            <SetAsDefaultButton
                                                 onClick={() => handleSetDefaultStage(stage as any)}
                                                 disabled={updateStageMutation.isPending}
                                             >
                                                 {t('setAsDefault') || 'Set as default'}
-                                            </button>
+                                            </SetAsDefaultButton>
                                         )}
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">

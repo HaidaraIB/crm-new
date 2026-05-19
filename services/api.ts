@@ -2909,11 +2909,16 @@ export const getIntegrationLogsAPI = async (accountId?: number) => {
 
 // ==================== Twilio SMS (نقبل Twilio فقط لـ SMS) ====================
 
+export type SmsProviderType = 'twilio' | 'otpiq';
+
 export interface TwilioSettingsResponse {
   id?: number;
+  provider?: SmsProviderType;
   account_sid: string;
   twilio_number: string;
   auth_token_masked?: string | null;
+  otpiq_api_key_masked?: string | null;
+  otpiq_route_provider?: string;
   sender_id: string;
   is_enabled: boolean;
   lead_created_sms_enabled?: boolean;
@@ -2933,9 +2938,12 @@ export const getTwilioSettingsAPI = async (): Promise<TwilioSettingsResponse> =>
  * PUT /api/integrations/twilio/settings/
  */
 export const updateTwilioSettingsAPI = async (data: {
+  provider?: SmsProviderType;
   account_sid?: string;
   twilio_number?: string;
   auth_token?: string;
+  otpiq_api_key?: string;
+  otpiq_route_provider?: string;
   sender_id?: string;
   is_enabled?: boolean;
   lead_created_sms_enabled?: boolean;
@@ -2968,6 +2976,8 @@ export interface LeadSMSMessageResponse {
   phone_number: string;
   body: string;
   direction: string;
+  provider?: SmsProviderType | null;
+  external_message_id?: string | null;
   twilio_sid: string | null;
   created_by: number | null;
   created_by_username: string;

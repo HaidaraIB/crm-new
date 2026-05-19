@@ -21,6 +21,7 @@ const FEATURE_KEY_ORDER = [
     'integration_tiktok',
     'integration_whatsapp',
     'integration_twilio',
+    'integration_otpiq',
 ] as const;
 
 /** Monthly usage keys — display order */
@@ -46,7 +47,8 @@ const LABELS: Record<string, { ar: string; en: string }> = {
     integration_meta: { ar: 'ميتا', en: 'Meta' },
     integration_tiktok: { ar: 'تيك توك', en: 'TikTok' },
     integration_whatsapp: { ar: 'واتساب', en: 'WhatsApp' },
-    integration_twilio: { ar: 'تويليو', en: 'Twilio' },
+    integration_twilio: { ar: 'تويليو (SMS)', en: 'Twilio (SMS)' },
+    integration_otpiq: { ar: 'OTPIQ (SMS)', en: 'OTPIQ (SMS)' },
     max_deals: { ar: 'الصفقات', en: 'Deals' },
     max_tasks: { ar: 'المهام', en: 'Tasks' },
     max_integration_accounts: { ar: 'التكاملات', en: 'Integrations' },

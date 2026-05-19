@@ -64,11 +64,25 @@ function buildMetaLeadFormModalConfig(account: any, accountId: number) {
     };
 }
 
-function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; replaceTwilio: (str: string) => string }) {
+type SmsProviderChoice = 'twilio' | 'otpiq';
+
+type IntegrationPolicyEntry = { enabled: boolean; message: string; scope: string };
+
+function TwilioSMSForm({
+    t,
+    replaceTwilio,
+    integrationPolicyMap,
+}: {
+    t: (key: string) => string;
+    replaceTwilio: (str: string) => string;
+    integrationPolicyMap?: Record<string, IntegrationPolicyEntry>;
+}) {
     const { setCurrentPage, currentUser } = useAppContext();
+    const [provider, setProvider] = useState<SmsProviderChoice>('twilio');
     const [accountSid, setAccountSid] = useState('');
     const [twilioNumber, setTwilioNumber] = useState('');
     const [authToken, setAuthToken] = useState('');
+    const [otpiqApiKey, setOtpiqApiKey] = useState('');
     const [senderId, setSenderId] = useState('');
     const [isEnabled, setIsEnabled] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -77,15 +91,18 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
     const [success, setSuccess] = useState(false);
     const [showAccountSid, setShowAccountSid] = useState(false);
     const [showAuthToken, setShowAuthToken] = useState(false);
+    const [showOtpiqApiKey, setShowOtpiqApiKey] = useState(false);
 
     useEffect(() => {
         let cancelled = false;
         getTwilioSettingsAPI()
             .then((data) => {
                 if (!cancelled) {
+                    setProvider(data.provider === 'otpiq' ? 'otpiq' : 'twilio');
                     setAccountSid(data.account_sid || '');
                     setTwilioNumber(data.twilio_number || '');
                     setAuthToken('');
+                    setOtpiqApiKey('');
                     setSenderId(data.sender_id || '');
                     setIsEnabled(!!data.is_enabled);
                 }
@@ -95,18 +112,42 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
         return () => { cancelled = true; };
     }, []);
 
+    const twilioPolicyDisabled = integrationPolicyMap?.twilio?.enabled === false;
+    const otpiqPolicyDisabled = integrationPolicyMap?.otpiq?.enabled === false;
+    const selectedProviderPolicyDisabled =
+        (provider === 'twilio' && twilioPolicyDisabled) || (provider === 'otpiq' && otpiqPolicyDisabled);
+    const selectedProviderPolicyMessage =
+        provider === 'otpiq'
+            ? integrationPolicyMap?.otpiq?.message
+            : integrationPolicyMap?.twilio?.message;
+
     const handleSave = () => {
+        if (selectedProviderPolicyDisabled) {
+            setError(
+                selectedProviderPolicyMessage ||
+                    t('integrationDisabledDefaultMessage') ||
+                    'This integration is currently disabled by your administrator.',
+            );
+            return;
+        }
         setError(null);
         setSuccess(false);
         setSaving(true);
-        updateTwilioSettingsAPI({
-            account_sid: accountSid || undefined,
-            twilio_number: twilioNumber || undefined,
-            auth_token: authToken || undefined,
+        const payload: Parameters<typeof updateTwilioSettingsAPI>[0] = {
+            provider,
             sender_id: senderId || undefined,
             is_enabled: isEnabled,
-        })
-            .then(() => { setSuccess(true); setAuthToken(''); })
+            otpiq_route_provider: 'sms',
+        };
+        if (provider === 'twilio') {
+            payload.account_sid = accountSid || undefined;
+            payload.twilio_number = twilioNumber || undefined;
+            if (authToken) payload.auth_token = authToken;
+        } else {
+            if (otpiqApiKey) payload.otpiq_api_key = otpiqApiKey;
+        }
+        updateTwilioSettingsAPI(payload)
+            .then(() => { setSuccess(true); setAuthToken(''); setOtpiqApiKey(''); })
             .catch((e: any) => setError(e?.message || t('failedToSaveTwilioSettings')))
             .finally(() => setSaving(false));
     };
@@ -126,10 +167,10 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
                     <IntegrationPlatformIcon platform="sms" size="lg" variant="inline" />
                     <div>
                         <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                            {replaceTwilio(t('twilioSmsIntegration'))}
+                            {t('twilioSmsIntegration')}
                         </h2>
                         <p className="text-sm text-amber-600 dark:text-amber-400 font-medium mt-1">
-                            {replaceTwilio(t('twilioOnlyNote'))}
+                            {t('smsProviderNote')}
                         </p>
                         <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('twilioNewLeadSmsHint')}</p>
                         <Button
@@ -169,6 +210,30 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
 
                 <div className="grid gap-4">
                     <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('smsProvider') || 'SMS provider'}</label>
+                        <select
+                            value={provider}
+                            onChange={(e) => setProvider(e.target.value as SmsProviderChoice)}
+                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                        >
+                            <option value="twilio" disabled={twilioPolicyDisabled}>
+                                Twilio{twilioPolicyDisabled ? ` (${t('smsProviderUnavailable') || 'unavailable'})` : ''}
+                            </option>
+                            <option value="otpiq" disabled={otpiqPolicyDisabled}>
+                                OTPIQ{otpiqPolicyDisabled ? ` (${t('smsProviderUnavailable') || 'unavailable'})` : ''}
+                            </option>
+                        </select>
+                        {selectedProviderPolicyDisabled && (
+                            <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                                {selectedProviderPolicyMessage ||
+                                    t('integrationDisabledDefaultMessage') ||
+                                    'This integration is currently disabled by your administrator.'}
+                            </p>
+                        )}
+                    </div>
+                    {provider === 'twilio' ? (
+                    <>
+                    <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('accountSid')}</label>
                         <div className="relative">
                             <input
@@ -192,7 +257,7 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
                         </div>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{replaceTwilio(t('twilioNumber'))}</label>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('twilioNumber')}</label>
                         <input
                             type="text"
                             value={twilioNumber}
@@ -227,6 +292,33 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
                             </button>
                         </div>
                     </div>
+                    </>
+                    ) : (
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('otpiqApiKey') || 'OTPIQ API key'}</label>
+                        <div className="relative">
+                            <input
+                                type={showOtpiqApiKey ? 'text' : 'password'}
+                                value={otpiqApiKey}
+                                onChange={(e) => setOtpiqApiKey(e.target.value)}
+                                autoComplete="new-password"
+                                data-form-type="other"
+                                data-lpignore="true"
+                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                placeholder={t('leaveBlankToKeepCurrent')}
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowOtpiqApiKey(!showOtpiqApiKey)}
+                                className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                title={showOtpiqApiKey ? (t('hide') || 'Hide') : (t('show') || 'Show')}
+                            >
+                                {showOtpiqApiKey ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                            </button>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('otpiqApiKeyHelp') || 'From your OTPIQ project dashboard.'}</p>
+                    </div>
+                    )}
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('senderId')}</label>
                         <input
@@ -239,13 +331,18 @@ function TwilioSMSForm({ t, replaceTwilio }: { t: (key: string) => string; repla
                             className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
                             placeholder={t('senderIdPlaceholder')}
                         />
+                        {provider === 'otpiq' ? (
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                {t('otpiqSenderIdHelp') || 'Optional. Register sender ID in OTPIQ if required.'}
+                            </p>
+                        ) : null}
                     </div>
                 </div>
 
                 {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
                 {success && <p className="text-sm text-green-600 dark:text-green-400">{t('saveSucceeded')}</p>}
 
-                <Button onClick={handleSave} disabled={saving}>
+                <Button onClick={handleSave} disabled={saving || selectedProviderPolicyDisabled}>
                     {saving ? <Loader variant="primary" className="h-4 w-4" /> : t('save')}
                 </Button>
             </div>
@@ -297,10 +394,11 @@ export const IntegrationsPage = () => {
         }
         return undefined;
     }, [currentPage]);
+    const needsIntegrationPolicy = !!platformParam || currentPage === 'Twilio';
     const { data: integrationPolicyMap } = useQuery({
         queryKey: ['integrationPolicy'],
         queryFn: getIntegrationPolicyAPI,
-        enabled: !!platformParam,
+        enabled: needsIntegrationPolicy,
     });
 
     // Get dataKey based on currentPage (memoized)
@@ -480,24 +578,61 @@ export const IntegrationsPage = () => {
     }, [dataKey]);
 
     const currentPolicy = platformParam ? integrationPolicyMap?.[platformParam] : undefined;
+
+    function renderSmsProviderPolicyBanners() {
+        if (currentPage !== 'Twilio' || !integrationPolicyMap) return null;
+        const providers: { key: 'twilio' | 'otpiq'; label: string }[] = [
+            { key: 'twilio', label: 'Twilio' },
+            { key: 'otpiq', label: 'OTPIQ' },
+        ];
+        const disabled = providers.filter((p) => integrationPolicyMap[p.key]?.enabled === false);
+        if (!disabled.length) return null;
+        return (
+            <>
+                {disabled.map(({ key, label }) => {
+                    const policy = integrationPolicyMap[key];
+                    const title = (t('smsProviderDisabledTitle') || '{provider} SMS is unavailable').replace(
+                        '{provider}',
+                        label,
+                    );
+                    return (
+                        <div
+                            key={key}
+                            className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200"
+                        >
+                            <div className="font-semibold">{title}</div>
+                            <div className="mt-1">
+                                {policy?.message ||
+                                    t('integrationDisabledDefaultMessage') ||
+                                    'This integration is currently disabled by your administrator.'}
+                            </div>
+                        </div>
+                    );
+                })}
+            </>
+        );
+    }
+
     /** Admin/plan policy: only show a banner when the integration is turned off (no redundant "all good" green bar). */
     function renderPolicyBanner() {
-        if (!currentPolicy || currentPolicy.enabled !== false) return null;
+        if (currentPage === 'Twilio') return null;
+        const policy = currentPolicy;
+        if (!policy || policy.enabled !== false) return null;
         return (
             <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                 <div className="font-semibold">{t('integrationStatusDisabled') || 'Integration is disabled'}</div>
-                <div className="mt-1">{currentPolicy.message || (t('integrationDisabledDefaultMessage') || 'This integration is currently disabled by your administrator.')}</div>
+                <div className="mt-1">{policy.message || (t('integrationDisabledDefaultMessage') || 'This integration is currently disabled by your administrator.')}</div>
             </div>
         );
     }
 
-    // Twilio SMS: we only accept Twilio for SMS. Credentials form and "integration enabled" toggle.
+    // SMS integration (Twilio or OTPIQ)
     const replaceTwilio = (str: string) => (str || '').replace(/\{\{twilio\}\}/g, t('twilioWord') || 'Twilio');
     if (currentPage === 'Twilio') {
         return (
-            <PageWrapper title={replaceTwilio(t('twilioSmsIntegration')) || 'SMS (Twilio) Notifications Integration'}>
-                {renderPolicyBanner()}
-                <TwilioSMSForm t={t} replaceTwilio={replaceTwilio} />
+            <PageWrapper title={t('twilioSmsIntegration') || 'SMS Notifications Integration'}>
+                {renderSmsProviderPolicyBanners()}
+                <TwilioSMSForm t={t} replaceTwilio={replaceTwilio} integrationPolicyMap={integrationPolicyMap} />
             </PageWrapper>
         );
     }
@@ -676,7 +811,8 @@ export const IntegrationsPage = () => {
                 }
                 await completeWhatsAppEmbeddedSignupAPI(accountId, code);
                 finalizeOAuthConnect(accountId);
-                showAlert(t('connectionSuccessful') || 'Connected successfully.', 'success');
+                setSuccessMessage(t('connectionSuccessful') || 'Connected successfully.');
+                setIsSuccessModalOpen(true);
                 return;
             }
 

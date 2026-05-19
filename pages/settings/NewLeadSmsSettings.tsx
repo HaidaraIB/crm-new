@@ -54,7 +54,7 @@ export const NewLeadSmsSettings = () => {
         }
     };
 
-    const openTwilioIntegrations = () => {
+    const openSmsIntegrations = () => {
         // Keep URL in sync with page state; App.tsx maps pathname → currentPage and would otherwise reset to Settings.
         navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Twilio');
         setCurrentPage('Twilio');
@@ -81,7 +81,7 @@ export const NewLeadSmsSettings = () => {
                     <Button
                         type="button"
                         variant="secondary"
-                        onClick={openTwilioIntegrations}
+                        onClick={openSmsIntegrations}
                         className="mt-3 w-full sm:w-auto"
                         title={t('newLeadSmsGoIntegrationsHint')}
                     >

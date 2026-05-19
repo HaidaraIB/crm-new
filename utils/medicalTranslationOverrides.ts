@@ -108,6 +108,13 @@ export const medicalTranslationOverrides: {
     whatsapp_template_parameter_mismatch: 'Could not fill template variables from this patient.',
     newLeadSmsSettings: 'New patient SMS',
     newLeadSmsEnable: 'Send SMS automatically when a new patient is created',
+    newLeadSmsIntegrationsNote:
+      'Messages are sent via your configured SMS provider (Twilio or OTPIQ). Enable the integration and complete credentials under Integrations → SMS.',
+    newLeadSmsGoIntegrations: 'Go to Integrations → SMS',
+    newLeadSmsGoIntegrationsHint:
+      'Opens SMS integration settings to choose a provider (Twilio or OTPIQ) and enter credentials.',
+    twilioSmsIntegration: 'SMS Notifications Integration',
+    smsProviderNote: 'Choose Twilio or OTPIQ as your SMS provider. Configure credentials below.',
     leadAssignmentSettings: 'Patient assignment settings',
     autoRotation: 'Auto-assign new patients',
     multiChannelTracking: 'Enable multi-channel patient tracking',
@@ -242,6 +249,13 @@ export const medicalTranslationOverrides: {
     whatsapp_template_parameter_mismatch: 'تعذر ملء متغيرات القالب من هذا المريض.',
     newLeadSmsSettings: 'رسائل المريض الجديد',
     newLeadSmsEnable: 'إرسال رسالة تلقائياً عند إنشاء مريض جديد',
+    newLeadSmsIntegrationsNote:
+      'تُرسل الرسائل عبر مزود SMS المضبوط (Twilio أو OTPIQ). يجب تفعيل التكامل وإكمال البيانات من التكاملات → الرسائل القصيرة.',
+    newLeadSmsGoIntegrations: 'الانتقال إلى التكاملات → الرسائل القصيرة',
+    newLeadSmsGoIntegrationsHint:
+      'يفتح إعدادات SMS لاختيار المزود (Twilio أو OTPIQ) وإدخال بيانات الاعتماد.',
+    twilioSmsIntegration: 'ربط إشعارات SMS',
+    smsProviderNote: 'اختر Twilio أو OTPIQ كمزود للرسائل القصيرة. أدخل بيانات الاعتماد أدناه.',
     leadAssignmentSettings: 'إعدادات إسناد المرضى',
     autoRotation: 'إسناد المرضى الجدد تلقائياً',
     multiChannelTracking: 'تفعيل تتبع المرضى متعدد القنوات',

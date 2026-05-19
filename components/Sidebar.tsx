@@ -92,7 +92,7 @@ export const Sidebar = () => {
         setOpenSubMenus(prev => ({ ...prev, [name]: !prev[name] }));
     };
     
-    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio'>> = {
+    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio' | 'otpiq'>> = {
         Integrations: 'meta',
         Meta: 'meta',
         TikTok: 'tiktok',
@@ -106,12 +106,24 @@ export const Sidebar = () => {
         if (platform && currentUser?.company?.id) {
             try {
                 const policies = await getIntegrationPolicyAPI();
-                const policy = policies?.[platform];
-                if (policy && policy.enabled === false) {
-                    setAlertMessage(policy.message || 'This integration is currently disabled.');
-                    setAlertVariant('warning');
-                    setIsAlertModalOpen(true);
-                    return;
+                if (page === 'Twilio') {
+                    const twilioOk = policies?.twilio?.enabled !== false;
+                    const otpiqOk = policies?.otpiq?.enabled !== false;
+                    if (!twilioOk && !otpiqOk) {
+                        const policy = policies?.otpiq?.enabled === false ? policies.otpiq : policies?.twilio;
+                        setAlertMessage(policy?.message || 'This integration is currently disabled.');
+                        setAlertVariant('warning');
+                        setIsAlertModalOpen(true);
+                        return;
+                    }
+                } else {
+                    const policy = policies?.[platform];
+                    if (policy && policy.enabled === false) {
+                        setAlertMessage(policy.message || 'This integration is currently disabled.');
+                        setAlertVariant('warning');
+                        setIsAlertModalOpen(true);
+                        return;
+                    }
                 }
             } catch {
                 // Ignore policy fetch failures to avoid blocking navigation.

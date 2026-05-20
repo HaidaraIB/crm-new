@@ -152,7 +152,7 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
     'dashboard', 'leads', 'activities', 'properties', 'owners', 'services',
     'products', 'suppliers', 'deals', 'employees', 'users', 'marketing',
     'campaigns',
-    'messaging-center', 'team-chat', 'todos', 'reports', 'integrations', 'twilio', 'settings', 'profile',
+    'messaging-center', 'team-chat', 'todos', 'reports', 'integrations', 'twilio', 'ai', 'openai', 'settings', 'profile',
     'billing', 'payment', 'subscription', 'support-center', 'support', 'login', 'register', 'forgot-password',
     'reset-password', 'verify-email', 'verify-phone', '2fa', 'payment-success', 'change-plan',
     'create-lead', 'edit-lead', 'view-lead', 'create-deal',

@@ -7,7 +7,7 @@ import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, Se
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, type MetaHealthResponse } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
@@ -350,6 +350,258 @@ function TwilioSMSForm({
     );
 }
 
+const OPENAI_MODEL_OPTIONS: { value: string; labelKey: 'openaiModelGpt4oMini' | 'openaiModelGpt4o' | 'openaiModelGpt41Mini' | 'openaiModelGpt41' }[] = [
+    { value: 'gpt-4o-mini', labelKey: 'openaiModelGpt4oMini' },
+    { value: 'gpt-4o', labelKey: 'openaiModelGpt4o' },
+    { value: 'gpt-4.1-mini', labelKey: 'openaiModelGpt41Mini' },
+    { value: 'gpt-4.1', labelKey: 'openaiModelGpt41' },
+];
+
+function OpenAISettingsForm({
+    t,
+    integrationPolicyMap,
+}: {
+    t: (key: string) => string;
+    integrationPolicyMap?: Record<string, IntegrationPolicyEntry>;
+}) {
+    const { currentUser } = useAppContext();
+    const [apiKey, setApiKey] = useState('');
+    const [isEnabled, setIsEnabled] = useState(false);
+    const [model, setModel] = useState('gpt-4o-mini');
+    const [autoAnalyze, setAutoAnalyze] = useState(true);
+    const [maxLeads, setMaxLeads] = useState(20);
+    const [apiKeyMasked, setApiKeyMasked] = useState<string | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [saving, setSaving] = useState(false);
+    const [testing, setTesting] = useState(false);
+    const [running, setRunning] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [successMessage, setSuccessMessage] = useState<string | null>(null);
+    const [testOk, setTestOk] = useState<boolean | null>(null);
+    const [showApiKey, setShowApiKey] = useState(false);
+    const [lastError, setLastError] = useState<string | null>(null);
+
+    const openaiPolicyDisabled = integrationPolicyMap?.openai?.enabled === false;
+    const openaiPolicyMessage = integrationPolicyMap?.openai?.message;
+    const canRunAnalysis =
+        (currentUser?.role ?? '').toLowerCase() === 'admin' ||
+        (currentUser?.role ?? '').toLowerCase() === 'supervisor';
+
+    useEffect(() => {
+        let cancelled = false;
+        getOpenAISettingsAPI()
+            .then((data) => {
+                if (!cancelled) {
+                    setIsEnabled(!!data.is_enabled);
+                    setModel(data.model || 'gpt-4o-mini');
+                    setAutoAnalyze(data.auto_analyze_enabled !== false);
+                    setMaxLeads(data.max_leads_per_run ?? 20);
+                    setApiKeyMasked(data.api_key_masked ?? null);
+                    setLastError(data.last_error ?? null);
+                    setApiKey('');
+                }
+            })
+            .catch(() => {
+                if (!cancelled) setError(t('failedToLoadOpenAISettings'));
+            })
+            .finally(() => {
+                if (!cancelled) setLoading(false);
+            });
+        return () => {
+            cancelled = true;
+        };
+    }, [t]);
+
+    const handleSave = () => {
+        if (openaiPolicyDisabled) {
+            setError(openaiPolicyMessage || t('integrationDisabledDefaultMessage'));
+            return;
+        }
+        setError(null);
+        setSuccessMessage(null);
+        setTestOk(null);
+        setSaving(true);
+        const payload: Parameters<typeof updateOpenAISettingsAPI>[0] = {
+            is_enabled: isEnabled,
+            model,
+            auto_analyze_enabled: autoAnalyze,
+            max_leads_per_run: maxLeads,
+        };
+        if (apiKey) payload.api_key = apiKey;
+        updateOpenAISettingsAPI(payload)
+            .then((data) => {
+                setSuccessMessage(t('saveSucceeded'));
+                setApiKey('');
+                setApiKeyMasked(data.api_key_masked ?? null);
+                setLastError(data.last_error ?? null);
+            })
+            .catch((e: any) => setError(e?.message || t('failedToSaveOpenAISettings')))
+            .finally(() => setSaving(false));
+    };
+
+    const handleTest = () => {
+        setTesting(true);
+        setTestOk(null);
+        setSuccessMessage(null);
+        testOpenAISettingsAPI()
+            .then(() => {
+                setTestOk(true);
+                setSuccessMessage(t('openaiConnectionOk'));
+            })
+            .catch(() => {
+                setTestOk(false);
+                setSuccessMessage(null);
+            })
+            .finally(() => setTesting(false));
+    };
+
+    const handleAnalyze = () => {
+        setRunning(true);
+        setError(null);
+        setSuccessMessage(null);
+        setTestOk(null);
+        runAIAnalysisAPI(false)
+            .then(() => {
+                setSuccessMessage(t('openaiAnalyzeSuccess'));
+                setError(null);
+            })
+            .catch((e: any) => setError(e?.message || t('openaiConnectionFailed')))
+            .finally(() => setRunning(false));
+    };
+
+    if (loading) {
+        return (
+            <Card>
+                <SectionLoadingState className="py-12" label={t('loading')} />
+            </Card>
+        );
+    }
+
+    return (
+        <Card>
+            <div className="max-w-2xl space-y-6">
+                <div>
+                    <h2 className="text-lg font-semibold text-gray-900 dark:text-white">{t('aiIntegrationTitle')}</h2>
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('aiIntegrationDescription')}</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">{t('openaiDataPrivacyNote')}</p>
+                </div>
+
+                {openaiPolicyDisabled && (
+                    <div className="rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                        {openaiPolicyMessage || t('integrationDisabledDefaultMessage')}
+                    </div>
+                )}
+
+                {lastError ? (
+                    <p className="text-sm text-amber-700 dark:text-amber-300">{lastError}</p>
+                ) : null}
+
+                <div className="flex items-center gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setIsEnabled(!isEnabled)}
+                        disabled={openaiPolicyDisabled}
+                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${isEnabled ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+                    >
+                        {isEnabled && <span className="w-2 h-2 rounded-full bg-green-500" />}
+                        {t('openaiEnableIntegration')}
+                    </button>
+                </div>
+
+                <div className="grid gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {t('openaiApiKey')}
+                            {apiKeyMasked ? (
+                                <span className="text-xs text-gray-500 ms-2">({apiKeyMasked})</span>
+                            ) : null}
+                        </label>
+                        <div className="relative">
+                            <input
+                                type={showApiKey ? 'text' : 'password'}
+                                value={apiKey}
+                                onChange={(e) => setApiKey(e.target.value)}
+                                autoComplete="off"
+                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                placeholder={t('openaiApiKeyPlaceholder')}
+                            />
+                            <button
+                                type="button"
+                                className="absolute end-2 top-1/2 -translate-y-1/2 text-gray-500"
+                                onClick={() => setShowApiKey(!showApiKey)}
+                                title={showApiKey ? t('hide') : t('show')}
+                                aria-label={showApiKey ? t('hide') : t('show')}
+                            >
+                                {showApiKey ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
+                            </button>
+                        </div>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('openaiModel')}</label>
+                        <select
+                            value={model}
+                            onChange={(e) => setModel(e.target.value)}
+                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        >
+                            {OPENAI_MODEL_OPTIONS.map((m) => (
+                                <option key={m.value} value={m.value}>
+                                    {t(m.labelKey)}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {t('openaiMaxLeadsPerRun')}
+                        </label>
+                        <input
+                            type="number"
+                            min={1}
+                            max={100}
+                            value={maxLeads}
+                            onChange={(e) => setMaxLeads(Number(e.target.value) || 20)}
+                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                        />
+                    </div>
+                    <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+                        <input
+                            type="checkbox"
+                            checked={autoAnalyze}
+                            onChange={(e) => setAutoAnalyze(e.target.checked)}
+                        />
+                        {t('openaiAutoAnalyze')}
+                    </label>
+                </div>
+
+                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+                {running && (
+                    <p className="text-sm text-gray-600 dark:text-gray-400">{t('aiAnalysisRunning')}</p>
+                )}
+                {successMessage && !running && (
+                    <p className="text-sm text-green-600 dark:text-green-400">{successMessage}</p>
+                )}
+                {testOk === false && (
+                    <p className="text-sm text-red-600 dark:text-red-400">{t('openaiConnectionFailed')}</p>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                    <Button onClick={handleSave} disabled={saving || openaiPolicyDisabled}>
+                        {saving ? <Loader variant="primary" className="h-4 w-4" /> : t('save')}
+                    </Button>
+                    <Button variant="secondary" onClick={handleTest} disabled={testing || openaiPolicyDisabled}>
+                        {testing ? <Loader className="h-4 w-4" /> : t('openaiTestConnection')}
+                    </Button>
+                    {canRunAnalysis ? (
+                        <Button variant="secondary" onClick={handleAnalyze} disabled={running || openaiPolicyDisabled || !isEnabled}>
+                            {running ? <Loader className="h-4 w-4" /> : t('openaiAnalyzeNow')}
+                        </Button>
+                    ) : null}
+                </div>
+            </div>
+        </Card>
+    );
+}
+
 export const IntegrationsPage = () => {
     const { 
         t, 
@@ -391,10 +643,12 @@ export const IntegrationsPage = () => {
             return 'whatsapp';
         } else if (currentPage === 'Twilio') {
             return 'twilio';
+        } else if (currentPage === 'AI') {
+            return 'openai';
         }
         return undefined;
     }, [currentPage]);
-    const needsIntegrationPolicy = !!platformParam || currentPage === 'Twilio';
+    const needsIntegrationPolicy = !!platformParam || currentPage === 'Twilio' || currentPage === 'AI';
     const { data: integrationPolicyMap } = useQuery({
         queryKey: ['integrationPolicy'],
         queryFn: getIntegrationPolicyAPI,
@@ -633,6 +887,23 @@ export const IntegrationsPage = () => {
             <PageWrapper title={t('twilioSmsIntegration') || 'SMS Notifications Integration'}>
                 {renderSmsProviderPolicyBanners()}
                 <TwilioSMSForm t={t} replaceTwilio={replaceTwilio} integrationPolicyMap={integrationPolicyMap} />
+            </PageWrapper>
+        );
+    }
+
+    if (currentPage === 'AI') {
+        const openaiPolicy = integrationPolicyMap?.openai;
+        return (
+            <PageWrapper title={t('aiIntegration')}>
+                {openaiPolicy?.enabled === false ? (
+                    <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                        <div className="font-semibold">{t('integrationStatusDisabled')}</div>
+                        <div className="mt-1">
+                            {openaiPolicy.message || t('integrationDisabledDefaultMessage')}
+                        </div>
+                    </div>
+                ) : null}
+                <OpenAISettingsForm t={t} integrationPolicyMap={integrationPolicyMap} />
             </PageWrapper>
         );
     }

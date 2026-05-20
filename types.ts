@@ -13,7 +13,7 @@ export type Page =
   | 'Campaigns'
   | 'Messaging Center'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
-  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio'
+  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI'
   | 'Change Plan' | 'Payment' | 'Subscription'
   | 'Support Center'
   // Legal pages

@@ -6,7 +6,8 @@ import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionL
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
+import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useApproveAIInsight, useDismissAIInsight, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
+import { AIInsightsCard } from '../components/dashboard/AIInsightsCard';
 import { normalizeRole, getRoleTranslation, isAssignedClinicalAppRole } from '../utils/roles';
 import { MissionBar, MissionItem } from '../components/dashboard/MissionBar';
 import { SmartInsights } from '../components/dashboard/SmartInsights';
@@ -34,7 +35,17 @@ const formatLastSeenRelative = (
 };
 
 export const DashboardPage = () => {
-    const { t, currentUser, language, setSelectedLead, setCurrentPage, theme } = useAppContext();
+    const {
+        t,
+        currentUser,
+        language,
+        setSelectedLead,
+        setCurrentPage,
+        theme,
+        setAlertMessage,
+        setAlertVariant,
+        setIsAlertModalOpen,
+    } = useAppContext();
     const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
     const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
     const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
@@ -71,6 +82,12 @@ export const DashboardPage = () => {
     const stages = Array.isArray(stagesResponse) 
         ? stagesResponse 
         : (stagesResponse?.results || []);
+
+    const { data: aiInsightsData } = useAIInsightsDashboard();
+    const approveAI = useApproveAIInsight();
+    const dismissAI = useDismissAIInsight();
+    const [aiActionId, setAiActionId] = useState<number | null>(null);
+    const [aiActionType, setAiActionType] = useState<'approve' | 'dismiss' | null>(null);
 
     const isDashboardLoading =
         isLeadsLoading ||
@@ -598,6 +615,32 @@ export const DashboardPage = () => {
         ];
     }, [clientTasks, deals, leads, t]);
 
+    const mapAIInsight = (item: (typeof aiInsightsData)['pending'][0]) => {
+        const lead = leads.find((l: any) => l.id === item.client_id);
+        return {
+            ...item,
+            onView: lead
+                ? () => {
+                      setSelectedLead(lead);
+                      window.history.pushState({}, '', `/view-lead/${lead.id}`);
+                      setCurrentPage('ViewLead');
+                  }
+                : () => {
+                      window.history.pushState({}, '', `/view-lead/${item.client_id}`);
+                      setCurrentPage('ViewLead');
+                  },
+        };
+    };
+
+    const aiPendingItems = useMemo(
+        () => (aiInsightsData?.pending || []).map(mapAIInsight),
+        [aiInsightsData?.pending, leads, setCurrentPage, setSelectedLead],
+    );
+    const aiPriorityItems = useMemo(
+        () => (aiInsightsData?.priority || []).map(mapAIInsight),
+        [aiInsightsData?.priority, leads, setCurrentPage, setSelectedLead],
+    );
+
     const hotLeads = useMemo<HotLeadItem[]>(() => {
         const now = Date.now();
         const byLeadActivity = new Map<number, number>();
@@ -1038,6 +1081,54 @@ export const DashboardPage = () => {
                         menuAriaLabel={dashboardMenuAriaLabel}
                     />
                     <SmartInsights title={t('smartInsights')} insights={smartInsights} />
+                    {aiInsightsData?.ai_enabled ? (
+                        <AIInsightsCard
+                            title={t('aiInsights')}
+                            poweredByLabel={t('aiInsightsPoweredBy')}
+                            pendingTitle={t('aiPendingApproval')}
+                            priorityTitle={t('aiPriorityLeads')}
+                            scoreLabel={t('aiScore')}
+                            emptyLabel={t('aiNoInsights')}
+                            viewLeadLabel={t('viewLead')}
+                            approveLabel={t('aiApproveReminder')}
+                            dismissLabel={t('aiDismiss')}
+                            suggestedDateLabel={t('aiSuggestedDate')}
+                            pending={aiPendingItems}
+                            priority={aiPriorityItems}
+                            onApprove={(id) => {
+                                setAiActionId(id);
+                                setAiActionType('approve');
+                                approveAI.mutate(id, {
+                                    onError: () => {
+                                        setAlertMessage(t('failedToApproveAIInsight'));
+                                        setAlertVariant('error');
+                                        setIsAlertModalOpen(true);
+                                    },
+                                    onSettled: () => {
+                                        setAiActionId(null);
+                                        setAiActionType(null);
+                                    },
+                                });
+                            }}
+                            onDismiss={(id) => {
+                                setAiActionId(id);
+                                setAiActionType('dismiss');
+                                dismissAI.mutate(id, {
+                                    onError: () => {
+                                        setAlertMessage(t('failedToDismissAIInsight'));
+                                        setAlertVariant('error');
+                                        setIsAlertModalOpen(true);
+                                    },
+                                    onSettled: () => {
+                                        setAiActionId(null);
+                                        setAiActionType(null);
+                                    },
+                                });
+                            }}
+                            approvingId={aiActionType === 'approve' ? aiActionId : null}
+                            dismissingId={aiActionType === 'dismiss' ? aiActionId : null}
+                        />
+                    ) : null}
                     <HotLeadsCard
                         title={t('hotLeads')}
                         scoreLabel={t('score')}

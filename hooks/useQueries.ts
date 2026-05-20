@@ -41,6 +41,10 @@ import {
   createVisitTypeAPI, updateVisitTypeAPI, deleteVisitTypeAPI,
   bulkAssignLeadsAPI,
   assignUnassignedClientsAPI,
+  getAIInsightsDashboardAPI,
+  approveAIInsightAPI,
+  dismissAIInsightAPI,
+  runAIAnalysisAPI,
 } from '../services/api';
 
 // ==================== Query Keys ====================
@@ -1465,6 +1469,47 @@ export const useSelectLeadForm = (options?: UseMutationOptions<any, Error, { acc
       queryClient.invalidateQueries({ queryKey: ['leadForms'] });
     },
     ...options,
+  });
+};
+
+// ==================== AI Insights ====================
+
+export const useAIInsightsDashboard = () => {
+  return useQuery({
+    queryKey: ['aiInsightsDashboard'],
+    queryFn: getAIInsightsDashboardAPI,
+    staleTime: 60 * 1000,
+  });
+};
+
+export const useApproveAIInsight = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (insightId: number) => approveAIInsightAPI(insightId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['aiInsightsDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
+    },
+  });
+};
+
+export const useDismissAIInsight = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (insightId: number) => dismissAIInsightAPI(insightId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['aiInsightsDashboard'] });
+    },
+  });
+};
+
+export const useRunAIAnalysis = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (force?: boolean) => runAIAnalysisAPI(force),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['aiInsightsDashboard'] });
+    },
   });
 };
 

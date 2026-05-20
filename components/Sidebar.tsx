@@ -92,13 +92,23 @@ export const Sidebar = () => {
         setOpenSubMenus(prev => ({ ...prev, [name]: !prev[name] }));
     };
     
-    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio' | 'otpiq'>> = {
+    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio' | 'otpiq' | 'openai'>> = {
         Integrations: 'meta',
         Meta: 'meta',
         TikTok: 'tiktok',
         WhatsApp: 'whatsapp',
         'Messaging Center': 'whatsapp',
         Twilio: 'twilio',
+        AI: 'openai',
+    };
+
+    /** Sidebar labels for integration sub-pages (toCamelCase('AI') would wrongly yield aI). */
+    const subItemTranslationKey = (sub: PageType): keyof typeof translations.en => {
+        const special: Partial<Record<PageType, keyof typeof translations.en>> = {
+            AI: 'ai',
+            Twilio: 'twilio',
+        };
+        return special[sub] ?? (toCamelCase(sub) as keyof typeof translations.en);
     };
 
     const handleNavigation = async (page: PageType) => {
@@ -276,7 +286,7 @@ export const Sidebar = () => {
                             {subItems && subItems.length > 0 && isOpen && (
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>
                                     {subItems.map(sub => {
-                                        const subItemNameKey = toCamelCase(sub) as keyof typeof translations.en;
+                                        const subItemNameKey = subItemTranslationKey(sub);
                                         return (
                                             <a
                                                 key={sub}

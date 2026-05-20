@@ -1216,6 +1216,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'TikTok':
       case 'WhatsApp':
       case 'Twilio':
+      case 'AI':
       case 'Billing':
       case 'Change Plan':
       case 'Payment':

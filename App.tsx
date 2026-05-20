@@ -74,6 +74,7 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
         case 'TikTok':
         case 'WhatsApp':
         case 'Twilio':
+        case 'AI':
             return <IntegrationsPage key={currentPage} />;
         case 'Billing':
             return <BillingPage />;
@@ -342,6 +343,8 @@ const TheApp = () => {
                 'tiktok': 'TikTok',
                 'whatsapp': 'WhatsApp',
                 'twilio': 'Twilio',
+                'ai': 'AI',
+                'openai': 'AI',
                 'billing': 'Billing',
                 'change plan': 'Change Plan',
                 'change-plan': 'Change Plan',
@@ -588,6 +591,8 @@ const TheApp = () => {
             'tiktok': 'TikTok',
             'whatsapp': 'WhatsApp',
             'twilio': 'Twilio',
+            'ai': 'AI',
+            'openai': 'AI',
             'billing': 'Billing',
             'change plan': 'Change Plan',
             'change-plan': 'Change Plan',

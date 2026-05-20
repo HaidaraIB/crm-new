@@ -2970,6 +2970,130 @@ export const sendLeadSMSAPI = async (data: {
   });
 };
 
+// ==================== OpenAI / AI Insights ====================
+
+export interface OpenAISettingsResponse {
+  id?: number;
+  api_key_masked?: string | null;
+  is_enabled: boolean;
+  model: string;
+  auto_analyze_enabled: boolean;
+  max_leads_per_run: number;
+  last_analysis_at?: string | null;
+  last_error?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+/**
+ * GET /api/v1/integrations/openai/settings/
+ */
+export const getOpenAISettingsAPI = async (): Promise<OpenAISettingsResponse> => {
+  return apiRequest<OpenAISettingsResponse>('/integrations/openai/settings/');
+};
+
+/**
+ * PUT /api/v1/integrations/openai/settings/
+ */
+export const updateOpenAISettingsAPI = async (data: {
+  api_key?: string;
+  is_enabled?: boolean;
+  model?: string;
+  auto_analyze_enabled?: boolean;
+  max_leads_per_run?: number;
+}): Promise<OpenAISettingsResponse> => {
+  return apiRequest<OpenAISettingsResponse>('/integrations/openai/settings/', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * POST /api/v1/integrations/openai/settings/test/
+ */
+export const testOpenAISettingsAPI = async (): Promise<{ ok: boolean }> => {
+  return apiRequest<{ ok: boolean }>('/integrations/openai/settings/test/', {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+};
+
+export type AIInsightStatus = 'pending' | 'approved' | 'dismissed' | 'expired';
+
+export interface ClientAIInsightResponse {
+  id: number;
+  client_id: number;
+  client_name: string;
+  assigned_to_id: number | null;
+  assigned_to_name: string | null;
+  ai_score: number;
+  priority_level: string;
+  summary: string;
+  reasoning?: string | null;
+  suggested_reminder_date: string | null;
+  suggested_task_notes: string | null;
+  status: AIInsightStatus;
+  approved_at?: string | null;
+  approved_by?: number | null;
+  approved_by_name?: string | null;
+  created_client_task?: number | null;
+  analyzed_at: string;
+  model_used?: string;
+}
+
+export interface AIInsightsDashboardResponse {
+  pending: ClientAIInsightResponse[];
+  priority: ClientAIInsightResponse[];
+  ai_enabled: boolean;
+}
+
+/**
+ * GET /api/v1/integrations/ai-insights/dashboard/
+ */
+export const getAIInsightsDashboardAPI = async (): Promise<AIInsightsDashboardResponse> => {
+  return apiRequest<AIInsightsDashboardResponse>('/integrations/ai-insights/dashboard/');
+};
+
+/**
+ * GET /api/v1/integrations/ai-insights/
+ */
+export const getAIInsightsAPI = async (status?: AIInsightStatus): Promise<ClientAIInsightResponse[]> => {
+  const query = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiRequest<ClientAIInsightResponse[]>(`/integrations/ai-insights/${query}`);
+};
+
+/**
+ * POST /api/v1/integrations/ai-insights/run/
+ */
+export const runAIAnalysisAPI = async (force?: boolean): Promise<Record<string, unknown>> => {
+  return apiRequest<Record<string, unknown>>('/integrations/ai-insights/run/', {
+    method: 'POST',
+    body: JSON.stringify({ force: !!force }),
+  });
+};
+
+/**
+ * POST /api/v1/integrations/ai-insights/{id}/approve/
+ */
+export const approveAIInsightAPI = async (
+  insightId: number,
+): Promise<{ insight: ClientAIInsightResponse; client_task_id: number }> => {
+  return apiRequest<{ insight: ClientAIInsightResponse; client_task_id: number }>(
+    `/integrations/ai-insights/${insightId}/approve/`,
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+};
+
+/**
+ * POST /api/v1/integrations/ai-insights/{id}/dismiss/
+ */
+export const dismissAIInsightAPI = async (insightId: number): Promise<ClientAIInsightResponse> => {
+  return apiRequest<ClientAIInsightResponse>(`/integrations/ai-insights/${insightId}/dismiss/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+};
+
 export interface LeadSMSMessageResponse {
   id: number;
   client: number;

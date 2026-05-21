@@ -3011,10 +3011,13 @@ export const updateOpenAISettingsAPI = async (data: {
 /**
  * POST /api/v1/integrations/openai/settings/test/
  */
-export const testOpenAISettingsAPI = async (): Promise<{ ok: boolean }> => {
+export const testOpenAISettingsAPI = async (payload?: {
+  api_key?: string;
+  model?: string;
+}): Promise<{ ok: boolean }> => {
   return apiRequest<{ ok: boolean }>('/integrations/openai/settings/test/', {
     method: 'POST',
-    body: JSON.stringify({}),
+    body: JSON.stringify(payload ?? {}),
   });
 };
 

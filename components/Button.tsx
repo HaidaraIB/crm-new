@@ -16,7 +16,8 @@ export const Button = ({ children, onClick, className = '', variant = 'primary',
     ghost: 'text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 focus:ring-gray-500',
     danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
   };
-  const loaderTone = variant === 'primary' || variant === 'danger' ? 'light' : 'default';
+  const loaderTone =
+    variant === 'primary' || variant === 'danger' ? 'light' : variant === 'secondary' || variant === 'ghost' ? 'muted' : 'default';
   return (
     <button
       type={type}

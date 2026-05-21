@@ -28,7 +28,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
     required,
     disabled,
 }) => {
-    const { language } = useAppContext();
+    const { language, t } = useAppContext();
     const isRTL = language === 'ar';
 
     const roundToStep = (num: number, step: number): number => {
@@ -147,7 +147,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
                         transition-colors flex items-center justify-center
                         ${isRTL ? 'rounded-tl-md' : 'rounded-tr-md'}
                     `}
-                    aria-label="Increment"
+                    aria-label={t('numberInputIncrease')}
                 >
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
@@ -166,7 +166,7 @@ export const NumberInput: React.FC<NumberInputProps> = ({
                         transition-colors flex items-center justify-center
                         ${isRTL ? 'rounded-bl-md' : 'rounded-br-md'}
                     `}
-                    aria-label="Decrement"
+                    aria-label={t('numberInputDecrease')}
                 >
                     <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />

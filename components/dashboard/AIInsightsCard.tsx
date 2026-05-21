@@ -3,7 +3,7 @@ import { useAppContext } from '../../context/AppContext';
 import { dashboardSurface } from './dashboardStyles';
 import type { ClientAIInsightResponse } from '../../services/api';
 import { Button, Loader } from '../index';
-import { withLatinDigits } from '../../utils/dateUtils';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
 
 export type AIInsightCardItem = ClientAIInsightResponse & {
   onView?: () => void;
@@ -38,8 +38,12 @@ function leadInitials(name: string): string {
 function formatReminderDate(iso: string | null, locale: string, emptyLabel: string): string {
   if (!iso) return emptyLabel;
   try {
-    return withLatinDigits(
-      new Date(iso).toLocaleString(locale === 'ar' ? 'ar' : 'en', {
+    const date = new Date(iso);
+    if (Number.isNaN(date.getTime())) return emptyLabel;
+    const loc = locale === 'ar' ? ARABIC_DATE_LOCALE : undefined;
+    return date.toLocaleString(
+      loc,
+      withLatinDigits({
         dateStyle: 'short',
         timeStyle: 'short',
       }),
@@ -62,6 +66,7 @@ function InsightRow({
   approving,
   dismissing,
   locale,
+  emptyDateLabel,
 }: {
   item: AIInsightCardItem;
   scoreLabel: string;
@@ -75,6 +80,7 @@ function InsightRow({
   approving: boolean;
   dismissing: boolean;
   locale: string;
+  emptyDateLabel: string;
 }) {
   return (
     <div className="rounded-2xl border border-gray-100 dark:border-gray-700/90 bg-gray-50/50 dark:bg-gray-950/30 p-4">
@@ -190,6 +196,7 @@ export const AIInsightsCard = ({
                     approving={approvingId === item.id}
                     dismissing={dismissingId === item.id}
                     locale={locale}
+                    emptyDateLabel={emptyDateLabel}
                   />
                 ))}
               </div>
@@ -214,6 +221,7 @@ export const AIInsightsCard = ({
                     approving={approvingId === item.id}
                     dismissing={dismissingId === item.id}
                     locale={locale}
+                    emptyDateLabel={emptyDateLabel}
                   />
                 ))}
               </div>

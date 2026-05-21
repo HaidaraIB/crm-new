@@ -3,7 +3,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
@@ -20,6 +20,7 @@ import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import { normalizeRole } from '../utils/roles';
 
 type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
 
@@ -357,6 +358,12 @@ const OPENAI_MODEL_OPTIONS: { value: string; labelKey: 'openaiModelGpt4oMini' | 
     { value: 'gpt-4.1', labelKey: 'openaiModelGpt41' },
 ];
 
+function openaiTestErrorMessage(t: (key: string) => string, err: { code?: string; message?: string }): string {
+    if (err?.code === 'openai_not_configured') return t('openaiNotConfigured');
+    if (err?.code === 'openai_no_api_key') return t('openaiNoApiKey');
+    return err?.message || t('openaiConnectionFailed');
+}
+
 function OpenAISettingsForm({
     t,
     integrationPolicyMap,
@@ -377,15 +384,15 @@ function OpenAISettingsForm({
     const [running, setRunning] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
-    const [testOk, setTestOk] = useState<boolean | null>(null);
+    const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
+    const [testMessage, setTestMessage] = useState<string | null>(null);
     const [showApiKey, setShowApiKey] = useState(false);
     const [lastError, setLastError] = useState<string | null>(null);
 
     const openaiPolicyDisabled = integrationPolicyMap?.openai?.enabled === false;
     const openaiPolicyMessage = integrationPolicyMap?.openai?.message;
-    const canRunAnalysis =
-        (currentUser?.role ?? '').toLowerCase() === 'admin' ||
-        (currentUser?.role ?? '').toLowerCase() === 'supervisor';
+    const userRole = normalizeRole(currentUser?.role);
+    const canRunAnalysis = userRole === 'Owner' || userRole === 'Supervisor';
 
     useEffect(() => {
         let cancelled = false;
@@ -419,7 +426,8 @@ function OpenAISettingsForm({
         }
         setError(null);
         setSuccessMessage(null);
-        setTestOk(null);
+        setTestStatus('idle');
+        setTestMessage(null);
         setSaving(true);
         const payload: Parameters<typeof updateOpenAISettingsAPI>[0] = {
             is_enabled: isEnabled,
@@ -440,17 +448,25 @@ function OpenAISettingsForm({
     };
 
     const handleTest = () => {
+        if (openaiPolicyDisabled) {
+            setError(openaiPolicyMessage || t('integrationDisabledDefaultMessage'));
+            return;
+        }
         setTesting(true);
-        setTestOk(null);
+        setTestStatus('idle');
+        setTestMessage(null);
         setSuccessMessage(null);
-        testOpenAISettingsAPI()
+        setError(null);
+        const draftKey = apiKey.trim();
+        const payload = draftKey ? { api_key: draftKey, model } : undefined;
+        testOpenAISettingsAPI(payload)
             .then(() => {
-                setTestOk(true);
-                setSuccessMessage(t('openaiConnectionOk'));
+                setTestStatus('success');
+                setTestMessage(t('openaiConnectionOk'));
             })
-            .catch(() => {
-                setTestOk(false);
-                setSuccessMessage(null);
+            .catch((e: { code?: string; message?: string }) => {
+                setTestStatus('error');
+                setTestMessage(openaiTestErrorMessage(t, e));
             })
             .finally(() => setTesting(false));
     };
@@ -459,7 +475,8 @@ function OpenAISettingsForm({
         setRunning(true);
         setError(null);
         setSuccessMessage(null);
-        setTestOk(null);
+        setTestStatus('idle');
+        setTestMessage(null);
         runAIAnalysisAPI(false)
             .then(() => {
                 setSuccessMessage(t('openaiAnalyzeSuccess'));
@@ -518,10 +535,14 @@ function OpenAISettingsForm({
                         </label>
                         <div className="relative">
                             <input
+                                id="openai-api-key"
+                                name="openai_api_key"
                                 type={showApiKey ? 'text' : 'password'}
                                 value={apiKey}
                                 onChange={(e) => setApiKey(e.target.value)}
-                                autoComplete="off"
+                                autoComplete="new-password"
+                                data-form-type="other"
+                                data-lpignore="true"
                                 className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
                                 placeholder={t('openaiApiKeyPlaceholder')}
                             />
@@ -554,13 +575,22 @@ function OpenAISettingsForm({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                             {t('openaiMaxLeadsPerRun')}
                         </label>
-                        <input
-                            type="number"
+                        <NumberInput
+                            id="openai-max-leads-per-run"
+                            name="openai_max_leads_per_run"
                             min={1}
                             max={100}
+                            step={1}
                             value={maxLeads}
-                            onChange={(e) => setMaxLeads(Number(e.target.value) || 20)}
-                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm"
+                            disabled={openaiPolicyDisabled}
+                            onChange={(e) => {
+                                const value = parseInt(e.target.value, 10);
+                                if (!isNaN(value) && value >= 1) {
+                                    setMaxLeads(Math.min(100, value));
+                                } else if (e.target.value === '') {
+                                    setMaxLeads(1);
+                                }
+                            }}
                         />
                     </div>
                     <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
@@ -573,27 +603,48 @@ function OpenAISettingsForm({
                     </label>
                 </div>
 
-                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+                {error && (
+                    <div className="rounded-lg border px-4 py-3 text-sm bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
+                        {error}
+                    </div>
+                )}
+                {testStatus === 'success' && testMessage ? (
+                    <div className="rounded-lg border px-4 py-3 text-sm bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200">
+                        {testMessage}
+                    </div>
+                ) : null}
+                {testStatus === 'error' && testMessage ? (
+                    <div className="rounded-lg border px-4 py-3 text-sm bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
+                        {testMessage}
+                    </div>
+                ) : null}
                 {running && (
                     <p className="text-sm text-gray-600 dark:text-gray-400">{t('aiAnalysisRunning')}</p>
                 )}
-                {successMessage && !running && (
+                {successMessage && !running && testStatus === 'idle' && (
                     <p className="text-sm text-green-600 dark:text-green-400">{successMessage}</p>
-                )}
-                {testOk === false && (
-                    <p className="text-sm text-red-600 dark:text-red-400">{t('openaiConnectionFailed')}</p>
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                    <Button onClick={handleSave} disabled={saving || openaiPolicyDisabled}>
-                        {saving ? <Loader variant="primary" className="h-4 w-4" /> : t('save')}
+                    <Button onClick={handleSave} disabled={saving || openaiPolicyDisabled} loading={saving}>
+                        {t('save')}
                     </Button>
-                    <Button variant="secondary" onClick={handleTest} disabled={testing || openaiPolicyDisabled}>
-                        {testing ? <Loader className="h-4 w-4" /> : t('openaiTestConnection')}
+                    <Button
+                        variant="secondary"
+                        onClick={handleTest}
+                        disabled={openaiPolicyDisabled}
+                        loading={testing}
+                    >
+                        {t('openaiTestConnection')}
                     </Button>
                     {canRunAnalysis ? (
-                        <Button variant="secondary" onClick={handleAnalyze} disabled={running || openaiPolicyDisabled || !isEnabled}>
-                            {running ? <Loader className="h-4 w-4" /> : t('openaiAnalyzeNow')}
+                        <Button
+                            variant="secondary"
+                            onClick={handleAnalyze}
+                            disabled={running || openaiPolicyDisabled || !isEnabled}
+                            loading={running}
+                        >
+                            {t('openaiAnalyzeNow')}
                         </Button>
                     ) : null}
                 </div>

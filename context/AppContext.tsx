@@ -1173,6 +1173,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'Leads':
       case 'All Leads':
       case 'Fresh Leads':
+      case 'Hot Leads':
       case 'Cold Leads':
       case 'My Leads':
       case 'Rotated Leads':

@@ -6,7 +6,7 @@ export type Page =
   | 'Users' | 'Employees' | 'Marketing'   | 'Todos' | 'Team Chat' | 'Reports' | 'Integrations' 
   | 'Billing' | 'Settings' | 'ViewLead' | 'CreateDeal' | 'CreateLead' | 'EditLead' | 'Profile'
   // Sub-pages
-  | 'All Leads' | 'Fresh Leads' | 'Cold Leads' | 'My Leads' | 'Rotated Leads'
+  | 'All Leads' | 'Fresh Leads' | 'Hot Leads' | 'Cold Leads' | 'My Leads' | 'Rotated Leads'
   | 'Properties' | 'Owners'
   | 'Services' | 'Service Packages' | 'Service Providers'
   | 'Products' | 'Product Categories' | 'Suppliers'

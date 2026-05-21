@@ -42,6 +42,8 @@ import {
   bulkAssignLeadsAPI,
   assignUnassignedClientsAPI,
   getAIInsightsDashboardAPI,
+  getAIManagementReportAPI,
+  generateAIManagementReportAPI,
   approveAIInsightAPI,
   dismissAIInsightAPI,
   runAIAnalysisAPI,
@@ -1474,18 +1476,18 @@ export const useSelectLeadForm = (options?: UseMutationOptions<any, Error, { acc
 
 // ==================== AI Insights ====================
 
-export const useAIInsightsDashboard = () => {
+export const useAIInsightsDashboard = (language?: string) => {
   return useQuery({
-    queryKey: ['aiInsightsDashboard'],
-    queryFn: getAIInsightsDashboardAPI,
+    queryKey: ['aiInsightsDashboard', language ?? ''],
+    queryFn: () => getAIInsightsDashboardAPI(language),
     staleTime: 60 * 1000,
   });
 };
 
-export const useApproveAIInsight = () => {
+export const useApproveAIInsight = (language?: string) => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (insightId: number) => approveAIInsightAPI(insightId),
+    mutationFn: (insightId: number) => approveAIInsightAPI(insightId, language),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['aiInsightsDashboard'] });
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
@@ -1509,6 +1511,26 @@ export const useRunAIAnalysis = () => {
     mutationFn: (force?: boolean) => runAIAnalysisAPI(force),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['aiInsightsDashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['aiManagementReport'] });
+    },
+  });
+};
+
+export const useAIManagementReport = (enabled: boolean) => {
+  return useQuery({
+    queryKey: ['aiManagementReport'],
+    queryFn: getAIManagementReportAPI,
+    enabled,
+    staleTime: 60 * 1000,
+  });
+};
+
+export const useGenerateAIManagementReport = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: generateAIManagementReportAPI,
+    onSuccess: (data) => {
+      queryClient.setQueryData(['aiManagementReport'], data);
     },
   });
 };

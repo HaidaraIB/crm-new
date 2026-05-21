@@ -243,7 +243,7 @@ export const EditLeadModal = () => {
                 ? (formState.priority.toLowerCase() as 'low' | 'medium' | 'high')
                 : null;
             const typeValue = formState.type
-                ? (formState.type.toLowerCase() as 'fresh' | 'cold')
+                ? (formState.type.toLowerCase() as 'fresh' | 'hot' | 'cold')
                 : null;
 
             const primaryPhone =
@@ -446,6 +446,7 @@ export const EditLeadModal = () => {
                         <Label htmlFor="type">{t('type')}</Label>
                         <Select id="type" value={formState.type} onChange={handleChange}>
                             <option value="Fresh">{t('fresh')}</option>
+                            <option value="Hot">{t('hot')}</option>
                             <option value="Cold">{t('cold')}</option>
                         </Select>
                     </div>

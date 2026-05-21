@@ -1144,11 +1144,13 @@ export const ViewLeadPage = () => {
                                     return (
                                         <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
                                             type === 'fresh' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                            type === 'hot' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
                                             type === 'cold' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                                             'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                                         }`}>
-                                            {type === 'fresh' ? t('fresh') : 
-                                             type === 'cold' ? t('cold') : 
+                                            {type === 'fresh' ? t('fresh') :
+                                             type === 'hot' ? t('hot') :
+                                             type === 'cold' ? t('cold') :
                                              displayLead.type || '-'}
                                         </span>
                                     );

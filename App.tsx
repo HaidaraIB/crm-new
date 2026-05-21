@@ -16,6 +16,7 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
         case 'Leads':
         case 'All Leads':
         case 'Fresh Leads':
+        case 'Hot Leads':
         case 'Cold Leads':
         case 'My Leads':
         case 'Rotated Leads':
@@ -301,6 +302,8 @@ const TheApp = () => {
                 'all-leads': 'All Leads',
                 'fresh leads': 'Fresh Leads',
                 'fresh-leads': 'Fresh Leads',
+                'hot leads': 'Hot Leads',
+                'hot-leads': 'Hot Leads',
                 'cold leads': 'Cold Leads',
                 'cold-leads': 'Cold Leads',
                 'my leads': 'My Leads',
@@ -549,6 +552,8 @@ const TheApp = () => {
             'all-leads': 'All Leads',
             'fresh leads': 'Fresh Leads',
             'fresh-leads': 'Fresh Leads',
+            'hot leads': 'Hot Leads',
+            'hot-leads': 'Hot Leads',
             'cold leads': 'Cold Leads',
             'cold-leads': 'Cold Leads',
             'my leads': 'My Leads',

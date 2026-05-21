@@ -272,6 +272,7 @@ export const LeadsPage = () => {
     const apiFilters = useMemo(() => {
         const filters: { type?: string; priority?: string; search?: string } = {};
         if (currentPage === 'Fresh Leads') filters.type = 'fresh';
+        if (currentPage === 'Hot Leads') filters.type = 'hot';
         else if (currentPage === 'Cold Leads') filters.type = 'cold';
         else if (currentPage === 'Rotated Leads') filters.type = 'rotated';
         if (leadFilters.search) filters.search = leadFilters.search;
@@ -572,6 +573,7 @@ export const LeadsPage = () => {
         // 1. Filter by sidebar page type
         switch (currentPage) {
             case 'Fresh Leads': leads = leads.filter(l => (l.type?.toLowerCase() || '') === 'fresh'); break;
+            case 'Hot Leads': leads = leads.filter(l => (l.type?.toLowerCase() || '') === 'hot'); break;
             case 'Cold Leads': leads = leads.filter(l => (l.type?.toLowerCase() || '') === 'cold'); break;
             case 'My Leads': 
                 if (currentUser?.id) {
@@ -1167,10 +1169,12 @@ export const LeadsPage = () => {
                                                         return (
                                                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
                                                                 type === 'fresh' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                                                type === 'hot' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
                                                                 type === 'cold' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
                                                                 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
                                                             }`}>
                                                                 {type === 'fresh' ? t('fresh') : 
+                                                                 type === 'hot' ? t('hot') :
                                                                  type === 'cold' ? t('cold') : 
                                                                  lead.type || '-'}
                                                             </span>

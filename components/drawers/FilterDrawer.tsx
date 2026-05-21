@@ -116,7 +116,7 @@ export const FilterDrawer = () => {
         return ['All'];
     }, [statuses]);
     
-    const leadTypes: Array<'All' | 'Fresh' | 'Cold' | 'Rotated'> = ['All', 'Fresh', 'Cold', 'Rotated'];
+    const leadTypes: Array<'All' | 'Fresh' | 'Hot' | 'Cold' | 'Rotated'> = ['All', 'Fresh', 'Hot', 'Cold', 'Rotated'];
     const priorities: Array<'All' | 'High' | 'Medium' | 'Low'> = ['All', 'High', 'Medium', 'Low'];
     
     // Get communication ways from channels settings only (no hardcoded fallback)

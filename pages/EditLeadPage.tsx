@@ -80,7 +80,7 @@ export const EditLeadPage = () => {
         budget: '',
         budgetMax: '',
         assignedTo: '',
-        type: '' as 'fresh' | 'cold' | '',
+        type: '' as 'fresh' | 'hot' | 'cold' | '',
         communicationWay: '',
         priority: '' as 'low' | 'medium' | 'high' | '',
         status: '',
@@ -161,7 +161,7 @@ export const EditLeadPage = () => {
             setSelectedLead(editingLead);
             
             // Convert type and priority to lowercase for form state
-            const typeValue = editingLead.type ? editingLead.type.toLowerCase() as 'fresh' | 'cold' : '';
+            const typeValue = editingLead.type ? editingLead.type.toLowerCase() as 'fresh' | 'hot' | 'cold' : '';
             const priorityValue = editingLead.priority ? editingLead.priority.toLowerCase() as 'low' | 'medium' | 'high' : '';
             
             // Find channel and status IDs from names
@@ -340,7 +340,7 @@ export const EditLeadPage = () => {
             
             // Convert priority and type to lowercase for API (already lowercase, but ensure)
             const priorityValue = formState.priority ? (formState.priority.toLowerCase() as 'low' | 'medium' | 'high') : null;
-            const typeValue = formState.type ? (formState.type.toLowerCase() as 'fresh' | 'cold') : null;
+            const typeValue = formState.type ? (formState.type.toLowerCase() as 'fresh' | 'hot' | 'cold') : null;
             
             // Prepare phone_number for backward compatibility (only if we have phone numbers)
             const primaryPhone = finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '';
@@ -736,6 +736,7 @@ export const EditLeadPage = () => {
                             >
                                 <option value="">{t('selectType') || 'Select Type'}</option>
                                 <option value="fresh">{t('fresh')}</option>
+                                <option value="hot">{t('hot')}</option>
                                 <option value="cold">{t('cold')}</option>
                             </Select>
                             {errors.type && (

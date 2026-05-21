@@ -63,7 +63,7 @@ export interface PreviewRow {
   phone: string;
   budget: number | null;
   budget_max: number | null;
-  type: 'fresh' | 'cold';
+  type: 'fresh' | 'hot' | 'cold';
   priority: 'low' | 'medium' | 'high';
   assigned_to: number | null;
   status_id: number | null;
@@ -456,7 +456,7 @@ function buildPreviewRowsFromMapping(
     const budgetVal = getValueByHeader(row, headerByField.budget || '');
     const { budget, budget_max } = parseBudgetCell(budgetVal);
     let typeVal = getValueByHeader(row, headerByField.type || '').toLowerCase();
-    if (typeVal && typeVal !== 'fresh' && typeVal !== 'cold') typeVal = 'fresh';
+    if (typeVal && typeVal !== 'fresh' && typeVal !== 'hot' && typeVal !== 'cold') typeVal = 'fresh';
     if (!typeVal) typeVal = 'fresh';
     let priorityVal = getValueByHeader(row, headerByField.priority || '').toLowerCase();
     if (priorityVal && !['low', 'medium', 'high'].includes(priorityVal)) priorityVal = 'medium';
@@ -488,7 +488,7 @@ function buildPreviewRowsFromMapping(
       phone,
       budget,
       budget_max,
-      type: typeVal as 'fresh' | 'cold',
+      type: typeVal as 'fresh' | 'hot' | 'cold',
       priority: priorityVal as 'low' | 'medium' | 'high',
       assigned_to,
       status_id,

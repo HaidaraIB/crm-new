@@ -4,6 +4,7 @@ import { dashboardSurface } from './dashboardStyles';
 import type { ClientAIInsightResponse } from '../../services/api';
 import { Button, Loader } from '../index';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
+import { pickInsightText } from '../../utils/aiInsightText';
 
 export type AIInsightCardItem = ClientAIInsightResponse & {
   onView?: () => void;
@@ -67,6 +68,7 @@ function InsightRow({
   dismissing,
   locale,
   emptyDateLabel,
+  language,
 }: {
   item: AIInsightCardItem;
   scoreLabel: string;
@@ -81,7 +83,9 @@ function InsightRow({
   dismissing: boolean;
   locale: string;
   emptyDateLabel: string;
+  language: string;
 }) {
+  const summaryText = pickInsightText(item, 'summary', language);
   return (
     <div className="rounded-2xl border border-gray-100 dark:border-gray-700/90 bg-gray-50/50 dark:bg-gray-950/30 p-4">
       <div className="flex items-start gap-3">
@@ -102,7 +106,7 @@ function InsightRow({
               <span>{item.ai_score}</span>
             </span>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{item.summary}</p>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{summaryText}</p>
           <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
             {suggestedDateLabel}: {formatReminderDate(item.suggested_reminder_date, locale, emptyDateLabel)}
           </p>
@@ -155,6 +159,7 @@ export const AIInsightsCard = ({
 }: AIInsightsCardProps) => {
   const { language, t } = useAppContext();
   const locale = language === 'ar' ? 'ar' : 'en';
+  const uiLanguage = language === 'ar' ? 'ar' : 'en';
   const emptyDateLabel = t('notAvailable');
   const hasContent = pending.length > 0 || priority.length > 0;
 
@@ -197,6 +202,7 @@ export const AIInsightsCard = ({
                     dismissing={dismissingId === item.id}
                     locale={locale}
                     emptyDateLabel={emptyDateLabel}
+                    language={uiLanguage}
                   />
                 ))}
               </div>
@@ -222,6 +228,7 @@ export const AIInsightsCard = ({
                     dismissing={dismissingId === item.id}
                     locale={locale}
                     emptyDateLabel={emptyDateLabel}
+                    language={uiLanguage}
                   />
                 ))}
               </div>

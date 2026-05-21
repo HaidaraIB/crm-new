@@ -3031,10 +3031,17 @@ export interface ClientAIInsightResponse {
   assigned_to_name: string | null;
   ai_score: number;
   priority_level: string;
+  /** Localized for request `lang` / user language */
   summary: string;
+  summary_en?: string;
+  summary_ar?: string;
   reasoning?: string | null;
+  reasoning_en?: string | null;
+  reasoning_ar?: string | null;
   suggested_reminder_date: string | null;
   suggested_task_notes: string | null;
+  suggested_task_notes_en?: string | null;
+  suggested_task_notes_ar?: string | null;
   status: AIInsightStatus;
   approved_at?: string | null;
   approved_by?: number | null;
@@ -3050,11 +3057,53 @@ export interface AIInsightsDashboardResponse {
   ai_enabled: boolean;
 }
 
+export interface AIManagementReportEmployeeRow {
+  user_id: number;
+  name: string;
+  role: string;
+  tasks_today: number;
+  calls_today: number;
+  visits_today: number;
+  activity_total: number;
+  assigned_leads: number;
+}
+
+export interface AIManagementReportHotLead {
+  client_id: number;
+  name: string;
+  type: string;
+  priority: string;
+  stage: string;
+  ai_score: number | null;
+  summary_en: string;
+  summary_ar: string;
+  assigned_to_name: string | null;
+  source: string;
+}
+
+export interface AIManagementReportResponse {
+  ai_enabled?: boolean;
+  generated_at: string | null;
+  model_used?: string;
+  report_date?: string | null;
+  employees: AIManagementReportEmployeeRow[];
+  hot_leads: AIManagementReportHotLead[];
+  employee_performance_en?: string;
+  employee_performance_ar?: string;
+  hot_leads_summary_en?: string;
+  hot_leads_summary_ar?: string;
+  has_ai_summary: boolean;
+}
+
 /**
  * GET /api/v1/integrations/ai-insights/dashboard/
  */
-export const getAIInsightsDashboardAPI = async (): Promise<AIInsightsDashboardResponse> => {
-  return apiRequest<AIInsightsDashboardResponse>('/integrations/ai-insights/dashboard/');
+export const getAIInsightsDashboardAPI = async (
+  language?: string,
+): Promise<AIInsightsDashboardResponse> => {
+  const lang = language === 'ar' || language === 'en' ? language : undefined;
+  const query = lang ? `?lang=${encodeURIComponent(lang)}` : '';
+  return apiRequest<AIInsightsDashboardResponse>(`/integrations/ai-insights/dashboard${query}`);
 };
 
 /**
@@ -3080,10 +3129,12 @@ export const runAIAnalysisAPI = async (force?: boolean): Promise<Record<string, 
  */
 export const approveAIInsightAPI = async (
   insightId: number,
+  language?: string,
 ): Promise<{ insight: ClientAIInsightResponse; client_task_id: number }> => {
+  const lang = language === 'ar' || language === 'en' ? language : undefined;
   return apiRequest<{ insight: ClientAIInsightResponse; client_task_id: number }>(
     `/integrations/ai-insights/${insightId}/approve/`,
-    { method: 'POST', body: JSON.stringify({}) },
+    { method: 'POST', body: JSON.stringify(lang ? { language: lang } : {}) },
   );
 };
 
@@ -3092,6 +3143,23 @@ export const approveAIInsightAPI = async (
  */
 export const dismissAIInsightAPI = async (insightId: number): Promise<ClientAIInsightResponse> => {
   return apiRequest<ClientAIInsightResponse>(`/integrations/ai-insights/${insightId}/dismiss/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+};
+
+/**
+ * GET /api/v1/integrations/openai/management-report/
+ */
+export const getAIManagementReportAPI = async (): Promise<AIManagementReportResponse> => {
+  return apiRequest<AIManagementReportResponse>('/integrations/openai/management-report/');
+};
+
+/**
+ * POST /api/v1/integrations/openai/management-report/generate/
+ */
+export const generateAIManagementReportAPI = async (): Promise<AIManagementReportResponse> => {
+  return apiRequest<AIManagementReportResponse>('/integrations/openai/management-report/generate/', {
     method: 'POST',
     body: JSON.stringify({}),
   });

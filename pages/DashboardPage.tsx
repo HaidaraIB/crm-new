@@ -6,8 +6,9 @@ import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionL
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useApproveAIInsight, useDismissAIInsight, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
+import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useAIManagementReport, useGenerateAIManagementReport, useApproveAIInsight, useDismissAIInsight, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
 import { AIInsightsCard } from '../components/dashboard/AIInsightsCard';
+import { ManagementReportCard } from '../components/dashboard/ManagementReportCard';
 import { normalizeRole, getRoleTranslation, isAssignedClinicalAppRole } from '../utils/roles';
 import { MissionBar, MissionItem } from '../components/dashboard/MissionBar';
 import { SmartInsights } from '../components/dashboard/SmartInsights';
@@ -83,8 +84,11 @@ export const DashboardPage = () => {
         ? stagesResponse 
         : (stagesResponse?.results || []);
 
-    const { data: aiInsightsData } = useAIInsightsDashboard();
-    const approveAI = useApproveAIInsight();
+    const { data: aiInsightsData } = useAIInsightsDashboard(language);
+    const showManagementReport = isAdmin && !!aiInsightsData?.ai_enabled;
+    const { data: managementReport, isLoading: managementReportLoading } = useAIManagementReport(showManagementReport);
+    const generateManagementReport = useGenerateAIManagementReport();
+    const approveAI = useApproveAIInsight(language);
     const dismissAI = useDismissAIInsight();
     const [aiActionId, setAiActionId] = useState<number | null>(null);
     const [aiActionType, setAiActionType] = useState<'approve' | 'dismiss' | null>(null);
@@ -663,6 +667,9 @@ export const DashboardPage = () => {
         return visibleLeads
             .map((lead: any) => {
                 let score = 0;
+                const leadType = String(lead.type || '').toLowerCase();
+                if (leadType === 'hot') score += 40;
+                else if (leadType === 'fresh') score += 8;
                 const priority = String(lead.priority || '').toLowerCase();
                 if (priority === 'high') score += 30;
                 else if (priority === 'medium') score += 15;
@@ -685,7 +692,8 @@ export const DashboardPage = () => {
                 const assignedUser = companyUserMap.get(assignedToId);
                 const stageName = lead.last_stage || lead.lastStage || lead.status_name || lead.status || t('noStage');
                 const stageConfig = stages.find((s: any) => s.name?.toLowerCase().replace(/\s+/g, '_') === String(stageName).toLowerCase().replace(/\s+/g, '_'));
-                const bucket: HotLeadItem['bucket'] = score >= 60 ? 'hot' : score >= 30 ? 'warm' : 'cold';
+                let bucket: HotLeadItem['bucket'] = score >= 60 ? 'hot' : score >= 30 ? 'warm' : 'cold';
+                if (leadType === 'hot' && bucket !== 'hot') bucket = 'hot';
                 return {
                     id: lead.id,
                     name: lead.name || `${t('lead')} #${lead.id}`,
@@ -1127,6 +1135,36 @@ export const DashboardPage = () => {
                             }}
                             approvingId={aiActionType === 'approve' ? aiActionId : null}
                             dismissingId={aiActionType === 'dismiss' ? aiActionId : null}
+                        />
+                    ) : null}
+                    {showManagementReport ? (
+                        <ManagementReportCard
+                            title={t('managementReport')}
+                            poweredByLabel={t('aiInsightsPoweredBy')}
+                            employeeSectionTitle={t('managementReportEmployeePerformance')}
+                            hotLeadsSectionTitle={t('managementReportHotLeads')}
+                            activityLabel={t('managementReportEmployee')}
+                            tasksLabel={t('managementReportTasks')}
+                            callsLabel={t('managementReportCalls')}
+                            visitsLabel={t('managementReportVisits')}
+                            assignedLeadsLabel={t('managementReportAssignedLeads')}
+                            emptyEmployeesLabel={t('managementReportNoEmployees')}
+                            emptyHotLeadsLabel={t('managementReportNoHotLeads')}
+                            refreshLabel={t('managementReportRefresh')}
+                            viewLeadLabel={t('viewLead')}
+                            report={managementReport}
+                            loading={managementReportLoading}
+                            generating={generateManagementReport.isPending}
+                            language={language}
+                            onRefresh={() => generateManagementReport.mutate()}
+                            onViewLead={(clientId) => {
+                                const lead = leads.find((l: any) => l.id === clientId);
+                                if (lead) {
+                                    setSelectedLead(lead);
+                                }
+                                window.history.pushState({}, '', `/view-lead/${clientId}`);
+                                setCurrentPage('ViewLead');
+                            }}
                         />
                     ) : null}
                     <HotLeadsCard

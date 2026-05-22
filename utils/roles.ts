@@ -97,6 +97,12 @@ export const showInLeadAssigneePicker = (role?: string): boolean => {
   return ar !== 'DataEntry' && ar !== 'Reception';
 };
 
+/** Deactivate flow: ask whether to redistribute leads (data entry / reception cannot hold assignee leads). */
+export const roleUsesLeadReassignOnDeactivate = (role?: string): boolean => {
+  const ar = normalizeRole(role);
+  return ar !== 'DataEntry' && ar !== 'Reception';
+};
+
 /**
  * Users shown in operational “employee” UI: assignee filters, team/report breakdowns, activity user filter.
  * Same rule as lead assignee pickers (excludes data_entry). Use full `/users` where you only resolve names.
@@ -111,16 +117,18 @@ export function usersForOperationalEmployeeLists<T extends { id: number; role?: 
 /**
  * Company users suitable for manual assign dropdowns (excludes data_entry).
  */
-export function buildLeadAssigneePickerOptions<T extends { id: number; role?: string }>(
+export function buildLeadAssigneePickerOptions<T extends { id: number; role?: string; is_active?: boolean }>(
   apiUsers: T[],
   currentUser: T | null | undefined
 ): T[] {
   const map = new Map<number, T>();
   for (const u of apiUsers) {
+    if (u.is_active === false) continue;
     if (showInLeadAssigneePicker(u.role)) map.set(u.id, u);
   }
   if (
     currentUser &&
+    currentUser.is_active !== false &&
     showInLeadAssigneePicker(currentUser.role) &&
     !map.has(currentUser.id)
   ) {

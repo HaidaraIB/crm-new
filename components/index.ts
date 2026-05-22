@@ -58,6 +58,7 @@ export * from './modals/AddUserModal';
 export * from './modals/ViewUserModal';
 export * from './modals/EditUserModal';
 export * from './modals/DeleteUserModal';
+export * from './modals/DeactivateEmployeeModal';
 export * from './modals/AddCampaignModal';
 export * from './modals/EditCampaignModal';
 export * from './modals/ManageIntegrationAccountModal';

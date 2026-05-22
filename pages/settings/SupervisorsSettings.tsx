@@ -1,16 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Supervisor } from '../../types';
+import { Supervisor, User } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { getSupervisorsAPI, createSupervisorAPI, updateSupervisorAPI, updateUserAPI, deleteSupervisorAPI, toggleSupervisorActiveAPI } from '../../services/api';
 import { normalizeRole } from '../../utils/roles';
+import { normalizeUser } from '../../utils/userUtils';
+import { useReactivateEmployee } from '../../hooks/useQueries';
 import { SupervisorModal, SupervisorFormData } from './SupervisorModal';
 import { EditIcon, TrashIcon } from '../../components/icons';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 
 export const SupervisorsSettings = () => {
   const queryClient = useQueryClient();
-  const { t, currentUser, language } = useAppContext();
+  const {
+    t,
+    currentUser,
+    language,
+    setSelectedUser,
+    setIsDeactivateEmployeeModalOpen,
+    setIsSuccessModalOpen,
+    setSuccessMessage,
+    isDeactivateEmployeeModalOpen,
+  } = useAppContext();
+  const reactivateMutation = useReactivateEmployee();
   const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -40,6 +52,15 @@ export const SupervisorsSettings = () => {
   useEffect(() => {
     loadSupervisors();
   }, [currentUser?.role]);
+
+  const deactivateModalWasOpen = useRef(false);
+  useEffect(() => {
+    if (deactivateModalWasOpen.current && !isDeactivateEmployeeModalOpen) {
+      void loadSupervisors();
+      void queryClient.invalidateQueries({ queryKey: ['users'] });
+    }
+    deactivateModalWasOpen.current = isDeactivateEmployeeModalOpen;
+  }, [isDeactivateEmployeeModalOpen]);
 
   const handleOpenModal = (supervisor?: Supervisor) => {
     setEditingSupervisor(supervisor || null);
@@ -105,11 +126,42 @@ export const SupervisorsSettings = () => {
   };
 
   const handleToggleActive = async (s: Supervisor) => {
+    if (s.user?.is_active === false) return;
     try {
       await toggleSupervisorActiveAPI(s.id);
       await loadSupervisors();
     } catch (e) {
       console.error('Error toggling supervisor:', e);
+    }
+  };
+
+  const supervisorToUser = (s: Supervisor): User =>
+    normalizeUser({
+      id: s.user.id,
+      username: s.user.username,
+      email: s.user.email,
+      first_name: s.user.first_name,
+      last_name: s.user.last_name,
+      phone: s.user.phone,
+      role: 'supervisor',
+      is_active: s.user.is_active !== false,
+    });
+
+  const handleDeactivateSupervisor = (s: Supervisor) => {
+    setSelectedUser(supervisorToUser(s));
+    setIsDeactivateEmployeeModalOpen(true);
+  };
+
+  const handleReactivateSupervisor = async (s: Supervisor) => {
+    try {
+      await reactivateMutation.mutateAsync(s.user.id);
+      setSuccessMessage(t('employeeReactivatedSuccessfully'));
+      setIsSuccessModalOpen(true);
+      await loadSupervisors();
+      await queryClient.invalidateQueries({ queryKey: ['users'] });
+    } catch (e: any) {
+      console.error('Error reactivating supervisor:', e);
+      alert(e?.message || t('errorReactivatingEmployee'));
     }
   };
 
@@ -206,9 +258,23 @@ export const SupervisorsSettings = () => {
                   </td>
                   <td className="px-6 py-4 text-center">{s.user.email}</td>
                   <td className="px-6 py-4 text-center">
-                    <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${s.is_active ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}`}>
-                      {s.is_active ? t('active') : t('deactivated')}
-                    </span>
+                    {(() => {
+                      const accountOff = s.user?.is_active === false;
+                      const crmOff = !s.is_active;
+                      const label = accountOff
+                        ? t('deactivated')
+                        : crmOff
+                          ? t('supervisorsCrmAccessOff')
+                          : t('active');
+                      const cls = accountOff || crmOff
+                        ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                        : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300';
+                      return (
+                        <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${cls}`}>
+                          {label}
+                        </span>
+                      );
+                    })()}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <div className="flex flex-wrap gap-1 justify-center">
@@ -223,11 +289,32 @@ export const SupervisorsSettings = () => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex flex-wrap items-center justify-center gap-2">
+                      {s.user?.is_active !== false ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDeactivateSupervisor(s)}
+                          className="px-2 py-1 text-xs rounded-md border border-amber-600 text-amber-700 hover:bg-amber-50 dark:border-amber-500 dark:text-amber-300 dark:hover:bg-amber-900/20"
+                        >
+                          {t('deactivateEmployee')}
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleReactivateSupervisor(s)}
+                          disabled={reactivateMutation.isPending}
+                          className="px-2 py-1 text-xs rounded-md border border-emerald-600 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-500 dark:text-emerald-300 dark:hover:bg-emerald-900/20 disabled:opacity-50"
+                        >
+                          {t('reactivateEmployee')}
+                        </button>
+                      )}
                       {language === 'ar' && (
-                        <div className="flex items-center justify-center p-2" title={s.is_active ? t('deactivate') : t('activate')}>
+                        <div
+                          className="flex items-center justify-center p-2"
+                          title={s.is_active ? t('supervisorsCrmAccessOff') : t('supervisorsCrmAccess')}
+                        >
                           <ToggleSwitch
-                            enabled={s.is_active}
+                            enabled={s.is_active && s.user?.is_active !== false}
                             setEnabled={() => handleToggleActive(s)}
                           />
                         </div>
@@ -239,9 +326,12 @@ export const SupervisorsSettings = () => {
                         <TrashIcon className="h-4 w-4" />
                       </button>
                       {language !== 'ar' && (
-                        <div className="flex items-center justify-center p-2" title={s.is_active ? t('deactivate') : t('activate')}>
+                        <div
+                          className="flex items-center justify-center p-2"
+                          title={s.is_active ? t('supervisorsCrmAccessOff') : t('supervisorsCrmAccess')}
+                        >
                           <ToggleSwitch
-                            enabled={s.is_active}
+                            enabled={s.is_active && s.user?.is_active !== false}
                             setEnabled={() => handleToggleActive(s)}
                           />
                         </div>

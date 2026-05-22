@@ -353,12 +353,6 @@ export const LeadsPage = () => {
             setSuccessMessage(message);
             setIsSuccessModalOpen(true);
         },
-        onError: (error: any) => {
-            console.error('Error assigning unassigned clients:', error);
-            // Use translation for error message
-            setSuccessMessage(t('errorAssigningClients') || 'Failed to assign unassigned clients.');
-            setIsSuccessModalOpen(true);
-        },
     });
     
     // Track which lead is being updated

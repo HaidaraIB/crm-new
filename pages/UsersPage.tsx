@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon } from '../components/index';
 import { User } from '../types';
-import { useUsers } from '../hooks/useQueries';
+import { useUsers, useReactivateEmployee } from '../hooks/useQueries';
 import { getRoleTranslation, normalizeRole } from '../utils/roles';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -108,7 +108,19 @@ const Avatar = ({ src, alt, className }: { src: string; alt: string; className?:
 };
 
 const UserCard = ({ user }: { user: User }) => {
-    const { t, setSelectedUser, setIsViewUserModalOpen, setIsEditUserModalOpen, setIsDeleteUserModalOpen, currentUser, hasSupervisorPermission } = useAppContext();
+    const {
+        t,
+        setSelectedUser,
+        setIsViewUserModalOpen,
+        setIsEditUserModalOpen,
+        setIsDeleteUserModalOpen,
+        setIsDeactivateEmployeeModalOpen,
+        setIsSuccessModalOpen,
+        setSuccessMessage,
+        currentUser,
+        hasSupervisorPermission,
+    } = useAppContext();
+    const reactivateMutation = useReactivateEmployee();
     
     const getUserDisplayNameLocal = (user: User): string => {
         if (user.name) return user.name;
@@ -135,6 +147,21 @@ const UserCard = ({ user }: { user: User }) => {
         setIsDeleteUserModalOpen(true);
     };
 
+    const handleDeactivate = () => {
+        setSelectedUser(user);
+        setIsDeactivateEmployeeModalOpen(true);
+    };
+
+    const handleReactivate = async () => {
+        try {
+            await reactivateMutation.mutateAsync(user.id);
+            setSuccessMessage(t('employeeReactivatedSuccessfully'));
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
+            alert(error?.message || t('errorReactivatingEmployee'));
+        }
+    };
+
     const handleView = () => {
         setSelectedUser(user);
         setIsViewUserModalOpen(true);
@@ -150,12 +177,17 @@ const UserCard = ({ user }: { user: User }) => {
                         </Button>
                     }>
                         <DropdownItem onClick={handleView}>{t('viewEmployee')}</DropdownItem>
-                        {!isUserAdmin && !isSupervisorUser && (
+                        {isSupervisorUser ? null : !isUserAdmin ? (
                             <>
                                 <DropdownItem onClick={handleEdit}>{t('editEmployee')}</DropdownItem>
+                                {user.is_active !== false ? (
+                                    <DropdownItem onClick={handleDeactivate}>{t('deactivateEmployee')}</DropdownItem>
+                                ) : (
+                                    <DropdownItem onClick={handleReactivate}>{t('reactivateEmployee')}</DropdownItem>
+                                )}
                                 <DropdownItem onClick={handleDelete}>{t('deleteEmployee')}</DropdownItem>
                             </>
-                        )}
+                        ) : null}
                     </Dropdown>
                 </div>
             )}
@@ -173,6 +205,17 @@ const UserCard = ({ user }: { user: User }) => {
                     </div>
                 )}
                 <p className="text-sm text-gray-500 dark:text-gray-400">{getRoleTranslation(user.role, t, currentUser?.company?.specialization)}</p>
+                {isAdmin && (
+                    <span
+                        className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full ${
+                            user.is_active === false
+                                ? 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'
+                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                        }`}
+                    >
+                        {user.is_active === false ? t('deactivated') : t('active')}
+                    </span>
+                )}
                 <p className="text-sm mt-1">{user.phone}</p>
                 {user.phone && (
                     <div className="flex items-center justify-center gap-2 mt-4">

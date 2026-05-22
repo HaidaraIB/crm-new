@@ -1727,6 +1727,47 @@ export const deleteUserAPI = async (userId: number) => {
   });
 };
 
+/**
+ * Preview assigned leads before deactivating an employee
+ * GET /api/users/:id/deactivate-preview/
+ */
+export const getDeactivateEmployeePreviewAPI = async (userId: number) => {
+  return apiRequest<{
+    assigned_leads_count: number;
+    can_reassign: boolean;
+    show_lead_reassign_options: boolean;
+  }>(`/users/${userId}/deactivate-preview/`);
+};
+
+/**
+ * Deactivate an employee (optional lead redistribution)
+ * POST /api/users/:id/deactivate/
+ */
+export const deactivateEmployeeAPI = async (
+  userId: number,
+  payload: { reassign_leads: boolean }
+) => {
+  return apiRequest<{
+    user: any;
+    assigned_lead_count: number;
+    skipped_lead_count: number;
+    leads_remaining_on_user: number;
+  }>(`/users/${userId}/deactivate/`, {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+};
+
+/**
+ * Reactivate a deactivated employee
+ * POST /api/users/:id/reactivate/
+ */
+export const reactivateEmployeeAPI = async (userId: number) => {
+  return apiRequest<{ user: any }>(`/users/${userId}/reactivate/`, {
+    method: 'POST',
+  });
+};
+
 // ==================== Supervisors (company-scoped, admin only) ====================
 
 /** GET /api/supervisors/ - returns paginated { count, next, previous, results } */

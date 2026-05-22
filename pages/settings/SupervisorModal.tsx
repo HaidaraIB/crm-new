@@ -340,9 +340,23 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
               {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
             </div>
           )}
-          <div className="flex items-center gap-2">
-            <input name="is_active" type="checkbox" checked={formData.is_active} onChange={handleChange} className="rounded" />
-            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('active')}</label>
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <input
+                name="is_active"
+                type="checkbox"
+                checked={formData.is_active}
+                onChange={handleChange}
+                className="rounded"
+                disabled={editingSupervisor?.user?.is_active === false}
+              />
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                {t('supervisorsCrmAccess')}
+              </label>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">
+              {t('supervisorsCrmAccessHint')}
+            </p>
           </div>
           <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-3">{t('supervisorsPermissions')}</h3>

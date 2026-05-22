@@ -261,6 +261,8 @@ export interface AppContextType {
   setIsEditUserModalOpen: (isOpen: boolean) => void;
   isDeleteUserModalOpen: boolean;
   setIsDeleteUserModalOpen: (isOpen: boolean) => void;
+  isDeactivateEmployeeModalOpen: boolean;
+  setIsDeactivateEmployeeModalOpen: (isOpen: boolean) => void;
 
   // Marketing states
   isAddCampaignModalOpen: boolean;
@@ -322,6 +324,7 @@ export interface AppContextType {
   setAlertMessage: (message: string) => void;
   alertVariant: 'info' | 'warning' | 'error';
   setAlertVariant: (v: 'info' | 'warning' | 'error') => void;
+  showAlert: (message: string, variant?: 'info' | 'warning' | 'error') => void;
 
   // Filters (UI state only)
   leadFilters: LeadFilters;
@@ -701,6 +704,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isViewUserModalOpen, setIsViewUserModalOpen] = useState(false);
   const [isEditUserModalOpen, setIsEditUserModalOpen] = useState(false);
   const [isDeleteUserModalOpen, setIsDeleteUserModalOpen] = useState(false);
+  const [isDeactivateEmployeeModalOpen, setIsDeactivateEmployeeModalOpen] = useState(false);
   
   // Marketing state
   const [isAddCampaignModalOpen, setIsAddCampaignModalOpen] = useState(false);
@@ -1305,6 +1309,12 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme, language]);
 
+  const showAlert = (message: string, variant: 'info' | 'warning' | 'error' = 'info') => {
+    setAlertMessage(message);
+    setAlertVariant(variant);
+    setIsAlertModalOpen(true);
+  };
+
   const t = (key: keyof typeof translations.en) => {
     const base = translations[language][key] || translations.en[key];
     const lang: 'en' | 'ar' = language === 'ar' ? 'ar' : 'en';
@@ -1424,6 +1434,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isViewUserModalOpen, setIsViewUserModalOpen,
     isEditUserModalOpen, setIsEditUserModalOpen,
     isDeleteUserModalOpen, setIsDeleteUserModalOpen,
+    isDeactivateEmployeeModalOpen, setIsDeactivateEmployeeModalOpen,
     isAddCampaignModalOpen, setIsAddCampaignModalOpen,
     isEditCampaignModalOpen, setIsEditCampaignModalOpen,
     editingCampaign, setEditingCampaign,
@@ -1440,6 +1451,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isAlertModalOpen, setIsAlertModalOpen,
     alertMessage, setAlertMessage,
     alertVariant, setAlertVariant,
+    showAlert,
     // Filters (UI state only)
     leadFilters, setLeadFilters,
     dealFilters, setDealFilters,

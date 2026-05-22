@@ -69,7 +69,7 @@ export interface SupervisorPermissionPayload {
 
 export interface Supervisor {
   id: number;
-  user: { id: number; username: string; email: string; first_name: string; last_name: string; phone?: string };
+  user: { id: number; username: string; email: string; first_name: string; last_name: string; phone?: string; is_active?: boolean };
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -107,6 +107,7 @@ export interface User {
   is_online?: boolean;
   /** 0=Mon .. 6=Sun; null/undefined = no fixed weekly day off */
   weekly_day_off?: number | null;
+  is_active?: boolean;
 }
 
 export interface TimelineEntry {

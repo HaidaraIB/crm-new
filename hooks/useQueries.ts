@@ -18,6 +18,7 @@ import {
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
   createLeadAPI, updateLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
+  getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
   createDealAPI, updateDealAPI, deleteDealAPI,
   createTaskAPI, updateTaskAPI, deleteTaskAPI,
   createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI,
@@ -587,33 +588,17 @@ export const useAssignLeads = (options?: UseMutationOptions<any, Error, { client
 
 export const useAssignUnassignedClients = (options?: UseMutationOptions<any, Error, void>) => {
   const queryClient = useQueryClient();
-  const customOnSuccess = options?.onSuccess;
-  
+  const { onSuccess: userOnSuccess, ...restOptions } = options ?? {};
+
   return useMutation({
+    ...restOptions,
     mutationFn: () => assignUnassignedClientsAPI(),
-    onSuccess: (data, variables, onMutateResult, context) => {
-      // Invalidate all leads queries regardless of filters to refresh the list
-      queryClient.invalidateQueries({ 
-        queryKey: ['leads'],
-        exact: false // Invalidate all queries that start with 'leads'
-      });
-      // Also invalidate client events for all leads that might have been assigned
-      queryClient.invalidateQueries({ 
-        queryKey: ['clientEvents'],
-        exact: false
-      });
-      // Refetch all leads queries to ensure UI is updated immediately
-      queryClient.refetchQueries({ 
-        queryKey: ['leads'],
-        exact: false
-      });
-      
-      // Call custom onSuccess if provided
-      if (customOnSuccess) {
-        customOnSuccess(data, variables, onMutateResult, context);
-      }
+    onSuccess: async (data, variables, onMutateResult, context) => {
+      await queryClient.invalidateQueries({ queryKey: ['leads'] });
+      await queryClient.invalidateQueries({ queryKey: ['clientEvents'] });
+      await queryClient.refetchQueries({ queryKey: ['leads'] });
+      userOnSuccess?.(data, variables, onMutateResult, context);
     },
-    ...options,
   });
 };
 
@@ -644,6 +629,39 @@ export const useDeleteUser = (options?: UseMutationOptions<void, Error, number>)
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteUserAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    ...options,
+  });
+};
+
+export const useDeactivateEmployee = (
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof deactivateEmployeeAPI>>,
+    Error,
+    { id: number; reassign_leads: boolean }
+  >
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reassign_leads }: { id: number; reassign_leads: boolean }) =>
+      deactivateEmployeeAPI(id, { reassign_leads }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['clients'] });
+    },
+    ...options,
+  });
+};
+
+export const useReactivateEmployee = (
+  options?: UseMutationOptions<Awaited<ReturnType<typeof reactivateEmployeeAPI>>, Error, number>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => reactivateEmployeeAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },

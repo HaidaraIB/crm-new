@@ -1,8 +1,9 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
 
 interface ConfirmDeleteModalProps {
     isOpen: boolean;
@@ -32,15 +33,28 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
     successMessage,
 }) => {
     const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
-    const [isDeleting, setIsDeleting] = React.useState(false);
+    const [isDeleting, setIsDeleting] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
+
+    useEffect(() => {
+        if (isOpen) {
+            setErrorMessage('');
+        }
+    }, [isOpen, title, message]);
+
+    const handleClose = () => {
+        setErrorMessage('');
+        onClose();
+    };
 
     const handleConfirm = async () => {
+        setErrorMessage('');
         setIsDeleting(true);
         try {
             await onConfirm();
             
             // Close modal immediately
-            onClose();
+            handleClose();
             
             // Show success message only if enabled
             if (showSuccessMessage) {
@@ -49,15 +63,20 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
             }
         } catch (error: any) {
             console.error('Error in confirm action:', error);
-            alert(error?.message || t('errorDeletingItem') || 'Failed to complete action. Please try again.');
+            setErrorMessage(getLocalizedApiErrorMessage(error, t, 'errorDeletingItem'));
         } finally {
             setIsDeleting(false);
         }
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title={title}>
+        <Modal isOpen={isOpen} onClose={handleClose} title={title}>
             <div className="space-y-4">
+                {errorMessage && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {errorMessage}
+                    </div>
+                )}
                 <p className="text-gray-700 dark:text-gray-300">
                     {itemName ? (
                         <>
@@ -70,7 +89,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
                     )}
                 </p>
                 <div className="flex justify-end gap-2">
-                    <Button variant="secondary" onClick={onClose} disabled={isDeleting}>
+                    <Button variant="secondary" onClick={handleClose} disabled={isDeleting}>
                         {t('cancel')}
                     </Button>
                     <Button 

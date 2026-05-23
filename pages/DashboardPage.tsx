@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon } from '../components/index';
+import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -1407,7 +1407,7 @@ export const DashboardPage = () => {
                             <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">{leadsToContactTodayList.length}</span>
                         </div>
                     </div>
-                    <div className="overflow-x-auto -mx-2 px-2">
+                    <TableHorizontalScroll scrollClassName="-mx-2 px-2">
                         <div className="min-w-full inline-block align-middle">
                             <div className="overflow-hidden rounded-lg">
                                 <table className="w-full text-sm text-left rtl:text-right min-w-[600px]">
@@ -1499,7 +1499,7 @@ export const DashboardPage = () => {
                                 </table>
                             </div>
                         </div>
-                    </div>
+                    </TableHorizontalScroll>
                 </Card>
             )}
             {!isDashboardLoading && leadsToContactTodayList.length === 0 && (
@@ -1680,7 +1680,7 @@ export const DashboardPage = () => {
                             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('recentActivityUpdates')}</p>
                         </div>
                     </div>
-                    <div className="overflow-x-auto -mx-2 px-2">
+                    <TableHorizontalScroll scrollClassName="-mx-2 px-2">
                         <div className="min-w-full inline-block align-middle">
                             <div className="overflow-hidden rounded-lg">
                                 {latestFeedbacks.length > 0 ? (
@@ -1774,7 +1774,7 @@ export const DashboardPage = () => {
                                 )}
                             </div>
                         </div>
-                    </div>
+                    </TableHorizontalScroll>
                 </Card>
             </div>
             )}

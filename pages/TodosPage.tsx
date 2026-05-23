@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, Loader, PlusIcon, EditIcon, TrashIcon, EditTodoModal } from '../components/index';
+import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, Loader, PlusIcon, EditIcon, TrashIcon, EditTodoModal, TableHorizontalScroll } from '../components/index';
 import { Todo, TaskStage } from '../types';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { isSameDay, ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -618,7 +618,7 @@ export const TodosPage = () => {
                         </Card>
                     ) : filteredTodos.length > 0 ? (
                         <Card className="p-0 overflow-hidden">
-                            <div className="overflow-x-auto -mx-4 sm:mx-0">
+                            <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
                                 <div className="min-w-full inline-block align-middle">
                                     <div className="overflow-hidden">
                                         <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1000px]">
@@ -880,7 +880,7 @@ export const TodosPage = () => {
                                         </table>
                                     </div>
                                 </div>
-                            </div>
+                            </TableHorizontalScroll>
                             <div className="mt-4 px-3 pb-3 flex flex-col sm:flex-row items-center justify-between gap-3">
                                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                                     {t('page')} {todosPageNumber} {t('of')} {totalTodoPages}

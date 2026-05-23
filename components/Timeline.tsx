@@ -122,22 +122,30 @@ export const Timeline = ({ history }: TimelineProps) => {
                                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1.5">{entry.details}</p>
                                 )}
                                 {/* Call / visit datetime and follow-up or upcoming date */}
-                                {(entry.type === 'call' || entry.type === 'visit') && (entry.callDatetime || entry.followUpDate) && (
+                                {(entry.type === 'call' || entry.type === 'visit' || entry.type === 'field_visit') && (entry.callDatetime || entry.followUpDate) && (
                                     <div className="mt-3 flex flex-wrap items-center gap-2">
                                         {entry.callDatetime && (
                                             <div className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border ${
                                                 entry.type === 'visit'
                                                     ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800'
+                                                    : entry.type === 'field_visit'
+                                                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800'
                                                     : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
                                             }`}>
-                                                {entry.type === 'visit' ? (
-                                                    <MapPinIcon className="w-3.5 h-3.5 text-amber-700 dark:text-amber-300 flex-shrink-0" />
+                                                {entry.type === 'visit' || entry.type === 'field_visit' ? (
+                                                    <MapPinIcon className={`w-3.5 h-3.5 flex-shrink-0 ${
+                                                        entry.type === 'field_visit'
+                                                            ? 'text-emerald-700 dark:text-emerald-300'
+                                                            : 'text-amber-700 dark:text-amber-300'
+                                                    }`} />
                                                 ) : (
                                                     <PhoneIcon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                                                 )}
                                                 <span className={`text-xs font-medium ${
                                                     entry.type === 'visit'
                                                         ? 'text-amber-800 dark:text-amber-200'
+                                                        : entry.type === 'field_visit'
+                                                          ? 'text-emerald-800 dark:text-emerald-200'
                                                         : 'text-blue-700 dark:text-blue-300'
                                                 }`}>{entry.callDatetime}</span>
                                             </div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
 import { Developer, Project, Unit } from '../types';
 import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -37,7 +37,7 @@ const getPaginationItems = (current: number, total: number): Array<number | 'ell
 const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { developers: Developer[], onUpdate: (dev: Developer) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[500px]">
@@ -77,14 +77,14 @@ const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { develope
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 
 const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Project[], onUpdate: (proj: Project) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[800px]">
@@ -132,14 +132,14 @@ const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Pr
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 }
 
 const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: Unit[], onUpdate: (unit: Unit) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1200px]">
@@ -213,7 +213,7 @@ const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: Unit[], onU
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 }
 

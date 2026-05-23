@@ -8,6 +8,9 @@ import { useUsers, useStatuses, useChannels, useUpdateLead } from '../hooks/useQ
 import { isUserOnWeeklyDayOff } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions, showInLeadAssigneePicker } from '../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
+import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
+import { buildLeadLocationApiBody, parseLeadCoordinate } from '../utils/leadLocation';
+import { mapApiLeadToDisplayLead, normalizeLead } from '../utils/normalizeLead';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -26,7 +29,7 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 };
 
 export const EditLeadPage = () => {
-    const { t, setCurrentPage, editingLead, setSelectedLead, currentUser } = useAppContext();
+    const { t, setCurrentPage, editingLead, setEditingLead, setSelectedLead, currentUser } = useAppContext();
 
     const isMedicalCompany = useMemo(
         () => String(currentUser?.company?.specialization || '').toLowerCase() === 'medical',
@@ -87,6 +90,8 @@ export const EditLeadPage = () => {
         leadCompanyName: '',
         profession: '',
         residence: '',
+        locationLatitude: '',
+        locationLongitude: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -221,6 +226,20 @@ export const EditLeadPage = () => {
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
                 profession: editingLead.profession ?? (editingLead as any).profession ?? '',
                 residence: (editingLead as Lead).residence ?? (editingLead as any).residence ?? '',
+                locationLatitude: (() => {
+                    const v = parseLeadCoordinate(
+                        (editingLead as Lead).locationLatitude ??
+                            (editingLead as any).location_latitude
+                    );
+                    return v != null ? String(v) : '';
+                })(),
+                locationLongitude: (() => {
+                    const v = parseLeadCoordinate(
+                        (editingLead as Lead).locationLongitude ??
+                            (editingLead as any).location_longitude
+                    );
+                    return v != null ? String(v) : '';
+                })(),
                 notes: editingLead.notes ?? (editingLead as any).notes ?? '',
                 interestedDeveloper:
                     (editingLead as Lead).interestedDeveloper != null
@@ -369,6 +388,7 @@ export const EditLeadPage = () => {
                 profession: formState.profession?.trim() || null,
                 residence: formState.residence?.trim() ? formState.residence.trim() : null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildLeadLocationApiBody(formState.locationLatitude, formState.locationLongitude),
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
                     interestedProject: formState.interestedProject,
@@ -385,38 +405,9 @@ export const EditLeadPage = () => {
             
             // Update selectedLead with the updated data
             if (updatedLead) {
-                // Transform API response to Lead format
-                const transformedLead: Lead = {
-                    id: updatedLead.id,
-                    name: updatedLead.name,
-                    phone: updatedLead.phone_number || updatedLead.phone || '',
-                    phoneNumbers: updatedLead.phone_numbers || [],
-                    status: updatedLead.status_name || updatedLead.status || '',
-                    type: updatedLead.type || '',
-                    assignedTo: updatedLead.assigned_to || 0,
-                    budget: updatedLead.budget || 0,
-                    budgetMax: updatedLead.budget_max ?? updatedLead.budgetMax ?? undefined,
-                    communicationWay: updatedLead.communication_way_name || updatedLead.communication_way || '',
-                    priority: updatedLead.priority || '',
-                    createdAt: updatedLead.created_at || updatedLead.createdAt || '',
-                    leadCompanyName: updatedLead.lead_company_name ?? updatedLead.leadCompanyName ?? undefined,
-                    profession: updatedLead.profession ?? undefined,
-                    residence: updatedLead.residence ?? (updatedLead as any).residence ?? undefined,
-                    patientFileNumber:
-                        updatedLead.patient_file_number ?? updatedLead.patientFileNumber ?? undefined,
-                    notes: updatedLead.notes ?? null,
-                    lastFeedback: updatedLead.last_feedback || updatedLead.lastFeedback || '',
-                    interestedDeveloper: updatedLead.interested_developer ?? updatedLead.interestedDeveloper ?? null,
-                    interestedProject: updatedLead.interested_project ?? updatedLead.interestedProject ?? null,
-                    interestedUnit: updatedLead.interested_unit ?? updatedLead.interestedUnit ?? null,
-                    interestedDeveloperName:
-                        updatedLead.interested_developer_name ?? updatedLead.interestedDeveloperName ?? null,
-                    interestedProjectName:
-                        updatedLead.interested_project_name ?? updatedLead.interestedProjectName ?? null,
-                    interestedUnitName: updatedLead.interested_unit_name ?? updatedLead.interestedUnitName ?? null,
-                    interestedUnitCode: updatedLead.interested_unit_code ?? updatedLead.interestedUnitCode ?? null,
-                };
+                const transformedLead = mapApiLeadToDisplayLead(updatedLead);
                 setSelectedLead(transformedLead);
+                setEditingLead(transformedLead);
             }
             
             // Navigate to ViewLead page to see the updated lead
@@ -593,17 +584,26 @@ export const EditLeadPage = () => {
                                         id="patientFileDisplay"
                                         readOnly
                                         className="bg-gray-100 dark:bg-gray-600 cursor-not-allowed"
-                                        value={
-                                            String(
-                                                (editingLead as Lead).patientFileNumber ??
-                                                    (editingLead as any).patient_file_number ??
-                                                    '',
-                                            )
-                                        }
+                                        value={String(
+                                            normalizeLead(editingLead).patientFileNumber ?? '',
+                                        )}
                                     />
                                 </div>
                             </>
                         )}
+                        <div className="md:col-span-2 lg:col-span-3">
+                            <LeadLocationMapPicker
+                                latitude={formState.locationLatitude}
+                                longitude={formState.locationLongitude}
+                                onChange={(lat, lng) => {
+                                    setFormState((prev) => ({
+                                        ...prev,
+                                        locationLatitude: lat != null ? String(lat) : '',
+                                        locationLongitude: lng != null ? String(lng) : '',
+                                    }));
+                                }}
+                            />
+                        </div>
                         <LeadInterestInventoryFields
                             className="md:col-span-2 lg:col-span-3"
                             idPrefix="edit-lead-inv"

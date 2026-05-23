@@ -6,9 +6,10 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
+import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientEventsAPI,
+  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
@@ -24,6 +25,7 @@ import {
   createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI,
   createClientCallAPI, updateClientCallAPI, deleteClientCallAPI,
   createClientVisitAPI, updateClientVisitAPI, deleteClientVisitAPI,
+  createClientFieldVisitAPI,
   createDeveloperAPI, updateDeveloperAPI, deleteDeveloperAPI,
   createProjectAPI, updateProjectAPI, deleteProjectAPI,
   createUnitAPI, updateUnitAPI, deleteUnitAPI,
@@ -62,6 +64,7 @@ export const queryKeys = {
   clientTasks: ['clientTasks'] as const,
   clientCalls: ['clientCalls'] as const,
   clientVisits: ['clientVisits'] as const,
+  clientFieldVisits: ['clientFieldVisits'] as const,
   clientEvents: (clientId?: number) => ['clientEvents', clientId] as const,
   developers: (page?: number, pageSize?: number) => ['developers', page ?? 'all', pageSize ?? 'default'] as const,
   projects: (page?: number, pageSize?: number, developerId?: number | null) =>
@@ -130,32 +133,6 @@ export const useUsers = (
     ...resolvedOptions,
   });
 };
-
-/** Normalize lead from API (snake_case) so it has leadCompanyName for edit forms */
-function normalizeLead(lead: any): any {
-  if (!lead) return lead;
-  return {
-    ...lead,
-    leadCompanyName: lead.leadCompanyName ?? lead.lead_company_name ?? undefined,
-    profession: lead.profession ?? undefined,
-    residence: lead.residence ?? undefined,
-    patientFileNumber: lead.patientFileNumber ?? lead.patient_file_number ?? undefined,
-    budgetMax: lead.budgetMax ?? lead.budget_max ?? undefined,
-    lastFeedback: lead.lastFeedback ?? lead.last_feedback ?? undefined,
-    lastStage: lead.lastStage ?? lead.last_stage ?? undefined,
-    lastFeedbackAt: lead.lastFeedbackAt ?? lead.last_feedback_at ?? undefined,
-    createdBy: lead.createdBy ?? lead.created_by ?? null,
-    createdByName: lead.createdByName ?? lead.created_by_name ?? null,
-    notes: lead.notes ?? undefined,
-    interestedDeveloper: lead.interestedDeveloper ?? lead.interested_developer ?? null,
-    interestedProject: lead.interestedProject ?? lead.interested_project ?? null,
-    interestedUnit: lead.interestedUnit ?? lead.interested_unit ?? null,
-    interestedDeveloperName: lead.interestedDeveloperName ?? lead.interested_developer_name ?? null,
-    interestedProjectName: lead.interestedProjectName ?? lead.interested_project_name ?? null,
-    interestedUnitName: lead.interestedUnitName ?? lead.interested_unit_name ?? null,
-    interestedUnitCode: lead.interestedUnitCode ?? lead.interested_unit_code ?? null,
-  };
-}
 
 export const useLeads = (
   filters?: { type?: string; priority?: string; search?: string },
@@ -239,6 +216,33 @@ export const useClientVisits = (options?: Omit<UseQueryOptions<any, Error>, 'que
     queryKey: queryKeys.clientVisits,
     queryFn: () => getClientVisitsAPI(),
     staleTime: 1 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useClientFieldVisits = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+  return useQuery({
+    queryKey: queryKeys.clientFieldVisits,
+    queryFn: () => getClientFieldVisitsAPI(),
+    staleTime: 1 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useCreateClientFieldVisit = (options?: UseMutationOptions<any, Error, any>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createClientFieldVisitAPI(data),
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientFieldVisits });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      if (variables.client || variables.clientId) {
+        queryClient.invalidateQueries({
+          queryKey: queryKeys.clientEvents(variables.client || variables.clientId),
+        });
+      }
+    },
     ...options,
   });
 };

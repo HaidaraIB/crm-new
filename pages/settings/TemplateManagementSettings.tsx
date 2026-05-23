@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, Button, Loader } from '../../components/index';
+import { Card, Button, Loader, TableHorizontalScroll } from '../../components/index';
 import { FileTextIcon, SearchIcon, EditIcon, PlusIcon } from '../../components/icons';
 import { EditTemplateModal } from '../../components/modals/EditTemplateModal';
 import { useAppContext } from '../../context/AppContext';
@@ -87,7 +87,7 @@ export const TemplateManagementSettings = () => {
                 />
             </div>
             <Card className="overflow-hidden">
-                <div className="overflow-x-auto">
+                <TableHorizontalScroll>
                     <table className="w-full min-w-[700px]">
                         <thead>
                             <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -204,7 +204,7 @@ export const TemplateManagementSettings = () => {
                             )}
                         </tbody>
                     </table>
-                </div>
+                </TableHorizontalScroll>
             </Card>
 
             <EditTemplateModal

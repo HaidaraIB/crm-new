@@ -1,5 +1,6 @@
 import React from 'react';
 import { dashboardSurface } from '../dashboard/dashboardStyles';
+import { TableHorizontalScroll } from '../TableHorizontalScroll';
 import { reportTableChrome, reportTheadRow, reportTableRowInteractive, reportTbodyCell } from './reportStyles';
 
 type ReportTableCardProps = {
@@ -21,11 +22,11 @@ export const ReportTableCard = ({ title, children, empty, emptyMessage, minWidth
         <p className="text-sm font-medium text-gray-600 dark:text-gray-400">{emptyMessage}</p>
       </div>
     ) : (
-      <div className={`${reportTableChrome} py-2 px-1`}>
+      <TableHorizontalScroll scrollClassName={`${reportTableChrome} py-2 px-1`}>
         <div style={{ minWidth }}>
           <table className="w-full text-sm text-center rtl:text-right text-gray-600 dark:text-gray-400">{children}</table>
         </div>
-      </div>
+      </TableHorizontalScroll>
     )}
   </div>
 );

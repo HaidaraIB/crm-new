@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Input, Button, Modal } from '../components/index';
+import { PageWrapper, Input, Button, Modal, TableHorizontalScroll } from '../components/index';
 import { EyeIcon, RefreshIcon } from '../components/icons';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
 import { withLatinDigits } from '../utils/dateUtils';
@@ -218,7 +218,7 @@ export const SupportCenterPage = () => {
               {t('noData') || 'No tickets yet.'}
             </div>
           ) : (
-            <div className="overflow-x-auto">
+            <TableHorizontalScroll>
               <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-300">
                   <tr>
@@ -284,7 +284,7 @@ export const SupportCenterPage = () => {
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableHorizontalScroll>
           )}
         </section>
       </div>

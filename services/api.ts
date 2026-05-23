@@ -3421,6 +3421,21 @@ export const updateClientVisitAPI = async (clientVisitId: number, data: any) => 
   });
 };
 
+// ==================== Client Field Visits APIs ====================
+
+/** GET /client-field-visits/ */
+export const getClientFieldVisitsAPI = async () => {
+  return fetchAllPaginatedPages<any>('/client-field-visits/');
+};
+
+/** POST /client-field-visits/ */
+export const createClientFieldVisitAPI = async (data: any) => {
+  return apiRequest<any>('/client-field-visits/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
 /** DELETE /client-visits/{id}/ */
 export const deleteClientVisitAPI = async (clientVisitId: number) => {
   const token = localStorage.getItem('accessToken');

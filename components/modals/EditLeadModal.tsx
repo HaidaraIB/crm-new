@@ -13,6 +13,8 @@ import { useUpdateLead, useUsers, useStatuses, useChannels } from '../../hooks/u
 import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
 import { buildLeadAssigneePickerOptions, showInLeadAssigneePicker } from '../../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
+import { LeadLocationMapPicker } from '../LeadLocationMapPicker';
+import { buildLeadLocationApiBody, parseLeadCoordinate } from '../../utils/leadLocation';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -78,6 +80,8 @@ export const EditLeadModal = () => {
         leadCompanyName: '',
         profession: '',
         residence: '',
+        locationLatitude: '',
+        locationLongitude: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -119,6 +123,20 @@ export const EditLeadModal = () => {
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
                 profession: editingLead.profession ?? (editingLead as any).profession ?? '',
                 residence: (editingLead as Lead).residence ?? (editingLead as any).residence ?? '',
+                locationLatitude: (() => {
+                    const v = parseLeadCoordinate(
+                        (editingLead as Lead).locationLatitude ??
+                            (editingLead as any).location_latitude
+                    );
+                    return v != null ? String(v) : '';
+                })(),
+                locationLongitude: (() => {
+                    const v = parseLeadCoordinate(
+                        (editingLead as Lead).locationLongitude ??
+                            (editingLead as any).location_longitude
+                    );
+                    return v != null ? String(v) : '';
+                })(),
                 notes: editingLead.notes ?? (editingLead as any).notes ?? '',
                 interestedDeveloper:
                     (editingLead as Lead).interestedDeveloper != null
@@ -272,6 +290,7 @@ export const EditLeadModal = () => {
                 profession: formState.profession?.trim() || null,
                 residence: formState.residence?.trim() || null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildLeadLocationApiBody(formState.locationLatitude, formState.locationLongitude),
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
                     interestedProject: formState.interestedProject,
@@ -329,6 +348,19 @@ export const EditLeadModal = () => {
                     <div>
                         <Label htmlFor="residence">{t('residence')}</Label>
                         <Input id="residence" placeholder={t('enterResidence')} value={formState.residence} onChange={handleChange} />
+                    </div>
+                    <div className="md:col-span-2">
+                        <LeadLocationMapPicker
+                            latitude={formState.locationLatitude}
+                            longitude={formState.locationLongitude}
+                            onChange={(lat, lng) => {
+                                setFormState((prev) => ({
+                                    ...prev,
+                                    locationLatitude: lat != null ? String(lat) : '',
+                                    locationLongitude: lng != null ? String(lng) : '',
+                                }));
+                            }}
+                        />
                     </div>
                     <LeadInterestInventoryFields
                         className="md:col-span-2"

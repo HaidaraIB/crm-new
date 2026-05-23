@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterIcon, EditIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterIcon, EditIcon, TableHorizontalScroll } from '../components/index';
 import { Campaign } from '../types';
 import { CampaignsFilterDrawer } from '../components/drawers/CampaignsFilterDrawer';
 import { useCampaigns, useDeleteCampaign } from '../hooks/useQueries';
@@ -13,7 +13,7 @@ const CampaignsTable = ({ campaigns, onEdit, onDelete }: { campaigns: Campaign[]
     const { t, language } = useAppContext();
     
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0 rounded-lg">
             <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400" style={{ minWidth: '800px' }}>
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                     <tr>
@@ -91,7 +91,7 @@ const CampaignsTable = ({ campaigns, onEdit, onDelete }: { campaigns: Campaign[]
                     )}
                 </tbody>
             </table>
-        </div>
+        </TableHorizontalScroll>
     );
 }
 

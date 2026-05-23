@@ -2,7 +2,7 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll } from '../components/index';
 import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -35,7 +35,7 @@ const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, u
     const { t } = useAppContext();
     
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0 rounded-lg">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0 rounded-lg">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
                     <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1000px]">
@@ -221,7 +221,7 @@ const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, u
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 }
 

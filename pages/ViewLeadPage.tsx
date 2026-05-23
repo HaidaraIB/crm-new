@@ -2,211 +2,20 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon, LeadStatusDropdown, LeadStatusBadge } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateToLocal, formatDateTimeToLocal, withLatinDigits } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
-import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
-import { BriefcaseIcon, ChevronDownIcon, MapPinIcon } from '../components/icons';
+import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
+import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
+import { parseLeadCoordinate } from '../utils/leadLocation';
+import { BriefcaseIcon, MapPinIcon } from '../components/icons';
 import { Lead } from '../types';
-
-// Status Dropdown Component (same as in LeadsPage)
-const StatusDropdown = ({ 
-    leadId, 
-    currentStatus, 
-    availableStatuses, 
-    onStatusChange, 
-    isUpdating,
-    hexToRgb,
-    theme
-}: { 
-    leadId: number;
-    currentStatus: any;
-    availableStatuses: any[];
-    onStatusChange: (leadId: number, statusId: number) => void;
-    isUpdating: boolean;
-    hexToRgb: (hex: string) => { r: number; g: number; b: number } | null;
-    theme: 'light' | 'dark';
-}) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [openUpward, setOpenUpward] = useState(false);
-    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const buttonRef = useRef<HTMLButtonElement>(null);
-    const dropdownMenuRef = useRef<HTMLDivElement>(null);
-    
-    const statusName = currentStatus?.name || '';
-    const statusColor = currentStatus?.color || '#808080';
-    const rgb = hexToRgb(statusColor);
-    const bgColor = rgb 
-        ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
-        : 'bg-gray-200 dark:bg-gray-600';
-    // Simple: white text in dark mode, black text in light mode - no other conditions
-    const textColor = theme === 'light' ? '#000000' : '#ffffff';
-    
-    useEffect(() => {
-        if (isOpen && buttonRef.current) {
-            const buttonRect = buttonRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - buttonRect.bottom;
-            const spaceAbove = buttonRect.top;
-            const estimatedDropdownHeight = availableStatuses.length * 40 + 16;
-            
-            const left = buttonRect.left;
-            let top = 0;
-            let shouldOpenUpward = false;
-            
-            if (spaceBelow < estimatedDropdownHeight && spaceAbove > estimatedDropdownHeight) {
-                shouldOpenUpward = true;
-                top = buttonRect.top - estimatedDropdownHeight;
-            } else {
-                shouldOpenUpward = false;
-                top = buttonRect.bottom;
-            }
-            
-            setOpenUpward(shouldOpenUpward);
-            setDropdownPosition({ top, left, width: buttonRect.width });
-        }
-    }, [isOpen, availableStatuses.length]);
-    
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            if (
-                dropdownRef.current && 
-                !dropdownRef.current.contains(target) &&
-                dropdownMenuRef.current &&
-                !dropdownMenuRef.current.contains(target)
-            ) {
-                setIsOpen(false);
-            }
-        };
-        
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen]);
-    
-    if (availableStatuses.length === 0) {
-        return (
-            <span 
-                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
-                style={rgb ? {
-                    backgroundColor: bgColor,
-                    color: textColor,
-                } : undefined}
-            >
-                {statusName}
-            </span>
-        );
-    }
-    
-    return (
-        <div className="relative inline-flex items-center" ref={dropdownRef}>
-            <button
-                ref={buttonRef}
-                type="button"
-                onClick={() => !isUpdating && setIsOpen(!isOpen)}
-                disabled={isUpdating}
-                className={`inline-flex items-center justify-between px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap outline-none cursor-pointer transition-colors focus:ring-2 focus:ring-primary/70 focus:ring-offset-2 pr-9 min-w-[110px] ${
-                    !rgb 
-                        ? 'bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-500' 
-                        : 'border'
-                } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
-                style={rgb ? {
-                    backgroundColor: bgColor,
-                    color: textColor,
-                    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`,
-                } : {
-                    color: textColor,
-                }}
-            >
-                <span 
-                    className="flex flex-1 items-center justify-center gap-2 font-medium"
-                    style={{ color: textColor }}
-                >
-                    <span
-                        className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: statusColor }}
-                    />
-                    {statusName}
-                </span>
-                <div 
-                    className="absolute right-2.5 flex items-center pointer-events-none"
-                    style={{ color: textColor }}
-                >
-                    <ChevronDownIcon 
-                        className={`w-4 h-4 transition-all duration-200 ${isUpdating ? 'opacity-50' : 'opacity-100'} ${isOpen ? (openUpward ? '' : 'rotate-180') : ''}`}
-                    />
-                </div>
-            </button>
-            
-            {isOpen && (
-                <>
-                    <div 
-                        ref={dropdownMenuRef}
-                        className="fixed z-[9999] bg-gray-800 dark:bg-gray-900 rounded-lg shadow-2xl overflow-hidden border border-gray-700/80 dark:border-gray-600/80 backdrop-blur-md"
-                        style={{
-                            top: `${dropdownPosition.top}px`,
-                            left: `${dropdownPosition.left}px`,
-                            width: `${dropdownPosition.width || 180}px`,
-                            minWidth: '110px',
-                        }}
-                    >
-                        <div className="py-1.5">
-                            {availableStatuses.map((status, index) => {
-                                const isSelected = status.id === currentStatus?.id;
-                                
-                                return (
-                                    <button
-                                        key={status.id}
-                                        type="button"
-                                        onClick={() => {
-                                            if (status.id !== currentStatus?.id) {
-                                                onStatusChange(leadId, status.id);
-                                            }
-                                            setIsOpen(false);
-                                        }}
-                                        className={`relative w-full text-left px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                                            isSelected 
-                                                ? 'text-white dark:text-white bg-primary/15' 
-                                                : 'text-gray-200 dark:text-gray-300 hover:text-white dark:hover:text-white hover:bg-gray-700/60 dark:hover:bg-gray-700/60'
-                                        }`}
-                                    >
-                                        <span className="relative z-10 flex items-center justify-between">
-                                            <span className="flex flex-1 items-center gap-2">
-                                                <span
-                                                    className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: status.color || '#808080' }}
-                                                />
-                                                <span>{status.name}</span>
-                                            </span>
-                                            {isSelected && (
-                                                <svg className="w-4 h-4 text-primary ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                </svg>
-                                            )}
-                                        </span>
-                                        {isSelected && (
-                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary shadow-sm"></div>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </>
-            )}
-        </div>
-    );
-};
+import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
     
     // Update lead mutation
     const updateLeadMutation = useUpdateLead();
@@ -288,6 +97,9 @@ export const ViewLeadPage = () => {
 
     const { data: clientVisitsResponse } = useClientVisits();
     const clientVisits = clientVisitsResponse?.results || [];
+
+    const { data: clientFieldVisitsResponse } = useClientFieldVisits();
+    const clientFieldVisits = clientFieldVisitsResponse?.results || [];
     
     const { data: callMethodsData } = useCallMethods();
     const callMethods = Array.isArray(callMethodsData) 
@@ -326,44 +138,7 @@ export const ViewLeadPage = () => {
         if (leadId) {
             const apiLead = allLeads.find((l: any) => l.id === leadId);
             if (apiLead) {
-                // Transform API lead to Lead format
-                const transformedLead: Lead = {
-                    id: apiLead.id,
-                    name: apiLead.name,
-                    phone: apiLead.phone_number || apiLead.phone || '',
-                    phoneNumbers: apiLead.phone_numbers || [],
-                    status: apiLead.status_name || apiLead.status || '',
-                    type: apiLead.type || '',
-                    assignedTo: apiLead.assigned_to || (apiLead.assigned_to_username ? 0 : 0),
-                    budget: apiLead.budget || 0,
-                    budgetMax: apiLead.budget_max ?? apiLead.budgetMax ?? undefined,
-                    communicationWay: apiLead.communication_way_name || apiLead.communication_way || '',
-                    priority: apiLead.priority || '',
-                    createdAt: apiLead.created_at || apiLead.createdAt || '',
-                    lastFeedback: apiLead.last_feedback || apiLead.lastFeedback || '',
-                    notes: apiLead.notes ?? '',
-                    campaign: apiLead.campaign || null,
-                    campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
-                    source: apiLead.source || 'manual',
-                    integration_account: apiLead.integration_account || null,
-                    leadCompanyName: apiLead.lead_company_name ?? apiLead.leadCompanyName ?? undefined,
-                    profession: apiLead.profession ?? undefined,
-                    interestedDeveloper: apiLead.interested_developer ?? apiLead.interestedDeveloper ?? null,
-                    interestedProject: apiLead.interested_project ?? apiLead.interestedProject ?? null,
-                    interestedUnit: apiLead.interested_unit ?? apiLead.interestedUnit ?? null,
-                    interestedDeveloperName:
-                        apiLead.interested_developer_name ?? apiLead.interestedDeveloperName ?? null,
-                    interestedProjectName:
-                        apiLead.interested_project_name ?? apiLead.interestedProjectName ?? null,
-                    interestedUnitName: apiLead.interested_unit_name ?? apiLead.interestedUnitName ?? null,
-                    interestedUnitCode: apiLead.interested_unit_code ?? apiLead.interestedUnitCode ?? null,
-                };
-                // Store assigned_to from API for display
-                (transformedLead as any).assigned_to = apiLead.assigned_to;
-                (transformedLead as any).assigned_to_username = apiLead.assigned_to_username;
-                (transformedLead as any).created_by = apiLead.created_by;
-                (transformedLead as any).created_by_name = apiLead.created_by_name;
-                return transformedLead;
+                return mapApiLeadToDisplayLead(apiLead);
             }
         }
         
@@ -373,44 +148,7 @@ export const ViewLeadPage = () => {
         // Find lead from API data
         const apiLead = allLeads.find((l: any) => l.id === selectedLead.id);
         if (apiLead) {
-            // Transform API lead to Lead format
-            const transformedLead: Lead = {
-                id: apiLead.id,
-                name: apiLead.name,
-                phone: apiLead.phone_number || apiLead.phone || '',
-                phoneNumbers: apiLead.phone_numbers || [],
-                status: apiLead.status_name || apiLead.status || '',
-                type: apiLead.type || '',
-                assignedTo: apiLead.assigned_to || (apiLead.assigned_to_username ? 0 : 0),
-                budget: apiLead.budget || 0,
-                budgetMax: apiLead.budget_max ?? apiLead.budgetMax ?? undefined,
-                communicationWay: apiLead.communication_way_name || apiLead.communication_way || '',
-                priority: apiLead.priority || '',
-                createdAt: apiLead.created_at || apiLead.createdAt || '',
-                lastFeedback: apiLead.last_feedback || apiLead.lastFeedback || '',
-                notes: apiLead.notes ?? '',
-                campaign: apiLead.campaign || null,
-                campaign_name: apiLead.campaign_name || (apiLead.campaign ? String(apiLead.campaign) : null),
-                source: apiLead.source || 'manual',
-                integration_account: apiLead.integration_account || null,
-                leadCompanyName: apiLead.lead_company_name ?? apiLead.leadCompanyName ?? undefined,
-                profession: apiLead.profession ?? undefined,
-                interestedDeveloper: apiLead.interested_developer ?? apiLead.interestedDeveloper ?? null,
-                interestedProject: apiLead.interested_project ?? apiLead.interestedProject ?? null,
-                interestedUnit: apiLead.interested_unit ?? apiLead.interestedUnit ?? null,
-                interestedDeveloperName:
-                    apiLead.interested_developer_name ?? apiLead.interestedDeveloperName ?? null,
-                interestedProjectName:
-                    apiLead.interested_project_name ?? apiLead.interestedProjectName ?? null,
-                interestedUnitName: apiLead.interested_unit_name ?? apiLead.interestedUnitName ?? null,
-                interestedUnitCode: apiLead.interested_unit_code ?? apiLead.interestedUnitCode ?? null,
-            };
-            // Store assigned_to from API for display
-            (transformedLead as any).assigned_to = apiLead.assigned_to;
-            (transformedLead as any).assigned_to_username = apiLead.assigned_to_username;
-            (transformedLead as any).created_by = apiLead.created_by;
-            (transformedLead as any).created_by_name = apiLead.created_by_name;
-            return transformedLead;
+            return mapApiLeadToDisplayLead(apiLead);
         }
         
         // Fallback to selectedLead from context
@@ -501,6 +239,23 @@ export const ViewLeadPage = () => {
         const clientId = cv.client || cv.clientId;
         return clientId === displayLead.id;
     }) : [];
+
+    const leadClientFieldVisits = displayLead ? clientFieldVisits.filter((cv: { client?: number; clientId?: number }) => {
+        const clientId = cv.client || cv.clientId;
+        return clientId === displayLead.id;
+    }) : [];
+
+    const leadLocationLat = displayLead
+        ? parseLeadCoordinate(
+              (displayLead as Lead).locationLatitude ?? (displayLead as any).location_latitude
+          )
+        : null;
+    const leadLocationLng = displayLead
+        ? parseLeadCoordinate(
+              (displayLead as Lead).locationLongitude ?? (displayLead as any).location_longitude
+          )
+        : null;
+    const hasLeadLocation = leadLocationLat != null && leadLocationLng != null;
 
     const showVisitActions =
         currentUser?.company?.specialization === 'real_estate' ||
@@ -622,6 +377,48 @@ export const ViewLeadPage = () => {
                 timestamp,
                 stage: visitTypeName,
                 color: vt?.color,
+                callDatetime: visitDt,
+                followUpDate: upcoming || undefined,
+            };
+        });
+
+        const fieldVisits = leadClientFieldVisits.map((cv: Record<string, unknown>) => {
+            const user = users.find(u => u.id === (cv.created_by || cv.createdBy));
+            const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
+            const timestamp = new Date(visitDateRaw).getTime();
+
+            const formatCleanDateTime = (dateString: string | null | undefined): string => {
+                if (!dateString) return '';
+                try {
+                    const date = new Date(dateString);
+                    if (isNaN(date.getTime())) return '';
+                    const options: Intl.DateTimeFormatOptions = {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                        hour12: true,
+                    };
+                    return date.toLocaleString('en-US', withLatinDigits(options));
+                } catch {
+                    return '';
+                }
+            };
+
+            const visitDt = formatCleanDateTime(visitDateRaw);
+            const upcoming = formatCleanDateTime(cv.upcoming_visit_date as string | undefined);
+
+            return {
+                id: `field-visit-${cv.id}`,
+                type: 'field_visit' as const,
+                user: user?.name || (cv.created_by_username as string) || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('fieldVisitLogged'),
+                details: (cv.summary as string) || '',
+                date: formatDateToLocal(visitDateRaw),
+                timestamp,
+                stage: t('fieldVisit'),
                 callDatetime: visitDt,
                 followUpDate: upcoming || undefined,
             };
@@ -756,8 +553,8 @@ export const ViewLeadPage = () => {
         });
 
         // Combine and sort by date descending
-        return [...actions, ...calls, ...visits, ...events, ...smsEntries, ...waEntries].sort((a, b) => b.timestamp - a.timestamp);
-    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, callMethods, visitTypes]);
+        return [...actions, ...calls, ...visits, ...fieldVisits, ...events, ...smsEntries, ...waEntries].sort((a, b) => b.timestamp - a.timestamp);
+    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, callMethods, visitTypes]);
 
     if (!displayLead) {
         return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
@@ -848,6 +645,17 @@ export const ViewLeadPage = () => {
                             </span>
                         </Button>
                     )}
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => setIsAddFieldVisitModalOpen(true)}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <MapPinIcon className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            {t('addFieldVisit')}
+                        </span>
+                    </Button>
                     <Button onClick={() => setIsAddActionModalOpen(true)} className="w-full sm:w-auto shrink-0">
                         <PlusIcon className="w-4 h-4 shrink-0" />
                         <span className="whitespace-nowrap">{t('add_action')}</span>
@@ -871,6 +679,16 @@ export const ViewLeadPage = () => {
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('residence')}</label>
                             <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : '—'}</p>
                         </div>
+                        {hasLeadLocation && (
+                            <div className="md:col-span-1">
+                                <LeadLocationMapPicker
+                                    latitude={leadLocationLat}
+                                    longitude={leadLocationLng}
+                                    onChange={() => {}}
+                                    readOnly
+                                />
+                            </div>
+                        )}
                         {(displayLead as Lead).patientFileNumber != null && (
                             <div>
                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('patientFileNumber')}</label>
@@ -1044,34 +862,19 @@ export const ViewLeadPage = () => {
                                     const availableStatuses = statuses.filter(s => !s.isHidden);
                                     
                                     const isUpdating = updatingLeadId === displayLead.id;
-                                    
-                                    // Convert hex to RGB for background opacity
-                                    const hexToRgb = (hex: string) => {
-                                        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                                        return result ? {
-                                            r: parseInt(result[1], 16),
-                                            g: parseInt(result[2], 16),
-                                            b: parseInt(result[3], 16)
-                                        } : null;
-                                    };
-                                    
+
                                     if (!statusName || !currentStatusConfig) {
-                                        return (
-                                            <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
-                                                -
-                                            </span>
-                                        );
+                                        return <LeadStatusBadge name="—" size="md" />;
                                     }
-                                    
+
                                     return (
-                                        <StatusDropdown
+                                        <LeadStatusDropdown
                                             leadId={displayLead.id}
                                             currentStatus={currentStatusConfig}
                                             availableStatuses={availableStatuses}
                                             onStatusChange={handleStatusChange}
                                             isUpdating={isUpdating}
-                                            hexToRgb={hexToRgb}
-                                            theme={theme}
+                                            size="md"
                                         />
                                     );
                                 })()}

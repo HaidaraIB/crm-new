@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Loader, Button, FilterIcon, SearchIcon, Input } from '../components/index';
+import { PageWrapper, Card, Loader, Button, FilterIcon, SearchIcon, Input, TableHorizontalScroll } from '../components/index';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 
 /** صف جدول الأنشطة بعد دمج client_task و client_call (المعرّف نصي لتفادي التعارض بين الأنواع) */
@@ -226,7 +226,7 @@ export const ActivitiesPage = () => {
                 }
             >
                 <Card>
-                    <div className="overflow-x-auto">
+                    <TableHorizontalScroll>
                         <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
                             <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                                 <tr>
@@ -388,7 +388,7 @@ export const ActivitiesPage = () => {
                                 )}
                             </tbody>
                         </table>
-                    </div>
+                    </TableHorizontalScroll>
                 </Card>
             </PageWrapper>
     );

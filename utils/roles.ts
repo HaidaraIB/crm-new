@@ -85,10 +85,10 @@ export const normalizeRoleForApi = (role?: string): ApiRole => {
 /** True only for `data_entry` (restricted UI / no assignee) — not reception or doctor. */
 export const isDataEntryOnlyRole = (role?: string): boolean => normalizeRole(role) === 'DataEntry';
 
-/** Same lead-assignment scope as API “clinical staff” (employee or doctor). */
+/** Medical dashboard scope: users who may be assigned patients (matches API medical assignee roles). */
 export const isAssignedClinicalAppRole = (role?: string): boolean => {
   const r = normalizeRole(role);
-  return r === 'Employee' || r === 'Doctor';
+  return r === 'Owner' || r === 'Supervisor' || r === 'Employee' || r === 'Doctor';
 };
 
 /** Shown in manual lead/deal assignee pickers; data-entry and reception are not assignees. */

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
 import { Service, ServicePackage, ServiceProvider } from '../types';
 import { AddServiceModal } from '../components/modals/AddServiceModal';
 import { EditServiceModal } from '../components/modals/EditServiceModal';
@@ -19,7 +19,7 @@ type Tab = 'services' | 'packages' | 'providers';
 const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[700px]">
@@ -67,14 +67,14 @@ const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Se
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 
 const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: ServicePackage[], onUpdate: (pkg: ServicePackage) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[700px]">
@@ -122,14 +122,14 @@ const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: Se
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 
 const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers: ServiceProvider[], onUpdate: (provider: ServiceProvider) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[800px]">
@@ -174,7 +174,7 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 

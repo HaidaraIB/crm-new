@@ -2,6 +2,7 @@
 export * from './icons';
 export * from './Button';
 export * from './Card';
+export * from './TableHorizontalScroll';
 export * from './Input';
 export * from './NumberInput';
 export * from './PhoneInput';
@@ -20,6 +21,9 @@ export * from './Loader';
 export * from './modals/AddActionModal';
 export * from './modals/AddCallModal';
 export * from './modals/AddVisitModal';
+export * from './modals/AddFieldVisitModal';
+export * from './LeadLocationMapPicker';
+export * from './LeadStatusDropdown';
 export * from './modals/AddLeadModal';
 export * from './modals/EditLeadModal';
 export * from './modals/AssignLeadModal';

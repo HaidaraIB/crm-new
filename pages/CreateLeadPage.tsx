@@ -9,6 +9,8 @@ import { getCompanyRoute } from '../utils/routing';
 import { isUserOnWeeklyDayOff } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole, normalizeRole } from '../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
+import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
+import { buildLeadLocationApiBody } from '../utils/leadLocation';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -82,13 +84,15 @@ export const CreateLeadPage = () => {
         budget: '',
         budgetMax: '',
         assignedTo: '', // Don't auto-assign to current user - allow creating unassigned leads
-        type: 'fresh' as 'fresh' | 'cold' | '',
+        type: 'fresh' as 'fresh' | 'hot' | 'cold' | '',
         communicationWay: '',
         priority: 'medium' as 'low' | 'medium' | 'high' | '',
         status: '',
         leadCompanyName: '',
         profession: '',
         residence: '',
+        locationLatitude: '',
+        locationLongitude: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -306,7 +310,7 @@ export const CreateLeadPage = () => {
             
             // Convert priority and type to lowercase for API
             const priorityValue = formState.priority ? (formState.priority.toLowerCase() as 'low' | 'medium' | 'high') : null;
-            const typeValue = formState.type ? (formState.type.toLowerCase() as 'fresh' | 'cold') : null;
+            const typeValue = formState.type ? (formState.type.toLowerCase() as 'fresh' | 'hot' | 'cold') : null;
             
             // Prepare phone_number for backward compatibility (only if we have phone numbers)
             const primaryPhone = finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number || finalPhoneNumbers[0]?.phone_number || '';
@@ -326,6 +330,7 @@ export const CreateLeadPage = () => {
                 profession: formState.profession?.trim() || null,
                 residence: formState.residence?.trim() ? formState.residence.trim() : null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildLeadLocationApiBody(formState.locationLatitude, formState.locationLongitude),
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
                     interestedProject: formState.interestedProject,
@@ -488,6 +493,20 @@ export const CreateLeadPage = () => {
                                 />
                             </div>
                         )}
+                        <div className="md:col-span-2 lg:col-span-3">
+                            <LeadLocationMapPicker
+                                latitude={formState.locationLatitude}
+                                longitude={formState.locationLongitude}
+                                onChange={(lat, lng) => {
+                                    hasUserInteracted.current = true;
+                                    setFormState((prev) => ({
+                                        ...prev,
+                                        locationLatitude: lat != null ? String(lat) : '',
+                                        locationLongitude: lng != null ? String(lng) : '',
+                                    }));
+                                }}
+                            />
+                        </div>
                         <LeadInterestInventoryFields
                             className="md:col-span-2 lg:col-span-3"
                             idPrefix="create-lead-inv"
@@ -620,6 +639,7 @@ export const CreateLeadPage = () => {
                             <Select id="type" value={formState.type} onChange={handleChange}>
                                 <option value="">{t('selectType') || 'Select Type'}</option>
                                 <option value="fresh">{t('fresh')}</option>
+                                <option value="hot">{t('hot')}</option>
                                 <option value="cold">{t('cold')}</option>
                             </Select>
                         </div>

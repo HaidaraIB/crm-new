@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon, TableHorizontalScroll } from '../components/index';
 import { Owner } from '../types';
 import { useOwners, useDeleteOwner } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -11,7 +11,7 @@ import { normalizeRole } from '../utils/roles';
 const OwnersTable = ({ owners, onEdit, onDelete, isAdmin }: { owners: Owner[], onEdit: (owner: Owner) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto">
+        <TableHorizontalScroll>
             <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
                 <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                     <tr>
@@ -53,7 +53,7 @@ const OwnersTable = ({ owners, onEdit, onDelete, isAdmin }: { owners: Owner[], o
                     )}
                 </tbody>
             </table>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 

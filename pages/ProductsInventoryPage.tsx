@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
 import { Product, ProductCategory, Supplier } from '../types';
 import { AddProductModal } from '../components/modals/AddProductModal';
 import { EditProductModal } from '../components/modals/EditProductModal';
@@ -18,7 +18,7 @@ type Tab = 'products' | 'categories' | 'suppliers';
 const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Product[], onUpdate: (product: Product) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[900px]">
@@ -74,14 +74,14 @@ const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Pr
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 
 const CategoriesTable = ({ categories, onUpdate, onDelete, isAdmin }: { categories: ProductCategory[], onUpdate: (category: ProductCategory) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[600px]">
@@ -119,14 +119,14 @@ const CategoriesTable = ({ categories, onUpdate, onDelete, isAdmin }: { categori
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 
 const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[900px]">
@@ -172,7 +172,7 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers:
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 

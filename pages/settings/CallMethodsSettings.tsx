@@ -1,7 +1,7 @@
 
 import React from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, TrashIcon, PlusIcon, EditIcon } from '../../components/index';
+import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll } from '../../components/index';
 import { useAppContext } from '../../context/AppContext';
 import { useCallMethods, useDeleteCallMethod, useUpdateCallMethod } from '../../hooks/useQueries';
 import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
@@ -90,7 +90,7 @@ export const CallMethodsSettings = () => {
                         )}
                     </Button>
                 </div>
-                <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+                <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
                     <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700">
                             <tr>
@@ -184,7 +184,7 @@ export const CallMethodsSettings = () => {
                             )}
                         </tbody>
                     </table>
-                </div>
+                </TableHorizontalScroll>
             </Card>
         </div>
     );

@@ -9,6 +9,7 @@ import { useReactivateEmployee } from '../../hooks/useQueries';
 import { SupervisorModal, SupervisorFormData } from './SupervisorModal';
 import { EditIcon, TrashIcon } from '../../components/icons';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
+import { TableHorizontalScroll } from '../../components/TableHorizontalScroll';
 
 export const SupervisorsSettings = () => {
   const queryClient = useQueryClient();
@@ -230,7 +231,7 @@ export const SupervisorsSettings = () => {
           + {t('supervisorsAdd')}
         </button>
       </div>
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-lg shadow overflow-x-auto">
+      <TableHorizontalScroll scrollClassName="bg-white dark:bg-gray-800 p-4 rounded-lg shadow">
         <table className="w-full text-sm text-gray-500 dark:text-gray-400">
           <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
             <tr>
@@ -343,7 +344,7 @@ export const SupervisorsSettings = () => {
             )}
           </tbody>
         </table>
-      </div>
+      </TableHorizontalScroll>
       <SupervisorModal isOpen={isModalOpen} onClose={handleCloseModal} onSave={handleSave} editingSupervisor={editingSupervisor} isLoading={isSaving} />
       {deleteTarget && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={() => setDeleteTarget(null)}>

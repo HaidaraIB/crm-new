@@ -13,6 +13,8 @@ import { useCreateLead, useUsers, useStatuses, useChannels } from '../../hooks/u
 import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
 import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole } from '../../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
+import { LeadLocationMapPicker } from '../LeadLocationMapPicker';
+import { buildLeadLocationApiBody } from '../../utils/leadLocation';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -88,6 +90,8 @@ export const AddLeadModal = () => {
         leadCompanyName: '',
         profession: '',
         residence: '',
+        locationLatitude: '',
+        locationLongitude: '',
         notes: '',
         interestedDeveloper: '',
         interestedProject: '',
@@ -229,6 +233,7 @@ export const AddLeadModal = () => {
                 profession: formState.profession?.trim() || null,
                 residence: formState.residence?.trim() || null,
                 notes: formState.notes?.trim() ? formState.notes.trim() : null,
+                ...buildLeadLocationApiBody(formState.locationLatitude, formState.locationLongitude),
                 ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
                     interestedDeveloper: formState.interestedDeveloper,
                     interestedProject: formState.interestedProject,
@@ -248,7 +253,7 @@ export const AddLeadModal = () => {
             const defaultUserId = isDataEntryUser ? '' : (currentUser?.id || users[0]?.id || '');
             setFormState({
                 name: '', phone: '', budget: '', budgetMax: '', assignedTo: defaultUserId.toString(),
-                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '', profession: '', residence: '', notes: '',
+                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '', profession: '', residence: '', locationLatitude: '', locationLongitude: '', notes: '',
                 interestedDeveloper: '', interestedProject: '', interestedUnit: '',
             });
             setPhoneNumbers([]);
@@ -298,6 +303,19 @@ export const AddLeadModal = () => {
                     <div>
                         <Label htmlFor="residence">{t('residence')}</Label>
                         <Input id="residence" placeholder={t('enterResidence')} value={formState.residence} onChange={handleChange} />
+                    </div>
+                    <div className="md:col-span-2">
+                        <LeadLocationMapPicker
+                            latitude={formState.locationLatitude}
+                            longitude={formState.locationLongitude}
+                            onChange={(lat, lng) => {
+                                setFormState((prev) => ({
+                                    ...prev,
+                                    locationLatitude: lat != null ? String(lat) : '',
+                                    locationLongitude: lng != null ? String(lng) : '',
+                                }));
+                            }}
+                        />
                     </div>
                     <LeadInterestInventoryFields
                         className="md:col-span-2"

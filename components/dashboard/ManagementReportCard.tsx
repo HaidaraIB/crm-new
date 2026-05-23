@@ -1,6 +1,6 @@
 import React from 'react';
 import { dashboardSurface } from './dashboardStyles';
-import { Button, Loader } from '../index';
+import { Button, Loader, TableHorizontalScroll } from '../index';
 import type { AIManagementReportResponse } from '../../services/api';
 
 type ManagementReportCardProps = {
@@ -107,7 +107,7 @@ export const ManagementReportCard = ({
             {employees.length === 0 ? (
               <p className="text-sm text-gray-500 dark:text-gray-500">{emptyEmployeesLabel}</p>
             ) : (
-              <div className="overflow-x-auto rounded-xl border border-gray-100 dark:border-gray-700/90">
+              <TableHorizontalScroll scrollClassName="rounded-xl border border-gray-100 dark:border-gray-700/90">
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400">
                     <tr>
@@ -138,7 +138,7 @@ export const ManagementReportCard = ({
                     ))}
                   </tbody>
                 </table>
-              </div>
+              </TableHorizontalScroll>
             )}
           </section>
 

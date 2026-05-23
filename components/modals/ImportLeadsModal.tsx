@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppContext } from '../../context/AppContext';
-import { Modal, Button } from '../index';
+import { Modal, Button, TableHorizontalScroll } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUsers, useStatuses, useChannels, useCampaigns, useDevelopers, useProjects, useUnits } from '../../hooks/useQueries';
 import { createLeadAPI } from '../../services/api';
@@ -1063,7 +1063,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {t('importLeadsPreview') || 'Found'} <strong>{previewRows.length}</strong> {t('importLeadsRows') || 'row(s)'}. {t('importLeadsPreviewConfirm') || 'Review and assign below, then click Import.'}
             </p>
-            <div className="overflow-x-auto max-h-[60vh] rounded-lg border border-gray-200 dark:border-gray-700">
+            <TableHorizontalScroll scrollClassName="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
                   <tr>
@@ -1407,7 +1407,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                   ))}
                 </tbody>
               </table>
-            </div>
+            </TableHorizontalScroll>
             <div className="flex gap-2 pt-2">
               <Button variant="secondary" onClick={() => setStep('match')}>
                 {t('back') || 'Back'}

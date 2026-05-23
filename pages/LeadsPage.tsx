@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState, AssigneeFilter } from '../components/index';
-import { TrashIcon, ChevronDownIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll } from '../components/index';
+import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead } from '../types';
@@ -36,205 +36,6 @@ const getPaginationItems = (current: number, total: number): Array<number | 'ell
     if (end < total - 1) items.push('ellipsis');
     items.push(total);
     return items;
-};
-
-// Status Dropdown Component
-const StatusDropdown = ({ 
-    leadId, 
-    currentStatus, 
-    availableStatuses, 
-    onStatusChange, 
-    isUpdating,
-    hexToRgb,
-    theme
-}: { 
-    leadId: number;
-    currentStatus: any;
-    availableStatuses: any[];
-    onStatusChange: (leadId: number, statusId: number) => void;
-    isUpdating: boolean;
-    hexToRgb: (hex: string) => { r: number; g: number; b: number } | null;
-    theme: 'light' | 'dark';
-}) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [openUpward, setOpenUpward] = useState(false);
-    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const buttonRef = useRef<HTMLButtonElement>(null);
-    const dropdownMenuRef = useRef<HTMLDivElement>(null);
-    
-    const statusName = currentStatus?.name || '';
-    const statusColor = currentStatus?.color || '#808080';
-    const rgb = hexToRgb(statusColor);
-    // Background with good opacity
-    const bgColor = rgb 
-        ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.25)`
-        : 'bg-gray-200 dark:bg-gray-600';
-    // Simple: white text in dark mode, black text in light mode - no other conditions
-    const textColor = theme === 'light' ? '#000000' : '#ffffff';
-    
-    // Calculate dropdown position and direction
-    useEffect(() => {
-        if (isOpen && buttonRef.current) {
-            const buttonRect = buttonRef.current.getBoundingClientRect();
-            const spaceBelow = window.innerHeight - buttonRect.bottom;
-            const spaceAbove = buttonRect.top;
-            const estimatedDropdownHeight = availableStatuses.length * 36 + 8; // Approximate height
-            
-            // Calculate position using fixed positioning
-            const left = buttonRect.left;
-            let top = 0;
-            let shouldOpenUpward = false;
-            
-            // Open upward if there's not enough space below but enough above
-            if (spaceBelow < estimatedDropdownHeight && spaceAbove > estimatedDropdownHeight) {
-                shouldOpenUpward = true;
-                top = buttonRect.top - estimatedDropdownHeight;
-            } else {
-                shouldOpenUpward = false;
-                top = buttonRect.bottom;
-            }
-            
-            setOpenUpward(shouldOpenUpward);
-            setDropdownPosition({ top, left, width: buttonRect.width });
-        }
-    }, [isOpen, availableStatuses.length]);
-    
-    // Close dropdown when clicking outside
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            const target = event.target as Node;
-            if (
-                dropdownRef.current && 
-                !dropdownRef.current.contains(target) &&
-                dropdownMenuRef.current &&
-                !dropdownMenuRef.current.contains(target)
-            ) {
-                setIsOpen(false);
-            }
-        };
-        
-        if (isOpen) {
-            document.addEventListener('mousedown', handleClickOutside);
-        }
-        
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isOpen]);
-    
-    if (availableStatuses.length === 0) {
-        return (
-            <span 
-                className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
-                style={rgb ? {
-                    backgroundColor: bgColor,
-                    color: textColor,
-                } : undefined}
-            >
-                {statusName}
-            </span>
-        );
-    }
-    
-    return (
-        <div className="relative inline-flex items-center" ref={dropdownRef}>
-            <button
-                ref={buttonRef}
-                type="button"
-                onClick={() => !isUpdating && setIsOpen(!isOpen)}
-                disabled={isUpdating}
-                className={`inline-flex items-center justify-between px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap outline-none cursor-pointer transition-colors focus:ring-2 focus:ring-primary/70 focus:ring-offset-2 pr-9 min-w-[110px] ${
-                    !rgb 
-                        ? 'bg-gray-200 dark:bg-gray-600 border border-gray-300 dark:border-gray-500' 
-                        : 'border'
-                } ${isUpdating ? 'opacity-50 cursor-not-allowed' : 'hover:opacity-90'}`}
-                style={rgb ? {
-                    backgroundColor: bgColor,
-                    color: textColor,
-                    borderColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.4)`,
-                } : {
-                    color: textColor,
-                }}
-            >
-                <span 
-                    className="flex flex-1 items-center justify-center gap-2 font-medium"
-                    style={{ color: textColor }}
-                >
-                    <span
-                        className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: statusColor }}
-                    />
-                    {statusName}
-                </span>
-                <div 
-                    className="absolute right-2.5 flex items-center pointer-events-none"
-                    style={{ color: textColor }}
-                >
-                    <ChevronDownIcon 
-                        className={`w-4 h-4 transition-all duration-200 ${isUpdating ? 'opacity-50' : 'opacity-100'} ${isOpen ? (openUpward ? '' : 'rotate-180') : ''}`}
-                    />
-                </div>
-            </button>
-            
-            {isOpen && (
-                <>
-                    <div 
-                        ref={dropdownMenuRef}
-                        className="fixed z-[9999] bg-gray-800 dark:bg-gray-900 rounded-lg shadow-2xl overflow-hidden border border-gray-700/80 dark:border-gray-600/80 backdrop-blur-md"
-                        style={{
-                            top: `${dropdownPosition.top}px`,
-                            left: `${dropdownPosition.left}px`,
-                            width: `${dropdownPosition.width || 180}px`,
-                            minWidth: '110px',
-                        }}
-                    >
-                        <div className="py-1.5">
-                            {availableStatuses.map((status, index) => {
-                                const isSelected = status.id === currentStatus?.id;
-                                
-                                return (
-                                    <button
-                                        key={status.id}
-                                        type="button"
-                                        onClick={() => {
-                                            if (status.id !== currentStatus?.id) {
-                                                onStatusChange(leadId, status.id);
-                                            }
-                                            setIsOpen(false);
-                                        }}
-                                        className={`relative w-full text-left px-4 py-3 text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                                            isSelected 
-                                                ? 'text-white dark:text-white bg-primary/15' 
-                                                : 'text-gray-200 dark:text-gray-300 hover:text-white dark:hover:text-white hover:bg-gray-700/60 dark:hover:bg-gray-700/60'
-                                        }`}
-                                    >
-                                        <span className="relative z-10 flex items-center justify-between">
-                                            <span className="flex flex-1 items-center gap-2">
-                                                <span
-                                                    className="h-2.5 w-2.5 rounded-full flex-shrink-0"
-                                                    style={{ backgroundColor: status.color || '#808080' }}
-                                                />
-                                                <span>{status.name}</span>
-                                            </span>
-                                            {isSelected && (
-                                                <svg className="w-4 h-4 text-primary ml-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                                                </svg>
-                                            )}
-                                        </span>
-                                        {isSelected && (
-                                            <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary shadow-sm"></div>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </>
-            )}
-        </div>
-    );
 };
 
 export const LeadsPage = () => {
@@ -878,7 +679,7 @@ export const LeadsPage = () => {
                 </div>
             </div>
             <Card>
-                <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
                     <div className="min-w-full inline-block align-middle">
                         <div className="overflow-hidden">
                             <table className="w-full text-sm text-left rtl:text-right min-w-[1200px]">
@@ -1221,49 +1022,29 @@ export const LeadsPage = () => {
                                                             const availableStatuses = statuses.filter(s => !s.isHidden);
                                                             
                                                             const isUpdating = updatingLeadId === lead.id;
-                                                            
-                                                            // Convert hex to RGB for background opacity
-                                                            const hexToRgb = (hex: string) => {
-                                                                const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                                                                return result ? {
-                                                                    r: parseInt(result[1], 16),
-                                                                    g: parseInt(result[2], 16),
-                                                                    b: parseInt(result[3], 16)
-                                                                } : null;
-                                                            };
-                                                            
-                                                            const statusColor = currentStatusConfig?.color || '#808080';
-                                                            const rgb = hexToRgb(statusColor);
-                                                            const bgColor = rgb 
-                                                                ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
-                                                                : 'bg-gray-100 dark:bg-gray-700';
-                                                            const textColor = rgb
-                                                                ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
-                                                                : 'text-gray-800 dark:text-gray-200';
-                                                            
+
+                                                            if (!statusName || !currentStatusConfig) {
+                                                                return <LeadStatusBadge name="—" size="sm" />;
+                                                            }
+
                                                             if (availableStatuses.length === 0 || isDataEntryUser) {
                                                                 return (
-                                                                    <span 
-                                                                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
-                                                                        style={rgb ? {
-                                                                            backgroundColor: bgColor,
-                                                                            color: textColor,
-                                                                        } : undefined}
-                                                                    >
-                                                                        {statusName}
-                                                                    </span>
+                                                                    <LeadStatusBadge
+                                                                        name={statusName}
+                                                                        color={currentStatusConfig.color}
+                                                                        size="sm"
+                                                                    />
                                                                 );
                                                             }
-                                                            
+
                                                             return (
-                                                                <StatusDropdown
+                                                                <LeadStatusDropdown
                                                                     leadId={lead.id}
                                                                     currentStatus={currentStatusConfig}
                                                                     availableStatuses={availableStatuses}
                                                                     onStatusChange={handleStatusChange}
                                                                     isUpdating={isUpdating}
-                                                                    hexToRgb={hexToRgb}
-                                                                    theme={theme}
+                                                                    size="sm"
                                                                 />
                                                             );
                                                         })()}
@@ -1310,7 +1091,7 @@ export const LeadsPage = () => {
                             </table>
                         </div>
                     </div>
-                </div>
+                </TableHorizontalScroll>
                 <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         {totalLeadsCount > 0

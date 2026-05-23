@@ -3,7 +3,7 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
@@ -1809,7 +1809,7 @@ export const IntegrationsPage = () => {
                             />
                         </div>
                         <Card className="overflow-hidden">
-                            <div className="overflow-x-auto">
+                            <TableHorizontalScroll>
                                 <table className="w-full min-w-[700px]">
                                     <thead>
                                         <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
@@ -1888,7 +1888,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                         })()}
                                     </tbody>
                                 </table>
-                            </div>
+                            </TableHorizontalScroll>
                         </Card>
                     </div>
                 )}

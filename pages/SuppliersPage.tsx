@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon, TableHorizontalScroll } from '../components/index';
 import { Supplier } from '../types';
 import { useSuppliers, useDeleteSupplier } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -9,7 +9,7 @@ import { normalizeRole } from '../utils/roles';
 const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers: Supplier[], onUpdate: (supplier: Supplier) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
-        <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full inline-block align-middle">
                 <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
                     <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[900px]">
@@ -81,7 +81,7 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers:
                     </table>
                 </div>
             </div>
-        </div>
+        </TableHorizontalScroll>
     );
 };
 

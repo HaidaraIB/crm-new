@@ -118,7 +118,7 @@ export interface TimelineEntry {
   details: string;
   date: string;
   timestamp: number; // For sorting
-  type?: 'action' | 'event' | 'call' | 'visit' | 'sms';
+  type?: 'action' | 'event' | 'call' | 'visit' | 'field_visit' | 'sms';
   stage?: string; // Optional: formatted stage name for better display
   color?: string; // Optional: color for the stage or event
   oldValue?: string;
@@ -181,6 +181,9 @@ export interface Lead {
   profession?: string | null;
   /** Clinic / medical: residence (API: residence) */
   residence?: string | null;
+  /** Optional map coordinates (API: location_latitude / location_longitude) */
+  locationLatitude?: number | string | null;
+  locationLongitude?: number | string | null;
   /** Per-company patient file number (API: patient_file_number), read-only from API */
   patientFileNumber?: number | null;
   /** Real-estate: optional inventory interest (API: interested_developer / _project / _unit) */

@@ -112,6 +112,8 @@ export interface AppContextType {
   setIsAddCallModalOpen: (isOpen: boolean) => void;
   isAddVisitModalOpen: boolean;
   setIsAddVisitModalOpen: (isOpen: boolean) => void;
+  isAddFieldVisitModalOpen: boolean;
+  setIsAddFieldVisitModalOpen: (isOpen: boolean) => void;
   isAddTodoModalOpen: boolean;
   setIsAddTodoModalOpen: (isOpen: boolean) => void;
   isAssignLeadModalOpen: boolean;
@@ -623,6 +625,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isAddActionModalOpen, setIsAddActionModalOpen] = useState(false);
   const [isAddCallModalOpen, setIsAddCallModalOpen] = useState(false);
   const [isAddVisitModalOpen, setIsAddVisitModalOpen] = useState(false);
+  const [isAddFieldVisitModalOpen, setIsAddFieldVisitModalOpen] = useState(false);
   const [isAddTodoModalOpen, setIsAddTodoModalOpen] = useState(false);
   const [isAssignLeadModalOpen, setIsAssignLeadModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
@@ -1368,6 +1371,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isAddActionModalOpen, setIsAddActionModalOpen,
     isAddCallModalOpen, setIsAddCallModalOpen,
     isAddVisitModalOpen, setIsAddVisitModalOpen,
+    isAddFieldVisitModalOpen, setIsAddFieldVisitModalOpen,
     isAddTodoModalOpen, setIsAddTodoModalOpen,
     isAssignLeadModalOpen, setIsAssignLeadModalOpen,
     isFilterDrawerOpen, setIsFilterDrawerOpen,

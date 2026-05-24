@@ -544,7 +544,7 @@ export const LeadsPage = () => {
         <PageWrapper 
             title={pageTitle}
             actions={
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:pb-0.5">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
                         <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto shrink-0"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
                         {!isDataEntryUser && (
                         <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={filteredLeads.length === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{t('export')}</span><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>

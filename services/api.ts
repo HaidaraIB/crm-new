@@ -3429,7 +3429,24 @@ export const getClientFieldVisitsAPI = async () => {
 };
 
 /** POST /client-field-visits/ */
-export const createClientFieldVisitAPI = async (data: any) => {
+export const createClientFieldVisitAPI = async (data: Record<string, unknown>) => {
+  const photo = data.client_location_photo;
+  const hasPhoto = photo instanceof File;
+
+  if (hasPhoto) {
+    const form = new FormData();
+    for (const [key, value] of Object.entries(data)) {
+      if (key === 'client_location_photo') continue;
+      if (value === undefined || value === null || value === '') continue;
+      form.append(key, String(value));
+    }
+    form.append('client_location_photo', photo);
+    return apiRequest<any>('/client-field-visits/', {
+      method: 'POST',
+      body: form,
+    });
+  }
+
   return apiRequest<any>('/client-field-visits/', {
     method: 'POST',
     body: JSON.stringify(data),
@@ -3715,6 +3732,19 @@ export const updateCompanyAssignmentSettingsAPI = async (
   }
 ) => {
   return apiRequest<any>(`/companies/${companyId}/update_assignment_settings/`, {
+    method: 'PATCH',
+    body: JSON.stringify(settings),
+  });
+};
+
+/** PATCH /api/companies/:id/update_field_visit_settings/ */
+export const updateCompanyFieldVisitSettingsAPI = async (
+  companyId: number,
+  settings: {
+    field_visit_enabled?: boolean;
+  }
+) => {
+  return apiRequest<any>(`/companies/${companyId}/update_field_visit_settings/`, {
     method: 'PATCH',
     body: JSON.stringify(settings),
   });

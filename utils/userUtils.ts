@@ -37,6 +37,18 @@ export const normalizeUser = (userData: any): User => {
       auto_assign_enabled: typeof userData.company === 'object' ? (userData.company.auto_assign_enabled ?? false) : false,
       re_assign_enabled: typeof userData.company === 'object' ? (userData.company.re_assign_enabled ?? false) : false,
       re_assign_hours: typeof userData.company === 'object' ? (userData.company.re_assign_hours ?? 24) : 24,
+      field_visit_enabled: typeof userData.company === 'object'
+        ? (userData.company.field_visit_enabled ?? true)
+        : true,
+      field_visit_allowed: typeof userData.company === 'object'
+        ? (userData.company.field_visit_allowed ?? true)
+        : true,
+      field_visit_admin_allowed: typeof userData.company === 'object'
+        ? (userData.company.field_visit_admin_allowed ?? true)
+        : true,
+      field_visit_admin_message: typeof userData.company === 'object'
+        ? (userData.company.field_visit_admin_message ?? '')
+        : '',
       subscription: typeof userData.company === 'object' ? userData.company.subscription : undefined,
     } : undefined,
     emailVerified: userData.email_verified || userData.is_email_verified || userData.emailVerified || false,

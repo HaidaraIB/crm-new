@@ -121,6 +121,20 @@ export const Timeline = ({ history }: TimelineProps) => {
                                 {entry.details && (
                                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1.5">{entry.details}</p>
                                 )}
+                                {entry.type === 'field_visit' && entry.locationPhotoUrl && (
+                                    <a
+                                        href={entry.locationPhotoUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-block mt-2"
+                                    >
+                                        <img
+                                            src={entry.locationPhotoUrl}
+                                            alt=""
+                                            className="max-h-48 rounded-lg border border-gray-200 dark:border-gray-600 object-contain"
+                                        />
+                                    </a>
+                                )}
                                 {/* Call / visit datetime and follow-up or upcoming date */}
                                 {(entry.type === 'call' || entry.type === 'visit' || entry.type === 'field_visit') && (entry.callDatetime || entry.followUpDate) && (
                                     <div className="mt-3 flex flex-wrap items-center gap-2">

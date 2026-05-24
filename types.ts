@@ -41,6 +41,10 @@ export interface Company {
   auto_assign_enabled?: boolean;
   re_assign_enabled?: boolean;
   re_assign_hours?: number;
+  field_visit_enabled?: boolean;
+  field_visit_allowed?: boolean;
+  field_visit_admin_allowed?: boolean;
+  field_visit_admin_message?: string;
   /** True after any paid conversion or expired/forfeited trial — no new time-limited trials. */
   free_trial_consumed?: boolean;
   subscription?: Subscription;
@@ -125,6 +129,7 @@ export interface TimelineEntry {
   newValue?: string;
   callDatetime?: string; // Optional: formatted call datetime for calls
   followUpDate?: string; // Optional: formatted follow-up date for calls
+  locationPhotoUrl?: string; // Optional: client location photo for field visits
 }
 
 export interface ClientTask {

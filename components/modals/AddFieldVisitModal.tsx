@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
@@ -32,6 +32,9 @@ function getCurrentPosition(): Promise<GeolocationPosition> {
     });
 }
 
+const ALLOWED_PHOTO_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+
 export const AddFieldVisitModal = () => {
     const {
         isAddFieldVisitModalOpen,
@@ -41,6 +44,7 @@ export const AddFieldVisitModal = () => {
         language,
         setIsSuccessModalOpen,
         setSuccessMessage,
+        currentUser,
     } = useAppContext();
 
     const createFieldVisitMutation = useCreateClientFieldVisit();
@@ -51,6 +55,47 @@ export const AddFieldVisitModal = () => {
     const [upcomingVisitDate, setUpcomingVisitDate] = useState('');
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [locating, setLocating] = useState(false);
+    const [clientLocationPhoto, setClientLocationPhoto] = useState<File | null>(null);
+    const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+    const cameraInputRef = useRef<HTMLInputElement>(null);
+    const uploadInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!clientLocationPhoto) {
+            setPhotoPreview(null);
+            return;
+        }
+        const url = URL.createObjectURL(clientLocationPhoto);
+        setPhotoPreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [clientLocationPhoto]);
+
+    const validatePhoto = (file: File): string | null => {
+        if (!ALLOWED_PHOTO_TYPES.has(file.type)) {
+            return t('clientLocationPhotoInvalidType');
+        }
+        if (file.size > MAX_PHOTO_BYTES) {
+            return t('clientLocationPhotoTooLarge');
+        }
+        return null;
+    };
+
+    const handlePhotoSelected = (file: File | undefined) => {
+        if (!file) return;
+        const photoError = validatePhoto(file);
+        if (photoError) {
+            setErrors((prev) => ({ ...prev, clientLocationPhoto: photoError }));
+            return;
+        }
+        clearError('clientLocationPhoto');
+        setClientLocationPhoto(file);
+    };
+
+    const clearClientLocationPhoto = () => {
+        setClientLocationPhoto(null);
+        if (cameraInputRef.current) cameraInputRef.current.value = '';
+        if (uploadInputRef.current) uploadInputRef.current.value = '';
+    };
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -83,6 +128,7 @@ export const AddFieldVisitModal = () => {
         setUpcomingVisitDate('');
         setErrors({});
         setLocating(false);
+        clearClientLocationPhoto();
     };
 
     const setVisitDatetimeToNow = () => {
@@ -128,6 +174,7 @@ export const AddFieldVisitModal = () => {
                 ...(accuracy != null && !Number.isNaN(accuracy)
                     ? { employee_location_accuracy: accuracy }
                     : {}),
+                ...(clientLocationPhoto ? { client_location_photo: clientLocationPhoto } : {}),
             });
             handleClose();
             setSuccessMessage(t('fieldVisitCreatedSuccessfully'));
@@ -202,6 +249,63 @@ export const AddFieldVisitModal = () => {
                         onChange={(e) => setUpcomingVisitDate(e.target.value)}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
                     />
+                </div>
+                <div>
+                    <Label htmlFor="fieldClientLocationPhoto">{t('clientLocationPhoto')}</Label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{t('clientLocationPhotoHint')}</p>
+                    <input
+                        ref={cameraInputRef}
+                        type="file"
+                        accept="image/*"
+                        capture="environment"
+                        className="hidden"
+                        onChange={(e) => handlePhotoSelected(e.target.files?.[0])}
+                    />
+                    <input
+                        ref={uploadInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        className="hidden"
+                        onChange={(e) => handlePhotoSelected(e.target.files?.[0])}
+                    />
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => cameraInputRef.current?.click()}
+                            disabled={busy}
+                        >
+                            {t('takeClientLocationPhoto')}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            onClick={() => uploadInputRef.current?.click()}
+                            disabled={busy}
+                        >
+                            {t('uploadClientLocationPhoto')}
+                        </Button>
+                        {clientLocationPhoto && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={clearClientLocationPhoto}
+                                disabled={busy}
+                            >
+                                {t('removeClientLocationPhoto')}
+                            </Button>
+                        )}
+                    </div>
+                    {photoPreview && (
+                        <img
+                            src={photoPreview}
+                            alt={t('clientLocationPhoto')}
+                            className="mt-3 max-h-48 rounded-lg border border-gray-200 dark:border-gray-600 object-contain"
+                        />
+                    )}
+                    {errors.clientLocationPhoto && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.clientLocationPhoto}</p>
+                    )}
                 </div>
                 <div className="flex justify-end gap-2 pt-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={busy}>

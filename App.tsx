@@ -4,6 +4,7 @@ import React from 'react';
 import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotifications';
+import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage } from './pages';
@@ -104,6 +105,7 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
 
 const TheApp = () => {
     const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, isTeamChatDialogOpen, setIsTeamChatDialogOpen, isNotificationsDialogOpen, setIsNotificationsDialogOpen, selectedLead } = useAppContext();
+    const fieldVisitsAllowed = useFieldVisitAllowed();
     useTeamChatAwayNotifications();
     React.useEffect(() => {
         if (!isLoggedIn || currentPage !== 'Team Chat') return;
@@ -933,7 +935,7 @@ const TheApp = () => {
             <AddActionModal />
             <AddCallModal />
             <AddVisitModal />
-            <AddFieldVisitModal />
+            {fieldVisitsAllowed && <AddFieldVisitModal />}
             <AssignLeadModal />
             <FilterDrawer />
             <ActivitiesFilterDrawer />

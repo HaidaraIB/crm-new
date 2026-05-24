@@ -8,6 +8,7 @@ import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateToLocal, formatDateTimeToLocal, withLatinDigits } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
+import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { parseLeadCoordinate } from '../utils/leadLocation';
 import { BriefcaseIcon, MapPinIcon } from '../components/icons';
@@ -98,7 +99,11 @@ export const ViewLeadPage = () => {
     const { data: clientVisitsResponse } = useClientVisits();
     const clientVisits = clientVisitsResponse?.results || [];
 
-    const { data: clientFieldVisitsResponse } = useClientFieldVisits();
+    const fieldVisitsAllowed = useFieldVisitAllowed();
+
+    const { data: clientFieldVisitsResponse } = useClientFieldVisits({
+        enabled: fieldVisitsAllowed,
+    });
     const clientFieldVisits = clientFieldVisitsResponse?.results || [];
     
     const { data: callMethodsData } = useCallMethods();
@@ -382,7 +387,8 @@ export const ViewLeadPage = () => {
             };
         });
 
-        const fieldVisits = leadClientFieldVisits.map((cv: Record<string, unknown>) => {
+        const fieldVisits = fieldVisitsAllowed
+            ? leadClientFieldVisits.map((cv: Record<string, unknown>) => {
             const user = users.find(u => u.id === (cv.created_by || cv.createdBy));
             const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
             const timestamp = new Date(visitDateRaw).getTime();
@@ -421,8 +427,13 @@ export const ViewLeadPage = () => {
                 stage: t('fieldVisit'),
                 callDatetime: visitDt,
                 followUpDate: upcoming || undefined,
+                locationPhotoUrl:
+                    (cv.client_location_photo_url as string | undefined) ||
+                    (cv.clientLocationPhotoUrl as string | undefined) ||
+                    undefined,
             };
-        });
+        })
+            : [];
 
         // Format Events (ClientEvents)
         // Helper function to format values for display
@@ -554,7 +565,7 @@ export const ViewLeadPage = () => {
 
         // Combine and sort by date descending
         return [...actions, ...calls, ...visits, ...fieldVisits, ...events, ...smsEntries, ...waEntries].sort((a, b) => b.timestamp - a.timestamp);
-    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, callMethods, visitTypes]);
+    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, callMethods, visitTypes, fieldVisitsAllowed]);
 
     if (!displayLead) {
         return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
@@ -588,7 +599,7 @@ export const ViewLeadPage = () => {
                 </div>
             }
             actions={
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:pb-0.5">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
                     <Button
                         variant="secondary"
                         type="button"
@@ -645,6 +656,7 @@ export const ViewLeadPage = () => {
                             </span>
                         </Button>
                     )}
+                    {fieldVisitsAllowed && (
                     <Button
                         variant="secondary"
                         type="button"
@@ -656,6 +668,7 @@ export const ViewLeadPage = () => {
                             {t('addFieldVisit')}
                         </span>
                     </Button>
+                    )}
                     <Button onClick={() => setIsAddActionModalOpen(true)} className="w-full sm:w-auto shrink-0">
                         <PlusIcon className="w-4 h-4 shrink-0" />
                         <span className="whitespace-nowrap">{t('add_action')}</span>

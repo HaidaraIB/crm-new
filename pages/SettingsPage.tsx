@@ -7,6 +7,7 @@ import { StatusesSettings } from './settings/StatusesSettings';
 import { CallMethodsSettings } from './settings/CallMethodsSettings';
 import { VisitTypesSettings } from './settings/VisitTypesSettings';
 import { LeadAssignmentSettings } from './settings/LeadAssignmentSettings';
+import { FieldVisitSettings } from './settings/FieldVisitSettings';
 import { SupervisorsSettings } from './settings/SupervisorsSettings';
 import { NewLeadSmsSettings } from './settings/NewLeadSmsSettings';
 import { useAppContext } from '../context/AppContext';
@@ -20,6 +21,7 @@ type SettingsTab =
     | 'CallMethods'
     | 'VisitTypes'
     | 'LeadAssignment'
+    | 'FieldVisits'
     | 'NewLeadSms'
     | 'Supervisors';
 
@@ -30,6 +32,7 @@ const ALL_SETTINGS_TAB_IDS: SettingsTab[] = [
     'CallMethods',
     'VisitTypes',
     'LeadAssignment',
+    'FieldVisits',
     'NewLeadSms',
     'Supervisors',
 ];
@@ -49,6 +52,7 @@ export const SettingsPage = () => {
             'CallMethods',
             ...(showVisitTypes ? (['VisitTypes'] as const) : []),
             'LeadAssignment',
+            ...(normalizeRole(currentUser?.role) === 'Owner' ? (['FieldVisits'] as const) : []),
             'NewLeadSms',
             ...(normalizeRole(currentUser?.role) === 'Owner' ? (['Supervisors'] as const) : []),
         ],
@@ -68,6 +72,9 @@ export const SettingsPage = () => {
 
     useEffect(() => {
         if (activeTab === 'Supervisors' && normalizeRole(currentUser?.role) !== 'Owner') {
+            setActiveTab('Channels');
+        }
+        if (activeTab === 'FieldVisits' && normalizeRole(currentUser?.role) !== 'Owner') {
             setActiveTab('Channels');
         }
     }, [currentUser?.role, activeTab]);
@@ -92,6 +99,8 @@ export const SettingsPage = () => {
                 return <VisitTypesSettings />;
             case 'LeadAssignment':
                 return <LeadAssignmentSettings />;
+            case 'FieldVisits':
+                return <FieldVisitSettings />;
             case 'NewLeadSms':
                 return <NewLeadSmsSettings />;
             case 'Supervisors':
@@ -143,6 +152,14 @@ export const SettingsPage = () => {
                     >
                         {t('leadAssignmentSettings')}
                     </button>
+                    {normalizeRole(currentUser?.role) === 'Owner' && (
+                        <button
+                            onClick={() => setActiveTab('FieldVisits')}
+                            className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'FieldVisits' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
+                        >
+                            {t('fieldVisitSettings')}
+                        </button>
+                    )}
                     <button
                         onClick={() => setActiveTab('NewLeadSms')}
                         className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'NewLeadSms' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}

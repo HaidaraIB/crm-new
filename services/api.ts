@@ -2549,6 +2549,8 @@ export const updateConnectedAccountAPI = async (accountId: number, accountData: 
   account_link?: string;
   phone_number?: string;
   is_active?: boolean;
+  pixel_id?: string;
+  conversion_leads_enabled?: boolean;
 }) => {
   return apiRequest<any>(`/integrations/accounts/${accountId}/`, {
     method: 'PUT',
@@ -2613,6 +2615,11 @@ export type MetaHealthResponse = {
     last_lead_received_at?: string | null;
     leads_last_7d: number;
     errors_last_7d: number;
+  };
+  conversion_leads?: {
+    pixel_id?: string | null;
+    pixel_configured: boolean;
+    conversion_leads_enabled?: boolean;
   };
 };
 

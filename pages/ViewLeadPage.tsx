@@ -8,12 +8,15 @@ import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateToLocal, formatDateTimeToLocal, withLatinDigits } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
+import { useQuery } from '@tanstack/react-query';
+import { getConnectedAccountAPI } from '../services/api';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { parseLeadCoordinate } from '../utils/leadLocation';
 import { BriefcaseIcon, MapPinIcon } from '../components/icons';
 import { Lead } from '../types';
 import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
+import { translations } from '../constants';
 
 export const ViewLeadPage = () => {
     const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
@@ -23,6 +26,7 @@ export const ViewLeadPage = () => {
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
     const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
     const [sendWhatsAppModal, setSendWhatsAppModal] = React.useState<{ phone: string } | null>(null);
+    const [updatingMetaQualification, setUpdatingMetaQualification] = React.useState(false);
     
     // Handle status change
     const handleStatusChange = async (leadId: number, newStatusId: number) => {
@@ -227,6 +231,68 @@ export const ViewLeadPage = () => {
 
     // Use currentLead instead of selectedLead for display
     const displayLead = currentLead || selectedLead;
+
+    const integrationAccountId = displayLead?.integration_account ?? (displayLead as any)?.integrationAccount ?? null;
+    const isMetaLead = (displayLead?.source || (displayLead as any)?.source) === 'meta_lead_form';
+
+    const { data: metaIntegrationAccount } = useQuery({
+        queryKey: ['integrationAccount', integrationAccountId],
+        queryFn: () => getConnectedAccountAPI(integrationAccountId as number),
+        enabled: isMetaLead && !!integrationAccountId,
+    });
+    const metaPixelConfigured = Boolean(metaIntegrationAccount?.metadata?.pixel_id);
+    const metaLeadgenId = displayLead?.metaLeadgenId ?? (displayLead as any)?.meta_leadgen_id ?? null;
+    const metaQualificationStatus = displayLead?.metaQualificationStatus ?? (displayLead as any)?.meta_qualification_status ?? null;
+    const metaQualificationSentAt = displayLead?.metaQualificationSentAt ?? (displayLead as any)?.meta_qualification_sent_at ?? null;
+    const metaQualificationError = displayLead?.metaQualificationError ?? (displayLead as any)?.meta_qualification_error ?? null;
+    const metaQualificationDisabled = !metaLeadgenId || !metaPixelConfigured;
+
+    const metaQualificationErrorText = useMemo(() => {
+        if (!metaQualificationError) return null;
+        const key = metaQualificationError as keyof typeof translations.en;
+        if (key in translations.en) {
+            return t(key);
+        }
+        return metaQualificationError;
+    }, [metaQualificationError, t, language]);
+
+    const handleMetaQualificationChange = async (newStatus: '' | 'qualified' | 'unqualified') => {
+        if (!displayLead?.id) return;
+        const lead = allLeads.find((l: any) => l.id === displayLead.id) ?? displayLead;
+        const companyId = (lead as any).company?.id || (lead as any).company || (lead as any).company_id;
+        if (!companyId) {
+            alert(t('errorUpdatingLead') || 'Failed to update lead.');
+            return;
+        }
+        setUpdatingMetaQualification(true);
+        try {
+            const updateData: Record<string, unknown> = {
+                name: lead.name,
+                phone: (lead as any).phone_number || lead.phone || '',
+                budget: lead.budget || 0,
+                budget_max: (lead as any).budget_max ?? lead.budgetMax ?? null,
+                assignedTo: (lead as any).assigned_to || 0,
+                type: lead.type || '',
+                communicationWay: (lead as any).communication_way || '',
+                priority: lead.priority || '',
+                status: (lead as any).status?.id ?? (lead as any).status,
+                company: companyId,
+                lead_company_name: (lead as any).lead_company_name ?? lead.leadCompanyName ?? null,
+                profession: lead.profession ?? null,
+                meta_qualification_status: newStatus === '' ? null : newStatus,
+            };
+            if ((lead as any).phone_numbers?.length) {
+                updateData.phoneNumbers = (lead as any).phone_numbers;
+            }
+            await updateLeadMutation.mutateAsync({ id: displayLead.id, data: updateData });
+            await refetchLeads();
+        } catch (error) {
+            console.error('Error updating Meta qualification:', error);
+            alert(t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
+        } finally {
+            setUpdatingMetaQualification(false);
+        }
+    };
     
     // تحويل ClientTasks إلى TimelineEntries
     const leadClientTasks = displayLead ? clientTasks.filter(ct => {
@@ -1007,6 +1073,54 @@ export const ViewLeadPage = () => {
                                 })()}
                             </div>
                         </div>
+                        {isMetaLead && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                                    {t('metaQualification')}
+                                </label>
+                                <div className="mt-1">
+                                    <select
+                                        value={metaQualificationStatus ?? ''}
+                                        onChange={(e) => handleMetaQualificationChange(e.target.value as '' | 'qualified' | 'unqualified')}
+                                        disabled={metaQualificationDisabled || updatingMetaQualification}
+                                        title={
+                                            !metaLeadgenId
+                                                ? t('metaQualificationNoLeadId')
+                                                : !metaPixelConfigured
+                                                    ? t('metaQualificationNoPixel')
+                                                    : undefined
+                                        }
+                                        className="block w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">{t('metaQualificationNotSet')}</option>
+                                        <option value="qualified">{t('qualified')}</option>
+                                        <option value="unqualified">{t('unqualified')}</option>
+                                    </select>
+                                    {updatingMetaQualification && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('loading')}</p>
+                                    )}
+                                    {!metaLeadgenId && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                            {t('metaQualificationNoLeadId')}
+                                        </p>
+                                    )}
+                                    {metaLeadgenId && !metaPixelConfigured && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                            {t('metaQualificationNoPixel')}
+                                        </p>
+                                    )}
+                                    {metaQualificationSentAt && !metaQualificationError && (
+                                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                            {t('metaQualificationSent')}
+                                            {metaQualificationSentAt ? ` · ${formatDateTimeToLocal(metaQualificationSentAt, language)}` : ''}
+                                        </p>
+                                    )}
+                                    {metaQualificationErrorText && (
+                                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">{metaQualificationErrorText}</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('createdBy') || 'Created by'}</label>
                             <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">

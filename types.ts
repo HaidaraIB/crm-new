@@ -171,6 +171,12 @@ export interface Lead {
   campaign_name?: string; // Campaign name (from API)
   source?: 'meta_lead_form' | 'whatsapp' | 'tiktok' | 'manual' | 'other' | string; // Lead source
   integration_account?: number | null; // IntegrationAccount ID
+  /** Meta Lead Ads: leadgen_id from webhook (read-only from API) */
+  metaLeadgenId?: string | null;
+  /** Meta Conversion Leads qualification: null | qualified | unqualified */
+  metaQualificationStatus?: 'qualified' | 'unqualified' | null;
+  metaQualificationSentAt?: string | null;
+  metaQualificationError?: string | null;
   /** CRM user id who created the lead (API); null for integrations or legacy */
   createdBy?: number | null;
   /** Display name from API (full name or username) */

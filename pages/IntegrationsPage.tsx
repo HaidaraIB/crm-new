@@ -3,11 +3,11 @@
 import React, { useMemo, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, type MetaHealthResponse } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
@@ -809,6 +809,9 @@ export const IntegrationsPage = () => {
     const [testConnectionAccountId, setTestConnectionAccountId] = useState<number | null>(null);
     const [selectLeadFormAccountId, setSelectLeadFormAccountId] = useState<number | null>(null);
     const [metaHealthSelectedPageId, setMetaHealthSelectedPageId] = useState<string>('');
+    const [metaPixelDrafts, setMetaPixelDrafts] = useState<Record<number, string>>({});
+    const [metaPixelSavingId, setMetaPixelSavingId] = useState<number | null>(null);
+    const [metaPixelSavedId, setMetaPixelSavedId] = useState<number | null>(null);
     const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template'>(() => {
         try {
             const s = localStorage.getItem('messaging_center_tab');
@@ -1078,6 +1081,32 @@ export const IntegrationsPage = () => {
             setInfoAlert({ title: t('metaHealth') || 'Meta health', message: msg });
         } finally {
             setMetaHealthLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const next: Record<number, string> = {};
+        for (const acc of accounts) {
+            if (acc.platform === 'meta' && acc.metadata?.pixel_id != null) {
+                next[acc.id] = String(acc.metadata.pixel_id);
+            }
+        }
+        setMetaPixelDrafts((prev) => ({ ...prev, ...next }));
+    }, [accounts]);
+
+    const handleSaveMetaPixel = async (accountId: number) => {
+        try {
+            setMetaPixelSavingId(accountId);
+            const pixel_id = (metaPixelDrafts[accountId] ?? '').trim();
+            await updateConnectedAccountAPI(accountId, { pixel_id });
+            await queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+            setMetaPixelSavedId(accountId);
+            setTimeout(() => setMetaPixelSavedId((id) => (id === accountId ? null : id)), 2500);
+        } catch (error: any) {
+            const msg = error?.message || error?.data?.error || t('failedToSavePixelId');
+            setInfoAlert({ title: t('metaPixelId'), message: msg });
+        } finally {
+            setMetaPixelSavingId(null);
         }
     };
 
@@ -2234,8 +2263,9 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                         {accounts.map(account => (
                             <li
                                 key={account.id}
-                                className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/80 transition-colors duration-200 first:rounded-t-lg last:rounded-b-lg"
+                                className="p-5 sm:p-6 flex flex-col gap-4 bg-white dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/80 transition-colors duration-200 first:rounded-t-lg last:rounded-b-lg"
                             >
+                                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
                                 <div className="flex items-center gap-4 min-w-0">
                                     {integrationPlatform && (
                                         <IntegrationPlatformIcon platform={integrationPlatform} size="md" />
@@ -2303,6 +2333,40 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                         <TrashIcon className="w-4 h-4" /> <span className="sm:inline">{t('disconnect')}</span>
                                     </Button>
                                 </div>
+                                </div>
+                                {account.status === 'Connected' && account.platform === 'meta' && (
+                                    <div className="w-full pt-3 border-t border-gray-200/80 dark:border-gray-700/80">
+                                        <label className={`block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 ${language === 'ar' ? '' : 'uppercase tracking-wide'}`}>
+                                            {t('metaPixelId')}
+                                        </label>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                                            {t('metaPixelIdHint')}
+                                        </p>
+                                        <div className={`flex flex-col sm:flex-row gap-2 sm:items-center ${language === 'ar' ? 'sm:flex-row-reverse sm:justify-end' : ''}`}>
+                                            <Input
+                                                id={`meta-pixel-${account.id}`}
+                                                value={metaPixelDrafts[account.id] ?? String(account.metadata?.pixel_id ?? '')}
+                                                onChange={(e) => setMetaPixelDrafts((prev) => ({ ...prev, [account.id]: e.target.value }))}
+                                                placeholder={t('metaPixelIdPlaceholder')}
+                                                dir={language === 'ar' ? 'rtl' : 'ltr'}
+                                                className="sm:max-w-md"
+                                            />
+                                            <Button
+                                                variant="secondary"
+                                                onClick={() => handleSaveMetaPixel(account.id)}
+                                                loading={metaPixelSavingId === account.id}
+                                                className="rounded-lg text-sm shrink-0"
+                                            >
+                                                {t('savePixelId')}
+                                            </Button>
+                                            {metaPixelSavedId === account.id && (
+                                                <span className="text-xs text-green-600 dark:text-green-400">
+                                                    {t('metaPixelIdSaved')}
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
                             </li>
                         ))}
                     </ul>
@@ -2369,6 +2433,22 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                 <div>{t('pageInMetadata') || 'Page in metadata'}: {metaHealthData.selection.page_in_metadata ? 'Yes' : 'No'}</div>
                             </div>
                         </div>
+                        {metaHealthData.conversion_leads && (
+                            <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
+                                <div className="font-semibold text-sm mb-2">{t('metaQualification')}</div>
+                                <div className="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+                                    <div>{t('metaPixelId')}: {metaHealthData.conversion_leads.pixel_id || '-'}</div>
+                                    <div>
+                                        {t('metaPixelConfigured')}:{' '}
+                                        {metaHealthData.conversion_leads.pixel_configured ? (
+                                            <span className="text-green-600 dark:text-green-400">{t('yes')}</span>
+                                        ) : (
+                                            <span className="text-amber-600 dark:text-amber-400">{t('no')}</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                         <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
                             <div className="font-semibold text-sm mb-2">{t('pages') || 'Pages'}</div>
                             <div className="mb-3">

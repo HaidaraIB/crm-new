@@ -25,6 +25,10 @@ export function normalizeLead(lead: any): any {
     interestedProjectName: lead.interestedProjectName ?? lead.interested_project_name ?? null,
     interestedUnitName: lead.interestedUnitName ?? lead.interested_unit_name ?? null,
     interestedUnitCode: lead.interestedUnitCode ?? lead.interested_unit_code ?? null,
+    metaLeadgenId: lead.metaLeadgenId ?? lead.meta_leadgen_id ?? null,
+    metaQualificationStatus: lead.metaQualificationStatus ?? lead.meta_qualification_status ?? null,
+    metaQualificationSentAt: lead.metaQualificationSentAt ?? lead.meta_qualification_sent_at ?? null,
+    metaQualificationError: lead.metaQualificationError ?? lead.meta_qualification_error ?? null,
   };
 }
 
@@ -50,6 +54,10 @@ export function mapApiLeadToDisplayLead(apiLead: any): Lead {
     campaign_name: base.campaign_name || (base.campaign ? String(base.campaign) : null),
     source: base.source || 'manual',
     integration_account: base.integration_account || null,
+    metaLeadgenId: base.metaLeadgenId,
+    metaQualificationStatus: base.metaQualificationStatus,
+    metaQualificationSentAt: base.metaQualificationSentAt,
+    metaQualificationError: base.metaQualificationError,
     leadCompanyName: base.leadCompanyName,
     profession: base.profession,
     residence: base.residence,

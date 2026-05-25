@@ -3294,6 +3294,51 @@ export const getTikTokLeadgenConfigAPI = async () => {
   );
 };
 
+/** Custom Lead API: endpoint URL and masked keys. GET /integrations/accounts/lead-api-config/ */
+export type LeadApiKeySummary = {
+  id: number;
+  name: string;
+  key_prefix: string;
+  key_suffix?: string;
+  is_active: boolean;
+  created_at: string | null;
+  last_used_at: string | null;
+};
+
+export type LeadApiConfig = {
+  endpoint_url: string;
+  documentation_path: string;
+  keys: LeadApiKeySummary[];
+  integration_status?: string;
+  last_received_at?: string | null;
+  last_sync_at?: string | null;
+};
+
+export const getLeadApiConfigAPI = async () => {
+  return apiRequest<LeadApiConfig>('/integrations/accounts/lead-api-config/');
+};
+
+export const createLeadApiKeyAPI = async (name: string) => {
+  return apiRequest<LeadApiKeySummary & { api_key: string }>(
+    '/integrations/accounts/lead-api-keys/',
+    { method: 'POST', body: JSON.stringify({ name }) }
+  );
+};
+
+export const rotateLeadApiKeyAPI = async (keyId: number) => {
+  return apiRequest<LeadApiKeySummary & { api_key: string }>(
+    `/integrations/accounts/lead-api-keys/${keyId}/rotate/`,
+    { method: 'POST' }
+  );
+};
+
+export const revokeLeadApiKeyAPI = async (keyId: number) => {
+  return apiRequest<{ message?: string }>(
+    `/integrations/accounts/lead-api-keys/${keyId}/`,
+    { method: 'DELETE' }
+  );
+};
+
 // ==================== Activities/Tasks APIs ====================
 
 /**

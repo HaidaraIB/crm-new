@@ -100,7 +100,7 @@ export const LeadStatusDropdown = ({
     isUpdating = false,
     size = 'md',
 }: LeadStatusDropdownProps) => {
-    const { theme } = useAppContext();
+    const { theme, t } = useAppContext();
     const [isOpen, setIsOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, minWidth: 0 });
     const rootRef = useRef<HTMLDivElement>(null);
@@ -108,9 +108,13 @@ export const LeadStatusDropdown = ({
     const menuRef = useRef<HTMLDivElement>(null);
 
     const s = sizeClasses[size];
-    const statusName = currentStatus?.name || '—';
+    const statusName = currentStatus?.name || (t('selectStatus') as string) || 'Select status';
     const statusColor = currentStatus?.color || DEFAULT_STATUS_COLOR;
-    const surface = getStatusSurfaceStyles(statusColor, theme);
+    const surface = currentStatus
+        ? getStatusSurfaceStyles(statusColor, theme)
+        : theme === 'light'
+          ? { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', color: '#64748b' }
+          : { backgroundColor: 'rgba(30,41,59,0.6)', borderColor: '#475569', color: '#94a3b8' };
 
     useEffect(() => {
         if (!isOpen || !triggerRef.current) return;
@@ -157,7 +161,7 @@ export const LeadStatusDropdown = ({
         };
     }, [isOpen]);
 
-    if (!currentStatus || availableStatuses.length === 0) {
+    if (availableStatuses.length === 0) {
         return (
             <LeadStatusBadge
                 name={currentStatus?.name || '—'}

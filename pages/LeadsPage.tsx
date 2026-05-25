@@ -909,33 +909,41 @@ export const LeadsPage = () => {
                                                     </div>
                                                     )}
                                                 </td>
-                                                <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-center">
+                                                <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-center whitespace-nowrap">
                                                     {(() => {
                                                         const source = (lead as any).source || 'manual';
+                                                        const sourceBadgeClass =
+                                                            'inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap';
                                                         if (source === 'meta_lead_form') {
                                                             return (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                                <span className={`${sourceBadgeClass} bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200`}>
                                                                     <FacebookIcon className="w-3 h-3" />
                                                                     {t('metaLeadForm') || 'Meta'}
                                                                 </span>
                                                             );
                                                         } else if (source === 'whatsapp') {
                                                             return (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                                <span className={`${sourceBadgeClass} bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200`}>
                                                                     <WhatsappIcon className="w-3 h-3" />
                                                                     {t('whatsappSource') || 'WhatsApp'}
                                                                 </span>
                                                             );
                                                         } else if (source === 'tiktok') {
                                                             return (
-                                                                <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                                <span className={`${sourceBadgeClass} bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200`}>
                                                                     <TikTokIcon className="w-3 h-3 text-gray-900 dark:text-white" />
                                                                     {t('tiktokSource') || 'TikTok'}
                                                                 </span>
                                                             );
+                                                        } else if (source === 'api') {
+                                                            return (
+                                                                <span className={`${sourceBadgeClass} bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200`}>
+                                                                    {t('leadApiSource') || 'Custom API'}
+                                                                </span>
+                                                            );
                                                         }
                                                         return (
-                                                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                            <span className={`${sourceBadgeClass} bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200`}>
                                                                 {t('manualSource') || 'Manual'}
                                                             </span>
                                                         );

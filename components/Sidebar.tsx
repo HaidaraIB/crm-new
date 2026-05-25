@@ -107,6 +107,7 @@ export const Sidebar = () => {
         const special: Partial<Record<PageType, keyof typeof translations.en>> = {
             AI: 'ai',
             Twilio: 'twilio',
+            'Lead API': 'leadApi',
         };
         return special[sub] ?? (toCamelCase(sub) as keyof typeof translations.en);
     };

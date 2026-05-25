@@ -77,6 +77,7 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
         case 'WhatsApp':
         case 'Twilio':
         case 'AI':
+        case 'Lead API':
             return <IntegrationsPage key={currentPage} />;
         case 'Billing':
             return <BillingPage />;
@@ -350,6 +351,8 @@ const TheApp = () => {
                 'twilio': 'Twilio',
                 'ai': 'AI',
                 'openai': 'AI',
+                'lead api': 'Lead API',
+                'lead-api': 'Lead API',
                 'billing': 'Billing',
                 'change plan': 'Change Plan',
                 'change-plan': 'Change Plan',
@@ -600,6 +603,8 @@ const TheApp = () => {
             'twilio': 'Twilio',
             'ai': 'AI',
             'openai': 'AI',
+            'lead api': 'Lead API',
+            'lead-api': 'Lead API',
             'billing': 'Billing',
             'change plan': 'Change Plan',
             'change-plan': 'Change Plan',

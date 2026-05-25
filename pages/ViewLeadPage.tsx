@@ -942,14 +942,14 @@ export const ViewLeadPage = () => {
                                     
                                     const isUpdating = updatingLeadId === displayLead.id;
 
-                                    if (!statusName || !currentStatusConfig) {
+                                    if (availableStatuses.length === 0) {
                                         return <LeadStatusBadge name="—" size="md" />;
                                     }
 
                                     return (
                                         <LeadStatusDropdown
                                             leadId={displayLead.id}
-                                            currentStatus={currentStatusConfig}
+                                            currentStatus={currentStatusConfig ?? null}
                                             availableStatuses={availableStatuses}
                                             onStatusChange={handleStatusChange}
                                             isUpdating={isUpdating}
@@ -1062,6 +1062,12 @@ export const ViewLeadPage = () => {
                                         return (
                                             <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                                                 {t('tiktokSource') || 'TikTok'}
+                                            </span>
+                                        );
+                                    } else if (source === 'api') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
+                                                {t('leadApiSource') || 'Custom API'}
                                             </span>
                                         );
                                     }

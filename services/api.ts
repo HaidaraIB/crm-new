@@ -3979,12 +3979,22 @@ export async function startTenantChatConversationAPI(withUserId: number) {
 
 export async function getTenantChatMessagesAPI(
   conversationId: number,
-  params?: { ordering?: 'created_at' | '-created_at'; page?: number; page_size?: number }
+  params?: {
+    ordering?: 'created_at' | '-created_at';
+    page?: number;
+    page_size?: number;
+    before_id?: number;
+    after_id?: number;
+    around_id?: number;
+  }
 ) {
   const search = new URLSearchParams();
   if (params?.ordering) search.set('ordering', params.ordering);
   if (params?.page != null) search.set('page', String(params.page));
   if (params?.page_size != null) search.set('page_size', String(params.page_size));
+  if (params?.before_id != null) search.set('before_id', String(params.before_id));
+  if (params?.after_id != null) search.set('after_id', String(params.after_id));
+  if (params?.around_id != null) search.set('around_id', String(params.around_id));
   const q = search.toString();
   return apiRequest<{ count: number; next: string | null; previous: string | null; results: TenantChatMessage[] }>(
     `/tenant-chat/conversations/${conversationId}/messages/${q ? `?${q}` : ''}`

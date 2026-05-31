@@ -12,7 +12,10 @@ import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI } from '../services/api';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
-import { parseLeadCoordinate } from '../utils/leadLocation';
+import {
+    clientLocationEventTranslationKey,
+    parseLeadCoordinate,
+} from '../utils/leadLocation';
 import { BriefcaseIcon, MapPinIcon } from '../components/icons';
 import { Lead } from '../types';
 import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
@@ -571,6 +574,10 @@ export const ViewLeadPage = () => {
                     }
                 }
             }
+            else if (ce.event_type === 'location_update') {
+                actionText = t(clientLocationEventTranslationKey(ce.notes));
+                translatedDetails = '';
+            }
             else if (ce.event_type === 'edit') {
                 actionText = t('leadEdited') || 'Lead edited';
                 // For edit events, use the notes if available, otherwise create a generic description
@@ -595,15 +602,21 @@ export const ViewLeadPage = () => {
 
             return {
                 id: `event-${ce.id}`,
-                type: 'event',
+                type: ce.event_type === 'location_update' ? 'location_update' as const : 'event',
                 user: user?.name || ce.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
                 action: actionText,
-                details: translatedDetails || ce.notes || '',
+                details: ce.event_type === 'location_update'
+                    ? ''
+                    : (translatedDetails || ce.notes || ''),
                 date: formatDateToLocal(ce.created_at),
                 timestamp: new Date(ce.created_at).getTime(),
-                oldValue: formatValue(ce.old_value),
-                newValue: formatValue(ce.new_value),
+                oldValue: ce.event_type === 'location_update'
+                    ? (ce.old_value || undefined)
+                    : formatValue(ce.old_value),
+                newValue: ce.event_type === 'location_update'
+                    ? (ce.new_value || undefined)
+                    : formatValue(ce.new_value),
                 color: eventColor,
             };
         });

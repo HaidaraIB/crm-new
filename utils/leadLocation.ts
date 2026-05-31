@@ -25,3 +25,42 @@ export function parseLeadCoordinate(
   const n = Number(value);
   return Number.isNaN(n) ? null : n;
 }
+
+export type ClientLocationEventTranslationKey =
+  | 'leadLocationCleared'
+  | 'leadLocationSet'
+  | 'leadLocationUpdated';
+
+/** Map API ClientEvent.notes keys to frontend i18n keys. */
+export function clientLocationEventTranslationKey(
+  notes?: string | null
+): ClientLocationEventTranslationKey {
+  switch (notes) {
+    case 'lead_location_cleared':
+      return 'leadLocationCleared';
+    case 'lead_location_set':
+      return 'leadLocationSet';
+    default:
+      return 'leadLocationUpdated';
+  }
+}
+
+export function formatClientLocationPair(value?: string | null): string | null {
+  if (!value?.trim()) return null;
+  const parts = value.split(',');
+  if (parts.length !== 2) return null;
+  const lat = Number.parseFloat(parts[0]);
+  const lng = Number.parseFloat(parts[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+}
+
+export function clientLocationMapsUrl(value?: string | null): string | null {
+  if (!value?.trim()) return null;
+  const parts = value.split(',');
+  if (parts.length !== 2) return null;
+  const lat = Number.parseFloat(parts[0]);
+  const lng = Number.parseFloat(parts[1]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+  return `https://www.google.com/maps?q=${lat},${lng}`;
+}

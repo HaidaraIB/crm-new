@@ -1,6 +1,11 @@
 import React, { useState } from 'react';
 import { TimelineEntry as TimelineEntryType } from '../types';
 import { ClockIcon, PhoneIcon, MapPinIcon } from './icons';
+import { useAppContext } from '../context/AppContext';
+import {
+    clientLocationMapsUrl,
+    formatClientLocationPair,
+} from '../utils/leadLocation';
 
 type TimelineProps = {
     history: TimelineEntryType[];
@@ -49,6 +54,8 @@ const Avatar = ({ src, alt, className }: { src: string; alt: string; className?:
 };
 
 export const Timeline = ({ history }: TimelineProps) => {
+    const { t } = useAppContext();
+
     return (
         <div className="space-y-8">
             {history.map(entry => (
@@ -84,6 +91,11 @@ export const Timeline = ({ history }: TimelineProps) => {
                                         >
                                             {entry.action}
                                         </span>
+                                    ) : entry.type === 'location_update' ? (
+                                        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200">
+                                            <MapPinIcon className="w-3 h-3 flex-shrink-0" />
+                                            {entry.action}
+                                        </span>
                                     ) : entry.type === 'sms' ? (
                                         <span 
                                             className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200"
@@ -116,6 +128,53 @@ export const Timeline = ({ history }: TimelineProps) => {
                                         {entry.newValue && (
                                             <span className="font-medium text-primary-600 dark:text-primary-400">{entry.newValue}</span>
                                         )}
+                                    </div>
+                                )}
+                                {entry.type === 'location_update' && (
+                                    <div className="mt-2 inline-flex flex-col gap-2 px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-900/20 text-sm">
+                                        {entry.newValue ? (
+                                            <>
+                                                {entry.oldValue ? (
+                                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-gray-600 dark:text-gray-300">
+                                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                                            {t('from')}
+                                                        </span>
+                                                        <span className="font-mono text-xs text-gray-500 dark:text-gray-400" dir="ltr">
+                                                            {formatClientLocationPair(entry.oldValue)}
+                                                        </span>
+                                                        <svg className="w-3 h-3 text-gray-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                                                        </svg>
+                                                        <span className="text-xs text-emerald-700 dark:text-emerald-300">
+                                                            {t('to')}
+                                                        </span>
+                                                        <span className="font-mono text-xs font-medium text-emerald-700 dark:text-emerald-300" dir="ltr">
+                                                            {formatClientLocationPair(entry.newValue)}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="font-mono text-xs font-medium text-emerald-700 dark:text-emerald-300" dir="ltr">
+                                                        {formatClientLocationPair(entry.newValue)}
+                                                    </span>
+                                                )}
+                                                <a
+                                                    href={clientLocationMapsUrl(entry.newValue) || '#'}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-xs font-medium text-emerald-700 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+                                                >
+                                                    <MapPinIcon className="w-3.5 h-3.5 flex-shrink-0" />
+                                                    {t('openInMaps')}
+                                                </a>
+                                            </>
+                                        ) : entry.oldValue ? (
+                                            <div className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                                <span>{t('previous')}:</span>
+                                                <span className="font-mono" dir="ltr">
+                                                    {formatClientLocationPair(entry.oldValue)}
+                                                </span>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 )}
                                 {entry.details && (

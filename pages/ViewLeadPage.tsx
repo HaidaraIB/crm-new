@@ -576,6 +576,18 @@ export const ViewLeadPage = () => {
                 // For edit events, use the notes if available, otherwise create a generic description
                 translatedDetails = ce.notes || '';
             }
+            else if (ce.event_type === 're_assignment') {
+                actionText = t('leadReAssigned') || 'Lead re-assigned';
+                const oldVal = formatUserValue(ce.old_value);
+                const newVal = formatUserValue(ce.new_value);
+                const hoursMatch = ce.notes?.match(/(\d+)\s*ساعة/);
+                const hours = hoursMatch?.[1] || String(currentUser?.company?.re_assign_hours ?? 24);
+                translatedDetails =
+                    (t('autoReassignedFromTo') || 'Automatically reassigned from {from} to {to} after {hours} hours with no contact from the assigned employee')
+                        .replace('{from}', oldVal)
+                        .replace('{to}', newVal)
+                        .replace('{hours}', hours);
+            }
             else {
                 actionText = ce.event_type;
                 translatedDetails = ce.notes || '';

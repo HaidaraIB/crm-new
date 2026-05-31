@@ -324,6 +324,7 @@ export const translations = {
     add_action: "Add Action",
     statusUpdated: "Status updated",
     leadAssigned: "Lead assigned",
+    leadReAssigned: "Lead re-assigned",
     leadEdited: "Lead edited",
     importLeads: "Import from Excel",
     importLeadsDescription: "Upload an Excel file (.xlsx) with columns: Name and Phone. Optional: Budget, Type (fresh/cold), Priority (low/medium/high). The first row should be headers.",
@@ -1347,6 +1348,8 @@ export const translations = {
     bulkAssignedTo: "Bulk assigned to",
     was: "was",
     assignedToAction: "Assigned to",
+    autoReassignedFromTo:
+      "Automatically reassigned from {from} to {to} after {hours} hours with no contact from the assigned employee",
     // AssignLeadModal
     selectEmployee: "Select Employee",
     // FilterDrawer
@@ -2265,6 +2268,7 @@ export const translations = {
     add_action: "إضافة إجراء",
     statusUpdated: "تم تحديث الحالة",
     leadAssigned: "تم إسناد العميل",
+    leadReAssigned: "تم إعادة إسناد العميل",
     leadEdited: "تم تعديل العميل",
     importLeads: "استيراد من Excel",
     importLeadsDescription: "ارفع ملف Excel (.xlsx) يحتوي على أعمدة: الاسم والهاتف. اختياري: الميزانية، النوع (fresh/cold)، الأولوية (low/medium/high). الصف الأول يجب أن يكون العناوين.",
@@ -3255,6 +3259,8 @@ export const translations = {
     bulkAssignedTo: "تم الإسناد الجماعي إلى",
     was: "كان",
     assignedToAction: "تم الإسناد إلى",
+    autoReassignedFromTo:
+      "تم إعادة التعيين تلقائياً من {from} إلى {to} بعد {hours} ساعة من عدم تواصل الموظف المسند",
     // AssignLeadModal
     selectEmployee: "اختر موظف",
     // FilterDrawer

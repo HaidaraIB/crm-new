@@ -1983,11 +1983,11 @@ export const IntegrationsPage = () => {
                     </div>
                 }
                 actions={
-                    !isEmployee && (
+                    !isEmployee && effectiveTab === 'accounts' ? (
                         <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect}>
                             <PlusIcon className="w-4 h-4 me-2" /> {t('addNewAccount')}
                         </Button>
-                    )
+                    ) : undefined
                 }
             >
                 {renderPolicyBanner()}

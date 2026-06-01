@@ -24,8 +24,6 @@ const getPlatformName = (currentPage: Page): string => {
         case 'Integrations':
         case 'Meta':
             return 'Meta';
-        case 'TikTok':
-            return 'TikTok';
         case 'WhatsApp':
         case 'Messaging Center':
             return 'WhatsApp';
@@ -43,15 +41,13 @@ const getIntegrationPlatformApiParam = (currentPage: Page): string | undefined =
         case 'WhatsApp':
         case 'Messaging Center':
             return 'whatsapp';
-        case 'TikTok':
-            return 'tiktok';
         default:
             return undefined;
     }
 };
 
 const getIntegrationModalTitleKey = (platformName: string, isEditMode: boolean): string => {
-    const base = platformName === 'Meta' ? 'Meta' : platformName === 'TikTok' ? 'TikTok' : 'WhatsApp';
+    const base = platformName === 'Meta' ? 'Meta' : 'WhatsApp';
     return isEditMode ? `edit${base}Account` : `addNew${base}Account`;
 }
 
@@ -65,12 +61,9 @@ export const ManageIntegrationAccountModal = () => {
         setEditingAccount,
         setIsSuccessModalOpen,
         setSuccessMessage,
-        setPendingConnectAccountId,
     } = useAppContext();
 
     const [accountName, setAccountName] = useState('');
-    const [accountLink, setAccountLink] = useState('');
-    const [phoneNumber, setPhoneNumber] = useState('');
 
     // React Query mutations
     const createAccountMutation = useCreateConnectedAccount();
@@ -97,13 +90,8 @@ export const ManageIntegrationAccountModal = () => {
     useEffect(() => {
         if (editingAccount) {
             setAccountName(editingAccount.name || '');
-            setAccountLink(editingAccount.link || '');
-            setPhoneNumber(editingAccount.phone || '');
         } else {
-            // Reset form for "add" mode
             setAccountName('');
-            setAccountLink('');
-            setPhoneNumber('');
         }
     }, [editingAccount, isManageIntegrationAccountModalOpen]);
 
@@ -124,45 +112,21 @@ export const ManageIntegrationAccountModal = () => {
         try {
             if (isEditMode && editingAccount) {
                 // تحديث حساب موجود
-                const updateData: any = {
-                    name: accountName,
-                };
-                
-                if (platformName === 'WhatsApp') {
-                    updateData.phone_number = phoneNumber;
-                } else {
-                    updateData.account_link = accountLink;
-                }
-                
                 await updateAccountMutation.mutateAsync({
                     id: editingAccount.id,
-                    data: updateData
+                    data: { name: accountName },
                 });
             } else {
                 // إنشاء حساب جديد
-                const createData: any = {
+                await createAccountMutation.mutateAsync({
                     platform: platformName.toLowerCase() === 'meta' ? 'meta' : platformName.toLowerCase(),
                     name: accountName,
-                };
-                
-                if (platformName === 'WhatsApp') {
-                    createData.phone_number = phoneNumber;
-                } else {
-                    createData.account_link = accountLink;
-                }
-                
-                const created = await createAccountMutation.mutateAsync(createData);
-                // Meta و WhatsApp: فتح نافذة الربط (OAuth) تلقائياً بعد إنشاء الحساب
-                if ((platformName === 'WhatsApp' || platformName === 'Meta') && created?.id) {
-                    setPendingConnectAccountId(created.id);
-                }
+                });
             }
 
             // Reset form
             setAccountName('');
-            setAccountLink('');
-            setPhoneNumber('');
-            
+
             // Close modal and show success message
             handleClose();
             setSuccessMessage(isEditMode ? t('accountUpdatedSuccessfully') : t('accountCreatedSuccessfully'));
@@ -176,31 +140,20 @@ export const ManageIntegrationAccountModal = () => {
     const renderPlatformFields = () => {
         switch (platformName) {
             case 'Meta':
-            case 'TikTok':
+                if (!isEditMode) return null;
                 return (
-                    <>
-                        <div>
-                            <Label htmlFor="account-name">{t('accountName')}</Label>
-                            <Input id="account-name" placeholder={t('enterAccountName')} value={accountName} onChange={e => setAccountName(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
-                        </div>
-                        <div>
-                            <Label htmlFor="account-link">{t('accountLink')}</Label>
-                            <Input id="account-link" placeholder={t('enterAccountLink')} value={accountLink} onChange={e => setAccountLink(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
-                        </div>
-                    </>
+                    <div>
+                        <Label htmlFor="account-name">{t('accountName')}</Label>
+                        <Input id="account-name" placeholder={t('enterAccountName')} value={accountName} onChange={e => setAccountName(e.target.value)} />
+                    </div>
                 );
             case 'WhatsApp':
-                 return (
-                    <>
-                        <div>
-                            <Label htmlFor="account-name">{t('accountName')}</Label>
-                            <Input id="account-name" placeholder={t('egSalesWhatsapp')} value={accountName} onChange={e => setAccountName(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
-                        </div>
-                        <div>
-                            <Label htmlFor="phone-number">{t('phoneNumber')}</Label>
-                            <Input id="phone-number" placeholder={t('enterWhatsappNumber')} value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} disabled={cannotAddSecond || blockAddWhileLoading} />
-                        </div>
-                    </>
+                if (!isEditMode) return null;
+                return (
+                    <div>
+                        <Label htmlFor="account-name">{t('accountName')}</Label>
+                        <Input id="account-name" placeholder={t('egSalesWhatsapp')} value={accountName} onChange={e => setAccountName(e.target.value)} />
+                    </div>
                 );
             default:
                 return null;

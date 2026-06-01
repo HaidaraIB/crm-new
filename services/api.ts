@@ -2525,13 +2525,11 @@ export const getConnectedAccountAPI = async (accountId: number) => {
 /**
  * إنشاء حساب تكامل جديد
  * POST /api/integrations/accounts/
- * Body: { platform: 'meta' | 'tiktok' | 'whatsapp', name: string, account_link?: string, phone_number?: string }
+ * Body: { platform: 'meta' | 'whatsapp', name: string }
  */
 export const createConnectedAccountAPI = async (accountData: {
   platform: string;
   name: string;
-  account_link?: string;
-  phone_number?: string;
 }) => {
   return apiRequest<any>('/integrations/accounts/', {
     method: 'POST',
@@ -2542,12 +2540,10 @@ export const createConnectedAccountAPI = async (accountData: {
 /**
  * تحديث حساب تكامل
  * PUT /api/integrations/accounts/:id/
- * Body: { name?: string, account_link?: string, phone_number?: string, is_active?: boolean }
+ * Body: { name?: string, is_active?: boolean, pixel_id?: string, ... }
  */
 export const updateConnectedAccountAPI = async (accountId: number, accountData: {
   name?: string;
-  account_link?: string;
-  phone_number?: string;
   is_active?: boolean;
   pixel_id?: string;
   conversion_leads_enabled?: boolean;

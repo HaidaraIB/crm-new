@@ -13,7 +13,7 @@ import {
   type PbxSettingsResponse,
 } from '../../services/api';
 import { Button, Card, Input, Loader, PageWrapper } from '../index';
-import { EyeIcon, EyeOffIcon } from '../icons';
+import { EyeIcon, EyeOffIcon, TrashIcon } from '../icons';
 import { formatDateTimeToLocal } from '../../utils/dateUtils';
 
 type IntegrationPolicyEntry = { enabled: boolean; message: string; scope: string };
@@ -68,16 +68,24 @@ export function PbxSettingsForm({
   const [extUserId, setExtUserId] = useState('');
   const [extNumber, setExtNumber] = useState('');
   const [downloading, setDownloading] = useState(false);
+  const [addingExtension, setAddingExtension] = useState(false);
+  const [extensionBusyId, setExtensionBusyId] = useState<number | null>(null);
+  const [healthRefreshNotice, setHealthRefreshNotice] = useState<'success' | 'error' | null>(null);
   const queryClient = useQueryClient();
 
-  const { data: health, refetch: refetchHealth } = useQuery({
+  const {
+    data: health,
+    refetch: refetchHealth,
+    isFetching: healthFetching,
+    dataUpdatedAt: healthUpdatedAt,
+  } = useQuery({
     queryKey: ['pbxHealth'],
     queryFn: getPbxHealthAPI,
     refetchInterval: 15000,
     enabled: !pbxPolicyDisabled,
   });
 
-  const { data: extensions, refetch: refetchExtensions } = useQuery({
+  const { data: extensions, refetch: refetchExtensions, isFetching: extensionsFetching } = useQuery({
     queryKey: ['pbxExtensions'],
     queryFn: getPbxExtensionsAPI,
   });
@@ -141,15 +149,49 @@ export function PbxSettingsForm({
 
   const handleAddExtension = () => {
     if (!extUserId || !extNumber) return;
-    savePbxExtensionAPI({ user_id: parseInt(extUserId, 10), extension: extNumber })
+    setAddingExtension(true);
+    setError(null);
+    savePbxExtensionAPI({ user_id: parseInt(extUserId, 10), extension: extNumber.trim() })
       .then(() => {
         setExtUserId('');
         setExtNumber('');
         refetchExtensions();
         refetchHealth();
       })
-      .catch((e: any) => setError(e?.message || t('failedToSavePbxExtension')));
+      .catch((e: any) => setError(e?.message || t('failedToSavePbxExtension')))
+      .finally(() => setAddingExtension(false));
   };
+
+  const handleDeleteExtension = (id: number) => {
+    setExtensionBusyId(id);
+    setError(null);
+    deletePbxExtensionAPI(id)
+      .then(() => {
+        refetchExtensions();
+        refetchHealth();
+      })
+      .catch((e: any) => setError(e?.message || t('failedToSavePbxExtension')))
+      .finally(() => setExtensionBusyId(null));
+  };
+
+  const handleRefreshHealth = async () => {
+    setHealthRefreshNotice(null);
+    setError(null);
+    try {
+      await Promise.all([
+        refetchHealth(),
+        getPbxSettingsAPI().then(setSettings),
+        refetchExtensions(),
+      ]);
+      setHealthRefreshNotice('success');
+      window.setTimeout(() => setHealthRefreshNotice(null), 3500);
+    } catch {
+      setHealthRefreshNotice('error');
+      setError(t('failedToLoadPbxSettings'));
+    }
+  };
+
+  const healthRefreshing = healthFetching;
 
   const handleDownloadConnector = () => {
     setDownloading(true);
@@ -160,6 +202,8 @@ export function PbxSettingsForm({
   };
 
   const healthChecks = health?.checks;
+  const extensionList = Array.isArray(extensions) ? extensions : [];
+  const mappedUserIds = new Set(extensionList.map((row: { user_id?: number }) => row.user_id).filter(Boolean));
 
   if (loading) {
     return <div className="flex justify-center py-12"><Loader /></div>;
@@ -178,15 +222,17 @@ export function PbxSettingsForm({
 
       <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxConnection')}</h3>
-        <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
-          <input
-            type="checkbox"
-            checked={isEnabled}
-            onChange={(e) => setIsEnabled(e.target.checked)}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setIsEnabled(!isEnabled)}
             disabled={pbxPolicyDisabled}
-          />
-          <span>{t('enablePbxIntegration')}</span>
-        </label>
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${isEnabled ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300' : 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}
+          >
+            {isEnabled && <span className="w-2 h-2 rounded-full bg-green-500" />}
+            {t('enablePbxIntegration')}
+          </button>
+        </div>
 
         <div>
           <FieldLabel>{t('pbxHost')}</FieldLabel>
@@ -301,11 +347,6 @@ export function PbxSettingsForm({
         <Card className="p-6 space-y-4">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxSetupWizard')}</h3>
-            {health?.connector_package_version ? (
-              <span className="text-xs text-gray-500 dark:text-gray-400" dir="ltr">
-                {t('pbxConnectorVersion')}: v{health.connector_package_version}
-              </span>
-            ) : null}
           </div>
           <ul className="space-y-2">
             <CheckRow ok={healthChecks.integration_enabled} label={t('pbxCheckEnabled')} />
@@ -328,59 +369,148 @@ export function PbxSettingsForm({
                 ? formatDateTimeToLocal(health.last_event_at)
                 : t('pbxNever')}
             </p>
+            {healthUpdatedAt ? (
+              <p className="text-xs text-gray-500 dark:text-gray-500">
+                {t('pbxLastChecked')}: {formatDateTimeToLocal(new Date(healthUpdatedAt).toISOString())}
+              </p>
+            ) : null}
           </div>
-          <Button variant="secondary" onClick={() => refetchHealth()}>{t('refresh')}</Button>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="secondary"
+              onClick={() => void handleRefreshHealth()}
+              loading={healthRefreshing}
+              disabled={healthRefreshing}
+            >
+              {healthRefreshing ? t('pbxRefreshing') : t('refresh')}
+            </Button>
+            {healthRefreshNotice === 'success' ? (
+              <span className="text-sm text-green-600 dark:text-green-400 animate-pulse">
+                {t('pbxRefreshed')}
+              </span>
+            ) : null}
+            {healthRefreshNotice === 'error' ? (
+              <span className="text-sm text-red-600 dark:text-red-400">{t('failedToLoadPbxSettings')}</span>
+            ) : null}
+          </div>
         </Card>
       ) : null}
 
       <Card className="p-6 space-y-4">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxUserExtensions')}</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('pbxUserExtensionsHint')}</p>
-        </div>
-        <div className="flex flex-wrap gap-3 items-end">
-          <div className="min-w-[180px]">
-            <FieldLabel>{t('user')}</FieldLabel>
-            <select
-              value={extUserId}
-              onChange={(e) => setExtUserId(e.target.value)}
-              className={inputClass}
-            >
-              <option value="">{t('selectUser')}</option>
-              {(Array.isArray(users) ? users : []).map((u: any) => (
-                <option key={u.id} value={u.id}>{u.username || u.email}</option>
-              ))}
-            </select>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxUserExtensions')}</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('pbxUserExtensionsHint')}</p>
           </div>
-          <div className="min-w-[120px]">
-            <FieldLabel>{t('extension')}</FieldLabel>
-            <Input
-              value={extNumber}
-              onChange={(e) => setExtNumber(e.target.value)}
-              placeholder={t('extensionPlaceholder')}
-            />
-          </div>
-          <Button onClick={handleAddExtension}>{t('add')}</Button>
-        </div>
-        <ul className="divide-y dark:divide-gray-700">
-          {(extensions || []).map((row: any) => (
-            <li key={row.id} className="flex justify-between items-center py-2 text-sm">
-              <span className="text-gray-800 dark:text-gray-200">
-                {row.username} → {row.extension}
-              </span>
-              <button
-                type="button"
-                className="text-red-600 dark:text-red-400 hover:underline"
-                onClick={() => deletePbxExtensionAPI(row.id).then(() => refetchExtensions())}
-              >
-                {t('delete')}
-              </button>
-            </li>
-          ))}
-          {!extensions?.length ? (
-            <li className="py-4 text-sm text-center text-gray-500 dark:text-gray-400">{t('noExtensionsMapped')}</li>
+          {extensionList.length > 0 ? (
+            <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full">
+              {(t('extensionCount') as string).replace('{count}', String(extensionList.length))}
+            </span>
           ) : null}
-        </ul>
+        </div>
+
+        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/40 p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_minmax(7rem,9rem)_auto] gap-3 items-end">
+            <div>
+              <FieldLabel>{t('user')}</FieldLabel>
+              <select
+                value={extUserId}
+                onChange={(e) => setExtUserId(e.target.value)}
+                className={inputClass}
+                disabled={addingExtension}
+              >
+                <option value="">{t('selectUser')}</option>
+                {(Array.isArray(users) ? users : []).map((u: any) => (
+                  <option key={u.id} value={u.id} disabled={mappedUserIds.has(u.id)}>
+                    {u.username || u.email}
+                    {mappedUserIds.has(u.id) ? ` (${t('extension')})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <FieldLabel>{t('extension')}</FieldLabel>
+              <Input
+                value={extNumber}
+                onChange={(e) => setExtNumber(e.target.value)}
+                placeholder={t('extensionPlaceholder')}
+                disabled={addingExtension}
+              />
+            </div>
+            <Button
+              onClick={handleAddExtension}
+              disabled={!extUserId || !extNumber.trim() || addingExtension}
+              loading={addingExtension}
+              className="sm:mb-0 w-full sm:w-auto"
+            >
+              {addingExtension ? t('pbxAddingExtension') : t('add')}
+            </Button>
+          </div>
+        </div>
+
+        <div className="relative rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {extensionsFetching && !extensionList.length ? (
+            <div className="flex justify-center py-10">
+              <Loader />
+            </div>
+          ) : extensionList.length === 0 ? (
+            <div className="py-10 px-4 text-center text-sm text-gray-500 dark:text-gray-400">
+              {t('noExtensionsMapped')}
+            </div>
+          ) : (
+            <>
+              <div className="hidden sm:grid sm:grid-cols-3 sm:justify-items-center gap-4 px-4 py-2.5 bg-gray-100/90 dark:bg-gray-800/90 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 text-center">
+                <span className="w-full">{t('user')}</span>
+                <span className="w-full">{t('extension')}</span>
+                <span className="w-full">{t('pbxExtensionActions')}</span>
+              </div>
+              <ul className={`divide-y divide-gray-200 dark:divide-gray-700 ${extensionsFetching ? 'opacity-60 pointer-events-none' : ''}`}>
+                {extensionList.map((row: any) => (
+                  <li
+                    key={row.id}
+                    className="grid grid-cols-1 sm:grid-cols-3 sm:justify-items-center gap-3 sm:gap-4 sm:items-center px-4 py-3 hover:bg-gray-50/80 dark:hover:bg-gray-800/50 transition-colors text-center"
+                  >
+                    <div className="flex w-full flex-col items-center justify-center min-w-0">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden mb-1">{t('user')}</p>
+                      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-full">
+                        {row.username || '—'}
+                      </p>
+                    </div>
+                    <div className="flex w-full flex-col items-center justify-center">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden mb-1">{t('extension')}</p>
+                      <span
+                        className="inline-flex items-center justify-center font-mono text-sm font-semibold text-primary-700 dark:text-primary-300 bg-primary/10 dark:bg-primary/20 px-2.5 py-1 rounded-md"
+                        dir="ltr"
+                      >
+                        {row.extension}
+                      </span>
+                    </div>
+                    <div className="flex w-full flex-col items-center justify-center">
+                      <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden mb-1">{t('pbxExtensionActions')}</p>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="!px-2 !py-1.5 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                        onClick={() => handleDeleteExtension(row.id)}
+                        loading={extensionBusyId === row.id}
+                        disabled={extensionBusyId !== null}
+                        title={t('pbxRemoveExtension')}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                        <span className="sm:hidden ms-1">{t('delete')}</span>
+                      </Button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {extensionsFetching && extensionList.length > 0 ? (
+            <div className="absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-gray-900/40">
+              <Loader size="sm" />
+            </div>
+          ) : null}
+        </div>
       </Card>
     </div>
   );

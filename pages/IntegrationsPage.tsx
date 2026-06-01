@@ -11,7 +11,7 @@ import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getCon
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
-import { useConnectedAccounts, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
+import { useConnectedAccounts, useCreateConnectedAccount, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
@@ -25,7 +25,7 @@ import { leadApiDocT } from '../constants/leadApiDocumentation';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole } from '../utils/roles';
 
-type Account = { id: number; name: string; status: string; link?: string; platform?: string; };
+type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown> };
 
 type PlatformDetails = {
     name: string;
@@ -38,7 +38,6 @@ const templateCategoryKey: Record<string, string> = { auth: 'categoryAuth', mark
 
 const platformConfig: Record<string, { name: string; dataKey: keyof ReturnType<typeof useAppContext>['connectedAccounts'] }> = {
     Meta: { name: 'Meta', dataKey: 'facebook' },
-    TikTok: { name: 'TikTok', dataKey: 'tiktok' },
     WhatsApp: { name: 'WhatsApp', dataKey: 'whatsapp' },
 };
 
@@ -722,9 +721,6 @@ export const IntegrationsPage = () => {
             case 'Meta':
                 platformKey = 'Meta';
                 break;
-            case 'TikTok':
-                platformKey = 'TikTok';
-                break;
             case 'WhatsApp':
             case 'Messaging Center':
                 platformKey = 'WhatsApp';
@@ -735,7 +731,10 @@ export const IntegrationsPage = () => {
         return platformConfig[platformKey]?.dataKey || null;
     }, [currentPage]);
 
-    const { data: accountsResponse, isLoading: loading } = useConnectedAccounts(platformParam);
+    const accountsQueryEnabled = platformParam === 'meta' || platformParam === 'whatsapp';
+    const { data: accountsResponse, isLoading: loading } = useConnectedAccounts(platformParam, {
+        enabled: accountsQueryEnabled,
+    });
     const { data: leadgenConfig, isLoading: leadgenLoading } = useQuery({
         queryKey: ['tiktokLeadgenConfig'],
         queryFn: getTikTokLeadgenConfigAPI,
@@ -887,8 +886,6 @@ export const IntegrationsPage = () => {
             id: acc.id,
             name: acc.name,
             status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
-            link: acc.account_link,
-            phone: acc.phone_number,
             platform: acc.platform,
             metadata: acc.metadata,
         }));
@@ -1335,6 +1332,95 @@ export const IntegrationsPage = () => {
             </PageWrapper>
         );
     }
+
+    // TikTok = Lead Gen webhook only (no user-managed integration accounts).
+    if (currentPage === 'TikTok') {
+        const webhookUrl = leadgenConfig?.webhook_url || '';
+        const statusRaw = String(leadgenConfig?.integration_status || 'disconnected');
+        const isConnected = statusRaw === 'connected';
+        const lastReceivedAt = leadgenConfig?.last_received_at
+            ? new Date(leadgenConfig.last_received_at).toLocaleString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))
+            : null;
+        const setupSteps = [
+            { step: 1, text: t('tiktokStep1') || 'Copy the Webhook URL below (it is unique to your company).' },
+            { step: 2, text: t('tiktokStep2') || 'In TikTok Ads Manager go to Leads Center → CRM integration → TikTok Custom API with Webhooks.' },
+            { step: 3, text: t('tiktokStep3') || 'Paste the Webhook URL and save. Enable the integration if required.' },
+            { step: 4, text: t('tiktokStep4') || 'Create a Lead Gen campaign with an Instant Form. New leads will appear as clients here automatically.' },
+        ];
+        return (
+            <PageWrapper title={`${t('tikTok')} ${t('integration')}`}>
+                {renderPolicyBanner()}
+                <Card>
+                    <div className="max-w-2xl space-y-6">
+                        <div className="flex items-center gap-3">
+                            <IntegrationPlatformIcon platform="tiktok" size="lg" variant="inline" />
+                            <div>
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    {t('tiktokLeadGen') || 'TikTok Lead Gen'}
+                                </h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {t('tiktokLeadGenDescription') || 'Receive leads from TikTok Instant Forms instantly in your CRM. Follow the steps below to connect TikTok Ads Manager.'}
+                                </p>
+                                <div className="mt-2 flex items-center gap-2">
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                            isConnected
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                        }`}
+                                    >
+                                        {isConnected ? (t('tiktokStatusConnected') || 'Connected') : (t('tiktokStatusPending') || 'Pending setup')}
+                                    </span>
+                                    {lastReceivedAt && (
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {(t('tiktokLastLeadReceivedAt') || 'Last lead received:')} {lastReceivedAt}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {leadgenLoading ? (
+                            <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        {t('webhookUrl') || 'Webhook URL'}
+                                    </label>
+                                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                                        {t('tiktokWebhookUrlHint') || 'Use this exact URL in TikTok Ads Manager. Do not edit company_id or signature.'}
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            readOnly
+                                            value={webhookUrl}
+                                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm font-mono"
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => { if (webhookUrl) navigator.clipboard.writeText(webhookUrl); showAlert(t('copied') || 'Copied', 'info'); }}
+                                        >
+                                            {t('copy') || 'Copy'}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                                        {t('tiktokSetupSteps') || 'How to integrate TikTok with your CRM'}
+                                    </h3>
+                                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                                        {setupSteps.map(({ step, text }) => (
+                                            <li key={step}>{text}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </Card>
+            </PageWrapper>
+        );
+    }
     
     if (!platform || !dataKey) {
         return <PageWrapper title={t('integrations')}><div>{t('unknownIntegration')}</div></PageWrapper>;
@@ -1346,8 +1432,10 @@ export const IntegrationsPage = () => {
 
     // Handlers for Connect / Edit / Disconnect (must be defined before any early return so WhatsApp "accounts" tab can use them)
     const deleteAccountMutation = useDeleteConnectedAccount();
+    const createAccountMutation = useCreateConnectedAccount();
     const testConnectionMutation = useTestConnection();
     const queryClient = useQueryClient();
+    const [isStartingConnect, setIsStartingConnect] = useState(false);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -1596,103 +1684,31 @@ export const IntegrationsPage = () => {
         setIsManageIntegrationAccountModalOpen(true);
     };
 
-    const handleAddNew = () => {
+    const handleAddNew = async () => {
         if (accounts.length > 0) {
             showAlert(t('oneIntegrationAccountPerPlatformHint'), 'info');
+            return;
+        }
+        if (platformParam === 'meta' || platformParam === 'whatsapp') {
+            setIsStartingConnect(true);
+            try {
+                const created = await createAccountMutation.mutateAsync({
+                    platform: platformParam,
+                    name: platformParam === 'meta' ? 'Meta' : 'WhatsApp',
+                });
+                if (created?.id) {
+                    setPendingConnectAccountId(created.id);
+                }
+            } catch (error: any) {
+                showAlert(error?.message || t('errorSavingAccount'), 'error');
+            } finally {
+                setIsStartingConnect(false);
+            }
             return;
         }
         setEditingAccount(null);
         setIsManageIntegrationAccountModalOpen(true);
     };
-
-    // TikTok = Lead Gen only (like Meta lead forms). Show webhook URL and setup steps for subscribers.
-    if (currentPage === 'TikTok') {
-        const webhookUrl = leadgenConfig?.webhook_url || '';
-        const statusRaw = String(leadgenConfig?.integration_status || 'disconnected');
-        const isConnected = statusRaw === 'connected';
-        const lastReceivedAt = leadgenConfig?.last_received_at
-            ? new Date(leadgenConfig.last_received_at).toLocaleString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))
-            : null;
-        const setupSteps = [
-            { step: 1, text: t('tiktokStep1') || 'Copy the Webhook URL below (it is unique to your company).' },
-            { step: 2, text: t('tiktokStep2') || 'In TikTok Ads Manager go to Leads Center → CRM integration → TikTok Custom API with Webhooks.' },
-            { step: 3, text: t('tiktokStep3') || 'Paste the Webhook URL and save. Enable the integration if required.' },
-            { step: 4, text: t('tiktokStep4') || 'Create a Lead Gen campaign with an Instant Form. New leads will appear as clients here automatically.' },
-        ];
-        return (
-            <PageWrapper title={pageTitle}>
-                {renderPolicyBanner()}
-                <Card>
-                    <div className="max-w-2xl space-y-6">
-                        <div className="flex items-center gap-3">
-                            <IntegrationPlatformIcon platform="tiktok" size="lg" variant="inline" />
-                            <div>
-                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                    {t('tiktokLeadGen') || 'TikTok Lead Gen'}
-                                </h2>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">
-                                    {t('tiktokLeadGenDescription') || 'Receive leads from TikTok Instant Forms instantly in your CRM. Follow the steps below to connect TikTok Ads Manager.'}
-                                </p>
-                                <div className="mt-2 flex items-center gap-2">
-                                    <span
-                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                            isConnected
-                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
-                                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
-                                        }`}
-                                    >
-                                        {isConnected ? (t('tiktokStatusConnected') || 'Connected') : (t('tiktokStatusPending') || 'Pending setup')}
-                                    </span>
-                                    {lastReceivedAt && (
-                                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                                            {(t('tiktokLastLeadReceivedAt') || 'Last lead received:')} {lastReceivedAt}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                        {leadgenLoading ? (
-                            <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
-                        ) : (
-                            <>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        {t('webhookUrl') || 'Webhook URL'}
-                                    </label>
-                                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
-                                        {t('tiktokWebhookUrlHint') || 'Use this exact URL in TikTok Ads Manager. Do not edit company_id or signature.'}
-                                    </p>
-                                    <div className="flex gap-2">
-                                        <input
-                                            readOnly
-                                            value={webhookUrl}
-                                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm font-mono"
-                                        />
-                                        <Button
-                                            variant="secondary"
-                                            onClick={() => { if (webhookUrl) navigator.clipboard.writeText(webhookUrl); showAlert(t('copied') || 'Copied', 'info'); }}
-                                        >
-                                            {t('copy') || 'Copy'}
-                                        </Button>
-                                    </div>
-                                </div>
-                                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50">
-                                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                                        {t('tiktokSetupSteps') || 'How to integrate TikTok with your CRM'}
-                                    </h3>
-                                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
-                                        {setupSteps.map(({ step, text }) => (
-                                            <li key={step}>{text}</li>
-                                        ))}
-                                    </ol>
-                                </div>
-                            </>
-                        )}
-                    </div>
-                </Card>
-            </PageWrapper>
-        );
-    }
 
     // WhatsApp (Integrations) or Messaging Center (Marketing): Chats | Template Management (WhatsApp only) | Message Campaign | Accounts (WhatsApp only)
     const isMessagingCenterPage = currentPage === 'Messaging Center';
@@ -1968,7 +1984,7 @@ export const IntegrationsPage = () => {
                 }
                 actions={
                     !isEmployee && (
-                        <Button onClick={handleAddNew}>
+                        <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect}>
                             <PlusIcon className="w-4 h-4 me-2" /> {t('addNewAccount')}
                         </Button>
                     )
@@ -2568,7 +2584,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                 <IntegrationPlatformIcon platform="whatsapp" size="xl" variant="muted" className="mx-auto mb-4" />
                                 <h3 className="text-lg font-semibold">{t('noAccountsConnected')}</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mt-1">{t('connectAccountPrompt')}</p>
-                                <p className="text-gray-400 dark:text-gray-500 mt-2 text-sm">{t('addAccountThenConnectHint')}</p>
+                                <p className="text-gray-400 dark:text-gray-500 mt-2 text-sm">{t('whatsappConnectOnAddHint')}</p>
                             </div>
                         )}
                     </Card>
@@ -2625,7 +2641,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
         <PageWrapper
             title={pageTitle}
             actions={
-                <Button onClick={handleAddNew}>
+                <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect}>
                     <PlusIcon className="w-4 h-4" /> {t('addNewAccount')}
                 </Button>
             }
@@ -2751,8 +2767,11 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                         )}
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('noAccountsConnected')}</h3>
                         <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-sm mx-auto">{t('connectAccountPrompt')}</p>
-                        {(platformParam === 'whatsapp' || platformParam === 'meta') && (
-                            <p className="text-gray-400 dark:text-gray-500 mt-3 text-sm">{t('addAccountThenConnectHint')}</p>
+                        {platformParam === 'meta' && (
+                            <p className="text-gray-400 dark:text-gray-500 mt-3 text-sm">{t('metaConnectOnAddHint')}</p>
+                        )}
+                        {platformParam === 'whatsapp' && (
+                            <p className="text-gray-400 dark:text-gray-500 mt-3 text-sm">{t('whatsappConnectOnAddHint')}</p>
                         )}
                     </div>
                 )}

@@ -72,7 +72,7 @@ const hexToHsl = (hex: string): [number, number, number] | null => {
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
 };
 
-type ConnectedAccount = { id: number; name: string; status: string; link?: string; phone?: string; };
+type ConnectedAccount = { id: number; name: string; status: string; link?: string; };
 
 // --- CONTEXT ---
 export interface AppContextType {
@@ -277,8 +277,8 @@ export interface AppContextType {
   // Integrations states
   isManageIntegrationAccountModalOpen: boolean;
   setIsManageIntegrationAccountModalOpen: (isOpen: boolean) => void;
-  connectedAccounts: { facebook: ConnectedAccount[]; tiktok: ConnectedAccount[]; whatsapp: ConnectedAccount[] };
-  setConnectedAccounts: React.Dispatch<React.SetStateAction<{ facebook: ConnectedAccount[]; tiktok: ConnectedAccount[]; whatsapp: ConnectedAccount[] }>>;
+  connectedAccounts: { facebook: ConnectedAccount[]; whatsapp: ConnectedAccount[] };
+  setConnectedAccounts: React.Dispatch<React.SetStateAction<{ facebook: ConnectedAccount[]; whatsapp: ConnectedAccount[] }>>;
   editingAccount: ConnectedAccount | null;
   setEditingAccount: React.Dispatch<React.SetStateAction<ConnectedAccount | null>>;
   /** بعد إنشاء حساب تكامل جديد (Meta/WhatsApp) يُضبط هنا لفتح نافذة الربط تلقائياً */
@@ -743,10 +743,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   } | null>(null);
   // TODO: استدعي getConnectedAccountsAPI() عند تحميل صفحة Integrations
   // مثال: getConnectedAccountsAPI('meta').then(data => setConnectedAccounts(prev => ({ ...prev, facebook: data })));
-  const [connectedAccounts, setConnectedAccounts] = useState<{ facebook: ConnectedAccount[]; tiktok: ConnectedAccount[]; whatsapp: ConnectedAccount[] }>({
+  const [connectedAccounts, setConnectedAccounts] = useState<{ facebook: ConnectedAccount[]; whatsapp: ConnectedAccount[] }>({
     facebook: [],
-    tiktok: [],
-    whatsapp: []
+    whatsapp: [],
   });
   const [editingAccount, setEditingAccount] = useState<ConnectedAccount | null>(null);
   const [pendingConnectAccountId, setPendingConnectAccountId] = useState<number | null>(null);

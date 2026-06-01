@@ -25,7 +25,7 @@ type NotificationsDialogProps = {
 };
 
 export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
-  const { t } = useAppContext();
+  const { t, setCurrentPage, setSelectedLead } = useAppContext();
   const queryClient = useQueryClient();
 
   const listQuery = useQuery({
@@ -139,6 +139,12 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                     disabled={markOne.isPending}
                     onClick={() => {
                       if (!n.read) markOne.mutate(n.id);
+                      const leadId = n.data?.lead_id ?? n.data?.client_id;
+                      if ((n.type === 'pbx_incoming_call' || n.type === 'pbx_call_missed') && leadId) {
+                        setSelectedLead({ id: Number(leadId) } as any);
+                        setCurrentPage('ViewLead');
+                        onClose();
+                      }
                     }}
                     className={`w-full rounded-xl border px-3 py-3 text-start transition-colors ${
                       n.read
@@ -149,7 +155,15 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                     <div className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold text-gray-900 dark:text-gray-100">{n.title}</span>
-                        {n.type_display ? (
+                        {n.type === 'pbx_incoming_call' ? (
+                          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {t('incomingCall')}
+                          </span>
+                        ) : n.type === 'pbx_call_missed' ? (
+                          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                            {t('pbxMissedCall')}
+                          </span>
+                        ) : n.type_display ? (
                           <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
                             {n.type_display}
                           </span>

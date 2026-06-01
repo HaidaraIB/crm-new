@@ -19,6 +19,7 @@ import { StartNewConversationModal } from '../components/modals/StartNewConversa
 import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components/icons';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole } from '../utils/roles';
 
@@ -699,10 +700,12 @@ export const IntegrationsPage = () => {
             return 'openai';
         } else if (currentPage === 'Lead API') {
             return 'api';
+        } else if (currentPage === 'PBX') {
+            return 'pbx';
         }
         return undefined;
     }, [currentPage]);
-    const needsIntegrationPolicy = !!platformParam || currentPage === 'Twilio' || currentPage === 'AI' || currentPage === 'Lead API';
+    const needsIntegrationPolicy = !!platformParam || currentPage === 'Twilio' || currentPage === 'AI' || currentPage === 'Lead API' || currentPage === 'PBX';
     const { data: integrationPolicyMap } = useQuery({
         queryKey: ['integrationPolicy'],
         queryFn: getIntegrationPolicyAPI,
@@ -957,6 +960,10 @@ export const IntegrationsPage = () => {
                 <TwilioSMSForm t={t} replaceTwilio={replaceTwilio} integrationPolicyMap={integrationPolicyMap} />
             </PageWrapper>
         );
+    }
+
+    if (currentPage === 'PBX') {
+        return <PbxSettingsPage t={t} integrationPolicyMap={integrationPolicyMap} />;
     }
 
     if (currentPage === 'AI') {

@@ -3018,6 +3018,183 @@ export const sendLeadSMSAPI = async (data: {
   });
 };
 
+// ==================== PBX / ZYCOO Integration ====================
+
+export interface PbxSettingsResponse {
+  id?: number;
+  provider?: string;
+  pbx_host?: string;
+  ami_port?: number;
+  ami_username?: string;
+  ami_password_masked?: string | null;
+  webhook_token?: string;
+  webhook_url?: string;
+  connector_api_key?: string;
+  connector_install_key?: string;
+  is_enabled?: boolean;
+  auto_log_calls?: boolean;
+  screen_pop_enabled?: boolean;
+  connector_last_seen_at?: string | null;
+  connector_online?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface PbxExtensionRow {
+  id: number;
+  user_id?: number;
+  username?: string;
+  extension: string;
+}
+
+export const getPbxSettingsAPI = async (): Promise<PbxSettingsResponse> => {
+  return apiRequest<PbxSettingsResponse>('/integrations/pbx/settings/');
+};
+
+export const updatePbxSettingsAPI = async (data: {
+  pbx_host?: string;
+  ami_port?: number;
+  ami_username?: string;
+  ami_password?: string;
+  is_enabled?: boolean;
+  auto_log_calls?: boolean;
+  screen_pop_enabled?: boolean;
+}): Promise<PbxSettingsResponse> => {
+  return apiRequest<PbxSettingsResponse>('/integrations/pbx/settings/', {
+    method: 'PUT',
+    body: JSON.stringify(data),
+  });
+};
+
+export const rotatePbxConnectorKeyAPI = async (): Promise<{ connector_api_key: string }> => {
+  return apiRequest<{ connector_api_key: string }>('/integrations/pbx/settings/rotate-connector-key/', {
+    method: 'POST',
+  });
+};
+
+export const getPbxExtensionsAPI = async (): Promise<PbxExtensionRow[]> => {
+  return apiRequest<PbxExtensionRow[]>('/integrations/pbx/extensions/');
+};
+
+export const savePbxExtensionAPI = async (data: { user_id: number; extension: string }) => {
+  return apiRequest<PbxExtensionRow>('/integrations/pbx/extensions/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const deletePbxExtensionAPI = async (id: number) => {
+  return apiRequest<{ deleted: boolean }>(`/integrations/pbx/extensions/${id}/`, {
+    method: 'DELETE',
+  });
+};
+
+export const pbxDialAPI = async (data: { client: number; phone_number?: string; extension?: string }) => {
+  return apiRequest<{ id: number; status: string }>('/integrations/pbx/dial/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export interface PbxHealthResponse {
+  is_enabled: boolean;
+  connector_online: boolean;
+  connector_last_seen_at?: string | null;
+  last_event_at?: string | null;
+  extensions_mapped_count: number;
+  pbx_host_configured: boolean;
+  ami_configured: boolean;
+  pbx_host?: string;
+  push_event_url_hint?: string;
+  checks: {
+    integration_enabled: boolean;
+    pbx_host_configured: boolean;
+    ami_configured: boolean;
+    connector_online: boolean;
+    extensions_mapped: boolean;
+    events_received: boolean;
+  };
+}
+
+export const getPbxHealthAPI = async (): Promise<PbxHealthResponse> => {
+  return apiRequest<PbxHealthResponse>('/integrations/pbx/health/');
+};
+
+export interface PbxDialStatusResponse {
+  id: number;
+  status: string;
+  result_message?: string;
+  phone_number?: string;
+  extension?: string;
+  created_at?: string;
+  processed_at?: string | null;
+}
+
+export const getPbxDialStatusAPI = async (commandId: number): Promise<PbxDialStatusResponse> => {
+  return apiRequest<PbxDialStatusResponse>(`/integrations/pbx/dial/${commandId}/`);
+};
+
+export const downloadPbxConnectorPackageAPI = async (): Promise<void> => {
+  const token = localStorage.getItem('accessToken');
+  const headers: Record<string, string> = {};
+  if (token) headers.Authorization = `Bearer ${token}`;
+  if (API_KEY) headers['X-API-Key'] = API_KEY;
+  const uiLanguage = typeof window !== 'undefined' ? localStorage.getItem('language') : null;
+  if (uiLanguage === 'ar' || uiLanguage === 'en') headers['X-Language'] = uiLanguage;
+
+  const response = await fetch(`${BASE_URL}/integrations/pbx/connector/download/`, { headers });
+  if (!response.ok) {
+    let message = 'Download failed';
+    try {
+      const body = await response.json();
+      message = body?.message || body?.error?.message || message;
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = 'loop-pbx-connector.zip';
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
+};
+
+export const getPbxReportsSummaryAPI = async (params?: { from?: string; to?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.from) q.set('from', params.from);
+  if (params?.to) q.set('to', params.to);
+  const qs = q.toString();
+  return apiRequest<{
+    total: number;
+    inbound: number;
+    outbound: number;
+    answered: number;
+    missed: number;
+    avg_duration_sec: number;
+  }>(`/integrations/pbx/reports/summary/${qs ? `?${qs}` : ''}`);
+};
+
+export const getPbxReportsAgentsAPI = async (params?: { from?: string; to?: string }) => {
+  const q = new URLSearchParams();
+  if (params?.from) q.set('from', params.from);
+  if (params?.to) q.set('to', params.to);
+  const qs = q.toString();
+  return apiRequest<{ agents: Array<{
+    extension: string;
+    user_id?: number;
+    username?: string;
+    total: number;
+    answered: number;
+    missed: number;
+    avg_duration_sec: number;
+  }> }>(`/integrations/pbx/reports/agents/${qs ? `?${qs}` : ''}`);
+};
+
 // ==================== OpenAI / AI Insights ====================
 
 export interface OpenAISettingsResponse {

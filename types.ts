@@ -13,7 +13,8 @@ export type Page =
   | 'Campaigns'
   | 'Messaging Center'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
-  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API'
+  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'PBX'
+  | 'Call Reports'
   | 'Change Plan' | 'Payment' | 'Subscription'
   | 'Support Center'
   // Legal pages
@@ -130,6 +131,7 @@ export interface TimelineEntry {
   callDatetime?: string; // Optional: formatted call datetime for calls
   followUpDate?: string; // Optional: formatted follow-up date for calls
   locationPhotoUrl?: string; // Optional: client location photo for field visits
+  recordingUrl?: string; // Optional: PBX call recording playback URL
 }
 
 export interface ClientTask {

@@ -100,6 +100,7 @@ export const Sidebar = () => {
         'Messaging Center': 'whatsapp',
         Twilio: 'twilio',
         AI: 'openai',
+        PBX: 'pbx',
     };
 
     /** Sidebar labels for integration sub-pages (toCamelCase('AI') would wrongly yield aI). */
@@ -108,6 +109,8 @@ export const Sidebar = () => {
             AI: 'ai',
             Twilio: 'twilio',
             'Lead API': 'leadApi',
+            PBX: 'pbxIntegration',
+            'Call Reports': 'callReports',
         };
         return special[sub] ?? (toCamelCase(sub) as keyof typeof translations.en);
     };

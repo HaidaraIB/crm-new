@@ -180,6 +180,17 @@ export const Timeline = ({ history }: TimelineProps) => {
                                 {entry.details && (
                                     <p className="text-sm text-gray-600 dark:text-gray-300 mt-1.5">{entry.details}</p>
                                 )}
+                                {entry.recordingUrl ? (
+                                    <a
+                                        href={entry.recordingUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                                        dir="ltr"
+                                    >
+                                        {t('playRecording')}
+                                    </a>
+                                ) : null}
                                 {entry.type === 'field_visit' && entry.locationPhotoUrl && (
                                     <a
                                         href={entry.locationPhotoUrl}

@@ -9,7 +9,7 @@ import { formatDateToLocal, formatDateTimeToLocal, withLatinDigits } from '../ut
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
-import { getConnectedAccountAPI } from '../services/api';
+import { getConnectedAccountAPI, getPbxSettingsAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import {
@@ -22,10 +22,14 @@ import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
 import { translations } from '../constants';
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     
-    // Update lead mutation
-    const updateLeadMutation = useUpdateLead();
+    const { data: pbxSettings } = useQuery({
+        queryKey: ['pbxSettings'],
+        queryFn: getPbxSettingsAPI,
+    });
+    const pbxEnabled = !!pbxSettings?.is_enabled;
+
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
     const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
     const [sendWhatsAppModal, setSendWhatsAppModal] = React.useState<{ phone: string } | null>(null);
@@ -235,6 +239,64 @@ export const ViewLeadPage = () => {
     // Use currentLead instead of selectedLead for display
     const displayLead = currentLead || selectedLead;
 
+    const formatPbxCallSummary = (cc: Record<string, unknown>): string => {
+        const parts: string[] = [];
+        const direction = (cc.pbx_direction ?? cc.pbxDirection) as string | undefined;
+        if (direction === 'inbound') parts.push(t('inbound'));
+        else if (direction === 'outbound') parts.push(t('outbound'));
+        else if (direction === 'internal') parts.push(t('internal'));
+
+        const disposition = (cc.pbx_disposition ?? cc.pbxDisposition) as string | undefined;
+        if (disposition === 'answered') parts.push(t('answered'));
+        else if (disposition === 'no_answer') parts.push(t('missed'));
+        else if (disposition === 'busy') parts.push(t('busy'));
+        else if (disposition === 'failed') parts.push(t('callFailed'));
+
+        const duration = (cc.pbx_duration_sec ?? cc.pbxDurationSec) as number | undefined;
+        if (duration) parts.push(`${duration}s`);
+
+        const legacyNotes = (cc.notes as string) || '';
+        return parts.length ? parts.join(' · ') : legacyNotes;
+    };
+
+    const pollPbxDialStatus = async (commandId: number) => {
+        for (let attempt = 0; attempt < 15; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            try {
+                const status = await getPbxDialStatusAPI(commandId);
+                if (status.status === 'completed') {
+                    setSuccessMessage(t('pbxDialCompleted'));
+                    setIsSuccessModalOpen(true);
+                    return;
+                }
+                if (status.status === 'failed') {
+                    setAlertMessage(status.result_message || t('pbxDialFailed'));
+                    setAlertVariant('error');
+                    setIsAlertModalOpen(true);
+                    return;
+                }
+            } catch {
+                // keep polling until timeout
+            }
+        }
+    };
+
+    const handlePbxDial = async (phone: string) => {
+        if (!displayLead?.id) return;
+        try {
+            const result = await pbxDialAPI({ client: displayLead.id, phone_number: phone });
+            setSuccessMessage(t('pbxDialQueued'));
+            setIsSuccessModalOpen(true);
+            if (result?.id) {
+                void pollPbxDialStatus(result.id);
+            }
+        } catch (e: any) {
+            setAlertMessage(e?.message || t('pbxDialFailed'));
+            setAlertVariant('error');
+            setIsAlertModalOpen(true);
+        }
+    };
+
     const integrationAccountId = displayLead?.integration_account ?? (displayLead as any)?.integrationAccount ?? null;
     const isMetaLead = (displayLead?.source || (displayLead as any)?.source) === 'meta_lead_form';
 
@@ -393,20 +455,23 @@ export const ViewLeadPage = () => {
             
             const callDateTimeFormatted = formatCleanDateTime(callDate);
             const followUpDateFormatted = formatCleanDateTime(cc.follow_up_date);
-            
+            const isPbxCall = cc.source === 'pbx';
+            const recordingUrl = (cc.pbx_recording_url ?? cc.pbxRecordingUrl) as string | undefined;
+
             return {
                 id: `call-${cc.id}`,
                 type: 'call',
                 user: user?.name || cc.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
-                action: t('callMade') || 'Call made',
-                details: cc.notes || '', // Keep notes separate from dates
+                action: isPbxCall ? t('pbxCallSource') : (t('callMade') || 'Call made'),
+                details: isPbxCall ? formatPbxCallSummary(cc) : (cc.notes || ''),
                 date: formatDateToLocal(callDate),
                 timestamp: timestamp,
                 stage: callMethodName,
                 color: callMethod?.color,
-                callDatetime: callDateTimeFormatted, // Separate field for call datetime
-                followUpDate: followUpDateFormatted, // Separate field for follow-up date
+                callDatetime: callDateTimeFormatted,
+                followUpDate: followUpDateFormatted,
+                recordingUrl: recordingUrl || undefined,
             };
         });
 
@@ -878,6 +943,16 @@ export const ViewLeadPage = () => {
                                             >
                                                 <PhoneIcon className="w-5 h-5"/>
                                             </a>
+                                            {pbxEnabled ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handlePbxDial(pn.phone_number)}
+                                                    className="inline-flex items-center justify-center w-8 h-8 text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                    title={t('dialViaPbx')}
+                                                >
+                                                    <PhoneIcon className="w-5 h-5"/>
+                                                </button>
+                                            ) : null}
                                         </div>
                                     ))
                                 ) : (
@@ -911,6 +986,16 @@ export const ViewLeadPage = () => {
                                                 >
                                                     <PhoneIcon className="w-5 h-5"/>
                                                 </a>
+                                                {pbxEnabled ? (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handlePbxDial(displayLead.phone!)}
+                                                        className="inline-flex items-center justify-center w-8 h-8 text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition-opacity flex-shrink-0"
+                                                        title={t('dialViaPbx')}
+                                                    >
+                                                        <PhoneIcon className="w-5 h-5"/>
+                                                    </button>
+                                                ) : null}
                                             </>
                                         )}
                                     </div>

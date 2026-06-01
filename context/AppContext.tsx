@@ -1210,6 +1210,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'Teams Report':
       case 'Employees Report':
       case 'Marketing Report':
+      case 'Call Reports':
         return p('can_view_reports');
       case 'Properties':
       case 'Owners':
@@ -1235,6 +1236,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'Twilio':
       case 'AI':
       case 'Lead API':
+      case 'PBX':
       case 'Billing':
       case 'Change Plan':
       case 'Payment':

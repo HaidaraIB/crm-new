@@ -3036,6 +3036,7 @@ export interface PbxSettingsResponse {
   screen_pop_enabled?: boolean;
   connector_last_seen_at?: string | null;
   connector_online?: boolean;
+  connector_package_version?: string;
   created_at?: string;
   updated_at?: string;
 }
@@ -3100,6 +3101,7 @@ export interface PbxHealthResponse {
   is_enabled: boolean;
   connector_online: boolean;
   connector_last_seen_at?: string | null;
+  connector_package_version?: string;
   last_event_at?: string | null;
   extensions_mapped_count: number;
   pbx_host_configured: boolean;

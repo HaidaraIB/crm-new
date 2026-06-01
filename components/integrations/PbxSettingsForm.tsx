@@ -248,8 +248,23 @@ export function PbxSettingsForm({
 
       {settings ? (
         <Card className="p-6 space-y-3">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxConnector')}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxConnector')}</h3>
+            {(settings.connector_package_version || health?.connector_package_version) ? (
+              <span className="inline-flex items-center rounded-full bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-300 px-2.5 py-0.5 text-xs font-semibold" dir="ltr">
+                v{settings.connector_package_version || health?.connector_package_version}
+              </span>
+            ) : null}
+          </div>
           <p className="text-sm text-gray-600 dark:text-gray-400">{t('pbxConnectorHint')}</p>
+          {(settings.connector_package_version || health?.connector_package_version) ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {(t('pbxConnectorVersionHint') as string).replace(
+                '{version}',
+                settings.connector_package_version || health?.connector_package_version || ''
+              )}
+            </p>
+          ) : null}
           <div>
             <FieldLabel>{t('webhookUrl')}</FieldLabel>
             <div className="flex gap-2 mt-1">
@@ -284,7 +299,14 @@ export function PbxSettingsForm({
 
       {!pbxPolicyDisabled && healthChecks ? (
         <Card className="p-6 space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxSetupWizard')}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxSetupWizard')}</h3>
+            {health?.connector_package_version ? (
+              <span className="text-xs text-gray-500 dark:text-gray-400" dir="ltr">
+                {t('pbxConnectorVersion')}: v{health.connector_package_version}
+              </span>
+            ) : null}
+          </div>
           <ul className="space-y-2">
             <CheckRow ok={healthChecks.integration_enabled} label={t('pbxCheckEnabled')} />
             <CheckRow ok={healthChecks.pbx_host_configured} label={t('pbxCheckHost')} />

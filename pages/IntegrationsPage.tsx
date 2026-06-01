@@ -20,6 +20,8 @@ import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
+import { LeadApiDocumentation } from '../components/integrations/LeadApiDocumentation';
+import { leadApiDocT } from '../constants/leadApiDocumentation';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole } from '../utils/roles';
 
@@ -750,6 +752,7 @@ export const IntegrationsPage = () => {
     const [leadApiSecretModal, setLeadApiSecretModal] = useState<string | null>(null);
     const [leadApiKeyBusy, setLeadApiKeyBusy] = useState(false);
     const [showLeadApiSecret, setShowLeadApiSecret] = useState(false);
+    const [leadApiTab, setLeadApiTab] = useState<'setup' | 'docs'>('setup');
 
     // WhatsApp Messaging Center state (hooks at top level); persist tab in localStorage (employees cannot see 'accounts')
     const [whatsAppTab, setWhatsAppTab] = useState<'chats' | 'templates' | 'accounts' | 'campaigns'>(() => {
@@ -985,6 +988,7 @@ export const IntegrationsPage = () => {
 
     if (currentPage === 'Lead API') {
         const endpointUrl = leadApiConfig?.endpoint_url || '';
+        const docLanguage = language === 'ar' ? 'ar' : 'en';
         const statusRaw = String(leadApiConfig?.integration_status || 'disconnected');
         const isConnected = statusRaw === 'connected' || (leadApiConfig?.keys?.length ?? 0) > 0;
         const lastReceivedAt = leadApiConfig?.last_received_at
@@ -1037,6 +1041,39 @@ export const IntegrationsPage = () => {
                         <div className="mt-1">{apiPolicy.message || t('integrationDisabledDefaultMessage')}</div>
                     </div>
                 ) : null}
+                <div className="mb-4 flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+                    <button
+                        type="button"
+                        onClick={() => setLeadApiTab('setup')}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                            leadApiTab === 'setup'
+                                ? 'bg-primary text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                    >
+                        {leadApiDocT(docLanguage, 'leadApiDocTabSetup')}
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setLeadApiTab('docs')}
+                        className={`rounded-lg px-4 py-2 text-sm font-medium transition-colors ${
+                            leadApiTab === 'docs'
+                                ? 'bg-primary text-white'
+                                : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                        }`}
+                    >
+                        {leadApiDocT(docLanguage, 'leadApiDocTabDocs')}
+                    </button>
+                </div>
+                {leadApiTab === 'docs' ? (
+                    <Card>
+                        <LeadApiDocumentation
+                            endpointUrl={endpointUrl}
+                            onBack={() => setLeadApiTab('setup')}
+                        />
+                    </Card>
+                ) : null}
+                {leadApiTab === 'setup' ? (
                 <Card>
                     <div className="max-w-2xl space-y-6">
                         <div className="flex items-center gap-3">
@@ -1094,9 +1131,14 @@ export const IntegrationsPage = () => {
                                     </div>
                                 </div>
                                 <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50">
-                                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
-                                        {t('tiktokSetupSteps')}
-                                    </h3>
+                                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+                                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            {t('tiktokSetupSteps')}
+                                        </h3>
+                                        <Button variant="secondary" className="text-xs" onClick={() => setLeadApiTab('docs')}>
+                                            {leadApiDocT(docLanguage, 'leadApiDocViewDocumentation')}
+                                        </Button>
+                                    </div>
                                     <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
                                         {setupSteps.map(({ step, text }) => (
                                             <li key={step}>{text}</li>
@@ -1257,6 +1299,7 @@ export const IntegrationsPage = () => {
                         )}
                     </div>
                 </Card>
+                ) : null}
                 <Modal
                     isOpen={!!leadApiSecretModal}
                     onClose={() => { setLeadApiSecretModal(null); setShowLeadApiSecret(false); }}

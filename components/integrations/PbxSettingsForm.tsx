@@ -15,6 +15,7 @@ import {
 import { Button, Card, Input, Loader, PageWrapper } from '../index';
 import { EyeIcon, EyeOffIcon, TrashIcon } from '../icons';
 import { formatDateTimeToLocal } from '../../utils/dateUtils';
+import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
 
 type IntegrationPolicyEntry = { enabled: boolean; message: string; scope: string };
 
@@ -135,7 +136,7 @@ export function PbxSettingsForm({
         setAmiPassword('');
         refetchHealth();
       })
-      .catch((e: any) => setError(e?.message || t('failedToSavePbxSettings')))
+      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToSavePbxSettings')))
       .finally(() => setSaving(false));
   };
 
@@ -144,7 +145,7 @@ export function PbxSettingsForm({
       .then(() => queryClient.invalidateQueries({ queryKey: ['pbxSettings'] }))
       .then(() => getPbxSettingsAPI())
       .then(setSettings)
-      .catch((e: any) => setError(e?.message || t('failedToRotateConnectorKey')));
+      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToRotateConnectorKey')));
   };
 
   const handleAddExtension = () => {
@@ -158,7 +159,7 @@ export function PbxSettingsForm({
         refetchExtensions();
         refetchHealth();
       })
-      .catch((e: any) => setError(e?.message || t('failedToSavePbxExtension')))
+      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension')))
       .finally(() => setAddingExtension(false));
   };
 
@@ -170,7 +171,7 @@ export function PbxSettingsForm({
         refetchExtensions();
         refetchHealth();
       })
-      .catch((e: any) => setError(e?.message || t('failedToSavePbxExtension')))
+      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension')))
       .finally(() => setExtensionBusyId(null));
   };
 
@@ -197,7 +198,7 @@ export function PbxSettingsForm({
     setDownloading(true);
     setError(null);
     downloadPbxConnectorPackageAPI()
-      .catch((e: any) => setError(e?.message || t('failedToLoadPbxSettings')))
+      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToLoadPbxSettings')))
       .finally(() => setDownloading(false));
   };
 

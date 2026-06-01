@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, WhatsappIcon, PhoneIcon, FacebookIcon, SmsIcon, LeadStatusDropdown, LeadStatusBadge } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, LeadStatusDropdown, LeadStatusBadge, LeadContactPhoneList } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateToLocal, formatDateTimeToLocal, withLatinDigits } from '../utils/dateUtils';
@@ -10,6 +10,7 @@ import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI, getPbxSettingsAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
+import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import {
@@ -270,7 +271,9 @@ export const ViewLeadPage = () => {
                     return;
                 }
                 if (status.status === 'failed') {
-                    setAlertMessage(status.result_message || t('pbxDialFailed'));
+                    setAlertMessage(
+                        localizePbxResultMessage(status.result_message, t) || t('pbxDialFailed')
+                    );
                     setAlertVariant('error');
                     setIsAlertModalOpen(true);
                     return;
@@ -291,7 +294,7 @@ export const ViewLeadPage = () => {
                 void pollPbxDialStatus(result.id);
             }
         } catch (e: any) {
-            setAlertMessage(e?.message || t('pbxDialFailed'));
+            setAlertMessage(getLocalizedApiErrorMessage(e, t, 'pbxDialFailed'));
             setAlertVariant('error');
             setIsAlertModalOpen(true);
         }
@@ -897,109 +900,17 @@ export const ViewLeadPage = () => {
                         )}
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('phoneNumbers') || 'Phone Numbers'}</label>
-                            <div className="mt-2 space-y-2">
-                                {displayLead.phoneNumbers && displayLead.phoneNumbers.length > 0 ? (
-                                    displayLead.phoneNumbers.map((pn) => (
-                                        <div key={pn.id} className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-                                            <div className="min-w-0 justify-self-start">
-                                                <p className="text-base font-medium text-gray-900 dark:text-gray-100 truncate" dir="ltr">
-                                                    {pn.phone_number}
-                                                </p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {pn.phone_type === 'mobile' ? t('mobile') : 
-                                                     pn.phone_type === 'home' ? t('home') : 
-                                                     pn.phone_type === 'work' ? t('work') : 
-                                                     pn.phone_type === 'other' ? t('other') : 
-                                                     pn.phone_type}
-                                                </p>
-                                            </div>
-                                            <div className={language === 'ar' ? 'min-w-[5.5rem] flex justify-end shrink-0' : 'min-w-[5.5rem] flex justify-start shrink-0'}>
-                                                {pn.is_primary ? (
-                                                    <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap bg-primary/15 text-primary-700 ring-1 ring-inset ring-primary/30 dark:bg-primary-900/50 dark:text-primary-200 dark:ring-primary-500/40">({t('primary') || 'Primary'})</span>
-                                                ) : (
-                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
-                                                )}
-                                            </div>
-                                            <button
-                                                type="button"
-                                                onClick={() => setSendSMSModal({ phone: pn.phone_number })}
-                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                title={t('sendSms') || 'Send SMS'}
-                                            >
-                                                <SmsIcon className="w-5 h-5"/>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                onClick={() => setSendWhatsAppModal({ phone: pn.phone_number })}
-                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                            >
-                                                <WhatsappIcon className="w-5 h-5"/>
-                                            </button>
-                                            <a 
-                                                href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
-                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                title={`${t('call') || 'Call'} - ${pn.phone_type}`}
-                                            >
-                                                <PhoneIcon className="w-5 h-5"/>
-                                            </a>
-                                            {pbxEnabled ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePbxDial(pn.phone_number)}
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                    title={t('dialViaPbx')}
-                                                >
-                                                    <PhoneIcon className="w-5 h-5"/>
-                                                </button>
-                                            ) : null}
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="grid grid-cols-[1fr_auto_auto_auto_auto] items-center gap-2" dir={language === 'ar' ? 'rtl' : 'ltr'}>
-                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 justify-self-start">
-                                            {displayLead.phone || '-'}
-                                        </p>
-                                        <div className="min-w-[5.5rem] shrink-0" aria-hidden />
-                                        {displayLead.phone && (
-                                            <>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSendSMSModal({ phone: displayLead.phone! })}
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                    title={t('sendSms') || 'Send SMS'}
-                                                >
-                                                    <SmsIcon className="w-5 h-5"/>
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setSendWhatsAppModal({ phone: displayLead.phone! })}
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                    title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                >
-                                                    <WhatsappIcon className="w-5 h-5"/>
-                                                </button>
-                                                <a 
-                                                    href={`tel:${displayLead.phone.replace(/[^0-9+]/g, '')}`}
-                                                    className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                    title={t('call') || 'Call'}
-                                                >
-                                                    <PhoneIcon className="w-5 h-5"/>
-                                                </a>
-                                                {pbxEnabled ? (
-                                                    <button
-                                                        type="button"
-                                                        onClick={() => handlePbxDial(displayLead.phone!)}
-                                                        className="inline-flex items-center justify-center w-8 h-8 text-indigo-600 dark:text-indigo-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                        title={t('dialViaPbx')}
-                                                    >
-                                                        <PhoneIcon className="w-5 h-5"/>
-                                                    </button>
-                                                ) : null}
-                                            </>
-                                        )}
-                                    </div>
-                                )}
+                            <div className="mt-2 w-full">
+                                <LeadContactPhoneList
+                                    variant="details"
+                                    phoneNumbers={displayLead.phoneNumbers}
+                                    fallbackPhone={displayLead.phone}
+                                    pbxEnabled={pbxEnabled}
+                                    onSms={(phone) => setSendSMSModal({ phone })}
+                                    onWhatsApp={(phone) => setSendWhatsAppModal({ phone })}
+                                    onPbxDial={handlePbxDial}
+                                    t={t}
+                                />
                             </div>
                         </div>
                         <div>

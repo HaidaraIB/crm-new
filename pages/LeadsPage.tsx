@@ -2,12 +2,15 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, PhoneIcon, ImportLeadsModal, SmsIcon, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList } from '../components/index';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead } from '../types';
 import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
+import { useQuery } from '@tanstack/react-query';
+import { getPbxSettingsAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
+import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { normalizeRole } from '../utils/roles';
@@ -60,7 +63,15 @@ export const LeadsPage = () => {
         language,
         setIsSuccessModalOpen,
         setSuccessMessage,
+        setAlertMessage,
+        setAlertVariant,
+        setIsAlertModalOpen,
     } = useAppContext();
+    const { data: pbxSettings } = useQuery({
+        queryKey: ['pbxSettings'],
+        queryFn: getPbxSettingsAPI,
+    });
+    const pbxEnabled = !!pbxSettings?.is_enabled;
     const isDataEntryUser = normalizeRole(currentUser?.role) === 'DataEntry';
     const isMedicalCompany = useMemo(
         () => String(currentUser?.company?.specialization || '').toLowerCase() === 'medical',
@@ -162,6 +173,45 @@ export const LeadsPage = () => {
     const [sendSMSModal, setSendSMSModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
     // Send WhatsApp modal (opens from table like lead details page)
     const [sendWhatsAppModal, setSendWhatsAppModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
+
+    const pollPbxDialStatus = async (commandId: number) => {
+        for (let i = 0; i < 40; i += 1) {
+            await new Promise((r) => setTimeout(r, 1500));
+            try {
+                const status = await getPbxDialStatusAPI(commandId);
+                if (status.status === 'completed') {
+                    setSuccessMessage(t('pbxDialCompleted'));
+                    setIsSuccessModalOpen(true);
+                    return;
+                }
+                if (status.status === 'failed') {
+                    setAlertVariant('error');
+                    setAlertMessage(
+                        localizePbxResultMessage(status.result_message, t) || t('pbxDialFailed')
+                    );
+                    setIsAlertModalOpen(true);
+                    return;
+                }
+            } catch {
+                /* keep polling */
+            }
+        }
+    };
+
+    const handlePbxDial = async (leadId: number, phone: string) => {
+        try {
+            const result = await pbxDialAPI({ client: leadId, phone_number: phone });
+            setSuccessMessage(t('pbxDialQueued'));
+            setIsSuccessModalOpen(true);
+            if (result?.id) {
+                void pollPbxDialStatus(result.id);
+            }
+        } catch (e: any) {
+            setAlertVariant('error');
+            setAlertMessage(getLocalizedApiErrorMessage(e, t, 'pbxDialFailed'));
+            setIsAlertModalOpen(true);
+        }
+    };
 
     const [leadSearchDraft, setLeadSearchDraft] = useState(leadFilters.search);
 
@@ -760,152 +810,17 @@ export const LeadsPage = () => {
                                                                 : (lead.phone || '-')}
                                                         </span>
                                                     ) : (
-                                                    <div className="flex flex-col gap-2">
-                                                        {lead.phoneNumbers && lead.phoneNumbers.length > 0 ? (
-                                                            lead.phoneNumbers.map((pn) => (
-                                                                <div key={pn.id} className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto_auto]'} items-center gap-1`}>
-                                                                    {language === 'ar' ? (
-                                                                        <>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
-                                                                                {pn.phone_number}
-                                                                            </span>
-                                                                            <div className="min-w-[5.5rem] flex justify-end shrink-0">
-                                                                                {pn.is_primary ? (
-                                                                                    <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap bg-primary/15 text-primary-700 ring-1 ring-inset ring-primary/30 dark:bg-primary-900/50 dark:text-primary-200 dark:ring-primary-500/40">
-                                                                                        ({t('primary') || 'Primary'})
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <a 
-                                                                                href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={`${t('call') || 'Call'} - ${pn.phone_type}`}
-                                                                            >
-                                                                                <PhoneIcon className="w-5 h-5"/>
-                                                                            </a>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: pn.phone_number, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                                            >
-                                                                                <WhatsappIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendSms') || 'Send SMS'}
-                                                                            >
-                                                                                <SmsIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`} dir="ltr">
-                                                                                {pn.phone_number}
-                                                                            </span>
-                                                                            <div className="min-w-[5.5rem] flex justify-start shrink-0">
-                                                                                {pn.is_primary ? (
-                                                                                    <span className="inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap bg-primary/15 text-primary-700 ring-1 ring-inset ring-primary/30 dark:bg-primary-900/50 dark:text-primary-200 dark:ring-primary-500/40">
-                                                                                        ({t('primary') || 'Primary'})
-                                                                                    </span>
-                                                                                ) : (
-                                                                                    <span className="text-xs whitespace-nowrap">&nbsp;</span>
-                                                                                )}
-                                                                            </div>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: pn.phone_number, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendSms') || 'Send SMS'}
-                                                                            >
-                                                                                <SmsIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: pn.phone_number, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                                            >
-                                                                                <WhatsappIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                            <a 
-                                                                                href={`tel:${pn.phone_number.replace(/[^0-9+]/g, '')}`}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={`${t('call') || 'Call'} - ${pn.phone_type}`}
-                                                                            >
-                                                                                <PhoneIcon className="w-5 h-5"/>
-                                                                            </a>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            ))
-                                                        ) : (
-                                                            lead.phone ? (
-                                                                <div className={`grid ${language === 'ar' ? 'grid-cols-[1fr_auto_auto_auto]' : 'grid-cols-[1fr_auto_auto_auto]'} items-center gap-1`}>
-                                                                    {language === 'ar' ? (
-                                                                        <>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
-                                                                            <a 
-                                                                                href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('call') || 'Call'}
-                                                                            >
-                                                                                <PhoneIcon className="w-5 h-5"/>
-                                                                            </a>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: lead.phone, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                                            >
-                                                                                <WhatsappIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendSms') || 'Send SMS'}
-                                                                            >
-                                                                                <SmsIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                        </>
-                                                                    ) : (
-                                                                        <>
-                                                                            <span className={`text-gray-900 dark:text-gray-100 whitespace-nowrap text-sm ${language === 'ar' ? 'text-right' : 'text-left'}`}>{lead.phone}</span>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendSMSModal({ leadId: lead.id, phone: lead.phone, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-blue-600 dark:text-blue-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendSms') || 'Send SMS'}
-                                                                            >
-                                                                                <SmsIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                            <button
-                                                                                type="button"
-                                                                                onClick={() => setSendWhatsAppModal({ leadId: lead.id, phone: lead.phone, lead })}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('sendWhatsApp') || 'Send WhatsApp'}
-                                                                            >
-                                                                                <WhatsappIcon className="w-5 h-5"/>
-                                                                            </button>
-                                                                            <a 
-                                                                                href={`tel:${lead.phone.replace(/[^0-9+]/g, '')}`}
-                                                                                className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity flex-shrink-0"
-                                                                                title={t('call') || 'Call'}
-                                                                            >
-                                                                                <PhoneIcon className="w-5 h-5"/>
-                                                                            </a>
-                                                                        </>
-                                                                    )}
-                                                                </div>
-                                                            ) : (
-                                                                <span className="text-gray-900 dark:text-gray-100">-</span>
-                                                            )
-                                                        )}
+                                                    <div className="w-full min-w-0">
+                                                        <LeadContactPhoneList
+                                                            variant="table"
+                                                            phoneNumbers={lead.phoneNumbers}
+                                                            fallbackPhone={lead.phone}
+                                                            pbxEnabled={pbxEnabled}
+                                                            onSms={(phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
+                                                            onWhatsApp={(phone) => setSendWhatsAppModal({ leadId: lead.id, phone, lead })}
+                                                            onPbxDial={(phone) => handlePbxDial(lead.id, phone)}
+                                                            t={t}
+                                                        />
                                                     </div>
                                                     )}
                                                 </td>

@@ -101,5 +101,6 @@ export * from './modals/EditCallMethodModal';
 export * from './modals/AddVisitTypeModal';
 export * from './modals/EditVisitTypeModal';
 export * from './PaymentGatewaySelector';
+export * from './LeadContactPhone';
 export * from './LegalLinks';
 export * from './PlanEntitlementsSummary';

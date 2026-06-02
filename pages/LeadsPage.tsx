@@ -17,6 +17,7 @@ import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { formatLeadBudget, leadBudgetOverlapsFilter } from '../utils/budgetRange';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import { MarqueeText } from '../components/MarqueeText';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -746,7 +747,7 @@ export const LeadsPage = () => {
                                                 {t('patientFileNumber')}
                                             </th>
                                         )}
-                                        <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('phone')}</th>
+                                        <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap min-w-[220px]">{t('phone')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('source') || 'Source'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('createdBy') || 'Created by'}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('campaign') || 'Campaign'}</th>
@@ -777,17 +778,27 @@ export const LeadsPage = () => {
                                                 {!isDataEntryUser && (
                                                 <td className="p-2 sm:p-4 text-center"><input type="checkbox" checked={checkedLeadIds.has(lead.id)} onChange={(e) => handleCheckChange(lead.id, e.target.checked)} className="rounded" /></td>
                                                 )}
-                                                <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
-                                                    {isDataEntryUser ? (
-                                                        <span>{lead.name}</span>
-                                                    ) : (
-                                                    <button 
-                                                        onClick={() => handleViewLead(lead)}
-                                                        className="hover:text-primary-700 dark:hover:text-primary-200 transition-colors focus:outline-none"
-                                                    >
-                                                        {lead.name}
-                                                    </button>
-                                                    )}
+                                                <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 text-center">
+                                                    <div className="mx-auto w-full max-w-[220px] min-w-0">
+                                                        {isDataEntryUser ? (
+                                                            <MarqueeText
+                                                                text={lead.name}
+                                                                className="w-full"
+                                                                contentClassName="text-sm font-medium text-gray-900 dark:text-gray-100"
+                                                            />
+                                                        ) : (
+                                                        <button 
+                                                            onClick={() => handleViewLead(lead)}
+                                                            className="w-full hover:text-primary-700 dark:hover:text-primary-200 transition-colors focus:outline-none"
+                                                        >
+                                                            <MarqueeText
+                                                                text={lead.name}
+                                                                className="w-full"
+                                                                contentClassName="text-sm font-medium text-gray-900 dark:text-gray-100"
+                                                            />
+                                                        </button>
+                                                        )}
+                                                    </div>
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 hidden lg:table-cell text-center text-gray-700 dark:text-gray-300 whitespace-nowrap">
                                                     {(lead as any).leadCompanyName ?? (lead as any).lead_company_name ?? '-'}
@@ -802,7 +813,7 @@ export const LeadsPage = () => {
                                                             '-'}
                                                     </td>
                                                 )}
-                                                <td className="px-4 sm:px-6 py-4 text-center">
+                                                <td className="px-4 sm:px-6 py-4 text-center min-w-[220px]">
                                                     {isDataEntryUser ? (
                                                         <span className="text-sm text-gray-900 dark:text-gray-100" dir="ltr">
                                                             {lead.phoneNumbers && lead.phoneNumbers.length > 0
@@ -810,7 +821,7 @@ export const LeadsPage = () => {
                                                                 : (lead.phone || '-')}
                                                         </span>
                                                     ) : (
-                                                    <div className="w-full min-w-0">
+                                                    <div className="mx-auto w-full min-w-[200px] max-w-full">
                                                         <LeadContactPhoneList
                                                             variant="table"
                                                             phoneNumbers={lead.phoneNumbers}

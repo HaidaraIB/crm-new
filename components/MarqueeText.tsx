@@ -40,8 +40,11 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
         check();
         const ro = new ResizeObserver(check);
         ro.observe(outer);
+        ro.observe(m);
         window.addEventListener('resize', check);
+        const raf = requestAnimationFrame(check);
         return () => {
+            cancelAnimationFrame(raf);
             ro.disconnect();
             window.removeEventListener('resize', check);
         };

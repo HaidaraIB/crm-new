@@ -21,6 +21,7 @@ import { BriefcaseIcon, MapPinIcon } from '../components/icons';
 import { Lead } from '../types';
 import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
 import { translations } from '../constants';
+import { MarqueeText } from '../components/MarqueeText';
 
 export const ViewLeadPage = () => {
     const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
@@ -148,6 +149,7 @@ export const ViewLeadPage = () => {
     // Fetch leads to get updated data
     const { data: leadsResponse, refetch: refetchLeads } = useLeads();
     const allLeads = leadsResponse?.results || [];
+    const updateLeadMutation = useUpdateLead();
     
     // Find the current lead from the fetched leads list (most up-to-date)
     const currentLead = useMemo(() => {
@@ -743,18 +745,23 @@ export const ViewLeadPage = () => {
     return (
         <PageWrapper 
             title={
-                <div className="flex items-center gap-3">
+                <div className="flex min-w-0 w-full items-center gap-2 sm:gap-3">
                     <button
+                        type="button"
                         onClick={() => {
                             window.history.pushState({}, '', '/leads');
                             setCurrentPage('Leads');
                         }}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
+                        className="shrink-0 rounded-md p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                         title={t('back') || 'Back'}
                     >
-                        <ArrowLeftIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
+                        <ArrowLeftIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                     </button>
-                    <span>{displayLead.name}</span>
+                    <MarqueeText
+                        text={displayLead.name}
+                        className="min-w-0 flex-1"
+                        contentClassName="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg md:text-xl"
+                    />
                 </div>
             }
             actions={
@@ -1139,7 +1146,7 @@ export const ViewLeadPage = () => {
                                     {metaQualificationSentAt && !metaQualificationError && (
                                         <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                                             {t('metaQualificationSent')}
-                                            {metaQualificationSentAt ? ` · ${formatDateTimeToLocal(metaQualificationSentAt, language)}` : ''}
+                                            {metaQualificationSentAt ? ` · ${formatDateTimeToLocal(metaQualificationSentAt)}` : ''}
                                         </p>
                                     )}
                                     {metaQualificationErrorText && (

@@ -468,12 +468,14 @@ export const ViewLeadPage = () => {
                 type: 'call',
                 user: user?.name || cc.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
-                action: isPbxCall ? t('pbxCallSource') : (t('callMade') || 'Call made'),
-                details: isPbxCall ? formatPbxCallSummary(cc) : (cc.notes || ''),
+                action: isPbxCall
+                    ? formatPbxCallSummary(cc)
+                    : (t('callMade') || 'Call made'),
+                details: isPbxCall ? '' : (cc.notes || ''),
                 date: formatDateToLocal(callDate),
                 timestamp: timestamp,
-                stage: callMethodName,
-                color: callMethod?.color,
+                stage: isPbxCall ? t('pbxCallSource') : callMethodName,
+                color: isPbxCall ? '#4f46e5' : callMethod?.color,
                 callDatetime: callDateTimeFormatted,
                 followUpDate: followUpDateFormatted,
                 recordingUrl: recordingUrl || undefined,

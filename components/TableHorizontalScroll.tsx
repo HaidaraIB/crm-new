@@ -3,12 +3,14 @@ import React, { useCallback, useEffect, useRef } from 'react';
 type TableHorizontalScrollProps = {
     children: React.ReactNode;
     className?: string;
-    /** Classes applied to both the top and main horizontal scroll containers */
+    /** Classes applied to the main (table body) scroll container only */
     scrollClassName?: string;
 };
 
 /**
- * Wraps wide tables with a synced horizontal scrollbar at the top and bottom.
+ * Wraps wide tables with a synced horizontal scrollbar at the top.
+ * The main container scrolls horizontally but hides its native scrollbar to avoid
+ * a duplicate bar floating above pagination when the page is scrolled vertically.
  */
 export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
     children,
@@ -22,9 +24,12 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
     const isSyncingRef = useRef(false);
 
     const updateSpacerWidth = useCallback(() => {
-        if (contentRef.current && spacerRef.current) {
-            spacerRef.current.style.width = `${contentRef.current.scrollWidth}px`;
-        }
+        const content = contentRef.current;
+        const spacer = spacerRef.current;
+        if (!content || !spacer) return;
+        const table = content.querySelector('table');
+        const width = table?.scrollWidth ?? content.scrollWidth;
+        spacer.style.width = `${width}px`;
     }, []);
 
     useEffect(() => {
@@ -52,19 +57,21 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
         });
     }, []);
 
-    const scrollCn = ['overflow-x-auto', scrollClassName].filter(Boolean).join(' ');
+    const mainScrollCn = ['table-horizontal-scroll-main', 'overflow-x-auto', scrollClassName]
+        .filter(Boolean)
+        .join(' ');
 
     return (
-        <div className={className}>
+        <div className={['table-horizontal-scroll', 'relative min-w-0 w-full', className].filter(Boolean).join(' ')}>
             <div
                 ref={topScrollRef}
-                className={`table-horizontal-scroll-top ${scrollCn}`}
+                className="table-horizontal-scroll-top overflow-x-auto"
                 onScroll={() => syncScroll('top')}
                 aria-hidden
             >
                 <div ref={spacerRef} className="h-px" />
             </div>
-            <div ref={mainScrollRef} className={scrollCn} onScroll={() => syncScroll('main')}>
+            <div ref={mainScrollRef} className={mainScrollCn} onScroll={() => syncScroll('main')}>
                 <div ref={contentRef}>{children}</div>
             </div>
         </div>

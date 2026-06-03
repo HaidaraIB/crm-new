@@ -20,7 +20,7 @@ const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Se
     const { t } = useAppContext();
     return (
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
-            <div className="min-w-full inline-block align-middle">
+            <div className="min-w-full block">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[700px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -75,7 +75,7 @@ const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: Se
     const { t } = useAppContext();
     return (
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
-            <div className="min-w-full inline-block align-middle">
+            <div className="min-w-full block">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[700px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
@@ -130,7 +130,7 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
     const { t } = useAppContext();
     return (
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
-            <div className="min-w-full inline-block align-middle">
+            <div className="min-w-full block">
                 <div className="overflow-hidden">
                     <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[800px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">

@@ -1408,7 +1408,7 @@ export const DashboardPage = () => {
                         </div>
                     </div>
                     <TableHorizontalScroll scrollClassName="-mx-2 px-2">
-                        <div className="min-w-full inline-block align-middle">
+                        <div className="min-w-full block">
                             <div className="overflow-hidden rounded-lg">
                                 <table className="w-full text-sm text-left rtl:text-right min-w-[600px]">
                                     <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/50 dark:to-red-900/50 border-b-2 border-orange-200 dark:border-orange-700">
@@ -1681,7 +1681,7 @@ export const DashboardPage = () => {
                         </div>
                     </div>
                     <TableHorizontalScroll scrollClassName="-mx-2 px-2">
-                        <div className="min-w-full inline-block align-middle">
+                        <div className="min-w-full block">
                             <div className="overflow-hidden rounded-lg">
                                 {latestFeedbacks.length > 0 ? (
                                     <table className="w-full text-sm text-left rtl:text-right min-w-[600px]">

@@ -731,7 +731,7 @@ export const LeadsPage = () => {
             </div>
             <Card>
                 <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
-                    <div className="min-w-full inline-block align-middle">
+                    <div className="min-w-full block">
                         <div className="overflow-hidden">
                             <table className="w-full text-sm text-left rtl:text-right min-w-[1200px]">
                                 <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">

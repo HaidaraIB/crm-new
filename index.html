@@ -197,11 +197,26 @@
             scrollbar-color: hsl(var(--color-primary-400)) #111827;
         }
 
-        /* Top horizontal scrollbar for wide tables (synced with table body) */
+        /* Wide tables: one visible horizontal scrollbar (top), synced with hidden main bar */
         .table-horizontal-scroll-top {
             overflow-y: hidden;
             height: 12px;
             margin-bottom: 2px;
+            position: sticky;
+            top: 0;
+            z-index: 20;
+            background-color: #ffffff;
+        }
+        .dark .table-horizontal-scroll-top {
+            background-color: hsl(217, 33%, 17%);
+        }
+        .table-horizontal-scroll-main {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .table-horizontal-scroll-main::-webkit-scrollbar {
+            display: none;
+            height: 0;
         }
 
         /* Prevent chart background from changing on hover */

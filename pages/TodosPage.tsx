@@ -619,7 +619,7 @@ export const TodosPage = () => {
                     ) : filteredTodos.length > 0 ? (
                         <Card className="p-0 overflow-hidden">
                             <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
-                                <div className="min-w-full inline-block align-middle">
+                                <div className="min-w-full block">
                                     <div className="overflow-hidden">
                                         <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1000px]">
                                             <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">

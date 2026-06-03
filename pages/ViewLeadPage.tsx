@@ -5,9 +5,9 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, LeadStatusDropdown, LeadStatusBadge, LeadContactPhoneList } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
-import { formatDateToLocal, formatDateTimeToLocal, withLatinDigits } from '../utils/dateUtils';
+import { formatDateToLocal, formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
-import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages } from '../hooks/useQueries';
+import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI, getPbxSettingsAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
@@ -20,6 +20,12 @@ import {
 import { BriefcaseIcon, MapPinIcon } from '../components/icons';
 import { Lead } from '../types';
 import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
+import {
+    formatTimelineEventValuePair,
+    getEditFieldLabel,
+    getTimelineEventAction,
+    localizeTimelineEventNotes,
+} from '../utils/timelineEvents';
 import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
 
@@ -140,6 +146,11 @@ export const ViewLeadPage = () => {
     const statuses = Array.isArray(statusesData) 
         ? statusesData 
         : (statusesData?.results || []);
+
+    const { data: channelsData } = useChannels();
+    const channels = Array.isArray(channelsData)
+        ? channelsData
+        : (channelsData?.results || []);
     
     const { data: stagesData } = useStages();
     const stages = Array.isArray(stagesData) 
@@ -406,6 +417,10 @@ export const ViewLeadPage = () => {
     const timelineHistory = useMemo(() => {
         if (!displayLead) return [];
 
+        const lang = (language === 'ar' ? 'ar' : 'en') as 'en' | 'ar';
+        const formatDetailDateTime = (dateString: string | null | undefined) =>
+            formatTimelineDetailDateTime(dateString, lang);
+
         // Format Actions (ClientTasks)
         const actions = leadClientTasks.map(ct => {
             const user = users.find(u => u.id === (ct.created_by || ct.createdBy));
@@ -418,9 +433,9 @@ export const ViewLeadPage = () => {
                 type: 'action',
                 user: user?.name || ct.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
-                action: t('stageUpdated') || 'Stage updated',
+                action: t('stageUpdated'),
                 details: ct.notes || '',
-                date: formatDateToLocal(ct.created_at || ct.createdAt),
+                date: formatTimelineDate(ct.created_at || ct.createdAt, lang),
                 timestamp: new Date(ct.created_at || ct.createdAt).getTime(),
                 stage: formattedStage,
                 color: stageConfig?.color,
@@ -436,30 +451,9 @@ export const ViewLeadPage = () => {
             // Use call_datetime if available, otherwise use created_at
             const callDate = cc.call_datetime || cc.created_at || cc.createdAt;
             const timestamp = new Date(callDate).getTime();
-            
-            // Format call datetime and follow-up date for display (clean, modern format)
-            const formatCleanDateTime = (dateString: string | null | undefined): string => {
-                if (!dateString) return '';
-                try {
-                    const date = new Date(dateString);
-                    if (isNaN(date.getTime())) return '';
-                    // Format as "Jan 24, 2026 at 4:58 PM" - more readable
-                    const options: Intl.DateTimeFormatOptions = {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true
-                    };
-                    return date.toLocaleString('en-US', withLatinDigits(options));
-                } catch {
-                    return '';
-                }
-            };
-            
-            const callDateTimeFormatted = formatCleanDateTime(callDate);
-            const followUpDateFormatted = formatCleanDateTime(cc.follow_up_date);
+
+            const callDateTimeFormatted = formatDetailDateTime(callDate);
+            const followUpDateFormatted = formatDetailDateTime(cc.follow_up_date);
             const isPbxCall = cc.source === 'pbx';
             const recordingUrl = (cc.pbx_recording_url ?? cc.pbxRecordingUrl) as string | undefined;
 
@@ -470,9 +464,9 @@ export const ViewLeadPage = () => {
                 avatar: user?.avatar || '',
                 action: isPbxCall
                     ? formatPbxCallSummary(cc)
-                    : (t('callMade') || 'Call made'),
+                    : t('callMade'),
                 details: isPbxCall ? '' : (cc.notes || ''),
-                date: formatDateToLocal(callDate),
+                date: formatTimelineDate(callDate, lang),
                 timestamp: timestamp,
                 stage: isPbxCall ? t('pbxCallSource') : callMethodName,
                 color: isPbxCall ? '#4f46e5' : callMethod?.color,
@@ -490,36 +484,17 @@ export const ViewLeadPage = () => {
             const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
             const timestamp = new Date(visitDateRaw).getTime();
 
-            const formatCleanDateTime = (dateString: string | null | undefined): string => {
-                if (!dateString) return '';
-                try {
-                    const date = new Date(dateString);
-                    if (isNaN(date.getTime())) return '';
-                    const options: Intl.DateTimeFormatOptions = {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                    };
-                    return date.toLocaleString('en-US', withLatinDigits(options));
-                } catch {
-                    return '';
-                }
-            };
-
-            const visitDt = formatCleanDateTime(visitDateRaw);
-            const upcoming = formatCleanDateTime(cv.upcoming_visit_date as string | undefined);
+            const visitDt = formatDetailDateTime(visitDateRaw);
+            const upcoming = formatDetailDateTime(cv.upcoming_visit_date as string | undefined);
 
             return {
                 id: `visit-${cv.id}`,
                 type: 'visit' as const,
                 user: user?.name || (cv.created_by_username as string) || t('unknown'),
                 avatar: user?.avatar || '',
-                action: t('visitLogged') || 'Visit logged',
+                action: t('visitLogged'),
                 details: (cv.summary as string) || '',
-                date: formatDateToLocal(visitDateRaw),
+                date: formatTimelineDate(visitDateRaw, lang),
                 timestamp,
                 stage: visitTypeName,
                 color: vt?.color,
@@ -534,27 +509,8 @@ export const ViewLeadPage = () => {
             const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
             const timestamp = new Date(visitDateRaw).getTime();
 
-            const formatCleanDateTime = (dateString: string | null | undefined): string => {
-                if (!dateString) return '';
-                try {
-                    const date = new Date(dateString);
-                    if (isNaN(date.getTime())) return '';
-                    const options: Intl.DateTimeFormatOptions = {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                        hour: 'numeric',
-                        minute: '2-digit',
-                        hour12: true,
-                    };
-                    return date.toLocaleString('en-US', withLatinDigits(options));
-                } catch {
-                    return '';
-                }
-            };
-
-            const visitDt = formatCleanDateTime(visitDateRaw);
-            const upcoming = formatCleanDateTime(cv.upcoming_visit_date as string | undefined);
+            const visitDt = formatDetailDateTime(visitDateRaw);
+            const upcoming = formatDetailDateTime(cv.upcoming_visit_date as string | undefined);
 
             return {
                 id: `field-visit-${cv.id}`,
@@ -563,7 +519,7 @@ export const ViewLeadPage = () => {
                 avatar: user?.avatar || '',
                 action: t('fieldVisitLogged'),
                 details: (cv.summary as string) || '',
-                date: formatDateToLocal(visitDateRaw),
+                date: formatTimelineDate(visitDateRaw, lang),
                 timestamp,
                 stage: t('fieldVisit'),
                 callDatetime: visitDt,
@@ -577,100 +533,57 @@ export const ViewLeadPage = () => {
             : [];
 
         // Format Events (ClientEvents)
-        // Helper function to format values for display
-        const formatValue = (value: string | null | undefined) => {
-            if (!value || value === 'None') {
-                return t('unassigned') || 'Unassigned';
-            }
-            return value;
-        };
-        
-        // Helper function to format user values (try to get user name from ID)
-        const formatUserValue = (value: string | null | undefined) => {
-            if (!value || value === 'None') {
-                return t('unassigned') || 'Unassigned';
-            }
-            // Try to find user name if value is a user ID
-            const userId = parseInt(value);
-            if (!isNaN(userId)) {
-                const assignedUser = users.find(u => u.id === userId);
-                return assignedUser?.name || value;
-            }
-            return value;
-        };
-        
+        const eventFormatCtx = { t, users, statuses, channels };
+
         const events = clientEvents.map(ce => {
             const user = users.find(u => u.id === ce.created_by);
-            
-            let actionText = '';
-            let eventColor = undefined;
-            let translatedDetails = '';
-            
+            const actionText =
+                ce.event_type === 'location_update'
+                    ? t(clientLocationEventTranslationKey(ce.notes))
+                    : getTimelineEventAction(ce.event_type, t, ce.notes, ce.old_value, ce.new_value);
+
+            const editFieldLabel =
+                ce.event_type === 'edit'
+                    ? getEditFieldLabel(ce.notes, t, ce.old_value, ce.new_value)
+                    : undefined;
+
+            let eventColor: string | undefined;
             if (ce.event_type === 'status_change') {
-                actionText = t('statusUpdated') || 'Status updated';
-                // Try to find the status color
-                const statusConfig = statuses.find(s => s.name === ce.new_value || s.id.toString() === ce.new_value);
-                if (statusConfig) {
-                    eventColor = statusConfig.color;
-                }
-                
-                // Create translated description for status change
-                const oldVal = formatValue(ce.old_value);
-                const newVal = formatValue(ce.new_value);
-                
-                if (oldVal && newVal) {
-                    translatedDetails = `${t('statusChangedFrom') || 'Status changed from'} ${oldVal} ${t('statusChangedTo') || 'to'} ${newVal}`;
-                } else if (newVal) {
-                    translatedDetails = `${t('statusChangedFrom') || 'Status changed from'} ${t('unassigned') || 'Unassigned'} ${t('statusChangedTo') || 'to'} ${newVal}`;
-                }
+                const statusConfig = statuses.find(
+                    (s) => s.name === ce.new_value || s.id.toString() === ce.new_value
+                );
+                if (statusConfig) eventColor = statusConfig.color;
             }
-            else if (ce.event_type === 'assignment') {
-                actionText = t('leadAssigned') || 'Lead assigned';
-                
-                // Create translated description for assignment
-                const newVal = formatUserValue(ce.new_value);
-                const oldVal = formatUserValue(ce.old_value);
-                
-                // Check if it's a bulk assignment (notes contain "Bulk assigned")
-                if (ce.notes && ce.notes.toLowerCase().includes('bulk')) {
-                    if (oldVal && oldVal !== newVal) {
-                        translatedDetails = `${t('bulkAssignedTo') || 'Bulk assigned to'} ${newVal} (${t('was') || 'was'} ${oldVal})`;
-                    } else {
-                        translatedDetails = `${t('bulkAssignedTo') || 'Bulk assigned to'} ${newVal}`;
-                    }
-                } else {
-                    if (oldVal && oldVal !== newVal) {
-                        translatedDetails = `${t('assignedToAction') || 'Assigned to'} ${newVal} (${t('was') || 'was'} ${oldVal})`;
-                    } else {
-                        translatedDetails = `${t('assignedToAction') || 'Assigned to'} ${newVal}`;
-                    }
-                }
-            }
-            else if (ce.event_type === 'location_update') {
-                actionText = t(clientLocationEventTranslationKey(ce.notes));
+
+            const { oldFormatted, newFormatted } = formatTimelineEventValuePair(
+                ce.old_value,
+                ce.new_value,
+                eventFormatCtx,
+                ce.event_type,
+                ce.notes
+            );
+
+            let translatedDetails = '';
+            if (ce.event_type === 'location_update') {
                 translatedDetails = '';
-            }
-            else if (ce.event_type === 'edit') {
-                actionText = t('leadEdited') || 'Lead edited';
-                // For edit events, use the notes if available, otherwise create a generic description
-                translatedDetails = ce.notes || '';
-            }
-            else if (ce.event_type === 're_assignment') {
-                actionText = t('leadReAssigned') || 'Lead re-assigned';
-                const oldVal = formatUserValue(ce.old_value);
-                const newVal = formatUserValue(ce.new_value);
+            } else if (ce.event_type === 're_assignment') {
                 const hoursMatch = ce.notes?.match(/(\d+)\s*ساعة/);
                 const hours = hoursMatch?.[1] || String(currentUser?.company?.re_assign_hours ?? 24);
-                translatedDetails =
-                    (t('autoReassignedFromTo') || 'Automatically reassigned from {from} to {to} after {hours} hours with no contact from the assigned employee')
-                        .replace('{from}', oldVal)
-                        .replace('{to}', newVal)
-                        .replace('{hours}', hours);
+                translatedDetails = t('autoReassignedFromTo')
+                    .replace('{from}', oldFormatted || t('unassigned'))
+                    .replace('{to}', newFormatted || t('unassigned'))
+                    .replace('{hours}', hours);
+            } else {
+                translatedDetails = localizeTimelineEventNotes(ce.notes, ce.event_type, t);
             }
-            else {
-                actionText = ce.event_type;
-                translatedDetails = ce.notes || '';
-            }
+
+            const showValuePair =
+                ce.event_type !== 'location_update' &&
+                (oldFormatted != null || newFormatted != null);
+            const suppressDetailsWithPair =
+                showValuePair &&
+                ['edit', 'status_change', 'assignment', 'created'].includes(ce.event_type);
+            const detailsOnly = translatedDetails && !suppressDetailsWithPair;
 
             return {
                 id: `event-${ce.id}`,
@@ -678,17 +591,16 @@ export const ViewLeadPage = () => {
                 user: user?.name || ce.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
                 action: actionText,
-                details: ce.event_type === 'location_update'
-                    ? ''
-                    : (translatedDetails || ce.notes || ''),
-                date: formatDateToLocal(ce.created_at),
+                fieldLabel: editFieldLabel || undefined,
+                details: detailsOnly ? translatedDetails : '',
+                date: formatTimelineDate(ce.created_at, lang),
                 timestamp: new Date(ce.created_at).getTime(),
                 oldValue: ce.event_type === 'location_update'
                     ? (ce.old_value || undefined)
-                    : formatValue(ce.old_value),
+                    : oldFormatted,
                 newValue: ce.event_type === 'location_update'
                     ? (ce.new_value || undefined)
-                    : formatValue(ce.new_value),
+                    : newFormatted,
                 color: eventColor,
             };
         });
@@ -701,9 +613,9 @@ export const ViewLeadPage = () => {
                 type: 'sms' as const,
                 user: user?.name || sms.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
-                action: t('smsSent') || 'SMS sent',
+                action: t('smsSent'),
                 details: sms.body || '',
-                date: formatDateToLocal(sms.created_at),
+                date: formatTimelineDate(sms.created_at, lang),
                 timestamp: new Date(sms.created_at).getTime(),
                 stage: sms.phone_number,
             };
@@ -712,7 +624,7 @@ export const ViewLeadPage = () => {
         // Format WhatsApp messages
         const waEntries = (leadWhatsAppMessages as any[]).map((wa) => {
             const user = users.find(u => u.id === wa.created_by);
-            const dir = wa.direction === 'outbound' ? (t('whatsappSent') || 'WhatsApp sent') : (t('whatsappReceived') || 'WhatsApp received');
+            const dir = wa.direction === 'outbound' ? t('whatsappSent') : t('whatsappReceived');
             return {
                 id: `wa-${wa.id}`,
                 type: 'whatsapp' as const,
@@ -720,15 +632,14 @@ export const ViewLeadPage = () => {
                 avatar: user?.avatar || '',
                 action: dir,
                 details: wa.body || '',
-                date: formatDateToLocal(wa.created_at),
+                date: formatTimelineDate(wa.created_at, lang),
                 timestamp: new Date(wa.created_at).getTime(),
                 stage: wa.phone_number,
             };
         });
 
-        // Combine and sort by date descending
-        return [...actions, ...calls, ...visits, ...fieldVisits, ...events, ...smsEntries, ...waEntries].sort((a, b) => b.timestamp - a.timestamp);
-    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, callMethods, visitTypes, fieldVisitsAllowed]);
+        return [...actions, ...calls, ...visits, ...fieldVisits, ...events, ...smsEntries, ...waEntries];
+    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, channels, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
 
     if (!displayLead) {
         return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
@@ -767,7 +678,7 @@ export const ViewLeadPage = () => {
                 </div>
             }
             actions={
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
+                <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap">
                     <Button
                         variant="secondary"
                         type="button"
@@ -844,6 +755,7 @@ export const ViewLeadPage = () => {
                 </div>
             }
         >
+            <div className="min-w-0 overflow-x-hidden">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 <Card className="lg:col-span-1">
                     <h3 className="font-semibold text-lg mb-4 border-b pb-3 dark:border-gray-700">{t('contactInformation') || 'Contact Information'}</h3>
@@ -861,7 +773,7 @@ export const ViewLeadPage = () => {
                             <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : '—'}</p>
                         </div>
                         {hasLeadLocation && (
-                            <div className="md:col-span-1">
+                            <div className="overflow-hidden md:col-span-1">
                                 <LeadLocationMapPicker
                                     latitude={leadLocationLat}
                                     longitude={leadLocationLng}
@@ -1222,8 +1134,8 @@ export const ViewLeadPage = () => {
             </div>
 
             <div className="mt-6">
-                <h2 className="text-xl font-bold mb-4">{t('timeline')}</h2>
                 <Timeline history={timelineHistory} />
+            </div>
             </div>
 
             {sendSMSModal && displayLead && (

@@ -128,6 +128,8 @@ export interface TimelineEntry {
   color?: string; // Optional: color for the stage or event
   oldValue?: string;
   newValue?: string;
+  /** Localized label for which field changed (edit events). */
+  fieldLabel?: string;
   callDatetime?: string; // Optional: formatted call datetime for calls
   followUpDate?: string; // Optional: formatted follow-up date for calls
   locationPhotoUrl?: string; // Optional: client location photo for field visits

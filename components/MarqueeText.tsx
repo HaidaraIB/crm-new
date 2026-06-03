@@ -63,10 +63,11 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
     const durationSec = Math.min(Math.max(text.length * 0.1, 10), 45);
 
     return (
-        <div ref={outerRef} className={`relative min-w-0 max-w-full ${className}`}>
+        <div ref={outerRef} className={`relative min-w-0 max-w-full overflow-hidden ${className}`}>
             <span
                 ref={measureRef}
-                className={`pointer-events-none absolute left-0 top-0 -z-10 max-w-none whitespace-nowrap opacity-0 ${contentClassName}`}
+                className={`pointer-events-none fixed top-0 max-w-none whitespace-nowrap opacity-0 ${contentClassName}`}
+                style={{ left: '-10000px' }}
                 aria-hidden
             >
                 {text}

@@ -95,9 +95,25 @@
             --text-inverse: 15 23 42; /* slate-900 - for text on light backgrounds */
         }
         
+        html,
+        body {
+            margin: 0;
+            height: 100%;
+        }
+
         body {
             font-family: 'Inter', 'Tajawal', sans-serif;
             color: rgb(var(--text-secondary));
+            background-color: #f9fafb;
+        }
+
+        .dark body {
+            background-color: #111827;
+        }
+
+        #root {
+            height: 100%;
+            min-height: 100%;
         }
         
         /* Utility classes for consistent text colors */
@@ -120,37 +136,45 @@
         .text-inverse {
             color: rgb(var(--text-inverse));
         }
-        /* Global Scrollbar Styling - Webkit (Chrome, Safari, Edge) */
-        *::-webkit-scrollbar {
+        /* Scrollbar styling — scoped to main content + custom-scrollbar (avoids nested * scrollbars) */
+        .app-main-scroll::-webkit-scrollbar,
+        .custom-scrollbar::-webkit-scrollbar,
+        .table-horizontal-scroll-top::-webkit-scrollbar {
             width: 10px;
             height: 10px;
         }
-        
-        *::-webkit-scrollbar-track {
-            background-color: #f3f4f6; /* gray-100 */
+
+        .app-main-scroll::-webkit-scrollbar-track,
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background-color: #f3f4f6;
             border-radius: 5px;
         }
-        
-        .dark *::-webkit-scrollbar-track {
-            background-color: #1f2937; /* gray-800 */
+
+        .dark .app-main-scroll::-webkit-scrollbar-track,
+        .dark .custom-scrollbar::-webkit-scrollbar-track {
+            background-color: #1f2937;
         }
-        
-        *::-webkit-scrollbar-thumb {
+
+        .app-main-scroll::-webkit-scrollbar-thumb,
+        .custom-scrollbar::-webkit-scrollbar-thumb {
             background-color: hsl(var(--color-primary-500));
             border-radius: 5px;
             border: 2px solid transparent;
             background-clip: padding-box;
         }
-        
-        *::-webkit-scrollbar-thumb:hover {
+
+        .app-main-scroll::-webkit-scrollbar-thumb:hover,
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background-color: hsl(var(--color-primary-600));
         }
-        
-        .dark *::-webkit-scrollbar-thumb {
+
+        .dark .app-main-scroll::-webkit-scrollbar-thumb,
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb {
             background-color: hsl(var(--color-primary-400));
         }
-        
-        .dark *::-webkit-scrollbar-thumb:hover {
+
+        .dark .app-main-scroll::-webkit-scrollbar-thumb:hover,
+        .dark .custom-scrollbar::-webkit-scrollbar-thumb:hover {
             background-color: hsl(var(--color-primary-500));
         }
         
@@ -178,23 +202,15 @@
             background-color: hsl(var(--color-primary-500));
         }
 
-        /* Firefox scrollbar styling - Global */
-        * {
-            scrollbar-width: thin;
-            scrollbar-color: hsl(var(--color-primary-500)) #f3f4f6;
-        }
-        
-        .dark * {
-            scrollbar-color: hsl(var(--color-primary-400)) #1f2937;
-        }
-        
-        /* Firefox scrollbar styling - Custom scrollbar class */
+        /* Firefox scrollbar styling */
+        .app-main-scroll,
         .custom-scrollbar {
             scrollbar-width: thin;
             scrollbar-color: hsl(var(--color-primary-500)) #f3f4f6;
         }
+        .dark .app-main-scroll,
         .dark .custom-scrollbar {
-            scrollbar-color: hsl(var(--color-primary-400)) #111827;
+            scrollbar-color: hsl(var(--color-primary-400)) #1f2937;
         }
 
         /* Wide tables: one visible horizontal scrollbar (top), synced with hidden main bar */
@@ -217,6 +233,20 @@
         .table-horizontal-scroll-main::-webkit-scrollbar {
             display: none;
             height: 0;
+        }
+
+        /* Leaflet: clamp height so map tiles cannot inflate page scroll height */
+        .lead-location-map {
+            isolation: isolate;
+            overflow: hidden;
+        }
+        .lead-location-map .leaflet-container,
+        .lead-location-map .leaflet-map-pane,
+        .lead-location-map .leaflet-tile-pane,
+        .lead-location-map .leaflet-overlay-pane {
+            height: 100% !important;
+            max-height: 100% !important;
+            width: 100% !important;
         }
 
         /* Prevent chart background from changing on hover */

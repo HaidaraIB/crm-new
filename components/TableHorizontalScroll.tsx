@@ -22,6 +22,7 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
     const contentRef = useRef<HTMLDivElement>(null);
     const spacerRef = useRef<HTMLDivElement>(null);
     const isSyncingRef = useRef(false);
+    const userScrolledRef = useRef(false);
 
     const updateSpacerWidth = useCallback(() => {
         const content = contentRef.current;
@@ -34,22 +35,78 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
         spacer.style.width = `${Math.max(contentWidth, mainWidth)}px`;
     }, []);
 
+    /** RTL tables live in LTR scrollers; start at scrollWidth so the rightmost columns show first. */
+    const applyInitialHorizontalScroll = useCallback(() => {
+        if (userScrolledRef.current) return;
+        const top = topScrollRef.current;
+        const main = mainScrollRef.current;
+        if (!top || !main) return;
+
+        const maxScroll = Math.max(0, main.scrollWidth - main.clientWidth);
+        const isRtl = document.documentElement.dir === 'rtl';
+        const target = isRtl ? maxScroll : 0;
+
+        if (top.scrollLeft === target && main.scrollLeft === target) return;
+
+        isSyncingRef.current = true;
+        top.scrollLeft = target;
+        main.scrollLeft = target;
+        requestAnimationFrame(() => {
+            isSyncingRef.current = false;
+        });
+    }, []);
+
     useEffect(() => {
-        updateSpacerWidth();
+        userScrolledRef.current = false;
+
+        const runLayout = () => {
+            updateSpacerWidth();
+            requestAnimationFrame(() => {
+                applyInitialHorizontalScroll();
+                requestAnimationFrame(applyInitialHorizontalScroll);
+            });
+        };
+
+        runLayout();
         const content = contentRef.current;
         if (!content) return undefined;
-        const observer = new ResizeObserver(updateSpacerWidth);
+
+        const observer = new ResizeObserver(() => {
+            updateSpacerWidth();
+            if (!userScrolledRef.current) {
+                requestAnimationFrame(applyInitialHorizontalScroll);
+            }
+        });
         observer.observe(content);
         const table = content.querySelector('table');
         if (table) observer.observe(table);
+
+        const t = window.setTimeout(applyInitialHorizontalScroll, 150);
+
+        return () => {
+            observer.disconnect();
+            window.clearTimeout(t);
+        };
+    }, [children, updateSpacerWidth, applyInitialHorizontalScroll]);
+
+    useEffect(() => {
+        const html = document.documentElement;
+        const onDirChange = () => {
+            userScrolledRef.current = false;
+            updateSpacerWidth();
+            requestAnimationFrame(applyInitialHorizontalScroll);
+        };
+        const observer = new MutationObserver(onDirChange);
+        observer.observe(html, { attributes: true, attributeFilter: ['dir'] });
         return () => observer.disconnect();
-    }, [children, updateSpacerWidth]);
+    }, [updateSpacerWidth, applyInitialHorizontalScroll]);
 
     const syncScroll = useCallback((source: 'top' | 'main') => {
         if (isSyncingRef.current) return;
         const top = topScrollRef.current;
         const main = mainScrollRef.current;
         if (!top || !main) return;
+        userScrolledRef.current = true;
         const scrollLeft = source === 'top' ? top.scrollLeft : main.scrollLeft;
         isSyncingRef.current = true;
         top.scrollLeft = scrollLeft;

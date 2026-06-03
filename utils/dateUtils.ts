@@ -10,6 +10,47 @@ export const ARABIC_DATE_LOCALE = 'ar-EG';
 
 export { withLatinDigits, LATIN_DIGITS } from './latinNumerals';
 
+export type TimelineLanguage = 'en' | 'ar';
+
+/**
+ * Locale-aware date+time for lead timeline rows.
+ */
+export const formatTimelineDate = (
+    utcDateString: string | null | undefined,
+    language: TimelineLanguage = 'en'
+): string => {
+    const locale = language === 'ar' ? ARABIC_DATE_LOCALE : undefined;
+    const options: Intl.DateTimeFormatOptions = {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+    };
+    const opts = withLatinDigits(options);
+
+    if (!utcDateString) {
+        return new Date().toLocaleString(locale, opts);
+    }
+
+    try {
+        const date = new Date(utcDateString);
+        if (isNaN(date.getTime())) {
+            return new Date().toLocaleString(locale, opts);
+        }
+        return date.toLocaleString(locale, opts);
+    } catch (error) {
+        console.error('Error formatting timeline date:', error);
+        return new Date().toLocaleString(locale, opts);
+    }
+};
+
+/**
+ * Locale-aware datetime for call/visit detail chips in timeline.
+ */
+export const formatTimelineDetailDateTime = formatTimelineDate;
+
 /**
  * Converts a UTC date string (ISO format) to local date string (YYYY-MM-DD)
  * @param utcDateString - ISO date string from API (e.g., "2024-01-15T10:30:00Z")

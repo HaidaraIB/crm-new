@@ -498,6 +498,21 @@ const TheApp = () => {
         document.documentElement.lang = language;
         document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
     }, [language]);
+
+    // Single scroll container: main only (prevents body + main double scroll / white gap below app)
+    React.useEffect(() => {
+        if (!isLoggedIn) return undefined;
+        const html = document.documentElement;
+        const body = document.body;
+        const prevHtmlOverflow = html.style.overflow;
+        const prevBodyOverflow = body.style.overflow;
+        html.style.overflow = 'hidden';
+        body.style.overflow = 'hidden';
+        return () => {
+            html.style.overflow = prevHtmlOverflow;
+            body.style.overflow = prevBodyOverflow;
+        };
+    }, [isLoggedIn]);
     
     // Check for auth data in URL
     const [authProcessed, setAuthProcessed] = React.useState(() => {
@@ -901,7 +916,7 @@ const TheApp = () => {
         return <LoginPage />;
     }
     return (
-        <div className={`flex h-screen ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
+        <div className={`flex h-full min-h-0 overflow-hidden ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
             <Sidebar />
             {isSidebarOpen && (
                 <div
@@ -910,7 +925,7 @@ const TheApp = () => {
                     onClick={() => setIsSidebarOpen(false)}
                 ></div>
             )}
-            <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
                 <Header isInternetOnline={isInternetOnline} />
                 {/* Check if payment success message exists - if so, don't show email verification message */}
                 {!hasPaymentSuccessMessage && isLoggedIn && currentUser && currentUser.emailVerified === false && (
@@ -940,7 +955,7 @@ const TheApp = () => {
                         </button>
                     </div>
                 )}
-                <main className="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 dark:bg-gray-900">
+                <main className="app-main-scroll flex-1 min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain bg-gray-50 dark:bg-gray-900">
                     <CurrentPageContent currentPage={currentPage} />
                 </main>
             </div>

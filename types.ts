@@ -134,6 +134,7 @@ export interface TimelineEntry {
   followUpDate?: string; // Optional: formatted follow-up date for calls
   locationPhotoUrl?: string; // Optional: client location photo for field visits
   recordingUrl?: string; // Optional: PBX call recording playback URL
+  recordingStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'skipped' | string;
 }
 
 export interface ClientTask {

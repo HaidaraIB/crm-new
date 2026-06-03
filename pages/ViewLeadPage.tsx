@@ -456,6 +456,7 @@ export const ViewLeadPage = () => {
             const followUpDateFormatted = formatDetailDateTime(cc.follow_up_date);
             const isPbxCall = cc.source === 'pbx';
             const recordingUrl = (cc.pbx_recording_url ?? cc.pbxRecordingUrl) as string | undefined;
+            const recordingStatus = (cc.pbx_recording_status ?? cc.pbxRecordingStatus) as string | undefined;
 
             return {
                 id: `call-${cc.id}`,
@@ -473,6 +474,7 @@ export const ViewLeadPage = () => {
                 callDatetime: callDateTimeFormatted,
                 followUpDate: followUpDateFormatted,
                 recordingUrl: recordingUrl || undefined,
+                recordingStatus: recordingStatus || undefined,
             };
         });
 

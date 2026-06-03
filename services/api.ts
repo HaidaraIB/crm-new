@@ -3103,7 +3103,14 @@ export interface PbxHealthResponse {
   pbx_host_configured: boolean;
   ami_configured: boolean;
   pbx_host?: string;
+  webhook_url?: string;
   push_event_url_hint?: string;
+  push_event_connector_hint?: string;
+  recordings?: {
+    pending: number;
+    failed: number;
+    last_ready_at?: string | null;
+  };
   checks: {
     integration_enabled: boolean;
     pbx_host_configured: boolean;
@@ -3111,6 +3118,7 @@ export interface PbxHealthResponse {
     connector_online: boolean;
     extensions_mapped: boolean;
     events_received: boolean;
+    recordings_clear?: boolean;
   };
 }
 

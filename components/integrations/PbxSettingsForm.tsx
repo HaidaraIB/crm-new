@@ -356,12 +356,53 @@ export function PbxSettingsForm({
             <CheckRow ok={healthChecks.connector_online} label={t('pbxCheckConnector')} />
             <CheckRow ok={healthChecks.extensions_mapped} label={t('pbxCheckExtensions')} />
             <CheckRow ok={healthChecks.events_received} label={t('pbxCheckEvents')} />
+            {healthChecks.recordings_clear !== undefined ? (
+              <CheckRow ok={!!healthChecks.recordings_clear} label={t('pbxCheckRecordings')} />
+            ) : null}
           </ul>
-          <div className="text-sm text-gray-600 dark:text-gray-400 space-y-1">
+          {health?.recordings &&
+          (health.recordings.pending > 0 ||
+            health.recordings.failed > 0 ||
+            health.recordings.last_ready_at) ? (
+            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 space-y-1 text-sm">
+              <p className="font-medium text-gray-900 dark:text-gray-100">{t('pbxRecordingsPipeline')}</p>
+              {health.recordings.pending > 0 ? (
+                <p className="text-amber-700 dark:text-amber-300">
+                  {(t('pbxRecordingsPending') as string).replace(
+                    '{count}',
+                    String(health.recordings.pending)
+                  )}
+                </p>
+              ) : null}
+              {health.recordings.failed > 0 ? (
+                <p className="text-red-600 dark:text-red-400">
+                  {(t('pbxRecordingsFailed') as string).replace(
+                    '{count}',
+                    String(health.recordings.failed)
+                  )}
+                </p>
+              ) : null}
+              {health.recordings.last_ready_at ? (
+                <p className="text-gray-600 dark:text-gray-400">
+                  {(t('pbxRecordingsLastReady') as string).replace(
+                    '{time}',
+                    formatDateTimeToLocal(health.recordings.last_ready_at)
+                  )}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+          <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
             <p>
-              {t('pbxPushEventHint')}:{' '}
+              {t('pbxPushEventPrimaryHint')}{' '}
+              <span className="block font-mono text-xs text-gray-800 dark:text-gray-200 mt-1 break-all" dir="ltr">
+                {health?.webhook_url || settings?.webhook_url || health?.push_event_url_hint || '—'}
+              </span>
+            </p>
+            <p>
+              {t('pbxPushEventAltHint')}{' '}
               <span className="font-mono text-gray-800 dark:text-gray-200" dir="ltr">
-                {health?.push_event_url_hint || 'http://<connector-pc-ip>:8787'}
+                {health?.push_event_connector_hint || 'http://<connector-pc-ip>:8787'}
               </span>
             </p>
             <p>

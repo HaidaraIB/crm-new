@@ -396,16 +396,36 @@ export const Timeline = ({ history }: TimelineProps) => {
                                         </p>
                                     )}
 
-                                    {entry.recordingUrl ? (
-                                        <a
-                                            href={entry.recordingUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1.5 mt-2 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-                                            dir="ltr"
-                                        >
-                                            {t('playRecording')}
-                                        </a>
+                                    {entry.recordingStatus === 'ready' && entry.recordingUrl ? (
+                                        <div className="mt-2 flex flex-wrap items-center gap-3" dir="ltr">
+                                            <a
+                                                href={entry.recordingUrl}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                                            >
+                                                {t('playRecording')}
+                                            </a>
+                                            <a
+                                                href={entry.recordingUrl}
+                                                download
+                                                className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
+                                            >
+                                                {t('downloadRecording')}
+                                            </a>
+                                        </div>
+                                    ) : entry.recordingStatus === 'pending' || entry.recordingStatus === 'processing' ? (
+                                        <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
+                                            {t('recordingProcessing')}
+                                        </p>
+                                    ) : entry.recordingStatus === 'failed' ? (
+                                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                            {t('recordingUnavailable')}
+                                        </p>
+                                    ) : entry.recordingStatus === 'skipped' ? (
+                                        <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">
+                                            {t('recordingSkipped')}
+                                        </p>
                                     ) : null}
 
                                     {entry.type === 'field_visit' && entry.locationPhotoUrl && (

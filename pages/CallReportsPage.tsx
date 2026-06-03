@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Input, Loader } from '../components/index';
-import { getPbxReportsSummaryAPI, getPbxReportsAgentsAPI } from '../services/api';
+import { getPbxReportsSummaryAPI, getPbxReportsAgentsAPI, getPbxSettingsAPI } from '../services/api';
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -13,18 +13,26 @@ function FieldLabel({ children }: { children: React.ReactNode }) {
 }
 
 export const CallReportsPage = () => {
-  const { t } = useAppContext();
+  const { t, setCurrentPage } = useAppContext();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
+
+  const { data: pbxSettings, isLoading: pbxSettingsLoading } = useQuery({
+    queryKey: ['pbxSettings'],
+    queryFn: getPbxSettingsAPI,
+  });
+  const pbxEnabled = !!pbxSettings?.is_enabled;
 
   const summaryQuery = useQuery({
     queryKey: ['pbxReportsSummary', from, to],
     queryFn: () => getPbxReportsSummaryAPI({ from: from || undefined, to: to || undefined }),
+    enabled: pbxEnabled,
   });
 
   const agentsQuery = useQuery({
     queryKey: ['pbxReportsAgents', from, to],
     queryFn: () => getPbxReportsAgentsAPI({ from: from || undefined, to: to || undefined }),
+    enabled: pbxEnabled,
   });
 
   const summary = summaryQuery.data;
@@ -38,6 +46,25 @@ export const CallReportsPage = () => {
     { label: t('missed'), value: summary?.missed ?? 0 },
     { label: t('avgDuration'), value: summary?.avg_duration_sec ?? 0 },
   ];
+
+  if (pbxSettingsLoading) {
+    return (
+      <PageWrapper title={t('callReports')}>
+        <div className="flex justify-center py-12"><Loader /></div>
+      </PageWrapper>
+    );
+  }
+
+  if (!pbxEnabled) {
+    return (
+      <PageWrapper title={t('callReports')}>
+        <Card className="p-8 max-w-lg mx-auto text-center space-y-4">
+          <p className="text-gray-600 dark:text-gray-300">{t('callReportsPbxDisabled')}</p>
+          <Button onClick={() => setCurrentPage('PBX')}>{t('callReportsOpenPbxSettings')}</Button>
+        </Card>
+      </PageWrapper>
+    );
+  }
 
   return (
     <PageWrapper title={t('callReports')}>

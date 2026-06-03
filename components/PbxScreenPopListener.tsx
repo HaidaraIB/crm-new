@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { getNotificationsAPI, markNotificationReadAPI, type AppNotification } from '../services/api';
+import { getNotificationsAPI, getPbxSettingsAPI, markNotificationReadAPI, type AppNotification } from '../services/api';
 import { Button, Modal } from './index';
 
 /** Polls for PBX incoming-call notifications and shows a screen-pop modal on web. */
@@ -10,10 +10,19 @@ export const PbxScreenPopListener = () => {
   const [active, setActive] = useState<AppNotification | null>(null);
   const shownRef = useRef<Set<number>>(new Set());
 
+  const { data: pbxSettings } = useQuery({
+    queryKey: ['pbxSettings', 'screen-pop'],
+    queryFn: getPbxSettingsAPI,
+    staleTime: 60_000,
+  });
+  const screenPopActive =
+    !!pbxSettings?.is_enabled && pbxSettings.screen_pop_enabled !== false;
+
   const { data } = useQuery({
     queryKey: ['notifications', 'pbx-screen-pop'],
     queryFn: () => getNotificationsAPI({ page: 1, page_size: 20 }),
-    refetchInterval: 8000,
+    refetchInterval: screenPopActive ? 8000 : false,
+    enabled: screenPopActive,
   });
 
   useEffect(() => {

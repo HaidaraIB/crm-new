@@ -25,11 +25,13 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
 
     const updateSpacerWidth = useCallback(() => {
         const content = contentRef.current;
+        const main = mainScrollRef.current;
         const spacer = spacerRef.current;
         if (!content || !spacer) return;
         const table = content.querySelector('table');
-        const width = table?.scrollWidth ?? content.scrollWidth;
-        spacer.style.width = `${width}px`;
+        const contentWidth = table?.scrollWidth ?? content.scrollWidth;
+        const mainWidth = main?.scrollWidth ?? contentWidth;
+        spacer.style.width = `${Math.max(contentWidth, mainWidth)}px`;
     }, []);
 
     useEffect(() => {
@@ -38,6 +40,8 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
         if (!content) return undefined;
         const observer = new ResizeObserver(updateSpacerWidth);
         observer.observe(content);
+        const table = content.querySelector('table');
+        if (table) observer.observe(table);
         return () => observer.disconnect();
     }, [children, updateSpacerWidth]);
 
@@ -46,12 +50,10 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
         const top = topScrollRef.current;
         const main = mainScrollRef.current;
         if (!top || !main) return;
+        const scrollLeft = source === 'top' ? top.scrollLeft : main.scrollLeft;
         isSyncingRef.current = true;
-        if (source === 'top') {
-            main.scrollLeft = top.scrollLeft;
-        } else {
-            top.scrollLeft = main.scrollLeft;
-        }
+        top.scrollLeft = scrollLeft;
+        main.scrollLeft = scrollLeft;
         requestAnimationFrame(() => {
             isSyncingRef.current = false;
         });
@@ -65,14 +67,21 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
         <div className={['table-horizontal-scroll', 'relative min-w-0 w-full', className].filter(Boolean).join(' ')}>
             <div
                 ref={topScrollRef}
+                dir="ltr"
                 className="table-horizontal-scroll-top overflow-x-auto"
                 onScroll={() => syncScroll('top')}
                 aria-hidden
             >
                 <div ref={spacerRef} className="h-px" />
             </div>
-            <div ref={mainScrollRef} className={mainScrollCn} onScroll={() => syncScroll('main')}>
-                <div ref={contentRef}>{children}</div>
+            <div ref={mainScrollRef} dir="ltr" className={mainScrollCn} onScroll={() => syncScroll('main')}>
+                <div
+                    ref={contentRef}
+                    className="w-max min-w-full"
+                    dir={typeof document !== 'undefined' ? document.documentElement.dir || 'ltr' : 'ltr'}
+                >
+                    {children}
+                </div>
             </div>
         </div>
     );

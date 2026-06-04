@@ -9,6 +9,10 @@ import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, EditDealModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage } from './pages';
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
+import { MaintenanceScreen } from './components/MaintenanceScreen';
+import { fetchMaintenanceStatusAPI } from './services/api';
+import { subscribeMaintenanceMode } from './utils/maintenanceMode';
+import type { MaintenanceRetryResult } from './utils/maintenanceDisplay';
 
 /** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
 function CurrentPageContent({ currentPage }: { currentPage: Page }) {
@@ -149,6 +153,8 @@ const TheApp = () => {
     const [isInternetOnline, setIsInternetOnline] = React.useState<boolean>(() =>
         typeof navigator !== 'undefined' ? navigator.onLine : true,
     );
+    const [isMaintenanceMode, setIsMaintenanceMode] = React.useState(false);
+    const [maintenanceMessage, setMaintenanceMessage] = React.useState('');
     const previousInternetStatusRef = React.useRef<boolean>(isInternetOnline);
     const probeInFlightRef = React.useRef(false);
     
@@ -178,6 +184,37 @@ const TheApp = () => {
         
         return () => clearInterval(interval);
     }, []);
+
+    const checkMaintenanceStatus = React.useCallback(async (): Promise<MaintenanceRetryResult> => {
+        try {
+            const status = await fetchMaintenanceStatusAPI();
+            if (status.maintenance_mode) {
+                setIsMaintenanceMode(true);
+                setMaintenanceMessage(status.message || '');
+                return 'maintenance';
+            }
+            setIsMaintenanceMode(false);
+            setMaintenanceMessage('');
+            return 'online';
+        } catch {
+            return 'error';
+        }
+    }, []);
+
+    React.useEffect(() => {
+        void checkMaintenanceStatus();
+        const intervalId = window.setInterval(() => {
+            void checkMaintenanceStatus();
+        }, 30000);
+        const unsubscribe = subscribeMaintenanceMode((message) => {
+            setIsMaintenanceMode(true);
+            setMaintenanceMessage(message);
+        });
+        return () => {
+            window.clearInterval(intervalId);
+            unsubscribe();
+        };
+    }, [checkMaintenanceStatus]);
 
     React.useEffect(() => {
         const checkUrl = async (url: string): Promise<boolean> => {
@@ -812,6 +849,15 @@ const TheApp = () => {
             window.history.replaceState({}, '', clean);
         }
     }, []);
+
+    if (isMaintenanceMode) {
+        return (
+            <MaintenanceScreen
+                message={maintenanceMessage}
+                onRetry={checkMaintenanceStatus}
+            />
+        );
+    }
 
     // Check for verify-email route first (accessible for both logged-in and logged-out users)
     const pathnameRaw = decodeURIComponent(window.location.pathname);

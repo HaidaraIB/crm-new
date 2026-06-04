@@ -5,6 +5,8 @@
  * مفتاح الويب: `VITE_API_KEY_WEB` (يطابق `API_KEY_WEB` في السيرفر)، مع توافق خلفي مع `VITE_API_KEY`.
  */
 
+import { notifyMaintenanceMode } from '../utils/maintenanceMode';
+
 function normalizeApiBaseUrl(raw: string): string {
   if (!raw) return '';
   return raw.replace(/\/+$/, '');
@@ -28,7 +30,7 @@ function alignLocalApiHost(rawBaseUrl: string): string {
   return rawBaseUrl;
 }
 
-const BASE_URL = alignLocalApiHost(normalizeApiBaseUrl(import.meta.env.VITE_API_URL || ''));
+export const BASE_URL = alignLocalApiHost(normalizeApiBaseUrl(import.meta.env.VITE_API_URL || ''));
 /** يُرسل كـ X-API-Key — يجب أن يطابق قيمة API_KEY_WEB في الـ backend */
 const API_KEY =
   import.meta.env.VITE_API_KEY_WEB || import.meta.env.VITE_API_KEY || '';
@@ -47,6 +49,27 @@ function getHeadersWithApiKey(customHeaders: Record<string, string> = {}): Recor
     headers['X-API-Key'] = API_KEY;
   }
   return headers;
+}
+
+export type MaintenanceStatus = {
+  maintenance_mode: boolean;
+  message: string;
+};
+
+/** Public maintenance policy (no JWT). Used before app shell loads. */
+export async function fetchMaintenanceStatusAPI(): Promise<MaintenanceStatus> {
+  const headers: Record<string, string> = {};
+  if (API_KEY) headers['X-API-Key'] = API_KEY;
+  const uiLanguage = typeof window !== 'undefined' ? localStorage.getItem('language') : null;
+  if (uiLanguage === 'ar' || uiLanguage === 'en') {
+    headers['X-Language'] = uiLanguage;
+  }
+  const response = await fetch(`${BASE_URL}/public/maintenance-status/`, { headers });
+  const raw = await readJsonResponse(response);
+  if (!response.ok) {
+    throw new Error(getApiErrorMessage(raw, `HTTP ${response.status}`));
+  }
+  return unwrapApiSuccess<MaintenanceStatus>(raw);
 }
 
 /** Same auth headers as `apiRequest` for binary GETs (e.g. tenant chat attachment). */
@@ -356,6 +379,17 @@ async function apiRequest<T>(
 
   if (!response.ok) {
     const errorData = await readJsonResponse(response);
+    const code = getErrorCodeFromBody(errorData);
+    if (response.status === 503 && code === 'maintenance_mode') {
+      const maintenanceMessage = getApiErrorMessage(
+        errorData,
+        'The system is under maintenance. Please try again later.',
+      );
+      notifyMaintenanceMode(maintenanceMessage);
+      const maintenanceError: Error & { code?: string } = new Error(maintenanceMessage);
+      maintenanceError.code = 'maintenance_mode';
+      throw maintenanceError;
+    }
     const errorMessage =
       getApiErrorMessage(errorData, '') ||
       (typeof errorData === 'object' && errorData !== null
@@ -367,7 +401,6 @@ async function apiRequest<T>(
     const error: any = new Error(errorMessage);
     if (errorData && typeof errorData === 'object') {
       error.data = errorData;
-      const code = getErrorCodeFromBody(errorData);
       if (code) error.code = code;
       attachErrorFields(error, errorData);
     }

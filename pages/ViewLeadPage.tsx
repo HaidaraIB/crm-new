@@ -9,9 +9,10 @@ import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
-import { getConnectedAccountAPI, getPbxSettingsAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
+import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
+import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import {
     clientLocationEventTranslationKey,
@@ -32,11 +33,7 @@ import { MarqueeText } from '../components/MarqueeText';
 export const ViewLeadPage = () => {
     const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     
-    const { data: pbxSettings } = useQuery({
-        queryKey: ['pbxSettings'],
-        queryFn: getPbxSettingsAPI,
-    });
-    const pbxEnabled = !!pbxSettings?.is_enabled;
+    const canPbxDial = usePbxDialEnabled();
 
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
     const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
@@ -828,7 +825,7 @@ export const ViewLeadPage = () => {
                                     variant="details"
                                     phoneNumbers={displayLead.phoneNumbers}
                                     fallbackPhone={displayLead.phone}
-                                    pbxEnabled={pbxEnabled}
+                                    pbxEnabled={canPbxDial}
                                     onSms={(phone) => setSendSMSModal({ phone })}
                                     onWhatsApp={(phone) => setSendWhatsAppModal({ phone })}
                                     onPbxDial={handlePbxDial}

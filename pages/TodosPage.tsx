@@ -692,8 +692,8 @@ export const TodosPage = () => {
                         )}
                     </div>
 
-                    {/* Filters - only show for active todos or overdue follow-ups */}
-                    {(calendarOverdueOnly || activeTab === 'active') && !stagesLoading && (
+                    {/* Stage filters for active and completed todos */}
+                    {!stagesLoading && (
                         <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <Button variant={activeFilter === 'all' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('all')}><ListIcon className="w-4 h-4" /> {t('all')}</Button>
                             {availableStages.length > 0 ? (

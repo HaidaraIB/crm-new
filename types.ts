@@ -225,6 +225,21 @@ export interface LeadFilters {
   search: string; // Search by name or phone
 }
 
+/** Query params sent to GET /clients/ and /clients/status-counts/ */
+export interface LeadApiFilters {
+  type?: string;
+  priority?: string;
+  search?: string;
+  status?: string;
+  assignedTo?: string;
+  assignedToMe?: boolean;
+  communicationWay?: string;
+  budgetMin?: string;
+  budgetMax?: string;
+  createdAtFrom?: string;
+  createdAtTo?: string;
+}
+
 export interface Deal {
   id: number;
   clientName: string;

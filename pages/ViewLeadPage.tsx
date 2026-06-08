@@ -5,7 +5,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, LeadStatusDropdown, LeadStatusBadge, LeadContactPhoneList } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
-import { formatDateToLocal, formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
+import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
@@ -1113,8 +1113,12 @@ export const ViewLeadPage = () => {
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('createdAt')}</label>
                             <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
-                                {(displayLead as any).created_at ? formatDateToLocal((displayLead as any).created_at) : 
-                                 displayLead.createdAt ? formatDateToLocal(displayLead.createdAt) : '-'}
+                                {(() => {
+                                    const createdAt = (displayLead as any).created_at || displayLead.createdAt;
+                                    return createdAt
+                                        ? formatTimelineDate(createdAt, language === 'ar' ? 'ar' : 'en')
+                                        : '-';
+                                })()}
                             </p>
                         </div>
                         <div>

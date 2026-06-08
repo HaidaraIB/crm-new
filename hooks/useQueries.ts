@@ -6,10 +6,11 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
+import type { LeadApiFilters } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
+  getLeadsAPI, getLeadStatusCountsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
@@ -57,7 +58,8 @@ export const queryKeys = {
   currentUser: ['currentUser'] as const,
   users: (page?: number, pageSize?: number, filters?: { roles?: string[]; excludeRoles?: string[] }) =>
     ['users', page ?? 'all', pageSize ?? 'default', filters?.roles?.join('|') ?? '', filters?.excludeRoles?.join('|') ?? ''] as const,
-  leads: (filters?: { type?: string; priority?: string; search?: string }, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
+  leads: (filters?: LeadApiFilters, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
+  leadStatusCounts: (filters?: LeadApiFilters) => ['leadStatusCounts', filters] as const,
   deals: (page?: number, pageSize?: number) => ['deals', page ?? 'all', pageSize ?? 'default'] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
@@ -135,7 +137,7 @@ export const useUsers = (
 };
 
 export const useLeads = (
-  filters?: { type?: string; priority?: string; search?: string },
+  filters?: LeadApiFilters,
   page?: number,
   options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
   pageSize?: number
@@ -150,6 +152,18 @@ export const useLeads = (
       return data;
     },
     staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+export const useLeadStatusCounts = (
+  filters?: LeadApiFilters,
+  options?: Omit<UseQueryOptions<Record<string, number>, Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.leadStatusCounts(filters),
+    queryFn: () => getLeadStatusCountsAPI(filters),
+    staleTime: 1 * 60 * 1000,
     ...options,
   });
 };
@@ -536,8 +550,8 @@ export const useCreateLead = (options?: UseMutationOptions<any, Error, any>) => 
   return useMutation({
     mutationFn: (data: any) => createLeadAPI(data),
     onSuccess: () => {
-      // Invalidate all leads queries regardless of filters
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
     },
     ...options,
   });
@@ -548,8 +562,8 @@ export const useUpdateLead = (options?: UseMutationOptions<any, Error, { id: num
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateLeadAPI(id, data),
     onSuccess: (data, variables) => {
-      // Invalidate all leads queries regardless of filters
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       // Invalidate events for this specific lead to show updates in timeline
       queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.id) });
       // Also invalidate client tasks since they might be related
@@ -566,8 +580,8 @@ export const useDeleteLead = (options?: UseMutationOptions<void, Error, number>)
   return useMutation({
     mutationFn: (id: number) => deleteLeadAPI(id),
     onSuccess: () => {
-      // Invalidate all leads queries regardless of filters to refresh tables without manual reload
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
     },
     ...options,
   });
@@ -578,8 +592,8 @@ export const useAssignLeads = (options?: UseMutationOptions<any, Error, { client
   return useMutation({
     mutationFn: ({ clientIds, userId }: { clientIds: number[]; userId: number | null }) => bulkAssignLeadsAPI(clientIds, userId),
     onSuccess: (_, variables) => {
-      // Invalidate all leads queries to refresh the list with new assignments
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       // Invalidate events for all affected leads
       variables.clientIds.forEach(id => {
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(id) });
@@ -599,6 +613,7 @@ export const useAssignUnassignedClients = (options?: UseMutationOptions<any, Err
     mutationFn: () => assignUnassignedClientsAPI(),
     onSuccess: async (data, variables, onMutateResult, context) => {
       await queryClient.invalidateQueries({ queryKey: ['leads'] });
+      await queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       await queryClient.invalidateQueries({ queryKey: ['clientEvents'] });
       await queryClient.refetchQueries({ queryKey: ['leads'] });
       userOnSuccess?.(data, variables, onMutateResult, context);

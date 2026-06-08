@@ -6,6 +6,7 @@
  */
 
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
+import type { LeadApiFilters } from '../types';
 
 function normalizeApiBaseUrl(raw: string): string {
   if (!raw) return '';
@@ -1869,6 +1870,25 @@ export const toggleSupervisorActiveAPI = async (id: number) => {
 
 // ==================== Leads APIs (Clients in API) ====================
 
+function appendLeadApiFilters(queryParams: URLSearchParams, filters?: LeadApiFilters) {
+  if (!filters) return;
+  if (filters.type && filters.type !== 'All') queryParams.append('type', filters.type.toLowerCase());
+  if (filters.priority && filters.priority !== 'All') queryParams.append('priority', filters.priority.toLowerCase());
+  if (filters.search) queryParams.append('search', filters.search);
+  if (filters.status && filters.status !== 'All') queryParams.append('status', filters.status);
+  if (filters.assignedToMe) queryParams.append('assigned_to_me', 'true');
+  else if (filters.assignedTo && filters.assignedTo !== 'All') {
+    queryParams.append('assigned_to', filters.assignedTo);
+  }
+  if (filters.communicationWay && filters.communicationWay !== 'All') {
+    queryParams.append('communication_way', filters.communicationWay);
+  }
+  if (filters.budgetMin) queryParams.append('budget_min', filters.budgetMin);
+  if (filters.budgetMax) queryParams.append('budget_max', filters.budgetMax);
+  if (filters.createdAtFrom) queryParams.append('created_at_from', filters.createdAtFrom);
+  if (filters.createdAtTo) queryParams.append('created_at_to', filters.createdAtTo);
+}
+
 /**
  * الحصول على جميع Clients (Leads في Frontend)
  * GET /api/clients/
@@ -1876,14 +1896,12 @@ export const toggleSupervisorActiveAPI = async (id: number) => {
  * Response: { count, next, previous, results: Client[] }
  */
 export const getLeadsAPI = async (
-  filters?: { type?: string; priority?: string; search?: string },
+  filters?: LeadApiFilters,
   page?: number,
   pageSize?: number
 ) => {
   const queryParams = new URLSearchParams();
-  if (filters?.type && filters.type !== 'All') queryParams.append('type', filters.type.toLowerCase());
-  if (filters?.priority && filters.priority !== 'All') queryParams.append('priority', filters.priority.toLowerCase());
-  if (filters?.search) queryParams.append('search', filters.search);
+  appendLeadApiFilters(queryParams, filters);
   if (typeof page === 'number') queryParams.append('page', String(page));
   if (typeof pageSize === 'number') queryParams.append('page_size', String(pageSize));
   
@@ -1893,6 +1911,19 @@ export const getLeadsAPI = async (
     return apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint);
   }
   return fetchAllPaginatedPages<any>(endpoint);
+};
+
+/**
+ * Global per-status lead counts for tab badges (excludes status filter).
+ * GET /api/clients/status-counts/
+ */
+export const getLeadStatusCountsAPI = async (filters?: LeadApiFilters) => {
+  const queryParams = new URLSearchParams();
+  const { status: _status, ...rest } = filters || {};
+  appendLeadApiFilters(queryParams, rest);
+  const queryString = queryParams.toString();
+  const endpoint = `/clients/status-counts/${queryString ? `?${queryString}` : ''}`;
+  return apiRequest<Record<string, number>>(endpoint);
 };
 
 /**

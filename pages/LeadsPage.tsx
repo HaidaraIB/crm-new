@@ -6,8 +6,8 @@ import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon,
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
-import { Lead } from '../types';
-import { useLeads, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
+import { Lead, LeadApiFilters } from '../types';
+import { useLeads, useLeadStatusCounts, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { getPbxSettingsAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
@@ -15,8 +15,8 @@ import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
-import { formatLeadBudget, leadBudgetOverlapsFilter } from '../utils/budgetRange';
-import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import { formatLeadBudget } from '../utils/budgetRange';
+import { ARABIC_DATE_LOCALE, formatTimelineDate, withLatinDigits } from '../utils/dateUtils';
 import { MarqueeText } from '../components/MarqueeText';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -80,21 +80,57 @@ export const LeadsPage = () => {
     );
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
     const [leadsPageSize, setLeadsPageSize] = useState(20);
-    
-    // Determine API filters based on current page
-    const apiFilters = useMemo(() => {
-        const filters: { type?: string; priority?: string; search?: string } = {};
-        if (currentPage === 'Fresh Leads') filters.type = 'fresh';
-        if (currentPage === 'Hot Leads') filters.type = 'hot';
-        else if (currentPage === 'Cold Leads') filters.type = 'cold';
-        else if (currentPage === 'Rotated Leads') filters.type = 'rotated';
-        if (leadFilters.search) filters.search = leadFilters.search;
-        if (leadFilters.priority && leadFilters.priority !== 'All') filters.priority = leadFilters.priority.toLowerCase();
-        return filters;
-    }, [currentPage, leadFilters]);
+    const [activeStatusFilter, setActiveStatusFilter] = useState<Lead['status']>('All');
 
-    // Fetch leads using React Query
+    const apiFilters = useMemo((): LeadApiFilters => {
+        const filters: LeadApiFilters = {};
+
+        switch (currentPage) {
+            case 'Fresh Leads': filters.type = 'fresh'; break;
+            case 'Hot Leads': filters.type = 'hot'; break;
+            case 'Cold Leads': filters.type = 'cold'; break;
+            case 'My Leads': filters.assignedToMe = true; break;
+            case 'Rotated Leads': filters.type = 'rotated'; break;
+            default:
+                if (leadFilters.type && leadFilters.type !== 'All') {
+                    filters.type = leadFilters.type.toLowerCase();
+                }
+                break;
+        }
+
+        if (leadFilters.search) filters.search = leadFilters.search;
+        if (leadFilters.priority && leadFilters.priority !== 'All') {
+            filters.priority = leadFilters.priority.toLowerCase();
+        }
+
+        if (leadFilters.status && leadFilters.status !== 'All') {
+            filters.status = leadFilters.status;
+        } else if (activeStatusFilter !== 'All') {
+            filters.status = activeStatusFilter;
+        }
+
+        if (currentPage !== 'My Leads' && leadFilters.assignedTo && leadFilters.assignedTo !== 'All') {
+            filters.assignedTo = leadFilters.assignedTo === 'Unassigned' ? 'unassigned' : leadFilters.assignedTo;
+        }
+
+        if (leadFilters.communicationWay && leadFilters.communicationWay !== 'All') {
+            filters.communicationWay = leadFilters.communicationWay;
+        }
+        if (leadFilters.budgetMin) filters.budgetMin = leadFilters.budgetMin;
+        if (leadFilters.budgetMax) filters.budgetMax = leadFilters.budgetMax;
+        if (leadFilters.createdAtFrom) filters.createdAtFrom = leadFilters.createdAtFrom;
+        if (leadFilters.createdAtTo) filters.createdAtTo = leadFilters.createdAtTo;
+
+        return filters;
+    }, [currentPage, leadFilters, activeStatusFilter]);
+
+    const statusCountsFilters = useMemo((): LeadApiFilters => {
+        const { status: _status, ...rest } = apiFilters;
+        return rest;
+    }, [apiFilters]);
+
     const { data: leadsResponse, isLoading: leadsLoading, error: leadsError } = useLeads(apiFilters, leadsPageNumber, undefined, leadsPageSize);
+    const { data: statusCounts } = useLeadStatusCounts(statusCountsFilters);
     const allLeads = leadsResponse?.results || [];
     const totalLeadsCount = leadsResponse?.count || 0;
     const hasNextPage = Boolean(leadsResponse?.next);
@@ -104,13 +140,8 @@ export const LeadsPage = () => {
     const paginationItems = getPaginationItems(leadsPageNumber, totalPages);
 
     useEffect(() => {
-        // Reset to first page when lead filters / category change
         setLeadsPageNumber(1);
-    }, [currentPage, apiFilters.type, apiFilters.priority, apiFilters.search]);
-
-    useEffect(() => {
-        setLeadsPageNumber(1);
-    }, [leadsPageSize]);
+    }, [currentPage, apiFilters, leadsPageSize]);
     // Normalize API fields to frontend naming for consistent rendering (phone_numbers -> phoneNumbers, etc.)
     const normalizedLeads = React.useMemo(() => {
         return (allLeads || []).map((l: any) => ({
@@ -325,11 +356,10 @@ export const LeadsPage = () => {
         }
         return ['All'];
     }, [statuses]);
-    const [activeStatusFilter, setActiveStatusFilter] = useState<Lead['status']>('All');
     const [isImportLeadsModalOpen, setIsImportLeadsModalOpen] = useState(false);
 
     const handleExportLeads = () => {
-        const rows = filteredLeads.map((l: Lead & { assigned_to_username?: string; campaign_name?: string }) => {
+        const rows = normalizedLeads.map((l: Lead & { assigned_to_username?: string; campaign_name?: string }) => {
             const phone = l.phone || (l.phoneNumbers && l.phoneNumbers.length > 0
                 ? (l.phoneNumbers.find(p => p.is_primary) || l.phoneNumbers[0]).phone_number
                 : '');
@@ -412,127 +442,6 @@ export const LeadsPage = () => {
     const pageTitleKey = (currentPage.charAt(0).toLowerCase() + currentPage.slice(1).replace(/\s/g, '')) as Parameters<typeof t>[0];
     const pageTitle = t(pageTitleKey);
     
-    // Calculate filtered leads without status filter (for tab counts)
-    const filteredLeadsWithoutStatus = useMemo(() => {
-        let leads = normalizedLeads;
-        
-        // 1. Filter by sidebar page type
-        switch (currentPage) {
-            case 'Fresh Leads': leads = leads.filter(l => (l.type?.toLowerCase() || '') === 'fresh'); break;
-            case 'Hot Leads': leads = leads.filter(l => (l.type?.toLowerCase() || '') === 'hot'); break;
-            case 'Cold Leads': leads = leads.filter(l => (l.type?.toLowerCase() || '') === 'cold'); break;
-            case 'My Leads': 
-                if (currentUser?.id) {
-                    leads = leads.filter(l => {
-                        // Use assigned_to from API if available, otherwise fallback to assignedTo
-                        const assignedToId = (l as any).assigned_to || l.assignedTo;
-                        return assignedToId === currentUser.id;
-                    });
-                }
-                break;
-            case 'Rotated Leads': leads = leads.filter(l => l.type === 'Rotated'); break;
-            default: break; // All Leads
-        }
-
-        // Note: Status filter is applied separately in filteredLeads
-
-        // 3. Apply filters from FilterDrawer (excluding status filter for tab counts)
-        if (leadFilters.type && leadFilters.type !== 'All') {
-            leads = leads.filter(l => (l.type?.toLowerCase() || '') === leadFilters.type.toLowerCase());
-        }
-
-        if (leadFilters.priority && leadFilters.priority !== 'All') {
-            leads = leads.filter(l => (l.priority?.toLowerCase() || '') === leadFilters.priority.toLowerCase());
-        }
-
-        if (leadFilters.assignedTo && leadFilters.assignedTo !== 'All') {
-            if (leadFilters.assignedTo === 'Unassigned') {
-                leads = leads.filter(l => !((l as any).assigned_to || l.assignedTo));
-            } else {
-                leads = leads.filter(l => {
-                    // Use assigned_to from API if available, otherwise fallback to assignedTo
-                    const assignedToId = (l as any).assigned_to || l.assignedTo;
-                    return assignedToId === parseInt(leadFilters.assignedTo);
-                });
-            }
-        }
-
-        if (leadFilters.communicationWay && leadFilters.communicationWay !== 'All') {
-            leads = leads.filter(l => l.communicationWay === leadFilters.communicationWay);
-        }
-
-        if (leadFilters.budgetMin || leadFilters.budgetMax) {
-            const minBudget = leadFilters.budgetMin ? parseFloat(leadFilters.budgetMin) : -Infinity;
-            const maxBudget = leadFilters.budgetMax ? parseFloat(leadFilters.budgetMax) : Infinity;
-            if (!isNaN(minBudget) && !isNaN(maxBudget)) {
-                const lo = Math.min(minBudget, maxBudget);
-                const hi = Math.max(minBudget, maxBudget);
-                leads = leads.filter((l) => leadBudgetOverlapsFilter(l as any, lo, hi));
-            }
-        }
-
-        if (leadFilters.createdAtFrom) {
-            leads = leads.filter(l => {
-                const createdAt = (l as any).created_at || l.createdAt;
-                if (!createdAt) return false;
-                const leadDate = new Date(createdAt);
-                const filterDate = new Date(leadFilters.createdAtFrom);
-                return leadDate >= filterDate;
-            });
-        }
-
-        if (leadFilters.createdAtTo) {
-            leads = leads.filter(l => {
-                const createdAt = (l as any).created_at || l.createdAt;
-                if (!createdAt) return false;
-                const leadDate = new Date(createdAt);
-                const filterDate = new Date(leadFilters.createdAtTo);
-                // Set to end of day for inclusive comparison
-                filterDate.setHours(23, 59, 59, 999);
-                return leadDate <= filterDate;
-            });
-        }
-
-        if (leadFilters.search) {
-            const searchLower = leadFilters.search.toLowerCase();
-            const leadCompany = (l: any) => l.leadCompanyName ?? l.lead_company_name ?? '';
-            const leadProfession = (l: any) => (l.profession != null ? String(l.profession) : '');
-            const leadNotes = (l: any) => (l.notes != null ? String(l.notes) : '');
-            leads = leads.filter(l => 
-                l.name.toLowerCase().includes(searchLower) || 
-                l.phone.includes(searchLower) ||
-                (leadCompany(l) && String(leadCompany(l)).toLowerCase().includes(searchLower)) ||
-                leadProfession(l).toLowerCase().includes(searchLower) ||
-                leadNotes(l).toLowerCase().includes(searchLower)
-            );
-        }
-
-        return leads;
-    }, [currentPage, allLeads, leadFilters, currentUser, statuses]);
-
-    // Apply status filter to get final filtered leads
-    const filteredLeads = useMemo(() => {
-        let leads = filteredLeadsWithoutStatus;
-
-        // Apply status filter from FilterDrawer if set (takes priority over activeStatusFilter)
-        if (leadFilters.status && leadFilters.status !== 'All') {
-            leads = leads.filter(l => {
-                const statusName = (l as any).status_name || 
-                    (l.status ? statuses.find(s => s.id.toString() === l.status.toString() || s.name === l.status)?.name : null);
-                return statusName === leadFilters.status;
-            });
-        } else if(activeStatusFilter !== 'All') {
-            // Filter by quick status tabs only if no status filter from FilterDrawer
-            leads = leads.filter(l => {
-                const statusName = (l as any).status_name || 
-                    (l.status ? statuses.find(s => s.id.toString() === l.status.toString() || s.name === l.status)?.name : null);
-                return statusName === activeStatusFilter;
-            });
-        }
-
-        return leads;
-    }, [filteredLeadsWithoutStatus, activeStatusFilter, leadFilters.status, statuses]);
-
     const handleCheckChange = (leadId: number, isChecked: boolean) => {
         setCheckedLeadIds(prev => {
             const newSet = new Set(prev);
@@ -547,13 +456,13 @@ export const LeadsPage = () => {
 
     const handleSelectAll = (isChecked: boolean) => {
         if(isChecked) {
-            setCheckedLeadIds(new Set(filteredLeads.map(l => l.id)));
+            setCheckedLeadIds(new Set(normalizedLeads.map(l => l.id)));
         } else {
             setCheckedLeadIds(new Set());
         }
     };
     
-    const isAllSelected = filteredLeads.length > 0 && checkedLeadIds.size === filteredLeads.length;
+    const isAllSelected = normalizedLeads.length > 0 && checkedLeadIds.size === normalizedLeads.length;
 
     if (leadsLoading) {
         return (
@@ -598,7 +507,7 @@ export const LeadsPage = () => {
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
                         <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto shrink-0"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
                         {!isDataEntryUser && (
-                        <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={filteredLeads.length === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{t('export')}</span><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>
+                        <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={normalizedLeads.length === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{t('export')}</span><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>
                         )}
                         <Button variant="secondary" onClick={() => setIsImportLeadsModalOpen(true)} className="w-full sm:w-auto shrink-0" title={t('importLeads') || 'Import from Excel'}><span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importLeads') || 'Import from Excel'}</span></Button>
                         <Button onClick={() => {
@@ -652,14 +561,7 @@ export const LeadsPage = () => {
         >
             <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-thin">
                 {leadStatusFilters.map(status => {
-                    // Calculate count from filtered leads (without status filter)
-                    const count = status === 'All' 
-                        ? filteredLeadsWithoutStatus.length 
-                        : filteredLeadsWithoutStatus.filter(l => {
-                            const statusName = (l as any).status_name || 
-                                (l.status ? statuses.find(s => s.id.toString() === l.status.toString() || s.name === l.status)?.name : null);
-                            return statusName === status;
-                        }).length;
+                    const count = statusCounts?.[status] ?? 0;
                     
                     const statusConfig = status === 'All' ? null : statuses.find(s => s.name === status);
                     
@@ -763,7 +665,7 @@ export const LeadsPage = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filteredLeads.map(lead => {
+                                    {normalizedLeads.map(lead => {
                                         // Get assigned user info - use assigned_to from API if available
                                         const assignedToId = (lead as any).assigned_to || lead.assignedTo;
                                         const assignedToUsername = (lead as any).assigned_to_username;
@@ -988,11 +890,12 @@ export const LeadsPage = () => {
                                                     {lead.lastFeedback || (lead as any).last_feedback || '-'}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
-                                                    {(lead as any).created_at ? 
-                                                        new Date((lead as any).created_at).toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : 
-                                                        lead.createdAt ? 
-                                                            new Date(lead.createdAt).toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : 
-                                                            '-'}
+                                                    {(() => {
+                                                        const createdAt = (lead as any).created_at || lead.createdAt;
+                                                        return createdAt
+                                                            ? formatTimelineDate(createdAt, language === 'ar' ? 'ar' : 'en')
+                                                            : '-';
+                                                    })()}
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 text-center">
                                                     {isDataEntryUser ? (
@@ -1029,7 +932,7 @@ export const LeadsPage = () => {
                 <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
                     <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                         {totalLeadsCount > 0
-                            ? `${t('showing')} ${allLeads.length} ${t('of')} ${totalLeadsCount}`
+                            ? `${t('showing')} ${normalizedLeads.length} ${t('of')} ${totalLeadsCount}`
                             : t('noLeadsFound')}
                     </p>
                     <div className="flex items-center gap-2" dir="ltr">

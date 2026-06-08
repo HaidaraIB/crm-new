@@ -1926,6 +1926,21 @@ export const getLeadStatusCountsAPI = async (filters?: LeadApiFilters) => {
   return apiRequest<Record<string, number>>(endpoint);
 };
 
+export type MissionBarSummary = {
+  contact_today: number;
+  overdue_follow_ups: number;
+  today_new_leads: number;
+  unassigned_leads: number;
+};
+
+/**
+ * Dashboard mission bar counts (server-side aggregates).
+ * GET /api/clients/mission-bar-summary/
+ */
+export const getMissionBarSummaryAPI = async () => {
+  return apiRequest<MissionBarSummary>('/clients/mission-bar-summary/');
+};
+
 /**
  * إنشاء Client جديد (Lead)
  * POST /api/clients/

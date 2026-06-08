@@ -10,7 +10,7 @@ import type { LeadApiFilters } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getLeadStatusCountsAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
+  getLeadsAPI, getLeadStatusCountsAPI, getMissionBarSummaryAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
@@ -52,6 +52,7 @@ import {
   dismissAIInsightAPI,
   runAIAnalysisAPI,
 } from '../services/api';
+import type { MissionBarSummary } from '../services/api';
 
 // ==================== Query Keys ====================
 export const queryKeys = {
@@ -60,6 +61,7 @@ export const queryKeys = {
     ['users', page ?? 'all', pageSize ?? 'default', filters?.roles?.join('|') ?? '', filters?.excludeRoles?.join('|') ?? ''] as const,
   leads: (filters?: LeadApiFilters, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
   leadStatusCounts: (filters?: LeadApiFilters) => ['leadStatusCounts', filters] as const,
+  missionBarSummary: ['missionBarSummary'] as const,
   deals: (page?: number, pageSize?: number) => ['deals', page ?? 'all', pageSize ?? 'default'] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
@@ -163,6 +165,17 @@ export const useLeadStatusCounts = (
   return useQuery({
     queryKey: queryKeys.leadStatusCounts(filters),
     queryFn: () => getLeadStatusCountsAPI(filters),
+    staleTime: 1 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useMissionBarSummary = (
+  options?: Omit<UseQueryOptions<MissionBarSummary, Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.missionBarSummary,
+    queryFn: () => getMissionBarSummaryAPI(),
     staleTime: 1 * 60 * 1000,
     ...options,
   });
@@ -552,6 +565,7 @@ export const useCreateLead = (options?: UseMutationOptions<any, Error, any>) => 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
     },
     ...options,
   });
@@ -568,6 +582,7 @@ export const useUpdateLead = (options?: UseMutationOptions<any, Error, { id: num
       queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.id) });
       // Also invalidate client tasks since they might be related
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       // Return the updated data so components can use it
       return data;
     },
@@ -582,6 +597,7 @@ export const useDeleteLead = (options?: UseMutationOptions<void, Error, number>)
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
     },
     ...options,
   });
@@ -594,6 +610,7 @@ export const useAssignLeads = (options?: UseMutationOptions<any, Error, { client
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       // Invalidate events for all affected leads
       variables.clientIds.forEach(id => {
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(id) });
@@ -614,6 +631,7 @@ export const useAssignUnassignedClients = (options?: UseMutationOptions<any, Err
     onSuccess: async (data, variables, onMutateResult, context) => {
       await queryClient.invalidateQueries({ queryKey: ['leads'] });
       await queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
+      await queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       await queryClient.invalidateQueries({ queryKey: ['clientEvents'] });
       await queryClient.refetchQueries({ queryKey: ['leads'] });
       userOnSuccess?.(data, variables, onMutateResult, context);
@@ -763,6 +781,7 @@ export const useCreateClientTask = (options?: UseMutationOptions<any, Error, any
     mutationFn: (data: any) => createClientTaskAPI(data),
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
       // Also invalidate events for this lead if task creation triggers an event
@@ -780,6 +799,7 @@ export const useUpdateClientTask = (options?: UseMutationOptions<any, Error, { i
     mutationFn: ({ id, data }: { id: number; data: any }) => updateClientTaskAPI(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
@@ -793,6 +813,7 @@ export const useDeleteClientTask = (options?: UseMutationOptions<void, Error, nu
     mutationFn: (id: number) => deleteClientTaskAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
@@ -1528,6 +1549,7 @@ export const useApproveAIInsight = (language?: string) => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['aiInsightsDashboard'] });
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
     },
   });
 };

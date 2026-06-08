@@ -5,9 +5,17 @@ import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, C
 import { Todo, TaskStage } from '../types';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { isSameDay, ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import {
+    readMissionBarTodosPreset,
+    clearMissionBarTodosPreset,
+    isOverdueFollowUpTask,
+    type MissionBarTodosPreset,
+} from '../utils/missionBarNavigation';
 import { useTasks, useUpdateTask, useDeleteTask, useStages, useDeals, useClientTasks, useClientCalls, useDeleteClientTask, useDeleteClientCall, useCallMethods } from '../hooks/useQueries';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+type FilterType = 'all' | string;
 
 // Map stage categories to icons
 const getStageIcon = (stage: TaskStage) => {
@@ -31,7 +39,15 @@ const getPaginationItems = (current: number, total: number): Array<number | 'ell
 };
 
 export const TodosPage = () => {
-    const { t, setIsAddTodoModalOpen, language, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
+    const {
+        t,
+        setIsAddTodoModalOpen,
+        language,
+        setConfirmDeleteConfig,
+        setIsConfirmDeleteModalOpen,
+        todosPagePreset,
+        setTodosPagePreset,
+    } = useAppContext();
     
     // Load selected date from localStorage or default to today
     // Use 'all' string to represent null (All option)
@@ -52,6 +68,9 @@ export const TodosPage = () => {
     });
     
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+    const [calendarOverdueOnly, setCalendarOverdueOnly] = useState(
+        () => readMissionBarTodosPreset() === 'overdue',
+    );
     
     // Load active tab from localStorage or default to 'active'
     const [activeTab, setActiveTab] = useState<'active' | 'completed'>(() => {
@@ -66,7 +85,38 @@ export const TodosPage = () => {
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
     const [todosPageNumber, setTodosPageNumber] = useState(1);
     const [todosPageSize, setTodosPageSize] = useState(20);
+
+    const applyMissionPreset = (preset: MissionBarTodosPreset) => {
+        if (preset === 'overdue') {
+            setCalendarOverdueOnly(true);
+            setSelectedDate(null);
+            setActiveTab('active');
+            return;
+        }
+        setCalendarOverdueOnly(false);
+        clearMissionBarTodosPreset();
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        setSelectedDate(today);
+        setActiveTab('active');
+    };
+
+    const exitOverdueFollowUpsView = () => {
+        setCalendarOverdueOnly(false);
+        clearMissionBarTodosPreset();
+    };
     
+    useEffect(() => {
+        if (todosPagePreset) {
+            applyMissionPreset(todosPagePreset);
+            setTodosPagePreset(null);
+            return;
+        }
+        if (readMissionBarTodosPreset() === 'overdue') {
+            applyMissionPreset('overdue');
+        }
+    }, [todosPagePreset, setTodosPagePreset]);
+
     // Save selected date to localStorage when it changes
     // Save 'all' string when selectedDate is null (All option)
     useEffect(() => {
@@ -236,6 +286,11 @@ export const TodosPage = () => {
             ...transformedClientCalls,
         ];
     }, [allTasks, transformedClientTasks, transformedClientCalls]);
+
+    const overdueFollowUpTasks = useMemo(
+        () => allCombinedTasks.filter((task) => isOverdueFollowUpTask(task)),
+        [allCombinedTasks],
+    );
 
     // Separate active and completed todos - check if reminder_date has passed
     // Note: API doesn't have a "completed" field, so we use reminder_date logic
@@ -436,38 +491,78 @@ export const TodosPage = () => {
         }
         return stages || [];
     }, [stages, stagesLoading]);
-    
-    const filteredTodos = useMemo(() => {
-        return currentTodos.filter(todo => {
-            // Handle reminder_date from API - use the normalized field
-            const reminderDate = (todo as any).reminderDate || (todo as any).reminder_date || '';
-            
-            // If no date selected (null), show all todos
-            if (!selectedDate) {
+
+    const applyDateAndStageFilters = useMemo(() => {
+        return (sourceTodos: typeof allCombinedTasks) =>
+            sourceTodos.filter((todo) => {
+                const reminderDate = (todo as any).reminderDate || (todo as any).reminder_date || '';
+
+                if (calendarOverdueOnly) {
+                    if (!isOverdueFollowUpTask(todo)) return false;
+                }
+
+                if (!selectedDate) {
+                    const stageName = (todo as any).stageName || (todo as any).stage_name || '';
+                    return activeFilter === 'all' || stageName === activeFilter;
+                }
+
+                if (!reminderDate) return false;
+
+                let isDateMatch = false;
+                try {
+                    isDateMatch = isSameDay(reminderDate, selectedDate);
+                } catch (error) {
+                    console.error('Error comparing dates:', error, reminderDate, selectedDate);
+                    isDateMatch = false;
+                }
+
                 const stageName = (todo as any).stageName || (todo as any).stage_name || '';
                 const isStageMatch = activeFilter === 'all' || stageName === activeFilter;
-                return isStageMatch;
-            }
-            
-            // If no reminderDate, don't show it when a date is selected (only show todos with dates)
-            if (!reminderDate) {
-                return false;
-            }
-            
-            // Compare dates
-            let isDateMatch = false;
-            try {
-                isDateMatch = isSameDay(reminderDate, selectedDate);
-            } catch (error) {
-                console.error('Error comparing dates:', error, reminderDate, selectedDate);
-                isDateMatch = false;
-            }
-            
+                return isDateMatch && isStageMatch;
+            });
+    }, [activeFilter, calendarOverdueOnly, selectedDate]);
+
+    const dateFilteredActiveCount = useMemo(() => {
+        if (calendarOverdueOnly) {
+            return applyDateAndStageFilters(overdueFollowUpTasks).length;
+        }
+        return applyDateAndStageFilters(todos).length;
+    }, [applyDateAndStageFilters, calendarOverdueOnly, overdueFollowUpTasks, todos]);
+
+    const dateFilteredCompletedCount = useMemo(() => {
+        if (calendarOverdueOnly) {
+            return 0;
+        }
+        return applyDateAndStageFilters(completedTodos).length;
+    }, [applyDateAndStageFilters, calendarOverdueOnly, completedTodos]);
+
+    const allDatesActiveCount = useMemo(() => {
+        if (calendarOverdueOnly) {
+            return overdueFollowUpTasks.filter((todo) => {
+                const stageName = (todo as any).stageName || (todo as any).stage_name || '';
+                return activeFilter === 'all' || stageName === activeFilter;
+            }).length;
+        }
+        return todos.filter((todo) => {
             const stageName = (todo as any).stageName || (todo as any).stage_name || '';
-            const isStageMatch = activeFilter === 'all' || stageName === activeFilter;
-            return isDateMatch && isStageMatch;
-        });
-    }, [currentTodos, selectedDate, activeFilter]);
+            return activeFilter === 'all' || stageName === activeFilter;
+        }).length;
+    }, [activeFilter, calendarOverdueOnly, overdueFollowUpTasks, todos]);
+
+    const allDatesCompletedCount = useMemo(() => {
+        if (calendarOverdueOnly) {
+            return 0;
+        }
+        return completedTodos.filter((todo) => {
+            const stageName = (todo as any).stageName || (todo as any).stage_name || '';
+            return activeFilter === 'all' || stageName === activeFilter;
+        }).length;
+    }, [activeFilter, calendarOverdueOnly, completedTodos]);
+    
+    const filteredTodos = useMemo(() => {
+        const sourceTodos = calendarOverdueOnly ? overdueFollowUpTasks : currentTodos;
+        return applyDateAndStageFilters(sourceTodos);
+    }, [applyDateAndStageFilters, calendarOverdueOnly, currentTodos, overdueFollowUpTasks]);
 
     const totalTodoPages = Math.max(1, Math.ceil(filteredTodos.length / todosPageSize));
     const paginationItems = getPaginationItems(todosPageNumber, totalTodoPages);
@@ -485,8 +580,8 @@ export const TodosPage = () => {
     
     const todosByDay = useMemo(() => {
         const counts = new Map<string, number>();
-        currentTodos.forEach(todo => {
-            // Handle reminder_date from API
+        const source = calendarOverdueOnly ? overdueFollowUpTasks : currentTodos;
+        source.forEach(todo => {
             const reminderDate = (todo as any).reminderDate || (todo as any).reminder_date || '';
             if (!reminderDate) return;
             
@@ -498,7 +593,7 @@ export const TodosPage = () => {
             }
         });
         return counts;
-    }, [currentTodos]);
+    }, [calendarOverdueOnly, currentTodos, overdueFollowUpTasks]);
 
 
     return (
@@ -524,7 +619,7 @@ export const TodosPage = () => {
                                     <span className={`font-semibold text-sm ${!selectedDate ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>{t('all') || 'All'}</span>
                                 </div>
                                 <div className="flex items-center gap-2">
-                                    <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${!selectedDate ? 'bg-white text-gray-900' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`}>{currentTodos.length}</span>
+                                    <span className={`text-xs font-bold w-5 h-5 flex items-center justify-center rounded-full ${!selectedDate ? 'bg-white text-gray-900' : 'bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-gray-100'}`}>{activeTab === 'active' ? allDatesActiveCount : allDatesCompletedCount}</span>
                                 </div>
                             </button>
                             {weekDays.map((day, index) => {
@@ -556,28 +651,49 @@ export const TodosPage = () => {
                 
                 {/* Main Todos Area */}
                 <main className="flex-1 min-w-0 overflow-hidden">
+                    {calendarOverdueOnly && (
+                        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-rose-200/80 bg-rose-50/90 px-4 py-3 dark:border-rose-900/50 dark:bg-rose-950/30">
+                            <p className="text-sm text-rose-900 dark:text-rose-100">
+                                {t('overdueFollowUpsBanner')}
+                            </p>
+                            <Button variant="ghost" onClick={exitOverdueFollowUpsView}>
+                                {t('showAllTodos')}
+                            </Button>
+                        </div>
+                    )}
                     {/* Tabs */}
                     <div className="flex items-center gap-2 mb-4 border-b border-gray-200 dark:border-gray-700">
-                        <button
-                            onClick={() => setActiveTab('active')}
-                            className={`px-4 py-2 text-sm transition-colors ${
-                                activeTab === 'active' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
-                            }`}
-                        >
-                            {t('active')} ({todos.length})
-                        </button>
-                        <button
-                            onClick={() => setActiveTab('completed')}
-                            className={`px-4 py-2 text-sm transition-colors ${
-                                activeTab === 'completed' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
-                            }`}
-                        >
-                            {t('completed')} ({completedTodos.length})
-                        </button>
+                        {calendarOverdueOnly ? (
+                            <button
+                                type="button"
+                                className={`px-4 py-2 text-sm ${PAGE_TAB_ACTIVE}`}
+                            >
+                                {t('overdueFollowUpsView')} ({dateFilteredActiveCount})
+                            </button>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={() => setActiveTab('active')}
+                                    className={`px-4 py-2 text-sm transition-colors ${
+                                        activeTab === 'active' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                                    }`}
+                                >
+                                    {t('active')} ({dateFilteredActiveCount})
+                                </button>
+                                <button
+                                    onClick={() => setActiveTab('completed')}
+                                    className={`px-4 py-2 text-sm transition-colors ${
+                                        activeTab === 'completed' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                                    }`}
+                                >
+                                    {t('completed')} ({dateFilteredCompletedCount})
+                                </button>
+                            </>
+                        )}
                     </div>
 
-                    {/* Filters - only show for active todos */}
-                    {activeTab === 'active' && !stagesLoading && (
+                    {/* Filters - only show for active todos or overdue follow-ups */}
+                    {(calendarOverdueOnly || activeTab === 'active') && !stagesLoading && (
                         <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <Button variant={activeFilter === 'all' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('all')}><ListIcon className="w-4 h-4" /> {t('all')}</Button>
                             {availableStages.length > 0 ? (

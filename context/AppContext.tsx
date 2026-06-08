@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
 import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
 import {
@@ -14,6 +14,7 @@ import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI } from '../services/api';
 import { normalizeRole, roleReportsPresence } from '../utils/roles';
+import { navigateToPage, NavigateToPageOptions } from '../utils/routing';
 
 // --- Helper Functions ---
 /**
@@ -84,6 +85,8 @@ export interface AppContextType {
   setIsLoggedIn: (isLoggedIn: boolean) => void;
   currentPage: Page;
   setCurrentPage: (page: Page) => void;
+  /** Navigate to a page with company-scoped URL and update currentPage. */
+  goToPage: (page: Page, opts?: NavigateToPageOptions) => void;
   /** Team chat opens as an overlay dialog instead of a full main-area page. */
   isTeamChatDialogOpen: boolean;
   setIsTeamChatDialogOpen: (open: boolean) => void;
@@ -331,6 +334,9 @@ export interface AppContextType {
   // Filters (UI state only)
   leadFilters: LeadFilters;
   setLeadFilters: React.Dispatch<React.SetStateAction<LeadFilters>>;
+  /** One-shot preset when navigating to Todos from mission bar chips. */
+  todosPagePreset: import('../utils/missionBarNavigation').MissionBarTodosPreset | null;
+  setTodosPagePreset: React.Dispatch<React.SetStateAction<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>>;
   dealFilters: DealFilters;
   setDealFilters: React.Dispatch<React.SetStateAction<DealFilters>>;
   isEditDealModalOpen: boolean;
@@ -466,6 +472,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     createdAtTo: '',
     search: '',
   });
+  const [todosPagePreset, setTodosPagePreset] = useState<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>(null);
   const [activityFilters, setActivityFilters] = useState<ActivityFilters>({
     user: 'All',
     stage: 'All',
@@ -1361,11 +1368,21 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // All data fetching and mutations are handled by hooks in hooks/useQueries.ts
   // Components should use useQuery and useMutation hooks directly instead of AppContext
 
+  const goToPage = useCallback((page: Page, opts?: NavigateToPageOptions) => {
+    navigateToPage(page, {
+      companyName: currentUser?.company?.name,
+      companyDomain: currentUser?.company?.domain,
+      ...opts,
+    });
+    setCurrentPage(page);
+  }, [currentUser?.company?.name, currentUser?.company?.domain]);
+
   const value: AppContextType = { 
     theme, setTheme, 
     language, setLanguage: setLang, 
     isLoggedIn, setIsLoggedIn, 
     currentPage, setCurrentPage,
+    goToPage,
     isTeamChatDialogOpen, setIsTeamChatDialogOpen,
     isNotificationsDialogOpen, setIsNotificationsDialogOpen,
     t, 
@@ -1469,6 +1486,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     showAlert,
     // Filters (UI state only)
     leadFilters, setLeadFilters,
+    todosPagePreset, setTodosPagePreset,
     dealFilters, setDealFilters,
     campaignFilters, setCampaignFilters,
     activityFilters, setActivityFilters,

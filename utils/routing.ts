@@ -127,6 +127,33 @@ export const navigateToCompanyRoute = (companyName?: string, companyDomain?: str
   window.history.replaceState({}, '', route);
 };
 
+export type NavigateToPageOptions = {
+  companyName?: string;
+  companyDomain?: string;
+  query?: Record<string, string>;
+  replace?: boolean;
+};
+
+/**
+ * Navigate to a company-scoped page with optional query string (pushState by default).
+ */
+export const navigateToPage = (
+  page: string,
+  opts?: NavigateToPageOptions,
+): string => {
+  const base = getCompanyRoute(opts?.companyName, opts?.companyDomain, page);
+  const qs = opts?.query && Object.keys(opts.query).length > 0
+    ? `?${new URLSearchParams(opts.query).toString()}`
+    : '';
+  const path = `${base}${qs}`;
+  if (opts?.replace) {
+    window.history.replaceState({}, '', path);
+  } else {
+    window.history.pushState({}, '', path);
+  }
+  return path;
+};
+
 /**
  * Check if current subdomain matches company domain
  */

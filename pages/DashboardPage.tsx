@@ -1,12 +1,15 @@
 
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useAIManagementReport, useGenerateAIManagementReport, useApproveAIInsight, useDismissAIInsight, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
+import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useAIManagementReport, useGenerateAIManagementReport, useApproveAIInsight, useDismissAIInsight, useMissionBarSummary, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
+import { useDashboardDerivedMetrics } from '../hooks/useDashboardDerivedMetrics';
+import { presetTodosFromMissionBar, todayDateInputValue } from '../utils/missionBarNavigation';
+import { getCompanyViewLeadRoute } from '../utils/routing';
 import { AIInsightsCard } from '../components/dashboard/AIInsightsCard';
 import { ManagementReportCard } from '../components/dashboard/ManagementReportCard';
 import { normalizeRole, getRoleTranslation, isAssignedClinicalAppRole } from '../utils/roles';
@@ -42,6 +45,9 @@ export const DashboardPage = () => {
         language,
         setSelectedLead,
         setCurrentPage,
+        goToPage,
+        setLeadFilters,
+        setTodosPagePreset,
         theme,
         setAlertMessage,
         setAlertVariant,
@@ -53,6 +59,14 @@ export const DashboardPage = () => {
     const [chartDaysRange, setChartDaysRange] = useState<7 | 14 | 30>(7);
     const [leadSourceFilter, setLeadSourceFilter] = useState<'all' | 'meta_lead_form' | 'whatsapp' | 'manual'>('all');
     const [teamDailyTarget] = useState(5);
+    const [belowFoldEnabled, setBelowFoldEnabled] = useState(false);
+
+    useEffect(() => {
+        const frameId = requestAnimationFrame(() => setBelowFoldEnabled(true));
+        return () => cancelAnimationFrame(frameId);
+    }, []);
+
+    const { data: missionBarSummary } = useMissionBarSummary(dashboardHeavyListQueryOptions);
 
     // Fetch all data using React Query (larger page_size via api.ts + fewer refetch bursts)
     const { data: leadsResponse, isLoading: isLeadsLoading } = useLeads(
@@ -74,10 +88,29 @@ export const DashboardPage = () => {
     
     const { data: clientTasksResponse, isLoading: isClientTasksLoading } = useClientTasks(dashboardHeavyListQueryOptions);
     const clientTasks = clientTasksResponse?.results || [];
-    const { data: clientCallsResponse, isLoading: isClientCallsLoading } = useClientCalls(dashboardHeavyListQueryOptions);
+    const { data: clientCallsResponse, isLoading: isClientCallsLoading } = useClientCalls({
+        ...dashboardHeavyListQueryOptions,
+        enabled: belowFoldEnabled,
+    });
     const clientCalls = clientCallsResponse?.results || [];
-    const { data: clientVisitsResponse, isLoading: isClientVisitsLoading } = useClientVisits(dashboardHeavyListQueryOptions);
+    const { data: clientVisitsResponse, isLoading: isClientVisitsLoading } = useClientVisits({
+        ...dashboardHeavyListQueryOptions,
+        enabled: belowFoldEnabled,
+    });
     const clientVisits = clientVisitsResponse?.results || [];
+
+    const derivedMetrics = useDashboardDerivedMetrics(leads, clientTasks);
+
+    const openViewLead = useCallback((leadId: number, lead?: any) => {
+        const leadObj = lead ?? leads.find((l: any) => l.id === leadId);
+        if (leadObj) setSelectedLead(leadObj);
+        window.history.pushState(
+            {},
+            '',
+            getCompanyViewLeadRoute(currentUser?.company?.name, currentUser?.company?.domain, leadId),
+        );
+        setCurrentPage('ViewLead');
+    }, [currentUser?.company?.domain, currentUser?.company?.name, leads, setCurrentPage, setSelectedLead]);
 
     const { data: stagesResponse, isLoading: isStagesLoading } = useStages(dashboardHeavyListQueryOptions);
     const stages = Array.isArray(stagesResponse) 
@@ -100,8 +133,7 @@ export const DashboardPage = () => {
         isUsersLoading ||
         isClientTasksLoading ||
         isStagesLoading ||
-        isClientCallsLoading ||
-        isClientVisitsLoading;
+        (belowFoldEnabled && (isClientCallsLoading || isClientVisitsLoading));
 
     // Check for payment success message on mount
     useEffect(() => {
@@ -131,17 +163,8 @@ export const DashboardPage = () => {
 
     // Calculate statistics
     const stats = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        // Today's new leads (created today)
-        const todayNewLeads = leads.filter(lead => {
-            const createdAt = (lead as any).created_at || lead.createdAt;
-            if (!createdAt) return false;
-            const leadDate = new Date(createdAt);
-            leadDate.setHours(0, 0, 0, 0);
-            return leadDate.getTime() === today.getTime();
-        }).length;
+        const today = derivedMetrics.today;
+        const todayNewLeads = derivedMetrics.todayNewLeads;
         
         // Today's touched leads (created today AND status is not Untouched)
         const todayTouchedLeads = leads.filter(lead => {
@@ -203,29 +226,10 @@ export const DashboardPage = () => {
         // Win rate (Won / total * 100)
         const winRate = totalDeals > 0 ? Math.round((completedDeals / totalDeals) * 100) : 0;
         
-        // Leads to contact today (leads with reminder_date = today and assigned_to is set)
-        const leadsToContactToday = leads.filter(lead => {
-            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
-            if (!assignedToId) return false;
-            
-            // Check if there's a ClientTask with reminder_date = today for this lead
-            return clientTasks.some((ct: any) => {
-                const clientId = ct.client || ct.clientId;
-                if (clientId !== lead.id) return false;
-                
-                const reminderDate = ct.reminder_date;
-                if (!reminderDate) return false;
-                
-                const reminder = new Date(reminderDate);
-                reminder.setHours(0, 0, 0, 0);
-                return reminder.getTime() === today.getTime();
-            });
-        });
-        
         return [
             { 
                 title: t('leadsToContactToday'), 
-                value: leadsToContactToday.length, 
+                value: missionBarSummary?.contact_today ?? derivedMetrics.leadsToContactTodayCount, 
                 icon: <TargetIcon className="w-6 h-6"/>, 
                 gradient: 'from-orange-500 to-red-500',
                 bgColor: 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30',
@@ -323,7 +327,7 @@ export const DashboardPage = () => {
                 textColor: 'text-teal-600 dark:text-teal-400'
             },
         ];
-    }, [leads, clientTasks, deals, todos, t]);
+    }, [leads, clientTasks, deals, todos, t, derivedMetrics, missionBarSummary]);
     
     // Stages report data - get from ClientTasks
     const stagesReportData = useMemo(() => {
@@ -492,37 +496,13 @@ export const DashboardPage = () => {
     
     // Leads to contact today - detailed list
     const leadsToContactTodayList = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        // Filter leads to contact today
-        const leadsToContactToday = leads.filter(lead => {
-            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
-            if (!assignedToId) return false;
-            
-            // Check if there's a ClientTask with reminder_date = today for this lead
-            return clientTasks.some((ct: any) => {
-                const clientId = ct.client || ct.clientId;
-                if (clientId !== lead.id) return false;
-                
+        const today = derivedMetrics.today;
+
+        return derivedMetrics.leadsToContactToday.map(lead => {
+            const tasks = derivedMetrics.tasksByClient.get(lead.id) ?? [];
+            const task = tasks.find((ct: any) => {
                 const reminderDate = ct.reminder_date;
                 if (!reminderDate) return false;
-                
-                const reminder = new Date(reminderDate);
-                reminder.setHours(0, 0, 0, 0);
-                return reminder.getTime() === today.getTime();
-            });
-        });
-        
-        return leadsToContactToday.map(lead => {
-            // Find the ClientTask with reminder_date = today
-            const task = clientTasks.find((ct: any) => {
-                const clientId = ct.client || ct.clientId;
-                if (clientId !== lead.id) return false;
-                
-                const reminderDate = ct.reminder_date;
-                if (!reminderDate) return false;
-                
                 const reminder = new Date(reminderDate);
                 reminder.setHours(0, 0, 0, 0);
                 return reminder.getTime() === today.getTime();
@@ -540,13 +520,12 @@ export const DashboardPage = () => {
                 stage: task?.stage_name || task?.stage || '',
             };
         }).sort((a, b) => {
-            // Sort by reminder time if available, otherwise by lead name
             if (a.reminderDate && b.reminderDate) {
                 return new Date(a.reminderDate).getTime() - new Date(b.reminderDate).getTime();
             }
             return (a.lead.name || '').localeCompare(b.lead.name || '');
         });
-    }, [leads, clientTasks, users, t]);
+    }, [derivedMetrics, users, t]);
 
     const companyUserMap = useMemo(() => {
         const map = new Map<number, any>();
@@ -555,37 +534,54 @@ export const DashboardPage = () => {
     }, [users]);
 
     const missionItems = useMemo<MissionItem[]>(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const overdueFollowUps = clientTasks.filter((ct: any) => {
-            if (!ct.reminder_date) return false;
-            const d = new Date(ct.reminder_date);
-            d.setHours(0, 0, 0, 0);
-            return d < today;
-        }).length;
-        const unassignedLeads = leads.filter((lead: any) => !(lead.assigned_to || lead.assignedTo)).length;
-        const todayLeads = stats.find((s) => s.title === t('todayNewLeads'))?.value ?? 0;
+        const summary = missionBarSummary ?? {
+            contact_today: derivedMetrics.leadsToContactTodayCount,
+            overdue_follow_ups: derivedMetrics.overdueFollowUps,
+            today_new_leads: derivedMetrics.todayNewLeads,
+            unassigned_leads: derivedMetrics.unassignedLeads,
+        };
+        const todayIso = todayDateInputValue();
 
         const items: MissionItem[] = [
-            { id: 'contactToday', label: t('leadsToContactToday'), value: leadsToContactTodayList.length, tone: 'orange' },
+            {
+                id: 'contactToday',
+                label: t('leadsToContactToday'),
+                value: summary.contact_today,
+                tone: 'orange',
+                onClick: () => {
+                    presetTodosFromMissionBar('today');
+                    setTodosPagePreset('today');
+                    goToPage('Todos');
+                },
+            },
             {
                 id: 'overdue',
                 label: t('overdueFollowUps'),
-                value: overdueFollowUps,
+                value: summary.overdue_follow_ups,
                 tone: 'red',
                 onClick: () => {
-                    window.history.pushState({}, '', '/todos');
-                    setCurrentPage('Todos');
+                    presetTodosFromMissionBar('overdue');
+                    setTodosPagePreset('overdue');
+                    goToPage('Todos');
                 },
             },
             {
                 id: 'today',
                 label: t('todayNewLeads'),
-                value: Number(todayLeads),
+                value: summary.today_new_leads,
                 tone: 'blue',
                 onClick: () => {
-                    window.history.pushState({}, '', '/leads');
-                    setCurrentPage('All Leads');
+                    setLeadFilters((prev) => ({
+                        ...prev,
+                        status: 'All',
+                        type: 'All',
+                        priority: 'All',
+                        assignedTo: 'All',
+                        createdAtFrom: todayIso,
+                        createdAtTo: todayIso,
+                        search: '',
+                    }));
+                    goToPage('All Leads');
                 },
             },
         ];
@@ -593,16 +589,21 @@ export const DashboardPage = () => {
             items.push({
                 id: 'unassigned',
                 label: t('unassignedLeads'),
-                value: unassignedLeads,
+                value: summary.unassigned_leads,
                 tone: 'purple',
                 onClick: () => {
-                    window.history.pushState({}, '', '/leads');
-                    setCurrentPage('All Leads');
+                    setLeadFilters((prev) => ({
+                        ...prev,
+                        assignedTo: 'Unassigned',
+                        createdAtFrom: '',
+                        createdAtTo: '',
+                    }));
+                    goToPage('All Leads');
                 },
             });
         }
         return items;
-    }, [clientTasks, isAdmin, leads, leadsToContactTodayList.length, setCurrentPage, stats, t]);
+    }, [derivedMetrics, goToPage, isAdmin, missionBarSummary, setLeadFilters, setTodosPagePreset, t]);
 
     const funnelData = useMemo(() => {
         const touched = leads.filter((lead: any) => ((lead.status_name || lead.status || '') as string).toLowerCase() !== 'untouched').length;
@@ -624,25 +625,18 @@ export const DashboardPage = () => {
         return {
             ...item,
             onView: lead
-                ? () => {
-                      setSelectedLead(lead);
-                      window.history.pushState({}, '', `/view-lead/${lead.id}`);
-                      setCurrentPage('ViewLead');
-                  }
-                : () => {
-                      window.history.pushState({}, '', `/view-lead/${item.client_id}`);
-                      setCurrentPage('ViewLead');
-                  },
+                ? () => openViewLead(lead.id, lead)
+                : () => openViewLead(item.client_id),
         };
     };
 
     const aiPendingItems = useMemo(
         () => (aiInsightsData?.pending || []).map(mapAIInsight),
-        [aiInsightsData?.pending, leads, setCurrentPage, setSelectedLead],
+        [aiInsightsData?.pending, leads, openViewLead],
     );
     const aiPriorityItems = useMemo(
         () => (aiInsightsData?.priority || []).map(mapAIInsight),
-        [aiInsightsData?.priority, leads, setCurrentPage, setSelectedLead],
+        [aiInsightsData?.priority, leads, openViewLead],
     );
 
     const hotLeads = useMemo<HotLeadItem[]>(() => {
@@ -703,17 +697,13 @@ export const DashboardPage = () => {
                     bucket,
                     notes: lead.last_feedback || lead.lastFeedback || lead.notes || '',
                     stageColor: stageConfig?.color,
-                    onView: () => {
-                        setSelectedLead(lead);
-                        window.history.pushState({}, '', `/view-lead/${lead.id}`);
-                        setCurrentPage('ViewLead');
-                    },
+                    onView: () => openViewLead(lead.id, lead),
                 };
             })
             .filter((lead) => lead.bucket !== 'cold')
             .sort((a, b) => b.score - a.score)
             .slice(0, 6);
-    }, [clientCalls, clientTasks, clientVisits, companyUserMap, currentUser?.id, currentUser?.role, leads, setCurrentPage, setSelectedLead, stages, t]);
+    }, [clientCalls, clientTasks, clientVisits, companyUserMap, currentUser?.id, currentUser?.role, leads, openViewLead, stages, t]);
 
     const smartInsights = useMemo(() => {
         const insights: string[] = [];
@@ -724,12 +714,14 @@ export const DashboardPage = () => {
         if (overdue > 0) {
             insights.push(`${overdue} ${t('overdueFollowUps')} - ${t('tipPaceUp')}`);
         }
-        const unassigned = missionItems.find((m) => m.id === 'unassigned')?.value || 0;
+        const unassigned = missionBarSummary?.unassigned_leads
+            ?? missionItems.find((m) => m.id === 'unassigned')?.value
+            ?? 0;
         if (unassigned > 0) {
             insights.push(`${t('tipUnassignedReminder')}: ${unassigned}`);
         }
         return insights.slice(0, 2);
-    }, [hotLeads.length, missionItems, t]);
+    }, [hotLeads.length, missionBarSummary?.unassigned_leads, missionItems, t]);
 
     const trendSeries = useMemo(() => {
         const today = new Date();
@@ -870,133 +862,94 @@ export const DashboardPage = () => {
         () => [
             {
                 label: t('viewAllLeads'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/leads');
-                    setCurrentPage('All Leads');
-                },
+                onClick: () => goToPage('All Leads'),
             },
             {
                 label: t('todos'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/todos');
-                    setCurrentPage('Todos');
-                },
+                onClick: () => goToPage('Todos'),
             },
             {
                 label: t('deals'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/deals');
-                    setCurrentPage('Deals');
-                },
+                onClick: () => goToPage('Deals'),
             },
         ],
-        [setCurrentPage, t],
+        [goToPage, t],
     );
 
     const hotLeadsMenuItems = useMemo(
         () => [
             {
                 label: t('viewAllLeads'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/leads');
-                    setCurrentPage('All Leads');
-                },
+                onClick: () => goToPage('All Leads'),
             },
             {
                 label: t('addLead'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/create-lead');
-                    setCurrentPage('CreateLead');
-                },
+                onClick: () => goToPage('CreateLead'),
             },
         ],
-        [setCurrentPage, t],
+        [goToPage, t],
     );
 
     const weekLeadsChartMenuItems = useMemo(
         () => [
             {
                 label: t('viewAllLeads'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/leads');
-                    setCurrentPage('All Leads');
-                },
+                onClick: () => goToPage('All Leads'),
             },
             {
                 label: t('addLead'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/create-lead');
-                    setCurrentPage('CreateLead');
-                },
+                onClick: () => goToPage('CreateLead'),
             },
         ],
-        [setCurrentPage, t],
+        [goToPage, t],
     );
 
     const stagesReportMenuItems = useMemo(
         () => [
             {
                 label: t('viewAllLeads'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/leads');
-                    setCurrentPage('All Leads');
-                },
+                onClick: () => goToPage('All Leads'),
             },
             {
                 label: t('reports'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/reports');
-                    setCurrentPage('Reports');
-                },
+                onClick: () => goToPage('Reports'),
             },
         ],
-        [setCurrentPage, t],
+        [goToPage, t],
     );
 
     const conversionFunnelMenuItems = useMemo(
         () => [
             {
                 label: t('deals'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/deals');
-                    setCurrentPage('Deals');
-                },
+                onClick: () => goToPage('Deals'),
             },
             {
                 label: t('viewAllLeads'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/leads');
-                    setCurrentPage('All Leads');
-                },
+                onClick: () => goToPage('All Leads'),
             },
         ],
-        [setCurrentPage, t],
+        [goToPage, t],
     );
 
     const activityFeedMenuItems = useMemo(
         () => [
             {
                 label: t('activities'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/activities');
-                    setCurrentPage('Activities');
-                },
+                onClick: () => goToPage('Activities'),
             },
         ],
-        [setCurrentPage, t],
+        [goToPage, t],
     );
 
     const teamGoalsMenuItems = useMemo(
         () => [
             {
                 label: t('employeesReport'),
-                onClick: () => {
-                    window.history.pushState({}, '', '/employees-report');
-                    setCurrentPage('Employees Report');
-                },
+                onClick: () => goToPage('Employees Report'),
             },
         ],
-        [setCurrentPage, t],
+        [goToPage, t],
     );
 
     return (
@@ -1017,25 +970,25 @@ export const DashboardPage = () => {
                         </div>
                         <div className="flex flex-wrap gap-2.5 justify-start lg:justify-end">
                             <button
-                                onClick={() => { window.history.pushState({}, '', '/leads'); setCurrentPage('All Leads'); }}
+                                onClick={() => goToPage('All Leads')}
                                 className="px-5 py-2.5 rounded-xl border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-sm font-semibold shadow-sm hover:bg-white hover:shadow-md transition-all"
                             >
                                 {t('viewAllLeads')}
                             </button>
                             <button
-                                onClick={() => { window.history.pushState({}, '', '/deals'); setCurrentPage('Deals'); }}
+                                onClick={() => goToPage('Deals')}
                                 className="px-5 py-2.5 rounded-xl border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-sm font-semibold shadow-sm hover:bg-white hover:shadow-md transition-all"
                             >
                                 {t('deals')}
                             </button>
                             <button
-                                onClick={() => { window.history.pushState({}, '', '/todos'); setCurrentPage('Todos'); }}
+                                onClick={() => goToPage('Todos')}
                                 className="px-5 py-2.5 rounded-xl border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 text-gray-800 dark:text-gray-100 text-sm font-semibold shadow-sm hover:bg-white hover:shadow-md transition-all"
                             >
                                 {t('todos')}
                             </button>
                             <button
-                                onClick={() => { window.history.pushState({}, '', '/create-lead'); setCurrentPage('CreateLead'); }}
+                                onClick={() => goToPage('CreateLead')}
                                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-primary-600 to-blue-600 text-white text-sm font-bold shadow-lg shadow-primary-600/25 hover:shadow-xl hover:shadow-primary-600/30 transition-all"
                             >
                                 {t('addLead')}
@@ -1080,14 +1033,17 @@ export const DashboardPage = () => {
                 </div>
             )}
             
+            <div className="space-y-6 mb-6">
+                <MissionBar
+                    title={t('missionBar')}
+                    items={missionItems}
+                    menuItems={missionBarMenuItems}
+                    menuAriaLabel={dashboardMenuAriaLabel}
+                />
+            </div>
+
             {!isDashboardLoading && (
                 <div className="space-y-6 mb-6">
-                    <MissionBar
-                        title={t('missionBar')}
-                        items={missionItems}
-                        menuItems={missionBarMenuItems}
-                        menuAriaLabel={dashboardMenuAriaLabel}
-                    />
                     <SmartInsights title={t('smartInsights')} insights={smartInsights} />
                     {aiInsightsData?.ai_enabled ? (
                         <AIInsightsCard
@@ -1159,11 +1115,7 @@ export const DashboardPage = () => {
                             onRefresh={() => generateManagementReport.mutate()}
                             onViewLead={(clientId) => {
                                 const lead = leads.find((l: any) => l.id === clientId);
-                                if (lead) {
-                                    setSelectedLead(lead);
-                                }
-                                window.history.pushState({}, '', `/view-lead/${clientId}`);
-                                setCurrentPage('ViewLead');
+                                openViewLead(clientId, lead);
                             }}
                         />
                     ) : null}
@@ -1482,11 +1434,7 @@ export const DashboardPage = () => {
                                                     </td>
                                                     <td className="px-4 py-4 whitespace-nowrap text-center">
                                                         <button
-                                                            onClick={() => {
-                                                                setSelectedLead(lead);
-                                                                window.history.pushState({}, '', `/view-lead/${lead.id}`);
-                                                                setCurrentPage('ViewLead');
-                                                            }}
+                                                            onClick={() => openViewLead(lead.id, lead)}
                                                             className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white text-xs font-medium rounded-md transition-colors"
                                                         >
                                                             {t('viewLead')}
@@ -1515,7 +1463,7 @@ export const DashboardPage = () => {
                             </div>
                         </div>
                         <button
-                            onClick={() => { window.history.pushState({}, '', '/leads'); setCurrentPage('All Leads'); }}
+                            onClick={() => goToPage('All Leads')}
                             className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
                         >
                             {t('viewAllLeads')}
@@ -1746,11 +1694,7 @@ export const DashboardPage = () => {
                                                         <td className="px-4 py-4 whitespace-nowrap text-center">
                                                             {feedback.leadObj ? (
                                                                 <button
-                                                                    onClick={() => {
-                                                                        setSelectedLead(feedback.leadObj);
-                                                                        window.history.pushState({}, '', `/view-lead/${(feedback.leadObj as any).id}`);
-                                                                        setCurrentPage('ViewLead');
-                                                                    }}
+                                                                    onClick={() => openViewLead((feedback.leadObj as any).id, feedback.leadObj)}
                                                                     className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-md transition-colors"
                                                                 >
                                                                     {t('viewLead')}

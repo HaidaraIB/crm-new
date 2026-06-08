@@ -128,6 +128,19 @@ export function localizePbxResultMessage(
   if (lower.includes('connection refused') || lower.includes('timed out') || lower.includes('timeout')) {
     return t('errorPbxConnectionRefused');
   }
+  if (lower.includes('extension does not exist')) {
+    return t('errorPbxExtensionNotExist');
+  }
+  if (
+    lower.includes('not registered') ||
+    lower.includes('no registered') ||
+    lower.includes('unavailable') && lower.includes('endpoint')
+  ) {
+    return t('errorPbxExtensionNotRegistered');
+  }
+  if (lower.includes('ami originate failed')) {
+    return t('errorPbxOriginateFailed');
+  }
 
   return undefined;
 }

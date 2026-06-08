@@ -443,6 +443,7 @@ export function PbxSettingsForm({
           <div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxUserExtensions')}</h3>
             <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{t('pbxUserExtensionsHint')}</p>
+            <p className="text-sm text-amber-700 dark:text-amber-300 mt-2">{t('pbxUserExtensionsAlignHint')}</p>
           </div>
           {extensionList.length > 0 ? (
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2.5 py-1 rounded-full">

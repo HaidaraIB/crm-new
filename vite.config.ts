@@ -39,6 +39,8 @@ export default defineConfig(({ mode }) => {
         }
       },
       build: {
+        // esbuild 0.28+ no longer downlevels destructuring for legacy targets.
+        target: 'es2022',
         rollupOptions: {
           output: {
             manualChunks(id) {

@@ -8,10 +8,11 @@ import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead, LeadApiFilters } from '../types';
 import { useLeads, useLeadStatusCounts, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
-import { pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
+import { pbxDialAPI, getPbxDialStatusAPI, getLeadsAPI } from '../services/api';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { exportToExcel } from '../utils/exportToExcel';
+import { normalizeLead } from '../utils/normalizeLead';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
@@ -353,50 +354,79 @@ export const LeadsPage = () => {
         return ['All'];
     }, [statuses]);
     const [isImportLeadsModalOpen, setIsImportLeadsModalOpen] = useState(false);
+    const [isExportingLeads, setIsExportingLeads] = useState(false);
 
-    const handleExportLeads = () => {
-        const rows = normalizedLeads.map((l: Lead & { assigned_to_username?: string; campaign_name?: string }) => {
-            const phone = l.phone || (l.phoneNumbers && l.phoneNumbers.length > 0
-                ? (l.phoneNumbers.find(p => p.is_primary) || l.phoneNumbers[0]).phone_number
-                : '');
-            return {
-                name: l.name,
-                phone,
-                budget: formatLeadBudget(l as any, language === 'ar' ? 'ar-IQ' : 'en-US') || (l.budget ?? ''),
-                type: l.type ?? '',
-                priority: l.priority ?? '',
-                status: ((l as any).status_name || l.status) ?? '',
-                communicationWay: ((l as any).communication_way_name || l.communicationWay) ?? '',
-                assignedToName: (l as any).assigned_to_username ?? '',
-                source: l.source ?? '',
-                campaign: (l as any).campaign_name ?? l.campaign_name ?? '',
-                createdByName:
-                    (l as any).created_by_name ??
-                    (l as { createdByName?: string | null }).createdByName ??
-                    '',
-                createdAt: l.createdAt
-                    ? new Date(l.createdAt).toLocaleString(
-                          language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
-                          withLatinDigits({ dateStyle: 'short', timeStyle: 'short' }),
-                      )
-                    : '',
-            };
-        });
-        const columns = [
-            { key: 'name', label: t('name') || 'Name' },
-            { key: 'phone', label: t('phone') || 'Phone' },
-            { key: 'budget', label: t('budget') || 'Budget' },
-            { key: 'type', label: t('type') || 'Type' },
-            { key: 'priority', label: t('priority') || 'Priority' },
-            { key: 'status', label: t('status') || 'Status' },
-            { key: 'communicationWay', label: t('communicationWay') || 'Communication Way' },
-            { key: 'assignedToName', label: t('assignedTo') || 'Assigned To' },
-            { key: 'source', label: t('source') || 'Source' },
-            { key: 'createdByName', label: t('createdBy') || 'Created by' },
-            { key: 'campaign', label: t('campaign') || 'Campaign' },
-            { key: 'createdAt', label: t('createdAt') || 'Created At' },
-        ];
-        exportToExcel(rows, columns, `leads-export-${new Date().toISOString().slice(0, 10)}`, t('leads') || 'Leads');
+    const handleExportLeads = async () => {
+        setIsExportingLeads(true);
+        try {
+            const data = await getLeadsAPI(apiFilters);
+            const leadsToExport = (data?.results || []).map((l: any) => ({
+                ...normalizeLead(l),
+                phoneNumbers: l.phone_numbers || l.phoneNumbers || [],
+                phone: l.phone_number || l.phone || '',
+                communicationWay: l.communication_way_name || l.communication_way || l.communicationWay || '',
+                status: l.status_name || l.status || '',
+                priority: l.priority || '',
+                type: l.type || '',
+                budget: typeof l.budget === 'number' ? l.budget : Number(l.budget) || 0,
+                assignedTo: l.assigned_to ?? l.assignedTo,
+                createdAt: l.created_at || l.createdAt,
+                source: l.source || 'manual',
+                campaign: l.campaign || null,
+                campaign_name: l.campaign_name || (l.campaign ? String(l.campaign) : null),
+                assigned_to: l.assigned_to,
+                assigned_to_username: l.assigned_to_username,
+            }));
+
+            const rows = leadsToExport.map((l: Lead & { assigned_to_username?: string; campaign_name?: string }) => {
+                const phone = l.phone || (l.phoneNumbers && l.phoneNumbers.length > 0
+                    ? (l.phoneNumbers.find(p => p.is_primary) || l.phoneNumbers[0]).phone_number
+                    : '');
+                return {
+                    name: l.name,
+                    phone,
+                    budget: formatLeadBudget(l as any, language === 'ar' ? 'ar-IQ' : 'en-US') || (l.budget ?? ''),
+                    type: l.type ?? '',
+                    priority: l.priority ?? '',
+                    status: ((l as any).status_name || l.status) ?? '',
+                    communicationWay: ((l as any).communication_way_name || l.communicationWay) ?? '',
+                    assignedToName: (l as any).assigned_to_username ?? '',
+                    source: l.source ?? '',
+                    campaign: (l as any).campaign_name ?? l.campaign_name ?? '',
+                    createdByName:
+                        (l as any).created_by_name ??
+                        (l as { createdByName?: string | null }).createdByName ??
+                        '',
+                    createdAt: l.createdAt
+                        ? new Date(l.createdAt).toLocaleString(
+                              language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+                              withLatinDigits({ dateStyle: 'short', timeStyle: 'short' }),
+                          )
+                        : '',
+                };
+            });
+            const columns = [
+                { key: 'name', label: t('name') || 'Name' },
+                { key: 'phone', label: t('phone') || 'Phone' },
+                { key: 'budget', label: t('budget') || 'Budget' },
+                { key: 'type', label: t('type') || 'Type' },
+                { key: 'priority', label: t('priority') || 'Priority' },
+                { key: 'status', label: t('status') || 'Status' },
+                { key: 'communicationWay', label: t('communicationWay') || 'Communication Way' },
+                { key: 'assignedToName', label: t('assignedTo') || 'Assigned To' },
+                { key: 'source', label: t('source') || 'Source' },
+                { key: 'createdByName', label: t('createdBy') || 'Created by' },
+                { key: 'campaign', label: t('campaign') || 'Campaign' },
+                { key: 'createdAt', label: t('createdAt') || 'Created At' },
+            ];
+            await exportToExcel(rows, columns, `leads-export-${new Date().toISOString().slice(0, 10)}`, t('leads') || 'Leads');
+        } catch (e) {
+            setAlertMessage(getLocalizedApiErrorMessage(e, t, 'errorLoadingLeads'));
+            setAlertVariant('error');
+            setIsAlertModalOpen(true);
+        } finally {
+            setIsExportingLeads(false);
+        }
     };
 
     const handleViewLead = (lead: Lead) => {
@@ -503,7 +533,7 @@ export const LeadsPage = () => {
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
                         <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto shrink-0"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
                         {!isDataEntryUser && (
-                        <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={normalizedLeads.length === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{t('export')}</span><span className="hidden sm:inline">{t('exportLeads') || 'Export to Excel'}</span></Button>
+                        <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={isExportingLeads || totalLeadsCount === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{isExportingLeads ? (t('loading') || 'Loading...') : t('export')}</span><span className="hidden sm:inline">{isExportingLeads ? (t('loading') || 'Loading...') : (t('exportLeads') || 'Export to Excel')}</span></Button>
                         )}
                         <Button variant="secondary" onClick={() => setIsImportLeadsModalOpen(true)} className="w-full sm:w-auto shrink-0" title={t('importLeads') || 'Import from Excel'}><span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importLeads') || 'Import from Excel'}</span></Button>
                         <Button onClick={() => {

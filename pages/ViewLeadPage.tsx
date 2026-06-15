@@ -327,11 +327,14 @@ export const ViewLeadPage = () => {
 
     const metaQualificationErrorText = useMemo(() => {
         if (!metaQualificationError) return null;
-        const key = metaQualificationError as keyof typeof translations.en;
-        if (key in translations.en) {
-            return t(key);
+        const err =
+            typeof metaQualificationError === 'string'
+                ? { key: metaQualificationError, message: '' }
+                : metaQualificationError;
+        if (err.key in translations.en) {
+            return t(err.key as keyof typeof translations.en);
         }
-        return metaQualificationError;
+        return err.message || err.key;
     }, [metaQualificationError, t, language]);
 
     const handleMetaQualificationChange = async (newStatus: '' | 'qualified' | 'unqualified') => {

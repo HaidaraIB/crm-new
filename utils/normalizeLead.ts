@@ -1,4 +1,19 @@
-import { Lead } from '../types';
+import { Lead, MetaQualificationError } from '../types';
+
+function normalizeMetaQualificationError(raw: unknown): MetaQualificationError {
+  if (raw == null) return null;
+  if (typeof raw === 'string') {
+    return { key: raw, message: '' };
+  }
+  if (typeof raw === 'object' && raw !== null) {
+    const obj = raw as Record<string, unknown>;
+    const key = String(obj.key ?? obj.error_key ?? '');
+    const message = String(obj.message ?? '');
+    if (!key) return null;
+    return { key, message };
+  }
+  return null;
+}
 
 /** Normalize lead from API (snake_case) for forms and display. */
 export function normalizeLead(lead: any): any {
@@ -28,7 +43,9 @@ export function normalizeLead(lead: any): any {
     metaLeadgenId: lead.metaLeadgenId ?? lead.meta_leadgen_id ?? null,
     metaQualificationStatus: lead.metaQualificationStatus ?? lead.meta_qualification_status ?? null,
     metaQualificationSentAt: lead.metaQualificationSentAt ?? lead.meta_qualification_sent_at ?? null,
-    metaQualificationError: lead.metaQualificationError ?? lead.meta_qualification_error ?? null,
+    metaQualificationError: normalizeMetaQualificationError(
+      lead.metaQualificationError ?? lead.meta_qualification_error ?? null
+    ),
   };
 }
 

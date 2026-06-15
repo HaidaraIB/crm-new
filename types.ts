@@ -157,6 +157,8 @@ export interface PhoneNumber {
   updated_at?: string;
 }
 
+export type MetaQualificationError = { key: string; message: string } | null;
+
 export interface Lead {
   id: number;
   name: string;
@@ -181,7 +183,7 @@ export interface Lead {
   /** Meta Conversion Leads qualification: null | qualified | unqualified */
   metaQualificationStatus?: 'qualified' | 'unqualified' | null;
   metaQualificationSentAt?: string | null;
-  metaQualificationError?: string | null;
+  metaQualificationError?: MetaQualificationError;
   /** CRM user id who created the lead (API); null for integrations or legacy */
   createdBy?: number | null;
   /** Display name from API (full name or username) */

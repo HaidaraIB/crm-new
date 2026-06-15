@@ -2618,7 +2618,7 @@ export const createConnectedAccountAPI = async (accountData: {
 
 /**
  * تحديث حساب تكامل
- * PUT /api/integrations/accounts/:id/
+ * PATCH /api/integrations/accounts/:id/
  * Body: { name?: string, is_active?: boolean, pixel_id?: string, ... }
  */
 export const updateConnectedAccountAPI = async (accountId: number, accountData: {
@@ -2628,7 +2628,7 @@ export const updateConnectedAccountAPI = async (accountId: number, accountData: 
   conversion_leads_enabled?: boolean;
 }) => {
   return apiRequest<any>(`/integrations/accounts/${accountId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(accountData),
   });
 };

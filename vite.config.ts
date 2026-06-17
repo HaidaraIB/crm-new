@@ -21,6 +21,8 @@ export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
     return {
       esbuild: {
+        // esbuild 0.28+ no longer downlevels destructuring for legacy targets (dev + deps).
+        target: 'es2022',
         // Strip console/debugger from production bundles (dev keeps full logging).
         drop: mode === 'production' ? (['console', 'debugger'] as const) : [],
       },
@@ -37,6 +39,11 @@ export default defineConfig(({ mode }) => {
         alias: {
           '@': path.resolve(__dirname, '.'),
         }
+      },
+      optimizeDeps: {
+        esbuildOptions: {
+          target: 'es2022',
+        },
       },
       build: {
         // esbuild 0.28+ no longer downlevels destructuring for legacy targets.

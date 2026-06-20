@@ -3109,6 +3109,13 @@ export interface PbxSettingsResponse {
   is_enabled?: boolean;
   auto_log_calls?: boolean;
   screen_pop_enabled?: boolean;
+  softphone_enabled?: boolean;
+  sip_domain?: string;
+  sip_port?: number;
+  sip_transport?: string;
+  wss_uri?: string;
+  stun_server?: string;
+  turn_server?: string;
   connector_last_seen_at?: string | null;
   connector_online?: boolean;
   connector_package_version?: string;
@@ -3121,6 +3128,8 @@ export interface PbxExtensionRow {
   user_id?: number;
   username?: string;
   extension: string;
+  sip_password_masked?: string | null;
+  softphone_enabled?: boolean;
 }
 
 export const getPbxSettingsAPI = async (): Promise<PbxSettingsResponse> => {
@@ -3135,6 +3144,13 @@ export const updatePbxSettingsAPI = async (data: {
   is_enabled?: boolean;
   auto_log_calls?: boolean;
   screen_pop_enabled?: boolean;
+  softphone_enabled?: boolean;
+  sip_domain?: string;
+  sip_port?: number;
+  sip_transport?: string;
+  wss_uri?: string;
+  stun_server?: string;
+  turn_server?: string;
 }): Promise<PbxSettingsResponse> => {
   return apiRequest<PbxSettingsResponse>('/integrations/pbx/settings/', {
     method: 'PUT',
@@ -3152,9 +3168,29 @@ export const getPbxExtensionsAPI = async (): Promise<PbxExtensionRow[]> => {
   return apiRequest<PbxExtensionRow[]>('/integrations/pbx/extensions/');
 };
 
-export const savePbxExtensionAPI = async (data: { user_id: number; extension: string }) => {
+export const savePbxExtensionAPI = async (data: {
+  user_id: number;
+  extension: string;
+  sip_password?: string;
+  softphone_enabled?: boolean;
+}) => {
   return apiRequest<PbxExtensionRow>('/integrations/pbx/extensions/', {
     method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const updatePbxExtensionAPI = async (
+  id: number,
+  data: {
+    user_id?: number;
+    extension?: string;
+    sip_password?: string;
+    softphone_enabled?: boolean;
+  }
+) => {
+  return apiRequest<PbxExtensionRow>(`/integrations/pbx/extensions/${id}/`, {
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
 };

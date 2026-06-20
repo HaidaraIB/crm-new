@@ -101,8 +101,6 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <SettingsPage />;
         case 'Profile':
             return <ProfilePage />;
-        case 'ChangePlan':
-            return <ChangePlanPage />;
         default:
             return (
                 <PageWrapper title={currentPage}>
@@ -887,7 +885,7 @@ const TheApp = () => {
     }
     
     // Show change plan page if on /change-plan route (available for both logged-in and logged-out users)
-    if (pathname === '/change-plan' || pathname.startsWith('/change-plan') || currentPage === 'ChangePlan') {
+    if (pathname === '/change-plan' || pathname.startsWith('/change-plan') || currentPage === 'Change Plan') {
         return <ChangePlanPage />;
     }
     
@@ -1110,7 +1108,7 @@ function App() {
   return (
     // FIX: The AppProvider component requires children.
     <AppProvider>
-        <TheApp />
+      <TheApp />
     </AppProvider>
   );
 }

@@ -1,4 +1,5 @@
 import { Lead, MetaQualificationError } from '../types';
+import { resolvePrimaryPhone } from './resolvePrimaryPhone';
 
 function normalizeMetaQualificationError(raw: unknown): MetaQualificationError {
   if (raw == null) return null;
@@ -52,11 +53,15 @@ export function normalizeLead(lead: any): any {
 /** Map API list/detail payload to the Lead shape used by view/edit pages. */
 export function mapApiLeadToDisplayLead(apiLead: any): Lead {
   const base = normalizeLead(apiLead);
+  const phoneNumbers = base.phone_numbers || base.phoneNumbers || [];
   const transformedLead: Lead = {
     id: base.id,
     name: base.name,
-    phone: base.phone_number || base.phone || '',
-    phoneNumbers: base.phone_numbers || base.phoneNumbers || [],
+    phone: resolvePrimaryPhone({
+      phone: base.phone_number || base.phone || '',
+      phoneNumbers,
+    }),
+    phoneNumbers,
     status: base.status_name || base.status || '',
     type: base.type || '',
     assignedTo: base.assigned_to ?? base.assignedTo ?? 0,

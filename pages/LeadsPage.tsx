@@ -13,6 +13,7 @@ import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { exportToExcel } from '../utils/exportToExcel';
 import { normalizeLead } from '../utils/normalizeLead';
+import { resolvePrimaryPhone } from '../utils/resolvePrimaryPhone';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
@@ -141,10 +142,15 @@ export const LeadsPage = () => {
     }, [currentPage, apiFilters, leadsPageSize]);
     // Normalize API fields to frontend naming for consistent rendering (phone_numbers -> phoneNumbers, etc.)
     const normalizedLeads = React.useMemo(() => {
-        return (allLeads || []).map((l: any) => ({
+        return (allLeads || []).map((l: any) => {
+            const phoneNumbers = l.phone_numbers || l.phoneNumbers || [];
+            return {
             ...l,
-            phoneNumbers: l.phone_numbers || l.phoneNumbers || [],
-            phone: l.phone_number || l.phone || '',
+            phoneNumbers,
+            phone: resolvePrimaryPhone({
+                phone: l.phone_number || l.phone || '',
+                phoneNumbers,
+            }),
             communicationWay: l.communication_way_name || l.communication_way || l.communicationWay || '',
             status: l.status_name || l.status || '',
             priority: l.priority || '',
@@ -163,7 +169,8 @@ export const LeadsPage = () => {
             profession: l.profession,
             budgetMax: l.budgetMax ?? l.budget_max,
             budget_max: l.budget_max,
-        }));
+        };
+        });
     }, [allLeads]);
 
     // Fetch users and statuses
@@ -360,10 +367,15 @@ export const LeadsPage = () => {
         setIsExportingLeads(true);
         try {
             const data = await getLeadsAPI(apiFilters);
-            const leadsToExport = (data?.results || []).map((l: any) => ({
+            const leadsToExport = (data?.results || []).map((l: any) => {
+                const phoneNumbers = l.phone_numbers || l.phoneNumbers || [];
+                return {
                 ...normalizeLead(l),
-                phoneNumbers: l.phone_numbers || l.phoneNumbers || [],
-                phone: l.phone_number || l.phone || '',
+                phoneNumbers,
+                phone: resolvePrimaryPhone({
+                    phone: l.phone_number || l.phone || '',
+                    phoneNumbers,
+                }),
                 communicationWay: l.communication_way_name || l.communication_way || l.communicationWay || '',
                 status: l.status_name || l.status || '',
                 priority: l.priority || '',
@@ -376,12 +388,11 @@ export const LeadsPage = () => {
                 campaign_name: l.campaign_name || (l.campaign ? String(l.campaign) : null),
                 assigned_to: l.assigned_to,
                 assigned_to_username: l.assigned_to_username,
-            }));
+            };
+            });
 
             const rows = leadsToExport.map((l: Lead & { assigned_to_username?: string; campaign_name?: string }) => {
-                const phone = l.phone || (l.phoneNumbers && l.phoneNumbers.length > 0
-                    ? (l.phoneNumbers.find(p => p.is_primary) || l.phoneNumbers[0]).phone_number
-                    : '');
+                const phone = resolvePrimaryPhone(l);
                 return {
                     name: l.name,
                     phone,

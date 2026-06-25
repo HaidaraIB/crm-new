@@ -47,6 +47,50 @@ function normalizeToken(value: string): string {
     return value.trim().toLowerCase();
 }
 
+export type TimelineActorFallback = 'system' | 'whatsapp' | 'contact';
+
+/** Resolve the bold name shown on a timeline card (CRM user, contact, or system label). */
+export function resolveTimelineActor(options: {
+    createdById?: number | null;
+    createdByUsername?: string | null;
+    users: Array<{ id: number; name?: string; username?: string; avatar?: string }>;
+    t: TFn;
+    fallback?: TimelineActorFallback;
+    contactName?: string | null;
+    contactPhone?: string | null;
+}): { name: string; avatar?: string } {
+    const { createdById, createdByUsername, users, t, fallback, contactName, contactPhone } = options;
+    if (createdById != null) {
+        const user = users.find((u) => u.id === createdById);
+        if (user?.name) return { name: user.name, avatar: user.avatar };
+        if (user?.username) return { name: user.username, avatar: user.avatar };
+    }
+    if (createdByUsername?.trim()) {
+        return { name: createdByUsername.trim() };
+    }
+    if (fallback === 'contact') {
+        const contact = (contactName || contactPhone || '').trim();
+        if (contact) return { name: contact };
+    }
+    if (fallback === 'whatsapp') return { name: t('whatsappSource') };
+    if (fallback === 'system') return { name: t('timelineActorSystem') };
+    return { name: t('unknown') };
+}
+
+export function timelineEventActorFallback(
+    event: { event_type: string; new_value?: string | null; created_by?: number | null }
+): TimelineActorFallback | undefined {
+    if (event.created_by != null) return undefined;
+    if (event.event_type === 'whatsapp_message') return 'contact';
+    if (event.event_type === 'created' && normalizeToken(event.new_value || '') === 'whatsapp') {
+        return 'whatsapp';
+    }
+    if (['assignment', 're_assignment', 'created'].includes(event.event_type)) {
+        return 'system';
+    }
+    return 'system';
+}
+
 export function parseEditFieldKeyFromNotes(notes: string | null | undefined): keyof typeof translations.en | null {
     if (!notes) return null;
     const match = notes.match(/^(.+?)\s+updated$/i);

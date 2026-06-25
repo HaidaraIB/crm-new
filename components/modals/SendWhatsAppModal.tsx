@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Loader } from '../Loader';
-import { sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, getMessageTemplatesAPI } from '../../services/api';
+import { sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, getMessageTemplatesAPI, resolveLocalizedApiError } from '../../services/api';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -122,8 +122,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
             handleClose();
         } catch (e: any) {
             const fallback = stripAnsi(e?.message || '') || t('failedToSendSms');
-            const errKey = e?.data?.error_key;
-            setError((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || fallback));
+            setError(resolveLocalizedApiError(e, t, fallback));
         } finally {
             setSending(false);
         }
@@ -146,13 +145,10 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                 template_id: templateSendId as number,
                 client_id: leadId,
             });
-            setSuccessMessage(t('whatsappTemplateSent') || 'Template message sent');
-            setIsSuccessModalOpen(true);
             onSent?.();
             handleClose();
         } catch (e: any) {
-            const errKey = e?.data?.error_key;
-            setError((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')));
+            setError(resolveLocalizedApiError(e, t, t('failedToSendSms')));
         } finally {
             setTemplateSending(false);
         }
@@ -187,12 +183,12 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                 {approvedWaTemplates.length > 0 && (
                     <div>
                         <Label htmlFor="wa-meta-template">{t('sendMetaTemplate') || 'Send Meta template'}</Label>
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex items-stretch gap-2 mt-1">
                             <select
                                 id="wa-meta-template"
                                 value={templateSendId === '' ? '' : String(templateSendId)}
                                 onChange={(e) => setTemplateSendId(e.target.value ? Number(e.target.value) : '')}
-                                className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-2 text-sm text-gray-900 dark:text-white"
+                                className="flex-1 min-w-0 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white"
                             >
                                 <option value="">{t('selectApprovedTemplate') || 'Select approved template…'}</option>
                                 {approvedWaTemplates.map((tpl: any) => (
@@ -205,9 +201,11 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                                 type="button"
                                 variant="secondary"
                                 onClick={handleSendTemplate}
-                                disabled={templateSending || templateSendId === ''}
+                                disabled={templateSendId === ''}
+                                loading={templateSending}
+                                className="shrink-0 h-10 py-0 px-4"
                             >
-                                {templateSending ? <Loader variant="foreground" className="h-5" /> : (t('sendTemplateMessage') || 'Send')}
+                                {t('sendTemplateMessage') || 'Send'}
                             </Button>
                         </div>
                     </div>

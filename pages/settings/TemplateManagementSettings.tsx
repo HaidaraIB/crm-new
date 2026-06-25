@@ -11,6 +11,7 @@ import {
     deleteMessageTemplateAPI,
     submitMessageTemplateToWhatsAppAPI,
     type MessageTemplateType,
+    resolveLocalizedApiError,
 } from '../../services/api';
 
 export const TemplateManagementSettings = () => {
@@ -48,12 +49,17 @@ export const TemplateManagementSettings = () => {
                     onClick={async () => {
                         setSyncingTemplates(true);
                         try {
-                            await syncWhatsAppTemplatesAPI();
+                            const res = await syncWhatsAppTemplatesAPI();
                             await refetchTemplates();
-                            showAlert(t('templatesSynced') || 'Templates synced.', 'info');
+                            const summary = (t('templatesSyncedSummary') || 'Synced with Meta: {imported} imported, {updated} status updates.')
+                                .replace('{imported}', String(res.imported ?? 0))
+                                .replace('{updated}', String(res.updated ?? 0));
+                            showAlert(
+                                (res.imported ?? 0) > 0 || (res.updated ?? 0) > 0 ? summary : (t('templatesSynced') || 'Templates synced.'),
+                                'info'
+                            );
                         } catch (e: any) {
-                            const errKey = e?.data?.error_key;
-                            showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || 'Sync failed'), 'error');
+                            showAlert(resolveLocalizedApiError(e, t, 'Sync failed'), 'error');
                         } finally {
                             setSyncingTemplates(false);
                         }
@@ -110,7 +116,9 @@ export const TemplateManagementSettings = () => {
                             ) : (
                                 filteredTemplates.map((tpl) => {
                                     const isWa = (tpl.channel_type || '').toLowerCase() === 'whatsapp' || (tpl.channel_type || '').toLowerCase() === 'whatsapp_api';
-                                    const metaStatus = (tpl as MessageTemplateType).meta_status || 'PENDING';
+                                    const rawMeta = (tpl as MessageTemplateType).meta_status;
+                                    const metaStatus = rawMeta ? String(rawMeta).toUpperCase() : '';
+                                    const canSubmitToWhatsApp = isWa && (!metaStatus || metaStatus === 'REJECTED');
                                     const cat = (tpl.category || '').toLowerCase();
                                     const labelKey = categoryLabelKey(cat);
                                     const categoryDisplay = labelKey ? t(labelKey) : (tpl.category_display || tpl.category || '').toUpperCase();
@@ -120,13 +128,13 @@ export const TemplateManagementSettings = () => {
                                             <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white font-medium">{tpl.name}</td>
                                             <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{categoryDisplay || '—'}</td>
                                             <td className="py-3 px-4 text-center">
-                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
-                                                    {metaStatus === 'APPROVED' ? (t('templateApproved') || 'APPROVED') : metaStatus === 'REJECTED' ? (t('templateRejected') || 'REJECTED') : (t('templatePending') || 'PENDING')}
+                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : metaStatus === 'PENDING' ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                                    {metaStatus === 'APPROVED' ? (t('templateApproved') || 'APPROVED') : metaStatus === 'REJECTED' ? (t('templateRejected') || 'REJECTED') : metaStatus === 'PENDING' ? (t('templatePending') || 'PENDING') : (t('templateDraft') || 'Not submitted')}
                                                 </span>
                                             </td>
                                             <td className="py-3 px-4">
                                                 <div className="flex justify-center items-center gap-0.5">
-                                                    {isWa && (
+                                                    {canSubmitToWhatsApp && (
                                                         <Button
                                                             variant="secondary"
                                                             size="sm"
@@ -139,8 +147,7 @@ export const TemplateManagementSettings = () => {
                                                                     showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info');
                                                                     refetchTemplates();
                                                                 } catch (e: any) {
-                                                                    const errKey = e?.data?.error_key;
-                                                                    showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')), 'error');
+                                                                    showAlert(resolveLocalizedApiError(e, t, t('failedToSendSms')), 'error');
                                                                 } finally {
                                                                     setSubmittingTemplateId(null);
                                                                 }

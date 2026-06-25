@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
-import { Loader } from '../Loader';
 import type { MessageTemplateType } from '../../services/api';
-import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTemplateAPI } from '../../services/api';
+import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTemplateAPI, resolveLocalizedApiError } from '../../services/api';
 import { SelectMediaModal } from './SelectMediaModal';
+import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
 
 const NAME_MAX = 200;
 const BODY_MAX = 1000;
@@ -119,6 +119,8 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
 
   const isEdit = !!template?.id;
   const isWhatsApp = channelType === 'whatsapp_api';
+  const metaStatus = template?.meta_status ? String(template.meta_status).toUpperCase() : '';
+  const canSendToReview = !metaStatus || metaStatus === 'REJECTED';
 
   useEffect(() => {
     if (template) {
@@ -235,8 +237,18 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
     }
   };
 
+  const runWhatsAppBodyValidation = (): boolean => {
+    const result = validateWhatsAppTemplateBody(content);
+    if (!result.ok && result.key) {
+      setError(t(result.key));
+      return false;
+    }
+    return true;
+  };
+
   const handleSendToReview = async () => {
     if (!template?.id || !onSendToReview) return;
+    if (!runWhatsAppBodyValidation()) return;
     setError(null);
     setSendingToReview(true);
     try {
@@ -245,7 +257,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       onSuccess();
       onClose();
     } catch (e: any) {
-      setError(e?.data?.error || e?.message || 'Failed to send to review');
+      setError(resolveLocalizedApiError(e, t, 'Failed to send to review'));
     } finally {
       setSendingToReview(false);
     }
@@ -591,11 +603,11 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="secondary" onClick={onClose}>{t('cancel') || 'Cancel'}</Button>
-          <Button onClick={handleSubmit} disabled={saving}>
-            {saving ? <Loader variant="primary" className="h-4 w-4" /> : t('saveTemplate')}
+          <Button onClick={handleSubmit} loading={saving}>
+            {t('saveTemplate')}
           </Button>
-          {isEdit && isWhatsApp && onSendToReview && (
-            <Button variant="primary" onClick={() => setShowValidationConfirm(true)}>
+          {isEdit && isWhatsApp && onSendToReview && canSendToReview && (
+            <Button variant="primary" onClick={() => { if (runWhatsAppBodyValidation()) setShowValidationConfirm(true); }}>
               {t('sendToReview') || 'Send to review'}
             </Button>
           )}
@@ -626,8 +638,8 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
           <p className="text-gray-700 dark:text-gray-300 mb-6">{t('templateValidationConfirm') || 'This template is now eligible for validation. Would you like to start Template validation?'}</p>
           <div className="flex gap-3 w-full justify-end">
             <Button variant="secondary" onClick={() => setShowValidationConfirm(false)}>{t('cancel') || 'Cancel'}</Button>
-            <Button onClick={handleSendToReview} disabled={sendingToReview}>
-              {sendingToReview ? <Loader variant="primary" className="w-4 h-4" /> : (t('submit') || 'Submit')}
+            <Button onClick={handleSendToReview} loading={sendingToReview}>
+              {t('submit') || 'Submit'}
             </Button>
           </div>
         </div>

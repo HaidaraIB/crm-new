@@ -1,15 +1,15 @@
 
 
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, type MetaHealthResponse } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
-import { useWhatsAppConversations, useLeadWhatsAppMessages } from '../hooks/useQueries';
+import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useCreateConnectedAccount, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
@@ -23,6 +23,22 @@ import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
 import { LeadApiDocumentation } from '../components/integrations/LeadApiDocumentation';
 import { leadApiDocT } from '../constants/leadApiDocumentation';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import { ChatToast } from '../components/ChatToast';
+import {
+    isManualChatClient,
+    loadManualConversations,
+    loadManualMessages,
+    loadSelectedManualPhone,
+    mergeManualConversations,
+    buildManualClientForPhone,
+    normalizeChatPhone,
+    saveManualConversations,
+    saveManualMessages,
+    saveSelectedManualPhone,
+    removeManualConversationForPhone,
+    type ChatMessageStatus,
+    type ManualChatMessage,
+} from '../utils/whatsappManualChatsStorage';
 import { normalizeRole } from '../utils/roles';
 
 type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown> };
@@ -678,6 +694,8 @@ export const IntegrationsPage = () => {
         setIsAlertModalOpen,
     } = useAppContext();
 
+    const companyId = currentUser?.company?.id as number | string | undefined;
+
     const showAlert = (message: string, variant: 'info' | 'warning' | 'error' = 'info') => {
         setAlertMessage(message);
         setAlertVariant(variant);
@@ -771,25 +789,66 @@ export const IntegrationsPage = () => {
     const [editingTemplate, setEditingTemplate] = useState<MessageTemplateType | null>(null);
     const [submittingTemplateId, setSubmittingTemplateId] = useState<number | null>(null);
     const [syncingTemplates, setSyncingTemplates] = useState(false);
+    const [syncingPhoneAccountId, setSyncingPhoneAccountId] = useState<number | null>(null);
     const [isEditTemplateOpen, setIsEditTemplateOpen] = useState(false);
     const [templateSearch, setTemplateSearch] = useState('');
     const [isStartNewConversationOpen, setIsStartNewConversationOpen] = useState(false);
     const [extraConversations, setExtraConversations] = useState<Array<{ client: any }>>([]);
+    const manualChatsHydratedRef = useRef(false);
     const [selectedChatClient, setSelectedChatClient] = useState<any>(null);
-    const [optimisticMessages, setOptimisticMessages] = useState<Array<{ body: string; direction: 'in' | 'out'; time: string }>>([]);
+    const [optimisticMessages, setOptimisticMessages] = useState<ManualChatMessage[]>([]);
+    const [chatToast, setChatToast] = useState<{ message: string; variant: 'error' | 'warning' } | null>(null);
+    const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
     const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations();
     const isWhatsAppOrMessagingCenter = currentPage === 'WhatsApp' || currentPage === 'Messaging Center';
     const selectedChatLeadId =
         selectedChatClient && typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined;
-    const { data: leadWhatsAppMessages = [], refetch: refetchLeadWhatsApp } = useLeadWhatsAppMessages(
-        isWhatsAppOrMessagingCenter ? selectedChatLeadId : undefined
-    );
+    const selectedChatPhone = selectedChatClient ? normalizeChatPhone(selectedChatClient) : '';
+    const { data: leadWhatsAppMessages = [], refetch: refetchLeadWhatsApp } = useWhatsAppChatMessages({
+        clientId: selectedChatLeadId,
+        phone: selectedChatPhone || undefined,
+        enabled: isWhatsAppOrMessagingCenter && !!selectedChatClient,
+    });
+
+    // Link manual-number chat to CRM lead once Meta/webhook created or matched a client
+    useEffect(() => {
+        if (!isWhatsAppOrMessagingCenter || !selectedChatPhone || !selectedChatClient) return;
+        if (!isManualChatClient(selectedChatClient)) return;
+        let cancelled = false;
+        getWhatsAppContactByPhoneAPI(selectedChatPhone).then((contact) => {
+            if (cancelled || !contact?.id) return;
+            setSelectedChatClient({
+                id: contact.id,
+                name: contact.name,
+                phone_number: contact.phone_number || selectedChatPhone,
+                company_name: contact.company_name || contact.name,
+            });
+            saveSelectedManualPhone(companyId, null);
+            refetchConversations();
+            refetchLeadWhatsApp();
+        });
+        return () => {
+            cancelled = true;
+        };
+    }, [isWhatsAppOrMessagingCenter, selectedChatPhone, selectedChatClient?.id, companyId]);
+
+    // Drop optimistic "sent" rows once the server thread has them; keep sending/failed
+    useEffect(() => {
+        if (!leadWhatsAppMessages.length) return;
+        setOptimisticMessages((prev) => prev.filter((m) => m.status === 'sending' || m.status === 'failed'));
+    }, [leadWhatsAppMessages]);
 
     const { data: waSession, refetch: refetchWaSession } = useQuery({
-        queryKey: ['whatsappSession', selectedChatLeadId],
-        queryFn: () => getWhatsAppSessionWindowAPI(selectedChatLeadId!),
-        enabled: isWhatsAppOrMessagingCenter && typeof selectedChatLeadId === 'number',
+        queryKey: ['whatsappSession', selectedChatLeadId, selectedChatPhone],
+        queryFn: () =>
+            typeof selectedChatLeadId === 'number'
+                ? getWhatsAppSessionWindowAPI({ clientId: selectedChatLeadId })
+                : getWhatsAppSessionWindowAPI({ phone: selectedChatPhone }),
+        enabled:
+            isWhatsAppOrMessagingCenter &&
+            (typeof selectedChatLeadId === 'number' ||
+                (!!selectedChatPhone && selectedChatPhone.replace(/\D/g, '').length >= 7)),
     });
 
     const conversations = useMemo(() => {
@@ -801,12 +860,43 @@ export const IntegrationsPage = () => {
                 company_name: c.company_name || c.name,
             },
         }));
-        const extra = extraConversations.filter((e) => !fromApi.some((a: any) => a.client.id === e.client.id));
+        const extra = extraConversations.filter((e) => {
+            const ep = normalizeChatPhone(e.client);
+            return !fromApi.some((a: any) => {
+                const ap = normalizeChatPhone(a.client);
+                return a.client.id === e.client.id || (ep && ap === ep);
+            });
+        });
         return [...fromApi, ...extra];
     }, [conversationsList, extraConversations]);
+
+    useEffect(() => {
+        if (!companyId || !isWhatsAppOrMessagingCenter) return;
+        const merged = mergeManualConversations(companyId);
+        setExtraConversations(merged);
+        manualChatsHydratedRef.current = true;
+        const phone = loadSelectedManualPhone(companyId);
+        if (!phone) return;
+        const match = merged.find((e) => normalizeChatPhone(e.client) === phone);
+        const client = match?.client ?? buildManualClientForPhone(phone);
+        if (!match) {
+            setExtraConversations((prev) => {
+                if (prev.some((e) => normalizeChatPhone(e.client) === phone)) return prev;
+                return [{ client }, ...prev];
+            });
+        }
+        setSelectedChatClient(client);
+        setOptimisticMessages(loadManualMessages(companyId, phone));
+    }, [companyId, isWhatsAppOrMessagingCenter]);
+
+    useEffect(() => {
+        if (!companyId || !manualChatsHydratedRef.current) return;
+        saveManualConversations(companyId, extraConversations);
+    }, [companyId, extraConversations]);
     const [messageInput, setMessageInput] = useState('');
     const [chatTemplateSendId, setChatTemplateSendId] = useState<number | ''>('');
     const [chatTemplateSending, setChatTemplateSending] = useState(false);
+    const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
     const [infoAlert, setInfoAlert] = useState<{ title: string; message: string } | null>(null);
 
     useEffect(() => {
@@ -1613,16 +1703,27 @@ export const IntegrationsPage = () => {
 
             if (response.embedded_signup?.enabled && response.embedded_signup.config_id) {
                 const es = response.embedded_signup;
-                const code = await obtainWhatsAppEmbeddedSignupCode({
+                const signup = await obtainWhatsAppEmbeddedSignupCode({
                     app_id: es.app_id,
                     config_id: es.config_id,
                     graph_api_version: es.graph_api_version,
                 });
-                if (!code) {
+                if (!signup.code) {
                     showAlert(t('connectionCancelled') || 'Connection was cancelled.', 'info');
                     return;
                 }
-                await completeWhatsAppEmbeddedSignupAPI(accountId, code);
+                await completeWhatsAppEmbeddedSignupAPI(accountId, signup.code, {
+                    waba_id: signup.waba_id,
+                    phone_number_id: signup.phone_number_id,
+                    business_id: signup.business_id,
+                });
+                if (!signup.waba_id || !signup.phone_number_id) {
+                    showAlert(
+                        t('whatsappEmbeddedSignupMissingIds') ||
+                            'Connected to Meta, but phone number IDs were not returned. Click "Refresh phone numbers" on the Accounts tab, or reconnect after fixing Login for Business permissions (whatsapp_business_messaging).',
+                        'warning'
+                    );
+                }
                 finalizeOAuthConnect(accountId);
                 setSuccessMessage(t('connectionSuccessful') || 'Connected successfully.');
                 setIsSuccessModalOpen(true);
@@ -1672,6 +1773,31 @@ export const IntegrationsPage = () => {
         openConnectPopup(accountId);
     };
 
+    const handleSyncWhatsAppPhoneNumbers = async (accountId: number) => {
+        setSyncingPhoneAccountId(accountId);
+        try {
+            const res = await syncWhatsAppPhoneNumbersAPI(accountId);
+            queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+            const display = res.display_phone_number || res.phone_number_id || '';
+            showAlert(
+                display
+                    ? (t('whatsappPhoneNumbersSynced') || 'Phone numbers synced.') + ` ${display}`
+                    : (t('whatsappPhoneNumbersSynced') || 'Phone numbers synced.'),
+                'info'
+            );
+        } catch (error: any) {
+            const key = error?.error_key || error?.code;
+            const msg =
+                (key && t(key)) ||
+                error?.message ||
+                t('whatsapp_phone_numbers_not_synced') ||
+                'Could not sync phone numbers from Meta.';
+            showAlert(msg, 'error');
+        } finally {
+            setSyncingPhoneAccountId(null);
+        }
+    };
+
     useEffect(() => {
         if (pendingConnectAccountId == null) return;
         const id = pendingConnectAccountId;
@@ -1713,92 +1839,276 @@ export const IntegrationsPage = () => {
     // WhatsApp (Integrations) or Messaging Center (Marketing): Chats | Template Management (WhatsApp only) | Message Campaign | Accounts (WhatsApp only)
     const isMessagingCenterPage = currentPage === 'Messaging Center';
     if (currentPage === 'WhatsApp' || isMessagingCenterPage) {
-        const addConversation = (client: any) => {
+        const ensureManualConversationListed = (client: any) => {
+            const phone = normalizeChatPhone(client);
+            if (!phone || !isManualChatClient(client)) return;
             setExtraConversations((prev) => {
-                if (prev.some((c) => c.client.id === client.id)) return prev;
+                if (prev.some((c) => normalizeChatPhone(c.client) === phone)) return prev;
                 return [{ client }, ...prev];
             });
+        };
+
+        const addConversation = (client: any) => {
+            const phone = normalizeChatPhone(client);
+            ensureManualConversationListed(client);
             setSelectedChatClient(client);
-            setOptimisticMessages([]);
+            const history = phone && companyId ? loadManualMessages(companyId, phone) : [];
+            setOptimisticMessages(history);
+            if (phone) saveSelectedManualPhone(companyId, phone);
         };
 
-        const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '';
-
-        const blockFreeTextWhatsApp =
-            typeof selectedChatClient?.id === 'number' &&
-            waSession != null &&
-            !waSession.in_session;
-
-        const handleSendMessage = async () => {
-            if (!selectedChatClient || !messageInput.trim()) return;
-            const to = getClientPhone(selectedChatClient);
-            if (!to) {
-                showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
-                return;
+        const selectChatClient = (client: any) => {
+            setChatToast(null);
+            setSelectedChatClient(client);
+            const phone = normalizeChatPhone(client);
+            if (isManualChatClient(client)) {
+                setOptimisticMessages(phone && companyId ? loadManualMessages(companyId, phone) : []);
+                saveSelectedManualPhone(companyId, phone || null);
+            } else {
+                setOptimisticMessages([]);
+                saveSelectedManualPhone(companyId, null);
             }
-            if (blockFreeTextWhatsApp) {
-                showAlert(
-                    t('whatsappOutsideSessionUseTemplate') ||
-                        'This contact is outside the 24-hour messaging window. Send an approved WhatsApp template instead.',
-                    'warning'
-                );
-                return;
-            }
-            const body = messageInput.trim();
-            setMessageInput('');
-            setOptimisticMessages((prev) => [...prev, { body, direction: 'out' as const, time: new Date().toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' })) }]);
-            try {
-                const payload: { to: string; message: string; client_id?: number } = { to, message: body };
-                if (typeof selectedChatClient.id === 'number') payload.client_id = selectedChatClient.id;
-                await sendWhatsAppMessageAPI(payload);
-                refetchLeadWhatsApp();
-                // Manual-number chats have no client_id, so history never loads from API; keep optimistic rows.
-                if (typeof selectedChatClient.id === 'number') {
-                    setOptimisticMessages([]);
+        };
+
+        const pushManualChatMessages = (client: any, updater: (prev: ManualChatMessage[]) => ManualChatMessage[]) => {
+            ensureManualConversationListed(client);
+            setOptimisticMessages((prev) => {
+                const next = updater(prev);
+                if (isManualChatClient(client)) {
+                    const phone = normalizeChatPhone(client);
+                    if (phone && companyId) saveManualMessages(companyId, phone, next);
                 }
-            } catch (e: any) {
-                setOptimisticMessages((prev) => prev.slice(0, -1));
-                setMessageInput(body);
-                showAlert(e?.message || t('failedToSendSms'), 'error');
+                return next;
+            });
+        };
+
+        const patchChatMessageStatus = (client: any, msgId: string, status: ChatMessageStatus) => {
+            pushManualChatMessages(client, (prev) => prev.map((m) => (m.id === msgId ? { ...m, status } : m)));
+        };
+
+        const removeChatMessage = (client: any, msgId: string) => {
+            pushManualChatMessages(client, (prev) => prev.filter((m) => m.id !== msgId));
+        };
+
+        const inferTemplateIdForMessage = (msg: ManualChatMessage): number | undefined => {
+            if (msg.templateId) return msg.templateId;
+            const body = (msg.body || '').trim();
+            if (!body) return undefined;
+            for (const tpl of approvedWaTemplates) {
+                let preview = selectedChatClient
+                    ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient)
+                    : (tpl.content || '');
+                preview = preview.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();
+                if (preview && preview === body) return tpl.id;
+            }
+            return undefined;
+        };
+
+        const finalizeOutboundSuccess = async (client: any, msgId: string) => {
+            const phone = getClientPhone(client);
+            if (typeof client.id !== 'number' && phone) {
+                try {
+                    const contact = await getWhatsAppContactByPhoneAPI(phone);
+                    if (contact?.id) {
+                        setSelectedChatClient({
+                            id: contact.id,
+                            name: contact.name,
+                            phone_number: contact.phone_number || phone,
+                            company_name: contact.company_name || contact.name,
+                        });
+                        saveSelectedManualPhone(companyId, null);
+                        await refetchLeadWhatsApp();
+                        setOptimisticMessages((prev) => prev.filter((m) => m.id !== msgId));
+                        refetchWaSession();
+                        refetchConversations();
+                        return;
+                    }
+                } catch {
+                    /* keep optimistic sent state */
+                }
+            }
+            if (typeof client.id === 'number') {
+                await refetchLeadWhatsApp();
+                setOptimisticMessages((prev) => prev.filter((m) => m.id !== msgId));
+            } else {
+                patchChatMessageStatus(client, msgId, 'sent');
+            }
+            refetchWaSession();
+            refetchConversations();
+        };
+
+        const handleOutboundSendError = (client: any, msgId: string, e: unknown, restoreText?: string) => {
+            patchChatMessageStatus(client, msgId, 'failed');
+            if (restoreText !== undefined) setMessageInput(restoreText);
+            setChatToast({
+                message: resolveLocalizedApiError(e as { data?: unknown; message?: string }, t, t('chatMessageFailed')),
+                variant: 'error',
+            });
+        };
+
+        const sendOutboundMessage = async (
+            client: any,
+            msgId: string,
+            payload: { kind: 'text'; body: string } | { kind: 'template'; templateId: number; previewBody: string }
+        ) => {
+            const to = getClientPhone(client);
+            if (!to) {
+                handleOutboundSendError(client, msgId, { message: t('sms_error_invalid_to_number') });
+                return;
+            }
+            patchChatMessageStatus(client, msgId, 'sending');
+            try {
+                if (payload.kind === 'template') {
+                    await sendWhatsAppTemplateAPI({
+                        to,
+                        template_id: payload.templateId,
+                        ...(typeof client.id === 'number' ? { client_id: client.id } : {}),
+                    });
+                } else {
+                    const req: { to: string; message: string; client_id?: number } = { to, message: payload.body };
+                    if (typeof client.id === 'number') req.client_id = client.id;
+                    await sendWhatsAppMessageAPI(req);
+                }
+                await finalizeOutboundSuccess(client, msgId);
+            } catch (e: unknown) {
+                handleOutboundSendError(client, msgId, e, payload.kind === 'text' ? payload.body : undefined);
             }
         };
 
-        const handleSendMetaTemplate = async () => {
-            if (!selectedChatClient || chatTemplateSendId === '') {
-                showAlert(t('selectApprovedTemplate') || 'Select an approved template', 'warning');
-                return;
-            }
-            const to = getClientPhone(selectedChatClient);
-            if (!to) {
-                showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
-                return;
-            }
-            setChatTemplateSending(true);
+        const handleDeleteChatMessage = (msg: ManualChatMessage) => {
+            if (!selectedChatClient || !msg.id || msg.status === 'sending') return;
+            const idStr = String(msg.id);
+            setConfirmDeleteConfig({
+                title: t('delete'),
+                message: t('deleteChatMessageConfirm'),
+                confirmButtonText: t('delete'),
+                confirmButtonVariant: 'danger',
+                onConfirm: async () => {
+                    setDeletingMessageId(idStr);
+                    try {
+                        if (idStr.startsWith('api-')) {
+                            const apiId = parseInt(idStr.slice(4), 10);
+                            if (!Number.isNaN(apiId)) {
+                                await deleteWhatsAppMessageAPI(apiId);
+                                await refetchLeadWhatsApp();
+                                refetchConversations();
+                            }
+                        } else {
+                            removeChatMessage(selectedChatClient, idStr);
+                        }
+                    } catch (e: unknown) {
+                        setChatToast({
+                            message: resolveLocalizedApiError(e as { data?: unknown; message?: string }, t, t('error')),
+                            variant: 'error',
+                        });
+                    } finally {
+                        setDeletingMessageId(null);
+                    }
+                },
+            });
+            setIsConfirmDeleteModalOpen(true);
+        };
+
+        const handleDeleteConversation = (client: any) => {
+            const phone = normalizeChatPhone(client);
+            const clientId = typeof client.id === 'number' ? client.id : undefined;
+            const label = String(client.company_name || client.name || phone || '');
+            setConfirmDeleteConfig({
+                title: t('delete'),
+                message: t('deleteConversationConfirm'),
+                itemName: label,
+                confirmButtonText: t('delete'),
+                confirmButtonVariant: 'danger',
+                onConfirm: async () => {
+                    try {
+                        if (clientId || phone) {
+                            await deleteWhatsAppConversationAPI({ clientId, phone: phone || undefined });
+                        }
+                        if (phone) {
+                            removeManualConversationForPhone(companyId, phone);
+                        }
+                        setExtraConversations((prev) =>
+                            prev.filter((e) => {
+                                const ep = normalizeChatPhone(e.client);
+                                return e.client.id !== client.id && (!phone || ep !== phone);
+                            })
+                        );
+                        if (
+                            selectedChatClient &&
+                            (selectedChatClient.id === client.id ||
+                                (phone && normalizeChatPhone(selectedChatClient) === phone))
+                        ) {
+                            setSelectedChatClient(null);
+                            setOptimisticMessages([]);
+                            saveSelectedManualPhone(companyId, null);
+                        }
+                        await refetchConversations();
+                        await refetchLeadWhatsApp();
+                    } catch (e: unknown) {
+                        showAlert(
+                            resolveLocalizedApiError(e as { data?: unknown; message?: string }, t, t('error')),
+                            'error'
+                        );
+                    }
+                },
+            });
+            setIsConfirmDeleteModalOpen(true);
+        };
+
+        const handleDeleteFailedMessage = (msgId: string) => {
+            handleDeleteChatMessage({ id: msgId, body: '', direction: 'out', time: '' });
+        };
+
+        const handleResendFailedMessage = async (msg: ManualChatMessage) => {
+            if (!selectedChatClient || !msg.id || resendingMessageId) return;
+            setResendingMessageId(msg.id);
             try {
-                await sendWhatsAppTemplateAPI({
-                    to,
-                    template_id: chatTemplateSendId as number,
-                    ...(typeof selectedChatClient.id === 'number' ? { client_id: selectedChatClient.id } : {}),
-                });
-                showAlert(t('whatsappTemplateSent') || 'Template message sent', 'info');
-                refetchLeadWhatsApp();
-                refetchWaSession();
-            } catch (e: any) {
-                const errKey = e?.data?.error_key;
-                showAlert(
-                    (errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')),
-                    'error'
-                );
+                const templateId = msg.sendKind === 'text' ? undefined : inferTemplateIdForMessage(msg);
+                if (templateId) {
+                    await sendOutboundMessage(selectedChatClient, msg.id, {
+                        kind: 'template',
+                        templateId,
+                        previewBody: msg.body,
+                    });
+                } else if (msg.sendKind === 'template') {
+                    setChatToast({ message: t('selectApprovedTemplate') || 'Select an approved template', variant: 'warning' });
+                } else {
+                    await sendOutboundMessage(selectedChatClient, msg.id, { kind: 'text', body: msg.body });
+                }
             } finally {
-                setChatTemplateSending(false);
+                setResendingMessageId(null);
             }
         };
+
+        const newChatMessageId = () => `msg-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        const getClientPhone = (c: any) => normalizeChatPhone(c);
+
+        const CHAT_AVATAR_CLASS =
+            'w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center text-primary-800 dark:text-primary-50 font-bold text-sm shrink-0 ring-2 ring-primary-200/80 dark:ring-primary-600';
+
+        const getChatAvatarLabel = (client: any): string => {
+            const name = String(client?.company_name || client?.name || '').trim();
+            const nameOnlyDigits = name.replace(/\s/g, '').replace(/\D/g, '') === name.replace(/\s/g, '');
+            if (name && !nameOnlyDigits) {
+                return name.charAt(0).toUpperCase();
+            }
+            const phone = String(client?.phone_number || client?.phone || (nameOnlyDigits ? name : '') || '').replace(/\D/g, '');
+            if (phone.length >= 2) return phone.slice(-2);
+            if (phone.length === 1) return phone;
+            return '?';
+        };
+
+        const formatChatTime = () =>
+            new Date().toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' }));
 
         /** Replace template placeholders (EN and AR) with actual lead/client values; if no value, leave placeholder as-is */
         const replaceTemplatePlaceholders = (text: string, client: any): string => {
             if (!client) return text;
             const customerName = (client.name || client.contact_name || (client.first_name && client.last_name ? `${client.first_name} ${client.last_name}`.trim() : '') || '').trim();
-            const company = (typeof client.company_name === 'string' ? client.company_name : (client.company && (typeof client.company === 'string' ? client.company : client.company.name)) || '').trim();
+            const leadCompany = (typeof client.company_name === 'string' ? client.company_name : (client.company && (typeof client.company === 'string' ? client.company : client.company.name)) || '').trim();
+            const tenantCompany = (currentUser?.company?.name || '').trim();
+            const company = tenantCompany || leadCompany;
             const amount = client.amount ?? client.last_invoice_amount ?? '';
             const amountStr = amount !== undefined && amount !== null && String(amount).trim() !== '' ? String(amount).trim() : null;
             const invoiceNumber = client.invoice_number ?? client.last_invoice_number ?? '';
@@ -1825,6 +2135,81 @@ export const IntegrationsPage = () => {
                 out = replacePlaceholder(out, 'Invoice Number', invoiceStr);
             }
             return out;
+        };
+
+        const buildTemplatePreviewBody = (templateId: number): string => {
+            const tpl = approvedWaTemplates.find((t) => t.id === templateId);
+            if (!tpl) return 'Template';
+            let body = selectedChatClient ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient) : (tpl.content || '');
+            body = body.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();
+            return body || tpl.name || 'Template';
+        };
+
+        const blockFreeTextWhatsApp =
+            typeof selectedChatClient?.id === 'number' &&
+            waSession != null &&
+            !waSession.in_session;
+
+        const handleSendMessage = async () => {
+            if (!selectedChatClient || !messageInput.trim()) return;
+            const to = getClientPhone(selectedChatClient);
+            if (!to) {
+                showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
+                return;
+            }
+            if (blockFreeTextWhatsApp) {
+                showAlert(
+                    t('whatsappOutsideSessionUseTemplate') ||
+                        'This contact is outside the 24-hour messaging window. Send an approved WhatsApp template instead.',
+                    'warning'
+                );
+                return;
+            }
+            const body = messageInput.trim();
+            setMessageInput('');
+            const msgId = newChatMessageId();
+            pushManualChatMessages(selectedChatClient, (prev) => [
+                ...prev,
+                { id: msgId, body, direction: 'out' as const, time: formatChatTime(), status: 'sending', sendKind: 'text' },
+            ]);
+            await sendOutboundMessage(selectedChatClient, msgId, { kind: 'text', body });
+        };
+
+        const handleSendMetaTemplate = async () => {
+            if (!selectedChatClient || chatTemplateSendId === '') {
+                showAlert(t('selectApprovedTemplate') || 'Select an approved template', 'warning');
+                return;
+            }
+            const to = getClientPhone(selectedChatClient);
+            if (!to) {
+                showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
+                return;
+            }
+            setChatTemplateSending(true);
+            const templateId = chatTemplateSendId as number;
+            const previewBody = buildTemplatePreviewBody(templateId);
+            const msgId = newChatMessageId();
+            pushManualChatMessages(selectedChatClient, (prev) => [
+                ...prev,
+                {
+                    id: msgId,
+                    body: previewBody,
+                    direction: 'out' as const,
+                    time: formatChatTime(),
+                    status: 'sending',
+                    sendKind: 'template',
+                    templateId,
+                },
+            ]);
+            try {
+                await sendOutboundMessage(selectedChatClient, msgId, {
+                    kind: 'template',
+                    templateId,
+                    previewBody,
+                });
+            } finally {
+                setChatTemplateSending(false);
+            }
         };
 
         const handleApplyQuickTemplate = (content: string) => {
@@ -1896,9 +2281,9 @@ export const IntegrationsPage = () => {
                                         </div>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{t('campaignSearchHint')}</p>
                                     </div>
-                                    <div className="flex items-center gap-2 mb-2">
-                                        <button type="button" onClick={() => { const allIds = new Set(campaignLeads.map((l: any) => l.id)); setCampaignSelectedIds(allIds); }} className="text-sm text-primary hover:underline">{t('selectAll') || 'Select all'}</button>
-                                        <button type="button" onClick={() => setCampaignSelectedIds(new Set())} className="text-sm text-gray-500 hover:underline">{t('deselectAll') || 'Deselect all'}</button>
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <button type="button" onClick={() => { const allIds = new Set(campaignLeads.map((l: any) => l.id)); setCampaignSelectedIds(allIds); }} className="text-sm font-medium text-primary-600 dark:text-primary-300 hover:text-primary-700 dark:hover:text-primary-200 hover:underline underline-offset-2">{t('selectAll') || 'Select all'}</button>
+                                        <button type="button" onClick={() => setCampaignSelectedIds(new Set())} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:underline underline-offset-2">{t('deselectAll') || 'Deselect all'}</button>
                                     </div>
                                     <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
                                         {campaignLeadsLoading ? (
@@ -2032,19 +2417,30 @@ export const IntegrationsPage = () => {
                                 </div>
                                 <ul className="flex-1 overflow-y-auto">
                                     {conversations.map(({ client }) => (
-                                        <li key={client.id}>
+                                        <li key={String(client.id)} className="group relative">
                                             <button
                                                 type="button"
-                                                onClick={() => { setSelectedChatClient(client); setOptimisticMessages([]); }}
-                                                className={`w-full flex items-center gap-3 p-3 text-start ${selectedChatClient?.id === client.id ? 'bg-primary/10 dark:bg-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
+                                                onClick={() => selectChatClient(client)}
+                                                className={`w-full flex items-center gap-3 p-3 pe-10 text-start ${selectedChatClient?.id === client.id ? 'bg-primary/10 dark:bg-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
                                             >
-                                                <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold flex-shrink-0">
-                                                    {(client.company_name || client.name || '?').charAt(0)}
+                                                <div className={CHAT_AVATAR_CLASS}>
+                                                    {getChatAvatarLabel(client)}
                                                 </div>
                                                 <div className="min-w-0 flex-1">
                                                     <p className="font-medium text-gray-900 dark:text-white truncate">{client.company_name || client.name}</p>
                                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.name ? client.name : <span dir="ltr">{client.phone_number}</span>}</p>
                                                 </div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                title={t('delete')}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteConversation(client);
+                                                }}
+                                                className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
                                             </button>
                                         </li>
                                     ))}
@@ -2057,36 +2453,144 @@ export const IntegrationsPage = () => {
                                 {selectedChatClient ? (
                                     <>
                                         <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
-                                            <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                                                {(selectedChatClient.company_name || selectedChatClient.name || '?').charAt(0)}
+                                            <div className={CHAT_AVATAR_CLASS}>
+                                                {getChatAvatarLabel(selectedChatClient)}
                                             </div>
-                                            <div>
+                                            <div className="min-w-0 flex-1">
                                                 <p className="font-medium text-gray-900 dark:text-white">{selectedChatClient.company_name || selectedChatClient.name}</p>
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">{selectedChatClient.phone_number && <>{t('connectedWhatsAppApi')} · <span dir="ltr">{selectedChatClient.phone_number}</span></>}</p>
                                             </div>
+                                            <button
+                                                type="button"
+                                                title={t('delete')}
+                                                onClick={() => handleDeleteConversation(selectedChatClient)}
+                                                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
+                                            </button>
                                         </div>
                                         <div className="flex-1 overflow-y-auto p-4 space-y-2">
                                             <p className="text-center text-xs text-gray-400 py-2">{t('today')}</p>
                                             {[
                                                 ...(leadWhatsAppMessages as any[])
-                                                    .map((wa: any) => ({
-                                                        body: wa.body,
-                                                        direction: (wa.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
-                                                        time: new Date(wa.created_at).toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' })),
-                                                    }))
+                                                    .map((wa: any) => {
+                                                        const delivery = String(wa.delivery_status || 'sent').toLowerCase();
+                                                        let status: 'sent' | 'delivered' | 'read' | 'failed' = 'sent';
+                                                        if (delivery === 'failed') status = 'failed';
+                                                        else if (delivery === 'delivered') status = 'delivered';
+                                                        else if (delivery === 'read') status = 'read';
+                                                        return {
+                                                            id: `api-${wa.id}`,
+                                                            body: wa.body,
+                                                            direction: (wa.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
+                                                            time: new Date(wa.created_at).toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' })),
+                                                            status,
+                                                            deliveryError: wa.delivery_error || undefined,
+                                                        };
+                                                    })
                                                     .reverse(),
                                                 ...optimisticMessages,
-                                            ].map((msg, i) => (
+                                            ].map((msg) => (
                                                 <div
-                                                    key={i}
-                                                    className={`max-w-[85%] rounded-lg px-3 py-2 ${msg.direction === 'out' ? 'ms-auto bg-primary text-white' : 'me-auto bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'}`}
+                                                    key={msg.id ?? `${msg.time}-${msg.body.slice(0, 24)}`}
+                                                    className={`group relative max-w-[85%] rounded-lg px-3 py-2 ${
+                                                        msg.direction === 'out'
+                                                            ? msg.status === 'failed'
+                                                                ? 'ms-auto bg-red-600/90 text-white'
+                                                                : 'ms-auto bg-primary text-white'
+                                                            : 'me-auto bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                                                    } ${msg.status === 'sending' ? 'opacity-80' : ''}`}
                                                 >
-                                                    <p className="text-sm">{msg.body}</p>
-                                                    <p className="text-xs opacity-80 mt-1">{msg.time}</p>
+                                                    {msg.status !== 'sending' && msg.id && (
+                                                        <button
+                                                            type="button"
+                                                            title={t('delete')}
+                                                            disabled={deletingMessageId === msg.id}
+                                                            onClick={() => handleDeleteChatMessage(msg)}
+                                                            className={`absolute -top-2 ${msg.direction === 'out' ? '-start-2' : '-end-2'} rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 ${
+                                                                msg.direction === 'out'
+                                                                    ? 'bg-red-900/80 text-white hover:bg-red-900'
+                                                                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500'
+                                                            } disabled:opacity-40`}
+                                                        >
+                                                            <TrashIcon className="w-3 h-3" />
+                                                        </button>
+                                                    )}
+                                                    <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                                                    <div className="flex items-center justify-end gap-1.5 mt-1">
+                                                        <span className="text-xs opacity-80">{msg.time}</span>
+                                                        {msg.direction === 'out' && msg.status === 'sending' && (
+                                                            <svg className="w-3.5 h-3.5 animate-spin opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
+                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                                                            </svg>
+                                                        )}
+                                                        {msg.direction === 'out' && msg.status === 'sent' && (
+                                                            <span
+                                                                className="text-xs opacity-70 leading-none"
+                                                                title={t('whatsappDeliveryPending') || 'Sent to Meta — waiting for delivery'}
+                                                                aria-hidden="true"
+                                                            >
+                                                                ✓
+                                                            </span>
+                                                        )}
+                                                        {msg.direction === 'out' && (msg.status === 'delivered' || msg.status === 'read') && (
+                                                            <span
+                                                                className={`text-xs leading-none ${msg.status === 'read' ? 'opacity-95' : 'opacity-70'}`}
+                                                                title={msg.status === 'read' ? (t('whatsappRead') || 'Read') : (t('whatsappDelivered') || 'Delivered')}
+                                                                aria-hidden="true"
+                                                            >
+                                                                ✓✓
+                                                            </span>
+                                                        )}
+                                                        {msg.direction === 'out' && msg.status === 'failed' && (
+                                                            <span
+                                                                className="text-xs font-semibold text-red-100"
+                                                                title={
+                                                                    (msg as { deliveryError?: string }).deliveryError
+                                                                        ? (t('whatsappDeliveryFailed') || 'Meta did not deliver: {error}').replace(
+                                                                              '{error}',
+                                                                              (msg as { deliveryError?: string }).deliveryError || ''
+                                                                          )
+                                                                        : t('chatMessageFailed')
+                                                                }
+                                                            >
+                                                                !
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {msg.direction === 'out' && msg.status === 'failed' && msg.id && !String(msg.id).startsWith('api-') && (
+                                                        <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-red-300/30">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleDeleteFailedMessage(msg.id!)}
+                                                                className="text-xs text-red-100/90 hover:text-white underline-offset-2 hover:underline"
+                                                            >
+                                                                {t('delete')}
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleResendFailedMessage(msg)}
+                                                                disabled={resendingMessageId === msg.id}
+                                                                className="text-xs font-semibold text-white bg-red-800/50 hover:bg-red-800/70 disabled:opacity-60 rounded px-2 py-0.5"
+                                                            >
+                                                                {resendingMessageId === msg.id ? t('sending') : t('chatMessageResend')}
+                                                            </button>
+                                                        </div>
+                                                    )}
                                                 </div>
                                             ))}
                                         </div>
-                                        <div className="p-3 border-t border-gray-200 dark:border-gray-700">
+                                        <div className="p-3 border-t border-gray-200 dark:border-gray-700 relative">
+                                            {chatToast && (
+                                                <div className="absolute bottom-full left-3 right-3 mb-2 z-20 pointer-events-none">
+                                                    <ChatToast
+                                                        message={chatToast.message}
+                                                        variant={chatToast.variant}
+                                                        onDismiss={() => setChatToast(null)}
+                                                    />
+                                                </div>
+                                            )}
                                             {typeof selectedChatClient.id === 'number' && waSession && !waSession.in_session && (
                                                 <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5 mb-2">
                                                     {t('whatsappSessionClosedHint') ||
@@ -2102,17 +2606,17 @@ export const IntegrationsPage = () => {
                                                 </p>
                                             )}
                                             {approvedWaTemplates.length > 0 && (
-                                                <div className="flex flex-wrap items-end gap-2 mb-2">
-                                                    <div className="flex-1 min-w-[10rem]">
-                                                        <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-                                                            {t('sendMetaTemplate') || 'Send Meta template'}
-                                                        </span>
+                                                <div className="mb-2">
+                                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
+                                                        {t('sendMetaTemplate') || 'Send Meta template'}
+                                                    </span>
+                                                    <div className="flex items-stretch gap-2">
                                                         <select
                                                             value={chatTemplateSendId === '' ? '' : String(chatTemplateSendId)}
                                                             onChange={(e) =>
                                                                 setChatTemplateSendId(e.target.value ? Number(e.target.value) : '')
                                                             }
-                                                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2 py-1.5 text-sm text-gray-900 dark:text-white"
+                                                            className="flex-1 min-w-0 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white"
                                                         >
                                                             <option value="">{t('selectApprovedTemplate') || 'Select approved template…'}</option>
                                                             {approvedWaTemplates.map((tpl) => (
@@ -2121,15 +2625,16 @@ export const IntegrationsPage = () => {
                                                                 </option>
                                                             ))}
                                                         </select>
+                                                        <Button
+                                                            variant="secondary"
+                                                            onClick={handleSendMetaTemplate}
+                                                            disabled={chatTemplateSendId === ''}
+                                                            loading={chatTemplateSending}
+                                                            className="shrink-0 h-10 py-0 px-4"
+                                                        >
+                                                            {t('sendTemplateMessage') || 'Send template'}
+                                                        </Button>
                                                     </div>
-                                                    <Button
-                                                        variant="secondary"
-                                                        onClick={handleSendMetaTemplate}
-                                                        disabled={chatTemplateSending || chatTemplateSendId === ''}
-                                                        className="shrink-0"
-                                                    >
-                                                        {chatTemplateSending ? <Loader variant="primary" className="h-4 w-4" /> : (t('sendTemplateMessage') || 'Send template')}
-                                                    </Button>
                                                 </div>
                                             )}
                                             {templates.length > 0 && (
@@ -2183,12 +2688,17 @@ export const IntegrationsPage = () => {
                                     onClick={async () => {
                                         setSyncingTemplates(true);
                                         try {
-                                            await syncWhatsAppTemplatesAPI();
+                                            const res = await syncWhatsAppTemplatesAPI();
                                             await refetchTemplates();
-                                            showAlert(t('templatesSynced') || 'Templates synced.', 'info');
+                                            const summary = (t('templatesSyncedSummary') || 'Synced with Meta: {imported} imported, {updated} status updates.')
+                                                .replace('{imported}', String(res.imported ?? 0))
+                                                .replace('{updated}', String(res.updated ?? 0));
+                                            showAlert(
+                                                (res.imported ?? 0) > 0 || (res.updated ?? 0) > 0 ? summary : (t('templatesSynced') || 'Templates synced.'),
+                                                'info'
+                                            );
                                         } catch (e: any) {
-                                            const errKey = e?.data?.error_key;
-                                            showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || 'Sync failed'), 'error');
+                                            showAlert(resolveLocalizedApiError(e, t, 'Sync failed'), 'error');
                                         } finally {
                                             setSyncingTemplates(false);
                                         }
@@ -2257,9 +2767,9 @@ export const IntegrationsPage = () => {
                                             }
                                             return filtered.map((tpl) => {
                                                 const isWa = (tpl.channel_type || '').toLowerCase() === 'whatsapp' || (tpl.channel_type || '').toLowerCase() === 'whatsapp_api';
-                                                const metaStatus = (tpl as MessageTemplateType).meta_status || 'PENDING';
-                                                const isApproved = metaStatus === 'APPROVED';
-                                                const isPending = metaStatus === 'PENDING';
+                                                const rawMeta = (tpl as MessageTemplateType).meta_status;
+                                                const metaStatus = rawMeta ? String(rawMeta).toUpperCase() : '';
+                                                const canSubmitToWhatsApp = isWa && (!metaStatus || metaStatus === 'REJECTED');
                                                 const cat = (tpl.category || '').toLowerCase();
 const categoryLabelKey = cat === 'marketing' ? 'categoryMarketingLabel' : cat === 'auth' ? 'categoryAuthLabel' : cat === 'utility' ? 'categoryUtilityLabel' : cat === 'carousel' ? 'categoryCarouselLabel' : cat === 'single_product' ? 'categorySingleProductLabel' : cat === 'multi_product' ? 'categoryMultiProductLabel' : cat === 'product_card_carousel' ? 'categoryProductCardCarouselLabel' : cat === 'limited_time_offer' ? 'categoryLimitedTimeOfferLabel' : null;
 const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_display || tpl.category || '').toUpperCase();
@@ -2269,16 +2779,16 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                                         <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white font-medium">{tpl.name}</td>
                                                         <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{categoryDisplay || '—'}</td>
                                                         <td className="py-3 px-4 text-center">
-                                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300'}`}>
-                                                                {metaStatus === 'APPROVED' ? (t('templateApproved') || 'APPROVED') : metaStatus === 'REJECTED' ? (t('templateRejected') || 'REJECTED') : (t('templatePending') || 'PENDING')}
+                                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : metaStatus === 'PENDING' ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
+                                                                {metaStatus === 'APPROVED' ? (t('templateApproved') || 'APPROVED') : metaStatus === 'REJECTED' ? (t('templateRejected') || 'REJECTED') : metaStatus === 'PENDING' ? (t('templatePending') || 'PENDING') : (t('templateDraft') || 'Not submitted')}
                                                             </span>
                                                         </td>
                                                         <td className="py-3 px-4">
                                                             <div className="flex justify-center items-center">
                                                                 <div className="inline-flex items-center gap-2 flex-nowrap">
                                                                     <div className="w-[150px] min-w-[150px] flex justify-end items-center">
-                                                                        {isWa && (
-                                                                            <Button variant="secondary" size="sm" className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem]" disabled={submittingTemplateId === tpl.id} onClick={async () => { setSubmittingTemplateId(tpl.id); try { await submitMessageTemplateToWhatsAppAPI(tpl.id); showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info'); refetchTemplates(); } catch (e: any) { const errKey = e?.data?.error_key; showAlert((errKey && t(errKey)) ? t(errKey) : (e?.data?.error || e?.message || t('failedToSendSms')), 'error'); } finally { setSubmittingTemplateId(null); } }}>
+                                                                        {canSubmitToWhatsApp && (
+                                                                            <Button variant="secondary" size="sm" className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem]" disabled={submittingTemplateId === tpl.id} onClick={async () => { setSubmittingTemplateId(tpl.id); try { await submitMessageTemplateToWhatsAppAPI(tpl.id); showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info'); refetchTemplates(); } catch (e: any) { showAlert(resolveLocalizedApiError(e, t, t('failedToSendSms')), 'error'); } finally { setSubmittingTemplateId(null); } }}>
                                                                                 {submittingTemplateId === tpl.id ? (
                                                                                     <>
                                                                                         <svg className="w-4 h-4 me-1.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -2347,21 +2857,21 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                         </div>
                                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{t('campaignSearchHint')}</p>
                                     </div>
-                                    <div className="flex items-center gap-2 mb-2">
+                                    <div className="flex items-center gap-3 mb-2">
                                         <button
                                             type="button"
                                             onClick={() => {
                                                 const allIds = new Set(campaignLeads.map((l: any) => l.id));
                                                 setCampaignSelectedIds(allIds);
                                             }}
-                                            className="text-sm text-primary hover:underline"
+                                            className="text-sm font-medium text-primary-600 dark:text-primary-300 hover:text-primary-700 dark:hover:text-primary-200 hover:underline underline-offset-2"
                                         >
                                             {t('selectAll') || 'Select all'}
                                         </button>
                                         <button
                                             type="button"
                                             onClick={() => setCampaignSelectedIds(new Set())}
-                                            className="text-sm text-gray-500 hover:underline"
+                                            className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:underline underline-offset-2"
                                         >
                                             {t('deselectAll') || 'Deselect all'}
                                         </button>
@@ -2564,6 +3074,16 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
+                                            {account.status === 'Connected' && (
+                                                <Button
+                                                    variant="ghost"
+                                                    disabled={syncingPhoneAccountId === account.id}
+                                                    onClick={() => handleSyncWhatsAppPhoneNumbers(account.id)}
+                                                    className="rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                >
+                                                    {syncingPhoneAccountId === account.id ? t('syncing') : t('refreshWhatsAppPhoneNumbers')}
+                                                </Button>
+                                            )}
                                             {account.status !== 'Connected' && (
                                                 <Button variant="primary" onClick={() => handleConnect(account.id)}>{t('connect')}</Button>
                                             )}

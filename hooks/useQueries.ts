@@ -17,7 +17,7 @@ import {
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI, getVisitTypesAPI,
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, testConnectionAPI,
-  getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
+  getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
   createLeadAPI, updateLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
@@ -90,6 +90,8 @@ export const queryKeys = {
   connectedAccounts: (platform?: string) => ['connectedAccounts', platform] as const,
   leadSMSMessages: (leadId?: number) => ['leadSMSMessages', leadId] as const,
   leadWhatsAppMessages: (leadId?: number) => ['leadWhatsAppMessages', leadId] as const,
+  whatsappChatMessages: (clientId?: number, phone?: string) =>
+    ['whatsappChatMessages', clientId ?? null, phone ?? ''] as const,
   whatsAppConversations: ['whatsAppConversations'] as const,
 };
 
@@ -529,6 +531,24 @@ export const useLeadWhatsAppMessages = (
     queryFn: () => getLeadWhatsAppMessagesAPI(leadId!),
     enabled: !!leadId,
     staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+/** WhatsApp thread for a lead id and/or phone (refetches on window focus when chat is open). */
+export const useWhatsAppChatMessages = (
+  params: { clientId?: number; phone?: string; enabled?: boolean; refetchInterval?: number | false },
+  options?: Omit<UseQueryOptions<any[], Error>, 'queryKey' | 'queryFn' | 'enabled' | 'refetchInterval'>
+) => {
+  const { clientId, phone, enabled = true, refetchInterval = false } = params;
+  const canFetch = enabled && (!!clientId || !!(phone && phone.replace(/\D/g, '').length >= 7));
+  return useQuery({
+    queryKey: queryKeys.whatsappChatMessages(clientId, phone),
+    queryFn: () => getWhatsAppMessagesAPI({ clientId, phone }),
+    enabled: canFetch,
+    staleTime: 3 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
     ...options,
   });
 };

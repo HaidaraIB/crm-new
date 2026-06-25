@@ -160,6 +160,44 @@ export function getApiErrorDetails(errorData: unknown): unknown {
   return getErrorDetailsFromBody(errorData);
 }
 
+/**
+ * User-facing string from a caught API error (never returns a raw object).
+ * Supports legacy `error_key`, unified `error.code`, and Meta `error.details.error.message`.
+ */
+export function resolveLocalizedApiError(
+  e: { data?: unknown; message?: string; code?: string } | null | undefined,
+  t?: (key: string) => string,
+  fallback = 'Something went wrong'
+): string {
+  const data = e?.data;
+  const legacyKey =
+    data && typeof data === 'object' && 'error_key' in data
+      ? String((data as Record<string, unknown>).error_key)
+      : undefined;
+  const code = legacyKey || getApiErrorCode(data) || e?.code;
+  if (t && code) {
+    const translated = t(code);
+    if (translated && translated !== code) return translated;
+  }
+  const details = getApiErrorDetails(data);
+  let metaMsg = '';
+  if (details && typeof details === 'object' && details !== null) {
+    const nested = (details as Record<string, unknown>).error;
+    if (nested && typeof nested === 'object' && nested !== null) {
+      const m = (nested as Record<string, unknown>).error_user_msg ?? (nested as Record<string, unknown>).message;
+      if (m != null) metaMsg = String(m);
+    }
+  }
+  const base =
+    (typeof e?.message === 'string' && e.message) ||
+    getApiErrorMessage(data, '') ||
+    fallback;
+  if (metaMsg && !base.includes(metaMsg)) {
+    return `${base}: ${metaMsg}`;
+  }
+  return base || fallback;
+}
+
 function attachErrorFields(
   err: Error & { fields?: Record<string, unknown> },
   errorData: unknown
@@ -2742,14 +2780,38 @@ export const connectIntegrationAccountAPI = async (accountId: number) => {
  * Complete WhatsApp Embedded Signup after FB.login returns authResponse.code
  * POST /api/integrations/accounts/:id/whatsapp/embedded-signup/complete/
  */
-export const completeWhatsAppEmbeddedSignupAPI = async (accountId: number, code: string) => {
+export const completeWhatsAppEmbeddedSignupAPI = async (
+  accountId: number,
+  code: string,
+  session?: { waba_id?: string; phone_number_id?: string; business_id?: string }
+) => {
   return apiRequest<{ account_id: number; connected: boolean }>(
     `/integrations/accounts/${accountId}/whatsapp/embedded-signup/complete/`,
     {
       method: 'POST',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({
+        code,
+        ...(session?.waba_id && { waba_id: session.waba_id }),
+        ...(session?.phone_number_id && { phone_number_id: session.phone_number_id }),
+        ...(session?.business_id && { business_id: session.business_id }),
+      }),
     }
   );
+};
+
+/**
+ * POST /api/integrations/accounts/:id/whatsapp/sync-phone-numbers/
+ * Re-fetch phone_number_id from Meta for a connected WhatsApp integration account.
+ */
+export const syncWhatsAppPhoneNumbersAPI = async (accountId: number) => {
+  return apiRequest<{
+    synced?: number;
+    phone_number_id?: string;
+    display_phone_number?: string;
+    waba_id?: string;
+  }>(`/integrations/accounts/${accountId}/whatsapp/sync-phone-numbers/`, {
+    method: 'POST',
+  });
 };
 
 /**
@@ -2816,14 +2878,26 @@ export type WhatsAppSessionWindowResponse = {
 };
 
 /**
- * GET /api/integrations/whatsapp/session-window/?client_id=
+ * GET /api/integrations/whatsapp/session-window/?client_id= | ?phone=
  * Open ~24h after the contact's last inbound WhatsApp message stored in the CRM.
  */
 export const getWhatsAppSessionWindowAPI = async (
-  clientId: number
+  clientIdOrParams: number | { clientId?: number; phone?: string }
 ): Promise<WhatsAppSessionWindowResponse> => {
+  if (typeof clientIdOrParams === 'number') {
+    return apiRequest<WhatsAppSessionWindowResponse>(
+      `/integrations/whatsapp/session-window/?client_id=${clientIdOrParams}`
+    );
+  }
+  const { clientId, phone } = clientIdOrParams;
+  if (typeof clientId === 'number' && !Number.isNaN(clientId)) {
+    return apiRequest<WhatsAppSessionWindowResponse>(
+      `/integrations/whatsapp/session-window/?client_id=${clientId}`
+    );
+  }
+  const normalized = phone?.replace(/\s+/g, '').replace(/^\+/, '') || '';
   return apiRequest<WhatsAppSessionWindowResponse>(
-    `/integrations/whatsapp/session-window/?client_id=${clientId}`
+    `/integrations/whatsapp/session-window/?phone=${encodeURIComponent(normalized)}`
   );
 };
 
@@ -2857,6 +2931,8 @@ export interface LeadWhatsAppMessageResponse {
   body: string;
   direction: 'inbound' | 'outbound';
   whatsapp_message_id: string | null;
+  delivery_status: string | null;
+  delivery_error: string | null;
   created_by: number | null;
   created_by_username: string;
   created_at: string;
@@ -2864,16 +2940,76 @@ export interface LeadWhatsAppMessageResponse {
 
 /**
  * GET /api/integrations/whatsapp/messages/?client=:clientId
+ * GET /api/integrations/whatsapp/messages/?phone=:digits
  */
+export const getWhatsAppMessagesAPI = async (params: {
+  clientId?: number;
+  phone?: string;
+}): Promise<LeadWhatsAppMessageResponse[]> => {
+  const parts: string[] = ['page_size=200'];
+  if (typeof params.clientId === 'number' && !Number.isNaN(params.clientId)) {
+    parts.push(`client=${params.clientId}`);
+  }
+  const phone = params.phone?.replace(/\s+/g, '').replace(/^\+/, '');
+  if (phone && phone.replace(/\D/g, '').length >= 7) {
+    parts.push(`phone=${encodeURIComponent(phone)}`);
+  }
+  if (parts.length === 1) return [];
+  const res = await apiRequest<
+    { results?: LeadWhatsAppMessageResponse[] } | LeadWhatsAppMessageResponse[]
+  >(`/integrations/whatsapp/messages/?${parts.join('&')}`);
+  if (Array.isArray(res)) return res;
+  return res.results ?? [];
+};
+
+/** DELETE /api/integrations/whatsapp/messages/:id/ */
+export const deleteWhatsAppMessageAPI = async (messageId: number): Promise<void> => {
+  await apiRequest<void>(`/integrations/whatsapp/messages/${messageId}/`, {
+    method: 'DELETE',
+  });
+};
+
+/**
+ * DELETE /api/integrations/whatsapp/conversations/?client= | ?phone=
+ * Removes all stored WhatsApp messages for a thread.
+ */
+export const deleteWhatsAppConversationAPI = async (params: {
+  clientId?: number;
+  phone?: string;
+}): Promise<{ deleted: number }> => {
+  const parts: string[] = [];
+  if (typeof params.clientId === 'number' && !Number.isNaN(params.clientId)) {
+    parts.push(`client=${params.clientId}`);
+  }
+  const phone = params.phone?.replace(/\s+/g, '').replace(/^\+/, '');
+  if (phone && phone.replace(/\D/g, '').length >= 7) {
+    parts.push(`phone=${encodeURIComponent(phone)}`);
+  }
+  if (!parts.length) return { deleted: 0 };
+  return apiRequest<{ deleted: number }>(`/integrations/whatsapp/conversations/?${parts.join('&')}`, {
+    method: 'DELETE',
+  });
+};
+
+/** @deprecated Use getWhatsAppMessagesAPI */
 export const getLeadWhatsAppMessagesAPI = async (
   clientId?: number
 ): Promise<LeadWhatsAppMessageResponse[]> => {
-  if (typeof clientId !== 'number' || Number.isNaN(clientId)) return [];
-  const res = await apiRequest<
-    { results?: LeadWhatsAppMessageResponse[] } | LeadWhatsAppMessageResponse[]
-  >(`/integrations/whatsapp/messages/?client=${clientId}`);
-  if (Array.isArray(res)) return res;
-  return res.results ?? [];
+  return getWhatsAppMessagesAPI({ clientId });
+};
+
+/**
+ * GET /api/integrations/whatsapp/contact-by-phone/?phone=...
+ */
+export const getWhatsAppContactByPhoneAPI = async (
+  phone: string
+): Promise<{ id: number; name: string; phone_number: string; company_name: string } | null> => {
+  const normalized = phone.replace(/\s+/g, '').replace(/^\+/, '');
+  if (!normalized) return null;
+  const res = await apiRequest<{ id: number; name: string; phone_number: string; company_name: string } | null>(
+    `/integrations/whatsapp/contact-by-phone/?phone=${encodeURIComponent(normalized)}`
+  );
+  return res ?? null;
 };
 
 /**
@@ -2994,6 +3130,8 @@ export const submitMessageTemplateToWhatsAppAPI = async (
 export const syncWhatsAppTemplatesAPI = async (): Promise<{
   message?: string;
   updated?: number;
+  linked?: number;
+  imported?: number;
   total_meta?: number;
 }> => {
   return apiRequest('/integrations/templates/sync-whatsapp/', { method: 'POST' });

@@ -9,6 +9,14 @@ export type WhatsAppEmbeddedSignupSdkConfig = {
   graph_api_version: string;
 };
 
+export type WhatsAppEmbeddedSignupResult = {
+  code: string | null;
+  waba_id?: string;
+  phone_number_id?: string;
+  business_id?: string;
+  signup_event?: string;
+};
+
 let lastFbInitKey: string | null = null;
 
 function loadFacebookSdk(): Promise<void> {
@@ -50,13 +58,29 @@ function normalizeGraphVersion(v: string): string {
   return s.startsWith('v') ? s : `v${s}`;
 }
 
+function parseEmbeddedSignupMessage(event: MessageEvent): Partial<WhatsAppEmbeddedSignupResult> | null {
+  if (!event.origin.endsWith('facebook.com')) return null;
+  try {
+    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+    if (!data || data.type !== 'WA_EMBEDDED_SIGNUP' || !data.data) return null;
+    const payload = data.data as Record<string, unknown>;
+    const out: Partial<WhatsAppEmbeddedSignupResult> = { signup_event: data.event };
+    if (payload.phone_number_id != null) out.phone_number_id = String(payload.phone_number_id);
+    if (payload.waba_id != null) out.waba_id = String(payload.waba_id);
+    if (payload.business_id != null) out.business_id = String(payload.business_id);
+    return out;
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Opens Meta Embedded Signup UI and returns the authorization code for server-side exchange.
- * Returns null if the user cancels or login does not return a code.
+ * Opens Meta Embedded Signup UI and returns the authorization code plus session asset IDs
+ * (phone_number_id, waba_id) from Meta's WA_EMBEDDED_SIGNUP postMessage.
  */
 export async function obtainWhatsAppEmbeddedSignupCode(
   cfg: WhatsAppEmbeddedSignupSdkConfig
-): Promise<string | null> {
+): Promise<WhatsAppEmbeddedSignupResult> {
   await loadFacebookSdk();
   const FB = (window as unknown as { FB?: { init: (o: Record<string, unknown>) => void; login: (cb: (r: unknown) => void, opts: Record<string, unknown>) => void } }).FB;
   if (!FB) {
@@ -75,18 +99,41 @@ export async function obtainWhatsAppEmbeddedSignupCode(
     lastFbInitKey = initKey;
   }
 
-  return new Promise((resolve) => {
-    FB.login(
-      (response: unknown) => {
-        const r = response as { authResponse?: { code?: string } };
-        const code = r?.authResponse?.code;
-        resolve(code ?? null);
-      },
-      {
-        config_id: cfg.config_id,
-        response_type: 'code',
-        override_default_response_type: true,
-      }
-    );
-  });
+  const session: Partial<WhatsAppEmbeddedSignupResult> = {};
+  const onMessage = (event: MessageEvent) => {
+    const parsed = parseEmbeddedSignupMessage(event);
+    if (!parsed) return;
+    if (parsed.phone_number_id) session.phone_number_id = parsed.phone_number_id;
+    if (parsed.waba_id) session.waba_id = parsed.waba_id;
+    if (parsed.business_id) session.business_id = parsed.business_id;
+    if (parsed.signup_event) session.signup_event = parsed.signup_event;
+  };
+  window.addEventListener('message', onMessage);
+
+  try {
+    const code = await new Promise<string | null>((resolve) => {
+      FB.login(
+        (response: unknown) => {
+          const r = response as { authResponse?: { code?: string } };
+          resolve(r?.authResponse?.code ?? null);
+        },
+        {
+          config_id: cfg.config_id,
+          response_type: 'code',
+          override_default_response_type: true,
+        }
+      );
+    });
+
+    // WA_EMBEDDED_SIGNUP postMessage often arrives after the FB.login callback.
+    const deadline = Date.now() + 8000;
+    while (Date.now() < deadline) {
+      if (session.phone_number_id && session.waba_id) break;
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
+    return { code, ...session };
+  } finally {
+    window.removeEventListener('message', onMessage);
+  }
 }

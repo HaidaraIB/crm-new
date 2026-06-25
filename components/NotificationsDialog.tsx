@@ -145,6 +145,11 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                         setCurrentPage('ViewLead');
                         onClose();
                       }
+                      if (n.type === 'whatsapp_message_received' && leadId) {
+                        setSelectedLead({ id: Number(leadId) } as any);
+                        setCurrentPage('WhatsApp');
+                        onClose();
+                      }
                     }}
                     className={`w-full rounded-xl border px-3 py-3 text-start transition-colors ${
                       n.read

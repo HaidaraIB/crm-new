@@ -101,8 +101,10 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
                     onClick={() => handleSelect(client)}
                     className="w-full flex items-center gap-3 p-3 text-start hover:bg-gray-50 dark:hover:bg-gray-700/50"
                   >
-                    <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                      {(displayName(client) || 'ش').charAt(0)}
+                    <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center text-primary-800 dark:text-primary-50 font-bold text-sm ring-2 ring-primary-200/80 dark:ring-primary-600">
+                      {(displayName(client).replace(/\D/g, '') === displayName(client).replace(/\s/g, '')
+                        ? displayName(client).replace(/\D/g, '').slice(-2) || '?'
+                        : displayName(client).charAt(0).toUpperCase())}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-gray-900 dark:text-white truncate">{displayName(client)}</p>

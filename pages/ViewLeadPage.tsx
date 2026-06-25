@@ -26,6 +26,8 @@ import {
     getEditFieldLabel,
     getTimelineEventAction,
     localizeTimelineEventNotes,
+    resolveTimelineActor,
+    timelineEventActorFallback,
 } from '../utils/timelineEvents';
 import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
@@ -420,6 +422,11 @@ export const ViewLeadPage = () => {
         const lang = (language === 'ar' ? 'ar' : 'en') as 'en' | 'ar';
         const formatDetailDateTime = (dateString: string | null | undefined) =>
             formatTimelineDetailDateTime(dateString, lang);
+        const leadContactName = displayLead.name || displayLead.company_name || '';
+        const leadContactPhone =
+            displayLead.phone_number ||
+            (displayLead as Lead & { phone?: string }).phone ||
+            '';
 
         // Format Actions (ClientTasks)
         const actions = leadClientTasks.map(ct => {
@@ -538,7 +545,15 @@ export const ViewLeadPage = () => {
         const eventFormatCtx = { t, users, statuses, channels };
 
         const events = clientEvents.map(ce => {
-            const user = users.find(u => u.id === ce.created_by);
+            const actor = resolveTimelineActor({
+                createdById: ce.created_by,
+                createdByUsername: ce.created_by_username,
+                users,
+                t,
+                fallback: timelineEventActorFallback(ce),
+                contactName: leadContactName,
+                contactPhone: leadContactPhone,
+            });
             const actionText =
                 ce.event_type === 'location_update'
                     ? t(clientLocationEventTranslationKey(ce.notes))
@@ -590,8 +605,8 @@ export const ViewLeadPage = () => {
             return {
                 id: `event-${ce.id}`,
                 type: ce.event_type === 'location_update' ? 'location_update' as const : 'event',
-                user: user?.name || ce.created_by_username || t('unknown'),
-                avatar: user?.avatar || '',
+                user: actor.name,
+                avatar: actor.avatar || '',
                 action: actionText,
                 fieldLabel: editFieldLabel || undefined,
                 details: detailsOnly ? translatedDetails : '',
@@ -625,13 +640,22 @@ export const ViewLeadPage = () => {
 
         // Format WhatsApp messages
         const waEntries = (leadWhatsAppMessages as any[]).map((wa) => {
-            const user = users.find(u => u.id === wa.created_by);
-            const dir = wa.direction === 'outbound' ? t('whatsappSent') : t('whatsappReceived');
+            const isInbound = wa.direction === 'inbound';
+            const actor = resolveTimelineActor({
+                createdById: wa.created_by,
+                createdByUsername: wa.created_by_username,
+                users,
+                t,
+                fallback: isInbound ? 'contact' : 'whatsapp',
+                contactName: leadContactName,
+                contactPhone: wa.phone_number || leadContactPhone,
+            });
+            const dir = isInbound ? t('whatsappReceived') : t('whatsappSent');
             return {
                 id: `wa-${wa.id}`,
                 type: 'whatsapp' as const,
-                user: user?.name || wa.created_by_username || t('unknown'),
-                avatar: user?.avatar || '',
+                user: actor.name,
+                avatar: actor.avatar || '',
                 action: dir,
                 details: wa.body || '',
                 date: formatTimelineDate(wa.created_at, lang),

@@ -16,6 +16,8 @@ import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
+import { SmsSendPreviewModal } from '../components/modals/SmsSendPreviewModal';
+import { replaceSmsTemplatePlaceholders } from '../utils/smsSendHelpers';
 import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components/icons';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { navigateToCompanyRoute } from '../utils/routing';
@@ -351,9 +353,14 @@ function TwilioSMSForm({
                             placeholder={t('senderIdPlaceholder')}
                         />
                         {provider === 'otpiq' ? (
-                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                {t('otpiqSenderIdHelp') || 'Optional. Register sender ID in OTPIQ if required.'}
-                            </p>
+                            <div className="mt-1 space-y-1">
+                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                    {t('otpiqSenderIdHelp')}
+                                </p>
+                                <p className="text-xs text-amber-700 dark:text-amber-300">
+                                    {t('otpiqSenderIdTestHint')}
+                                </p>
+                            </div>
                         ) : null}
                     </div>
                 </div>
@@ -911,6 +918,12 @@ export const IntegrationsPage = () => {
     const [campaignMessage, setCampaignMessage] = useState('');
     const [campaignSending, setCampaignSending] = useState(false);
     const [campaignProgress, setCampaignProgress] = useState<{ sent: number; failed: number } | null>(null);
+    const [smsCampaignPreview, setSmsCampaignPreview] = useState<{
+        leads: any[];
+        message: string;
+        previewBody: string;
+        previewPhone: string;
+    } | null>(null);
     const [metaHealthModalOpen, setMetaHealthModalOpen] = useState(false);
     const [metaHealthLoading, setMetaHealthLoading] = useState(false);
     const [metaHealthData, setMetaHealthData] = useState<MetaHealthResponse | null>(null);
@@ -2222,6 +2235,88 @@ export const IntegrationsPage = () => {
             showAlert(t('copied'), 'info');
         };
 
+        const runCampaignSend = async (withPhone: any[], message: string, isSmsCampaign: boolean) => {
+            setCampaignSending(true);
+            setCampaignProgress({ sent: 0, failed: 0 });
+            let sent = 0;
+            let failed = 0;
+            const tenantCompany = currentUser?.company?.name || '';
+            for (const lead of withPhone) {
+                try {
+                    const phone = getClientPhone(lead);
+                    const body = replaceSmsTemplatePlaceholders(message, lead, tenantCompany);
+                    if (isSmsCampaign) {
+                        await sendLeadSMSAPI({
+                            lead_id: lead.id,
+                            phone_number: lead.phone_number || lead.phone || '',
+                            body,
+                        });
+                    } else {
+                        await sendWhatsAppMessageAPI({ to: phone, message: body, client_id: lead.id });
+                    }
+                    sent++;
+                } catch {
+                    failed++;
+                }
+                setCampaignProgress({ sent, failed });
+            }
+            setCampaignSending(false);
+            setSmsCampaignPreview(null);
+            showAlert(
+                t('campaignComplete') +
+                    ' — ' +
+                    t('campaignSentCount').replace('{sent}', String(sent)).replace('{failed}', String(failed)),
+                'info',
+            );
+        };
+
+        const handleCampaignSend = async () => {
+            const selected = campaignLeads.filter((l: any) => campaignSelectedIds.has(l.id));
+            const withPhone = selected.filter(
+                (l: any) => ((l.phone_number || l.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0,
+            );
+            if (withPhone.length === 0) {
+                showAlert(t('selectAtLeastOneLead'), 'warning');
+                return;
+            }
+            const message = campaignMessage.trim();
+            if (!message) {
+                showAlert(t('enterMessageOrSelectTemplate'), 'warning');
+                return;
+            }
+            const isSmsCampaign = campaignChannel === 'sms';
+            if (isSmsCampaign) {
+                const first = withPhone[0];
+                const previewBody = replaceSmsTemplatePlaceholders(message, first, currentUser?.company?.name);
+                setSmsCampaignPreview({
+                    leads: withPhone,
+                    message,
+                    previewBody,
+                    previewPhone: first.phone_number || first.phone || '',
+                });
+                return;
+            }
+            await runCampaignSend(withPhone, message, false);
+        };
+
+        const handleConfirmSmsCampaign = async () => {
+            if (!smsCampaignPreview) return;
+            await runCampaignSend(smsCampaignPreview.leads, smsCampaignPreview.message, true);
+        };
+
+        const smsCampaignPreviewModal = smsCampaignPreview ? (
+            <SmsSendPreviewModal
+                isOpen={!!smsCampaignPreview}
+                onClose={() => setSmsCampaignPreview(null)}
+                onConfirm={handleConfirmSmsCampaign}
+                confirming={campaignSending}
+                phoneNumber={smsCampaignPreview.previewPhone}
+                messageBody={smsCampaignPreview.previewBody}
+                recipientCount={smsCampaignPreview.leads.length}
+                t={t}
+            />
+        ) : null;
+
         // Messaging Center (Marketing): Message Campaign + Template tabs
         if (isMessagingCenterPage) {
             return (
@@ -2341,7 +2436,7 @@ export const IntegrationsPage = () => {
                                     <textarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={6} placeholder={t('messageContent')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y" />
                                     {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppMessagingLimit') || 'WhatsApp limit'}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier} {t('conversationsPerDay') || ' conversations/day'}{whatsAppLimits.quality_rating && ` · ${t('quality') || 'Quality'}: ${whatsAppLimits.quality_rating}`}</p>}
                                     {campaignProgress !== null && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}</p>}
-                                    <Button className="mt-3" onClick={async () => { const selected = campaignLeads.filter((l: any) => campaignSelectedIds.has(l.id)); const withPhone = selected.filter((l: any) => ((l.phone_number || l.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0); if (withPhone.length === 0) { showAlert(t('selectAtLeastOneLead'), 'warning'); return; } const message = campaignMessage.trim(); if (!message) { showAlert(t('enterMessageOrSelectTemplate'), 'warning'); return; } setCampaignSending(true); setCampaignProgress({ sent: 0, failed: 0 }); let sent = 0, failed = 0; const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || ''; const isSmsCampaign = campaignChannel === 'sms'; for (const lead of withPhone) { try { const phone = getClientPhone(lead); const body = replaceTemplatePlaceholders(message, lead); if (isSmsCampaign) await sendLeadSMSAPI({ lead_id: lead.id, phone_number: lead.phone_number || lead.phone || '', body }); else await sendWhatsAppMessageAPI({ to: phone, message: body, client_id: lead.id }); sent++; } catch (_) { failed++; } setCampaignProgress({ sent, failed }); } setCampaignSending(false); showAlert(t('campaignComplete') + ' — ' + t('campaignSentCount').replace('{sent}', String(sent)).replace('{failed}', String(failed)), 'info'); }} disabled={campaignSending}>
+                                    <Button className="mt-3" onClick={handleCampaignSend} disabled={campaignSending}>
                                         {campaignSending ? <><Loader variant="primary" className="w-4 h-4 me-2" /> {t('campaignSending')}</> : <>{t('sendToSelected')} ({campaignSelectedIds.size})</>}
                                     </Button>
                                 </div>
@@ -2349,6 +2444,7 @@ export const IntegrationsPage = () => {
                         </Card>
                     </div>
                     )}
+                    {smsCampaignPreviewModal}
                 </PageWrapper>
             );
         }
@@ -3007,42 +3103,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                     )}
                                     <Button
                                         className="mt-3"
-                                        onClick={async () => {
-                                            const selected = campaignLeads.filter((l: any) => campaignSelectedIds.has(l.id));
-                                            const withPhone = selected.filter((l: any) => ((l.phone_number || l.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0);
-                                            if (withPhone.length === 0) {
-                                                showAlert(t('selectAtLeastOneLead'), 'warning');
-                                                return;
-                                            }
-                                            const message = campaignMessage.trim();
-                                            if (!message) {
-                                                showAlert(t('enterMessageOrSelectTemplate'), 'warning');
-                                                return;
-                                            }
-                                            setCampaignSending(true);
-                                            setCampaignProgress({ sent: 0, failed: 0 });
-                                            let sent = 0;
-                                            let failed = 0;
-                                            const getClientPhone = (c: any) => (c.phone_number || c.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '';
-                                            const isSmsCampaign = campaignChannel === 'sms';
-                                            for (const lead of withPhone) {
-                                                try {
-                                                    const phone = getClientPhone(lead);
-                                                    const body = replaceTemplatePlaceholders(message, lead);
-                                                    if (isSmsCampaign) {
-                                                        await sendLeadSMSAPI({ lead_id: lead.id, phone_number: lead.phone_number || lead.phone || '', body });
-                                                    } else {
-                                                        await sendWhatsAppMessageAPI({ to: phone, message: body, client_id: lead.id });
-                                                    }
-                                                    sent++;
-                                                } catch (_) {
-                                                    failed++;
-                                                }
-                                                setCampaignProgress({ sent, failed });
-                                            }
-                                            setCampaignSending(false);
-                                            showAlert(t('campaignComplete') + ' — ' + t('campaignSentCount').replace('{sent}', String(sent)).replace('{failed}', String(failed)), 'info');
-                                        }}
+                                        onClick={handleCampaignSend}
                                         disabled={campaignSending}
                                     >
                                         {campaignSending ? (
@@ -3056,6 +3117,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                         </Card>
                     </div>
                 )}
+                {smsCampaignPreviewModal}
 
                 {effectiveTab === 'accounts' && (
                     <Card>

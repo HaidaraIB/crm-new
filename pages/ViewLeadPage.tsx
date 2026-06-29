@@ -625,12 +625,13 @@ export const ViewLeadPage = () => {
         // Format SMS messages (Twilio)
         const smsEntries = (leadSMSMessages as any[]).map((sms) => {
             const user = users.find(u => u.id === sms.created_by);
+            const isAutoWelcome = sms.created_by == null;
             return {
                 id: `sms-${sms.id}`,
                 type: 'sms' as const,
                 user: user?.name || sms.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
-                action: t('smsSent'),
+                action: isAutoWelcome ? t('smsSentAutoWelcome') : t('smsSent'),
                 details: sms.body || '',
                 date: formatTimelineDate(sms.created_at, lang),
                 timestamp: new Date(sms.created_at).getTime(),

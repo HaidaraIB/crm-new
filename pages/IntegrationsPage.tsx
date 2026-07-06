@@ -3166,7 +3166,6 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                 <IntegrationPlatformIcon platform="whatsapp" size="xl" variant="muted" className="mx-auto mb-4" />
                                 <h3 className="text-lg font-semibold">{t('noAccountsConnected')}</h3>
                                 <p className="text-gray-500 dark:text-gray-400 mt-1">{t('connectAccountPrompt')}</p>
-                                <p className="text-gray-400 dark:text-gray-500 mt-2 text-sm">{t('whatsappConnectOnAddHint')}</p>
                             </div>
                         )}
                     </Card>
@@ -3349,12 +3348,6 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                         )}
                         <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{t('noAccountsConnected')}</h3>
                         <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-sm mx-auto">{t('connectAccountPrompt')}</p>
-                        {platformParam === 'meta' && (
-                            <p className="text-gray-400 dark:text-gray-500 mt-3 text-sm">{t('metaConnectOnAddHint')}</p>
-                        )}
-                        {platformParam === 'whatsapp' && (
-                            <p className="text-gray-400 dark:text-gray-500 mt-3 text-sm">{t('whatsappConnectOnAddHint')}</p>
-                        )}
                     </div>
                 )}
             </Card>

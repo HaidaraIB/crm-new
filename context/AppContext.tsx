@@ -1127,6 +1127,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           specialization: user.company.specialization,
           timezone: user.company.timezone,
           auto_assign_enabled: user.company.auto_assign_enabled,
+          auto_assign_algorithm: user.company.auto_assign_algorithm ?? 'least_busy',
           re_assign_enabled: user.company.re_assign_enabled,
           re_assign_hours: user.company.re_assign_hours,
           field_visit_enabled: user.company.field_visit_enabled,

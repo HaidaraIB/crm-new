@@ -32,6 +32,8 @@ export interface Subscription {
   };
 }
 
+export type AutoAssignAlgorithm = 'least_busy' | 'round_robin';
+
 export interface Company {
   id: number;
   name: string;
@@ -40,6 +42,7 @@ export interface Company {
   /** IANA timezone for business calendar (weekly day off). */
   timezone?: string;
   auto_assign_enabled?: boolean;
+  auto_assign_algorithm?: AutoAssignAlgorithm;
   re_assign_enabled?: boolean;
   re_assign_hours?: number;
   field_visit_enabled?: boolean;

@@ -7,6 +7,7 @@ import { updateCompanyAssignmentSettingsAPI } from '../../services/api';
 import { useCurrentUser, queryKeys } from '../../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { IANA_TIMEZONE_GROUPS, allListedIanaZones, type TimezoneGroup } from '../../utils/ianaTimezones';
+import type { AutoAssignAlgorithm } from '../../types';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -22,6 +23,7 @@ export const LeadAssignmentSettings = () => {
     const isRTL = language === 'ar';
     
     const [autoAssignEnabled, setAutoAssignEnabled] = useState(false);
+    const [autoAssignAlgorithm, setAutoAssignAlgorithm] = useState<AutoAssignAlgorithm>('least_busy');
     const [reAssignEnabled, setReAssignEnabled] = useState(false);
     const [reAssignHours, setReAssignHours] = useState(24);
     const [businessTimezone, setBusinessTimezone] = useState('UTC');
@@ -32,6 +34,7 @@ export const LeadAssignmentSettings = () => {
     useEffect(() => {
         if (company) {
             setAutoAssignEnabled(company.auto_assign_enabled || false);
+            setAutoAssignAlgorithm(company.auto_assign_algorithm || 'least_busy');
             setReAssignEnabled(company.re_assign_enabled || false);
             setReAssignHours(company.re_assign_hours || 24);
             setBusinessTimezone((company.timezone || 'UTC').trim() || 'UTC');
@@ -63,6 +66,7 @@ export const LeadAssignmentSettings = () => {
         try {
             await updateCompanyAssignmentSettingsAPI(company.id, {
                 auto_assign_enabled: autoAssignEnabled,
+                auto_assign_algorithm: autoAssignAlgorithm,
                 re_assign_enabled: reAssignEnabled,
                 re_assign_hours: reAssignHours,
                 timezone: businessTimezone.trim() || 'UTC',
@@ -114,6 +118,50 @@ export const LeadAssignmentSettings = () => {
                             />
                         </div>
                     </div>
+
+                    {autoAssignEnabled && (
+                        <div className="ml-0 pl-4 border-s-2 border-primary/30 space-y-3">
+                            <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                {t('autoAssignAlgorithm')}
+                            </p>
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="auto-assign-algorithm"
+                                    value="least_busy"
+                                    checked={autoAssignAlgorithm === 'least_busy'}
+                                    onChange={() => setAutoAssignAlgorithm('least_busy')}
+                                    className="mt-1"
+                                />
+                                <span>
+                                    <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        {t('autoAssignAlgorithmLeastBusy')}
+                                    </span>
+                                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        {t('autoAssignAlgorithmLeastBusyDesc')}
+                                    </span>
+                                </span>
+                            </label>
+                            <label className="flex items-start gap-3 cursor-pointer">
+                                <input
+                                    type="radio"
+                                    name="auto-assign-algorithm"
+                                    value="round_robin"
+                                    checked={autoAssignAlgorithm === 'round_robin'}
+                                    onChange={() => setAutoAssignAlgorithm('round_robin')}
+                                    className="mt-1"
+                                />
+                                <span>
+                                    <span className="block text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        {t('autoAssignAlgorithmRoundRobin')}
+                                    </span>
+                                    <span className="block text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                        {t('autoAssignAlgorithmRoundRobinDesc')}
+                                    </span>
+                                </span>
+                            </label>
+                        </div>
+                    )}
 
                     {/* Re-assign Setting */}
                     <div className="border-t border-gray-200 dark:border-gray-700 pt-6">

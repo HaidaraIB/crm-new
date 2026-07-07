@@ -4214,6 +4214,7 @@ export const updateCompanyAssignmentSettingsAPI = async (
   companyId: number,
   settings: {
     auto_assign_enabled?: boolean;
+    auto_assign_algorithm?: 'least_busy' | 'round_robin';
     re_assign_enabled?: boolean;
     re_assign_hours?: number;
     timezone?: string;

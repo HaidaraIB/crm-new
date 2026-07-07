@@ -1275,7 +1275,14 @@ export const translations = {
     leadAssignmentSettings: "Lead Assignment Settings",
     autoRotation: "Auto-assign new leads",
     autoRotationDesc:
-      "When enabled, new leads are automatically assigned to an available employee (typically whoever has the fewest assigned leads). Weekly day off is still respected. Includes leads from connected integrations (Meta, TikTok, WhatsApp, etc.).",
+      "When enabled, new leads are automatically assigned to an available employee using the algorithm you choose below. Weekly day off is still respected. Includes leads from connected integrations (Meta, TikTok, WhatsApp, etc.).",
+    autoAssignAlgorithm: "Assignment algorithm",
+    autoAssignAlgorithmLeastBusy: "Least busy (workload-based)",
+    autoAssignAlgorithmLeastBusyDesc:
+      "Assigns to the employee with the lightest active workload. Active and follow-up leads count fully; inactive leads count half; closed leads are ignored. Ties rotate fairly.",
+    autoAssignAlgorithmRoundRobin: "Round robin (take turns)",
+    autoAssignAlgorithmRoundRobinDesc:
+      "Assigns new leads in rotation, one after another, regardless of how many leads each employee already has.",
     reminderDelayTime: "No-contact window before re-assign (hours)",
     reminderDelayTimeDesc:
       "How long an assigned lead may go without contact before it can be moved to another employee (only when re-assign inactive clients is enabled).",
@@ -3378,7 +3385,14 @@ export const translations = {
     leadAssignmentSettings: "إعدادات إسناد العملاء",
     autoRotation: "إسناد العملاء الجدد تلقائياً",
     autoRotationDesc:
-      "عند التمكين، يُسند النظام العملاء الجدد تلقائياً إلى موظف متاح (غالباً من لديه أقل عدد عملاء مسندين). يُحترم يوم العطلة الأسبوعي إن وُجد. يشمل العملاء الواردين من التكاملات (مثل Meta وTikTok وWhatsApp).",
+      "عند التمكين، يُسند النظام العملاء الجدد تلقائياً إلى موظف متاح وفق الخوارزمية التي تختارها أدناه. يُحترم يوم العطلة الأسبوعي إن وُجد. يشمل العملاء الواردين من التكاملات (مثل Meta وTikTok وWhatsApp).",
+    autoAssignAlgorithm: "خوارزمية الإسناد",
+    autoAssignAlgorithmLeastBusy: "الأقل انشغالاً (حسب عبء العمل)",
+    autoAssignAlgorithmLeastBusyDesc:
+      "يُسند إلى الموظف ذي أقل عبء عمل نشط. العملاء النشطون ومتابعة المتابعة يُحسبون كاملاً؛ غير النشطين بنصف الوزن؛ المغلقون لا يُحسبون. عند التعادل يتم التناوب بعدالة.",
+    autoAssignAlgorithmRoundRobin: "التناوب الدائري (بالدور)",
+    autoAssignAlgorithmRoundRobinDesc:
+      "يُسند العملاء الجدد بالتناوب واحداً تلو الآخر بغض النظر عن عدد العملاء المسندين لكل موظف.",
     reminderDelayTime: "مدة عدم التواصل قبل إعادة الإسناد (ساعات)",
     reminderDelayTimeDesc:
       "مدة بقاء العميل مسنداً دون تواصل قبل أن يصبح مؤهلاً لإعادة الإسناد التلقائي (عند تفعيل إعادة تعيين غير النشطين).",

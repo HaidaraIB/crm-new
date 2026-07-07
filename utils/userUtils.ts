@@ -35,6 +35,9 @@ export const normalizeUser = (userData: any): User => {
         ? (userData.company.timezone ?? 'UTC')
         : (userData.company_timezone as string | undefined) ?? 'UTC',
       auto_assign_enabled: typeof userData.company === 'object' ? (userData.company.auto_assign_enabled ?? false) : false,
+      auto_assign_algorithm: typeof userData.company === 'object'
+        ? (userData.company.auto_assign_algorithm ?? 'least_busy')
+        : 'least_busy',
       re_assign_enabled: typeof userData.company === 'object' ? (userData.company.re_assign_enabled ?? false) : false,
       re_assign_hours: typeof userData.company === 'object' ? (userData.company.re_assign_hours ?? 24) : 24,
       field_visit_enabled: typeof userData.company === 'object'

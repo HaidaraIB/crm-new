@@ -7,7 +7,7 @@ import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, Se
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, type MetaHealthResponse } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
@@ -17,15 +17,17 @@ import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { SmsSendPreviewModal } from '../components/modals/SmsSendPreviewModal';
-import { replaceSmsTemplatePlaceholders } from '../utils/smsSendHelpers';
-import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon } from '../components/icons';
+import { replaceSmsTemplatePlaceholders, leadHasPhone, resolveLeadPhoneRaw } from '../utils/smsSendHelpers';
+import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon, ClockIcon } from '../components/icons';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
+import { MessageLogsPanel } from '../components/messaging/MessageLogsPanel';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
 import { LeadApiDocumentation } from '../components/integrations/LeadApiDocumentation';
 import { leadApiDocT } from '../constants/leadApiDocumentation';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { ChatToast } from '../components/ChatToast';
+import { CampaignLeadPicker } from '../components/campaign/CampaignLeadPicker';
 import {
     isManualChatClient,
     loadManualConversations,
@@ -911,11 +913,10 @@ export const IntegrationsPage = () => {
     }, [selectedChatLeadId]);
 
     // Message campaign state (WhatsApp tab: campaigns)
-    const [campaignLeadSearch, setCampaignLeadSearch] = useState('');
-    const [campaignLeadSearchApplied, setCampaignLeadSearchApplied] = useState('');
     const [campaignSelectedIds, setCampaignSelectedIds] = useState<Set<number>>(new Set());
     const [campaignChannel, setCampaignChannel] = useState<'whatsapp' | 'sms'>('whatsapp');
     const [campaignMessage, setCampaignMessage] = useState('');
+    const [campaignWhatsAppTemplateId, setCampaignWhatsAppTemplateId] = useState<number | null>(null);
     const [campaignSending, setCampaignSending] = useState(false);
     const [campaignProgress, setCampaignProgress] = useState<{ sent: number; failed: number } | null>(null);
     const [smsCampaignPreview, setSmsCampaignPreview] = useState<{
@@ -934,14 +935,14 @@ export const IntegrationsPage = () => {
     const [metaPixelDrafts, setMetaPixelDrafts] = useState<Record<number, string>>({});
     const [metaPixelSavingId, setMetaPixelSavingId] = useState<number | null>(null);
     const [metaPixelSavedId, setMetaPixelSavedId] = useState<number | null>(null);
-    const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template'>(() => {
+    const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template' | 'logs'>(() => {
         try {
             const s = localStorage.getItem('messaging_center_tab');
-            if (s === 'campaign' || s === 'template') return s;
+            if (s === 'campaign' || s === 'template' || s === 'logs') return s;
         } catch (_) {}
         return 'campaign';
     });
-    const setMessagingCenterTabPersisted = (tab: 'campaign' | 'template') => {
+    const setMessagingCenterTabPersisted = (tab: 'campaign' | 'template' | 'logs') => {
         setMessagingCenterTab(tab);
         try {
             localStorage.setItem('messaging_center_tab', tab);
@@ -964,22 +965,23 @@ export const IntegrationsPage = () => {
         [templates]
     );
 
-    const { data: campaignLeadsData, isLoading: campaignLeadsLoading } = useQuery({
-        queryKey: ['campaignLeads', campaignLeadSearchApplied],
-        queryFn: () => getLeadsAPI({ search: campaignLeadSearchApplied.trim() || undefined }),
-        enabled: (currentPage === 'WhatsApp' && whatsAppTab === 'campaigns') || currentPage === 'Messaging Center',
-    });
     const { data: whatsAppLimits } = useQuery({
         queryKey: ['whatsAppLimits'],
         queryFn: getWhatsAppLimitsAPI,
         enabled: ((currentPage === 'WhatsApp' && whatsAppTab === 'campaigns') || currentPage === 'Messaging Center') && campaignChannel === 'whatsapp',
     });
-    const campaignLeads = useMemo(() => {
-        const res = campaignLeadsData;
-        const list = res?.results ?? (Array.isArray(res) ? res : []);
-        return list as any[];
-    }, [campaignLeadsData]);
 
+    const { data: smsSettings } = useQuery({
+        queryKey: ['twilioSettings'],
+        queryFn: getTwilioSettingsAPI,
+        enabled:
+            (currentPage === 'Messaging Center' || currentPage === 'WhatsApp') &&
+            campaignChannel === 'sms',
+    });
+
+    useEffect(() => {
+        setCampaignWhatsAppTemplateId(null);
+    }, [campaignChannel]);
     const accounts = useMemo(() => {
         const accountsData = Array.isArray(accountsResponse) 
             ? accountsResponse 
@@ -2235,68 +2237,151 @@ export const IntegrationsPage = () => {
             showAlert(t('copied'), 'info');
         };
 
-        const runCampaignSend = async (withPhone: any[], message: string, isSmsCampaign: boolean) => {
+        const runCampaignSend = async (
+            withPhone: any[],
+            message: string,
+            isSmsCampaign: boolean,
+            waTemplateId: number | null = campaignWhatsAppTemplateId,
+        ) => {
             setCampaignSending(true);
             setCampaignProgress({ sent: 0, failed: 0 });
             let sent = 0;
             let failed = 0;
             const tenantCompany = currentUser?.company?.name || '';
-            for (const lead of withPhone) {
+            const channel = isSmsCampaign ? 'sms' : 'whatsapp';
+            let batchId: number | null = null;
+
+            const recordFailure = async (lead: any, phone: string, err: unknown) => {
+                failed++;
+                if (!batchId) return;
                 try {
+                    await recordCampaignFailureAPI(batchId, {
+                        client_id: lead.id,
+                        phone_number: phone,
+                        error: resolveLocalizedApiError(err as any, t, t('sendFailed')),
+                    });
+                } catch {
+                    /* best-effort failure log */
+                }
+            };
+
+            try {
+                const batch = await createCampaignBatchAPI({
+                    channel,
+                    message_preview: message.slice(0, 200),
+                    recipient_count: withPhone.length,
+                });
+                batchId = batch.id;
+
+                for (const lead of withPhone) {
                     const phone = getClientPhone(lead);
                     const body = replaceSmsTemplatePlaceholders(message, lead, tenantCompany);
-                    if (isSmsCampaign) {
-                        await sendLeadSMSAPI({
-                            lead_id: lead.id,
-                            phone_number: lead.phone_number || lead.phone || '',
-                            body,
-                        });
-                    } else {
-                        await sendWhatsAppMessageAPI({ to: phone, message: body, client_id: lead.id });
+                    try {
+                        if (isSmsCampaign) {
+                            await sendLeadSMSAPI({
+                                lead_id: lead.id,
+                                phone_number: phone,
+                                body,
+                                send_source: 'campaign',
+                                campaign_batch_id: batchId,
+                            });
+                        } else if (waTemplateId) {
+                            await sendWhatsAppTemplateAPI({
+                                to: phone,
+                                template_id: waTemplateId,
+                                client_id: lead.id,
+                                send_source: 'campaign',
+                                campaign_batch_id: batchId,
+                            });
+                        } else {
+                            const session = await getWhatsAppSessionWindowAPI({ clientId: lead.id, phone });
+                            if (!session.in_session) {
+                                throw {
+                                    code: 'whatsapp_outside_session_use_template',
+                                    message: t('whatsapp_outside_session_use_template'),
+                                };
+                            }
+                            await sendWhatsAppMessageAPI({
+                                to: phone,
+                                message: body,
+                                client_id: lead.id,
+                                send_source: 'campaign',
+                                campaign_batch_id: batchId,
+                            });
+                        }
+                        sent++;
+                    } catch (err) {
+                        await recordFailure(lead, phone, err);
                     }
-                    sent++;
-                } catch {
-                    failed++;
+                    setCampaignProgress({ sent, failed });
                 }
-                setCampaignProgress({ sent, failed });
+
+                if (batchId) {
+                    await completeCampaignBatchAPI(batchId, { sent_count: sent, failed_count: failed });
+                }
+                queryClient.invalidateQueries({ queryKey: ['messageLogs'] });
+            } catch (err) {
+                showAlert(resolveLocalizedApiError(err as any, t, t('campaignSendFailed')), 'error');
+            } finally {
+                setCampaignSending(false);
+                setSmsCampaignPreview(null);
             }
-            setCampaignSending(false);
-            setSmsCampaignPreview(null);
+
             showAlert(
                 t('campaignComplete') +
                     ' — ' +
                     t('campaignSentCount').replace('{sent}', String(sent)).replace('{failed}', String(failed)),
-                'info',
+                failed > 0 && sent === 0 ? 'warning' : 'info',
             );
         };
 
+        const getSelectedCampaignLeads = () => {
+            const leadById = new Map<number, any>();
+            for (const [, data] of queryClient.getQueriesData({ queryKey: ['campaignLeads'] })) {
+                const list = (data as any)?.results ?? (Array.isArray(data) ? data : []);
+                for (const lead of list) leadById.set(lead.id, lead);
+            }
+            return [...campaignSelectedIds].map((id) => leadById.get(id)).filter(Boolean);
+        };
+
         const handleCampaignSend = async () => {
-            const selected = campaignLeads.filter((l: any) => campaignSelectedIds.has(l.id));
-            const withPhone = selected.filter(
-                (l: any) => ((l.phone_number || l.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0,
-            );
+            const selected = getSelectedCampaignLeads();
+            const withPhone = selected.filter((l: any) => leadHasPhone(l));
             if (withPhone.length === 0) {
                 showAlert(t('selectAtLeastOneLead'), 'warning');
                 return;
             }
             const message = campaignMessage.trim();
-            if (!message) {
-                showAlert(t('enterMessageOrSelectTemplate'), 'warning');
-                return;
-            }
             const isSmsCampaign = campaignChannel === 'sms';
+
             if (isSmsCampaign) {
+                if (!smsSettings?.is_enabled) {
+                    showAlert(t('sms_error_not_configured'), 'warning');
+                    return;
+                }
+                if (!message) {
+                    showAlert(t('enterMessageOrSelectTemplate'), 'warning');
+                    return;
+                }
                 const first = withPhone[0];
                 const previewBody = replaceSmsTemplatePlaceholders(message, first, currentUser?.company?.name);
                 setSmsCampaignPreview({
                     leads: withPhone,
                     message,
                     previewBody,
-                    previewPhone: first.phone_number || first.phone || '',
+                    previewPhone: resolveLeadPhoneRaw(first),
                 });
                 return;
             }
-            await runCampaignSend(withPhone, message, false);
+
+            if (!campaignWhatsAppTemplateId && !message) {
+                showAlert(t('campaignWhatsAppTemplateOrMessageRequired'), 'warning');
+                return;
+            }
+            if (!campaignWhatsAppTemplateId && approvedWaTemplates.length > 0) {
+                showAlert(t('campaignWhatsAppSessionOnlyHint'), 'info');
+            }
+            await runCampaignSend(withPhone, message || approvedWaTemplates.find((tpl) => tpl.id === campaignWhatsAppTemplateId)?.content || '', false);
         };
 
         const handleConfirmSmsCampaign = async () => {
@@ -2348,93 +2433,73 @@ export const IntegrationsPage = () => {
                         >
                             <FileTextIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'template' ? 'text-white' : marketingAccentIconClass}`} /> {t('template')}
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setMessagingCenterTabPersisted('logs')}
+                            className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${messagingCenterTab === 'logs' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                        >
+                            <ClockIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'logs' ? 'text-white' : marketingAccentIconClass}`} /> {t('messageLogs')}
+                        </button>
                     </div>
                     {messagingCenterTab === 'template' ? (
                         <TemplateManagementSettings />
+                    ) : messagingCenterTab === 'logs' ? (
+                        <MessageLogsPanel />
                     ) : (
                     <div className="space-y-4">
                         <Card className="overflow-hidden">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-                                <div className="lg:col-span-2 flex flex-col">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('selectLeadsToSend')}</label>
-                                    <div className="mb-1">
-                                        <div className="flex gap-2">
-                                            <div className="relative flex-1">
-                                                <SearchIcon className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                                <input
-                                                    type="text"
-                                                    value={campaignLeadSearch}
-                                                    onChange={(e) => setCampaignLeadSearch(e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && setCampaignLeadSearchApplied(campaignLeadSearch.trim())}
-                                                    placeholder={t('campaignSearchPlaceholder')}
-                                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-9 pe-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                                />
-                                            </div>
-                                            <Button type="button" variant="secondary" onClick={() => setCampaignLeadSearchApplied(campaignLeadSearch.trim())}>
-                                                {t('search') || 'Search'}
-                                            </Button>
-                                        </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{t('campaignSearchHint')}</p>
-                                    </div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <button type="button" onClick={() => { const allIds = new Set(campaignLeads.map((l: any) => l.id)); setCampaignSelectedIds(allIds); }} className="text-sm font-medium text-primary-600 dark:text-primary-300 hover:text-primary-700 dark:hover:text-primary-200 hover:underline underline-offset-2">{t('selectAll') || 'Select all'}</button>
-                                        <button type="button" onClick={() => setCampaignSelectedIds(new Set())} className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:underline underline-offset-2">{t('deselectAll') || 'Deselect all'}</button>
-                                    </div>
-                                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
-                                        {campaignLeadsLoading ? (
-                                            <div className="flex justify-center py-8"><Loader variant="primary" className="h-8" /></div>
-                                        ) : campaignLeads.length === 0 ? (
-                                            <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">{t('noAccountsConnected') || 'No leads'}</p>
-                                        ) : (
-                                            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {campaignLeads.map((lead: any) => {
-                                                    const hasPhone = ((lead.phone_number || lead.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0;
-                                                    const checked = campaignSelectedIds.has(lead.id);
-                                                    const displayTitle = (lead.name ?? '') || (lead.company_name ?? '') || `#${lead.id}`;
-                                                    const statusName = lead.status_name ?? lead.status?.name ?? '';
-                                                    const typeVal = lead.type ?? '';
-                                                    const priorityVal = lead.priority ?? '';
-                                                    const assignedTo = lead.assigned_to_username ?? lead.assigned_to?.username ?? '';
-                                                    return (
-                                                        <li key={lead.id}>
-                                                            <label className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg ${!hasPhone ? 'opacity-60' : ''}`}>
-                                                                <input type="checkbox" checked={checked} disabled={!hasPhone} onChange={() => { setCampaignSelectedIds((prev) => { const next = new Set(prev); if (next.has(lead.id)) next.delete(lead.id); else next.add(lead.id); return next; }); }} className="rounded border-gray-300 dark:border-gray-600 text-primary shrink-0" />
-                                                                <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">{displayTitle.charAt(0)}</div>
-                                                                <div className="min-w-0 flex-1">
-                                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{displayTitle}</p>
-                                                                    {(lead.phone_number || lead.phone) && <p className="text-xs text-gray-500 dark:text-gray-400 truncate" dir="ltr">{lead.phone_number || lead.phone}</p>}
-                                                                    <div className="flex flex-wrap gap-1.5 mt-1">
-                                                                        {statusName && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{statusName}</span>}
-                                                                        {typeVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{typeVal}</span>}
-                                                                        {priorityVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{priorityVal}</span>}
-                                                                    </div>
-                                                                    {assignedTo && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{t('assignedTo')}: {assignedTo}</p>}
-                                                                    {!hasPhone && <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{t('sms_error_invalid_to_number')}</p>}
-                                                                </div>
-                                                            </label>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        )}
-                                    </div>
-                                </div>
+                                <CampaignLeadPicker
+                                    enabled={messagingCenterTab === 'campaign'}
+                                    selectedIds={campaignSelectedIds}
+                                    onSelectedIdsChange={setCampaignSelectedIds}
+                                />
                                 <div className="flex flex-col">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia') || 'Send via'}</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia')}</label>
                                     <div className="flex gap-2 mb-3">
-                                        <button type="button" onClick={() => setCampaignChannel('whatsapp')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" /> {t('campaignViaWhatsApp') || 'WhatsApp'}</button>
-                                        <button type="button" onClick={() => setCampaignChannel('sms')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><IntegrationPlatformIcon platform="sms" size="sm" variant="inline" /> {t('campaignViaSms') || 'SMS'}</button>
+                                        <button type="button" onClick={() => setCampaignChannel('whatsapp')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" /> {t('campaignViaWhatsApp')}</button>
+                                        <button type="button" onClick={() => setCampaignChannel('sms')} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}><IntegrationPlatformIcon platform="sms" size="sm" variant="inline" /> {t('campaignViaSms')}</button>
                                     </div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('quickTemplates')}</label>
                                     {(() => {
                                         const isSms = campaignChannel === 'sms';
                                         const campaignTemplates = (templates as any[]).filter((tpl: any) => { const ch = (tpl.channel_type || '').toLowerCase(); return isSms ? ch === 'sms' : (ch === 'whatsapp' || ch === 'whatsapp_api'); });
-                                        if (campaignTemplates.length === 0) return <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{isSms ? (t('noSmsTemplatesYet') || 'No SMS templates yet. Create one in Template Management.') : t('noWhatsAppTemplatesYet')}</p>;
-                                        return <div className="flex flex-wrap gap-2 mb-3">{campaignTemplates.map((tpl: any) => (<button key={tpl.id} type="button" onClick={() => { const content = tpl.content || ''; setCampaignMessage((prev) => (prev ? prev + '\n' + content : content)); }} className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">{tpl.name}</button>))}</div>;
+                                        if (campaignTemplates.length === 0) return <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">{isSms ? t('noSmsTemplatesYet') : t('noWhatsAppTemplatesYet')}</p>;
+                                        return <div className="flex flex-wrap gap-2 mb-3">{campaignTemplates.map((tpl: any) => (<button key={tpl.id} type="button" onClick={() => { const content = tpl.content || ''; setCampaignMessage((prev) => (prev ? prev + '\n' + content : content)); if (!isSms && (tpl.meta_status || '').toUpperCase() === 'APPROVED') setCampaignWhatsAppTemplateId(tpl.id); }} className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">{tpl.name}</button>))}</div>;
                                     })()}
+                                    {campaignChannel === 'whatsapp' && (
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignWhatsAppTemplateLabel')}</label>
+                                            <select
+                                                value={campaignWhatsAppTemplateId ?? ''}
+                                                onChange={(e) => {
+                                                    const id = e.target.value ? Number(e.target.value) : null;
+                                                    setCampaignWhatsAppTemplateId(id);
+                                                    if (id) {
+                                                        const tpl = approvedWaTemplates.find((t) => t.id === id);
+                                                        if (tpl?.content) setCampaignMessage(tpl.content);
+                                                    }
+                                                }}
+                                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-2 text-sm text-gray-900 dark:text-white"
+                                            >
+                                                <option value="">{t('campaignWhatsAppSessionMessage')}</option>
+                                                {approvedWaTemplates.map((tpl) => (
+                                                    <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                                                ))}
+                                            </select>
+                                            <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                                                {campaignWhatsAppTemplateId
+                                                    ? t('campaignWhatsAppTemplateHint')
+                                                    : t('campaignWhatsAppSessionOnlyHint')}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {campaignChannel === 'sms' && smsSettings && !smsSettings.is_enabled && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">{t('sms_error_not_configured')}</p>
+                                    )}
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 mt-1">{t('messageContent')}</label>
                                     <textarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={6} placeholder={t('messageContent')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y" />
-                                    {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppMessagingLimit') || 'WhatsApp limit'}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier} {t('conversationsPerDay') || ' conversations/day'}{whatsAppLimits.quality_rating && ` · ${t('quality') || 'Quality'}: ${whatsAppLimits.quality_rating}`}</p>}
+                                    {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppMessagingLimit')}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier} {t('conversationsPerDay')}{whatsAppLimits.quality_rating && ` · ${t('quality')}: ${whatsAppLimits.quality_rating}`}</p>}
                                     {campaignProgress !== null && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}</p>}
                                     <Button className="mt-3" onClick={handleCampaignSend} disabled={campaignSending}>
                                         {campaignSending ? <><Loader variant="primary" className="w-4 h-4 me-2" /> {t('campaignSending')}</> : <>{t('sendToSelected')} ({campaignSelectedIds.size})</>}
@@ -2928,109 +2993,13 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                         </div>
                         <Card className="overflow-hidden">
                             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-                                <div className="lg:col-span-2 flex flex-col">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('selectLeadsToSend')}</label>
-                                    <div className="mb-1">
-                                        <div className="flex gap-2">
-                                            <div className="relative flex-1">
-                                                <SearchIcon className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                                <input
-                                                    type="text"
-                                                    value={campaignLeadSearch}
-                                                    onChange={(e) => setCampaignLeadSearch(e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && setCampaignLeadSearchApplied(campaignLeadSearch.trim())}
-                                                    placeholder={t('campaignSearchPlaceholder')}
-                                                    className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-9 pe-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                                                />
-                                            </div>
-                                            <Button
-                                                type="button"
-                                                variant="secondary"
-                                                onClick={() => setCampaignLeadSearchApplied(campaignLeadSearch.trim())}
-                                            >
-                                                {t('search') || 'Search'}
-                                            </Button>
-                                        </div>
-                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1.5">{t('campaignSearchHint')}</p>
-                                    </div>
-                                    <div className="flex items-center gap-3 mb-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const allIds = new Set(campaignLeads.map((l: any) => l.id));
-                                                setCampaignSelectedIds(allIds);
-                                            }}
-                                            className="text-sm font-medium text-primary-600 dark:text-primary-300 hover:text-primary-700 dark:hover:text-primary-200 hover:underline underline-offset-2"
-                                        >
-                                            {t('selectAll') || 'Select all'}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setCampaignSelectedIds(new Set())}
-                                            className="text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100 hover:underline underline-offset-2"
-                                        >
-                                            {t('deselectAll') || 'Deselect all'}
-                                        </button>
-                                    </div>
-                                    <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
-                                        {campaignLeadsLoading ? (
-                                            <div className="flex justify-center py-8"><Loader variant="primary" className="h-8" /></div>
-                                        ) : campaignLeads.length === 0 ? (
-                                            <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">{t('noAccountsConnected') || 'No leads'}</p>
-                                        ) : (
-                                            <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                                                {campaignLeads.map((lead: any) => {
-                                                    const hasPhone = ((lead.phone_number || lead.phone || '').replace(/\s+/g, '').replace(/^\+/, '') || '').length > 0;
-                                                    const checked = campaignSelectedIds.has(lead.id);
-                                                    const leadName = lead.name ?? '';
-                                                    const companyName = lead.company_name ?? '';
-                                                    const displayTitle = leadName || companyName || `#${lead.id}`;
-                                                    const phone = lead.phone_number || lead.phone || '';
-                                                    const statusName = lead.status_name ?? lead.status?.name ?? '';
-                                                    const typeVal = lead.type ?? '';
-                                                    const priorityVal = lead.priority ?? '';
-                                                    const assignedTo = lead.assigned_to_username ?? lead.assigned_to?.username ?? '';
-                                                    return (
-                                                        <li key={lead.id}>
-                                                            <label className={`flex items-center gap-3 p-3 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700/50 rounded-lg ${!hasPhone ? 'opacity-60' : ''}`}>
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={checked}
-                                                                    disabled={!hasPhone}
-                                                                    onChange={() => {
-                                                                        setCampaignSelectedIds((prev) => {
-                                                                            const next = new Set(prev);
-                                                                            if (next.has(lead.id)) next.delete(lead.id);
-                                                                            else next.add(lead.id);
-                                                                            return next;
-                                                                        });
-                                                                    }}
-                                                                    className="rounded border-gray-300 dark:border-gray-600 text-primary shrink-0"
-                                                                />
-                                                                <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
-                                                                    {displayTitle.charAt(0)}
-                                                                </div>
-                                                                <div className="min-w-0 flex-1">
-                                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{displayTitle}</p>
-                                                                    {phone && <p className="text-xs text-gray-500 dark:text-gray-400 truncate" dir="ltr">{phone}</p>}
-                                                                    <div className="flex flex-wrap gap-1.5 mt-1">
-                                                                        {statusName && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{statusName}</span>}
-                                                                        {typeVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{typeVal}</span>}
-                                                                        {priorityVal && <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">{priorityVal}</span>}
-                                                                    </div>
-                                                                    {assignedTo && <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">{t('assignedTo')}: {assignedTo}</p>}
-                                                                    {!hasPhone && <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">{t('sms_error_invalid_to_number')}</p>}
-                                                                </div>
-                                                            </label>
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        )}
-                                    </div>
-                                </div>
+                                <CampaignLeadPicker
+                                    enabled={effectiveTab === 'campaigns'}
+                                    selectedIds={campaignSelectedIds}
+                                    onSelectedIdsChange={setCampaignSelectedIds}
+                                />
                                 <div className="flex flex-col">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia') || 'Send via'}</label>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia')}</label>
                                     <div className="flex gap-2 mb-3">
                                         <button
                                             type="button"
@@ -3038,7 +3007,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                                         >
                                             <IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" />
-                                            {t('campaignViaWhatsApp') || 'WhatsApp'}
+                                            {t('campaignViaWhatsApp')}
                                         </button>
                                         <button
                                             type="button"
@@ -3046,7 +3015,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
                                         >
                                             <IntegrationPlatformIcon platform="sms" size="sm" variant="inline" />
-                                            {t('campaignViaSms') || 'SMS'}
+                                            {t('campaignViaSms')}
                                         </button>
                                     </div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('quickTemplates')}</label>
@@ -3059,7 +3028,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                         if (campaignTemplates.length === 0) {
                                             return (
                                                 <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                                                    {isSms ? (t('noSmsTemplatesYet') || 'No SMS templates yet. Create one in Template Management.') : t('noWhatsAppTemplatesYet')}
+                                                    {isSms ? t('noSmsTemplatesYet') : t('noWhatsAppTemplatesYet')}
                                                 </p>
                                             );
                                         }
@@ -3072,6 +3041,9 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                                         onClick={() => {
                                                             const content = tpl.content || '';
                                                             setCampaignMessage((prev) => (prev ? prev + '\n' + content : content));
+                                                            if (!isSms && (tpl.meta_status || '').toUpperCase() === 'APPROVED') {
+                                                                setCampaignWhatsAppTemplateId(tpl.id);
+                                                            }
                                                         }}
                                                         className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                                                     >
@@ -3081,6 +3053,36 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             </div>
                                         );
                                     })()}
+                                    {campaignChannel === 'whatsapp' && (
+                                        <div className="mb-3">
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignWhatsAppTemplateLabel')}</label>
+                                            <select
+                                                value={campaignWhatsAppTemplateId ?? ''}
+                                                onChange={(e) => {
+                                                    const id = e.target.value ? Number(e.target.value) : null;
+                                                    setCampaignWhatsAppTemplateId(id);
+                                                    if (id) {
+                                                        const tpl = approvedWaTemplates.find((tplItem) => tplItem.id === id);
+                                                        if (tpl?.content) setCampaignMessage(tpl.content);
+                                                    }
+                                                }}
+                                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-2 text-sm text-gray-900 dark:text-white"
+                                            >
+                                                <option value="">{t('campaignWhatsAppSessionMessage')}</option>
+                                                {approvedWaTemplates.map((tpl) => (
+                                                    <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                                                ))}
+                                            </select>
+                                            <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
+                                                {campaignWhatsAppTemplateId
+                                                    ? t('campaignWhatsAppTemplateHint')
+                                                    : t('campaignWhatsAppSessionOnlyHint')}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {campaignChannel === 'sms' && smsSettings && !smsSettings.is_enabled && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">{t('sms_error_not_configured')}</p>
+                                    )}
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 mt-1">{t('messageContent')}</label>
                                     <textarea
                                         value={campaignMessage}

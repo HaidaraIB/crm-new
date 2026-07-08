@@ -232,13 +232,13 @@ export interface LeadFilters {
 
 /** Query params sent to GET /clients/ and /clients/status-counts/ */
 export interface LeadApiFilters {
-  type?: string;
-  priority?: string;
+  type?: string | string[];
+  priority?: string | string[];
   search?: string;
-  status?: string;
-  assignedTo?: string;
+  status?: string | string[];
+  assignedTo?: string | string[];
   assignedToMe?: boolean;
-  communicationWay?: string;
+  communicationWay?: string | string[];
   budgetMin?: string;
   budgetMax?: string;
   createdAtFrom?: string;

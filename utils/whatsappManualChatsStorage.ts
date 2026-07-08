@@ -1,3 +1,5 @@
+import { resolveLeadPhoneRaw } from './smsSendHelpers';
+
 export type ChatMessageStatus = 'sending' | 'sent' | 'failed';
 
 export type ManualChatMessage = {
@@ -29,12 +31,8 @@ function selectedPhoneKey(companyId: number | string | undefined): string {
   return `wa_manual_selected_phone_${storageSuffix(companyId)}`;
 }
 
-export function normalizeChatPhone(client: { phone_number?: string; phone?: string; name?: string } | null | undefined): string {
-  if (!client) return '';
-  const raw = (client.phone_number || client.phone || '').replace(/\s+/g, '').replace(/^\+/, '');
-  if (raw) return raw;
-  const name = String(client.name || '').replace(/\s+/g, '').replace(/^\+/, '');
-  return /^\d+$/.test(name) ? name : '';
+export function normalizeChatPhone(client: { phone_number?: string; phone?: string; phone_numbers?: Array<{ phone_number?: string; is_primary?: boolean }>; name?: string } | null | undefined): string {
+  return resolveLeadPhoneRaw(client);
 }
 
 export function isManualChatClient(client: { id?: unknown; is_manual?: boolean } | null | undefined): boolean {

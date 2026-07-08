@@ -1908,19 +1908,23 @@ export const toggleSupervisorActiveAPI = async (id: number) => {
 
 // ==================== Leads APIs (Clients in API) ====================
 
+function appendCsvFilter(queryParams: URLSearchParams, key: string, value?: string | string[]) {
+  if (!value) return;
+  const values = (Array.isArray(value) ? value : [value])
+    .map((v) => String(v).trim())
+    .filter((v) => v && v.toLowerCase() !== 'all');
+  if (values.length) queryParams.append(key, values.join(','));
+}
+
 function appendLeadApiFilters(queryParams: URLSearchParams, filters?: LeadApiFilters) {
   if (!filters) return;
-  if (filters.type && filters.type !== 'All') queryParams.append('type', filters.type.toLowerCase());
-  if (filters.priority && filters.priority !== 'All') queryParams.append('priority', filters.priority.toLowerCase());
+  appendCsvFilter(queryParams, 'type', filters.type);
+  appendCsvFilter(queryParams, 'priority', filters.priority);
   if (filters.search) queryParams.append('search', filters.search);
-  if (filters.status && filters.status !== 'All') queryParams.append('status', filters.status);
+  appendCsvFilter(queryParams, 'status', filters.status);
   if (filters.assignedToMe) queryParams.append('assigned_to_me', 'true');
-  else if (filters.assignedTo && filters.assignedTo !== 'All') {
-    queryParams.append('assigned_to', filters.assignedTo);
-  }
-  if (filters.communicationWay && filters.communicationWay !== 'All') {
-    queryParams.append('communication_way', filters.communicationWay);
-  }
+  else appendCsvFilter(queryParams, 'assigned_to', filters.assignedTo);
+  appendCsvFilter(queryParams, 'communication_way', filters.communicationWay);
   if (filters.budgetMin) queryParams.append('budget_min', filters.budgetMin);
   if (filters.budgetMax) queryParams.append('budget_max', filters.budgetMax);
   if (filters.createdAtFrom) queryParams.append('created_at_from', filters.createdAtFrom);
@@ -2857,6 +2861,8 @@ export const sendWhatsAppMessageAPI = async (data: {
   message: string;
   phone_number_id?: string;
   client_id?: number;
+  send_source?: 'manual' | 'campaign' | 'auto_welcome';
+  campaign_batch_id?: number;
 }) => {
   return apiRequest<any>('/integrations/whatsapp/send/', {
     method: 'POST',
@@ -2866,6 +2872,8 @@ export const sendWhatsAppMessageAPI = async (data: {
       text: data.message,
       ...(data.phone_number_id && { phone_number_id: data.phone_number_id }),
       ...(data.client_id != null && { client_id: data.client_id }),
+      ...(data.send_source && { send_source: data.send_source }),
+      ...(data.campaign_batch_id != null && { campaign_batch_id: data.campaign_batch_id }),
     }),
   });
 };
@@ -2911,6 +2919,8 @@ export const sendWhatsAppTemplateAPI = async (data: {
   client_id?: number;
   phone_number_id?: string;
   body_parameters?: string[];
+  send_source?: 'manual' | 'campaign' | 'auto_welcome';
+  campaign_batch_id?: number;
 }) => {
   return apiRequest<any>('/integrations/whatsapp/send-template/', {
     method: 'POST',
@@ -2920,6 +2930,8 @@ export const sendWhatsAppTemplateAPI = async (data: {
       ...(data.client_id != null && { client_id: data.client_id }),
       ...(data.phone_number_id && { phone_number_id: data.phone_number_id }),
       ...(data.body_parameters && { body_parameters: data.body_parameters }),
+      ...(data.send_source && { send_source: data.send_source }),
+      ...(data.campaign_batch_id != null && { campaign_batch_id: data.campaign_batch_id }),
     }),
   });
 };
@@ -3110,6 +3122,16 @@ export const deleteMessageTemplateAPI = async (id: number) => {
 };
 
 /**
+ * POST /api/integrations/templates/:id/clone-to-channel/
+ * Create counterpart on the other channel (WhatsApp ↔ SMS).
+ */
+export const cloneMessageTemplateToChannelAPI = async (id: number): Promise<MessageTemplateType> => {
+  return apiRequest<MessageTemplateType>(`/integrations/templates/${id}/clone-to-channel/`, {
+    method: 'POST',
+  });
+};
+
+/**
  * إرسال قالب واتساب إلى Meta للمراجعة (يظهر في حساب واتساب عند ميتا)
  * POST /api/integrations/templates/:id/submit-to-whatsapp/
  */
@@ -3224,6 +3246,8 @@ export const sendLeadSMSAPI = async (data: {
   lead_id: number;
   phone_number: string;
   body: string;
+  send_source?: 'manual' | 'campaign' | 'auto_welcome';
+  campaign_batch_id?: number;
 }): Promise<LeadSMSMessageResponse> => {
   return apiRequest<LeadSMSMessageResponse>('/integrations/twilio/send/', {
     method: 'POST',
@@ -3672,6 +3696,123 @@ export const getLeadSMSMessagesAPI = async (clientId: number): Promise<LeadSMSMe
   );
   if (Array.isArray(res)) return res;
   return res.results ?? [];
+};
+
+export type MessageLogEntry = {
+  id: string;
+  source_id: number;
+  channel: 'sms' | 'whatsapp';
+  campaign_batch_id?: number | null;
+  client_id: number;
+  client_name: string;
+  phone_number: string;
+  body: string;
+  body_preview: string;
+  direction: 'outbound';
+  status: 'pending' | 'sent' | 'delivered' | 'failed';
+  error: string | null;
+  provider: string;
+  external_id: string;
+  created_by_username: string;
+  created_at: string;
+};
+
+export type MessageLogSummary = {
+  total: number;
+  pending: number;
+  sent: number;
+  delivered: number;
+  failed: number;
+  sms: number;
+  whatsapp: number;
+};
+
+export type MessageLogFilters = {
+  page?: number;
+  page_size?: number;
+  channel?: 'all' | 'sms' | 'whatsapp';
+  status?: 'all' | 'pending' | 'sent' | 'delivered' | 'failed';
+  search?: string;
+  date_from?: string;
+  date_to?: string;
+  client?: number;
+  batch?: number;
+};
+
+export type MessageLogsResponse = {
+  count: number;
+  page: number;
+  page_size: number;
+  summary: MessageLogSummary;
+  results: MessageLogEntry[];
+};
+
+/**
+ * GET /api/integrations/message-logs/
+ */
+export const getMessageLogsAPI = async (filters?: MessageLogFilters): Promise<MessageLogsResponse> => {
+  const params = new URLSearchParams();
+  if (filters?.page) params.append('page', String(filters.page));
+  if (filters?.page_size) params.append('page_size', String(filters.page_size));
+  if (filters?.channel && filters.channel !== 'all') params.append('channel', filters.channel);
+  if (filters?.status && filters.status !== 'all') params.append('status', filters.status);
+  if (filters?.search) params.append('search', filters.search);
+  if (filters?.date_from) params.append('date_from', filters.date_from);
+  if (filters?.date_to) params.append('date_to', filters.date_to);
+  if (filters?.client) params.append('client', String(filters.client));
+  if (filters?.batch) params.append('batch', String(filters.batch));
+  const qs = params.toString();
+  return apiRequest<MessageLogsResponse>(`/integrations/message-logs/${qs ? `?${qs}` : ''}`);
+};
+
+export type CampaignBatchResponse = {
+  id: number;
+  channel: 'sms' | 'whatsapp';
+  message_preview?: string;
+  recipient_count?: number;
+  sent_count?: number;
+  failed_count?: number;
+  created_at?: string;
+};
+
+/**
+ * POST /api/integrations/campaign-batches/
+ */
+export const createCampaignBatchAPI = async (data: {
+  channel: 'sms' | 'whatsapp';
+  message_preview?: string;
+  recipient_count?: number;
+}): Promise<CampaignBatchResponse> => {
+  return apiRequest<CampaignBatchResponse>('/integrations/campaign-batches/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * PATCH /api/integrations/campaign-batches/:id/complete/
+ */
+export const completeCampaignBatchAPI = async (
+  batchId: number,
+  data: { sent_count: number; failed_count: number },
+): Promise<CampaignBatchResponse> => {
+  return apiRequest<CampaignBatchResponse>(`/integrations/campaign-batches/${batchId}/complete/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * POST /api/integrations/campaign-batches/:id/failures/
+ */
+export const recordCampaignFailureAPI = async (
+  batchId: number,
+  data: { client_id?: number; phone_number?: string; error?: string },
+): Promise<{ id: number }> => {
+  return apiRequest<{ id: number }>(`/integrations/campaign-batches/${batchId}/failures/`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 };
 
 /**

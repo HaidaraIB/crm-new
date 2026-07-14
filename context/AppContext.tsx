@@ -1106,41 +1106,57 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   };
 
   const setCurrentUser = (user: User | null) => {
-    setCurrentUserState(user);
-    if (user) {
-      // تنظيف الدور قبل الحفظ في localStorage
-      const cleanedRole = normalizeRole(user.role);
-      // Save full user data including company info and language
-      localStorage.setItem('currentUser', JSON.stringify({
-        id: user.id,
-        name: user.name,
-        username: user.username,
-        email: user.email,
-        role: cleanedRole,
-        phone: user.phone,
-        avatar: user.avatar,
-        supervisor_permissions: user.supervisor_permissions ?? null,
-        company: user.company ? {
-          id: user.company.id,
-          name: user.company.name,
-          domain: user.company.domain,
-          specialization: user.company.specialization,
-          timezone: user.company.timezone,
-          auto_assign_enabled: user.company.auto_assign_enabled,
-          auto_assign_algorithm: user.company.auto_assign_algorithm ?? 'least_busy',
-          re_assign_enabled: user.company.re_assign_enabled,
-          re_assign_hours: user.company.re_assign_hours,
-          field_visit_enabled: user.company.field_visit_enabled,
-          field_visit_allowed: user.company.field_visit_allowed,
-          field_visit_admin_allowed: user.company.field_visit_admin_allowed,
-          field_visit_admin_message: user.company.field_visit_admin_message,
-          subscription: user.company.subscription,
-        } : null,
-        language: user.language,
-      }));
-    } else {
+    if (!user) {
+      setCurrentUserState(null);
       localStorage.removeItem('currentUser');
+      return;
     }
+
+    setCurrentUserState((prev) => {
+      const merged = normalizeUser({
+        ...prev,
+        ...user,
+        company: user.company ?? prev?.company,
+      });
+      const cleanedRole = normalizeRole(merged.role);
+      localStorage.setItem('currentUser', JSON.stringify({
+        id: merged.id,
+        name: merged.name,
+        username: merged.username,
+        email: merged.email,
+        first_name: merged.first_name,
+        last_name: merged.last_name,
+        role: cleanedRole,
+        phone: merged.phone,
+        avatar: merged.avatar,
+        profile_photo: merged.profile_photo,
+        email_verified: merged.emailVerified,
+        is_company_owner: (merged as any).is_company_owner ?? (merged as any).isCompanyOwner,
+        login_two_factor_enabled:
+          (merged as any).login_two_factor_enabled ??
+          (merged as any).loginTwoFactorEnabled ??
+          true,
+        supervisor_permissions: merged.supervisor_permissions ?? null,
+        company: merged.company ? {
+          id: merged.company.id,
+          name: merged.company.name,
+          domain: merged.company.domain,
+          specialization: merged.company.specialization,
+          timezone: merged.company.timezone,
+          auto_assign_enabled: merged.company.auto_assign_enabled,
+          auto_assign_algorithm: merged.company.auto_assign_algorithm ?? 'least_busy',
+          re_assign_enabled: merged.company.re_assign_enabled,
+          re_assign_hours: merged.company.re_assign_hours,
+          field_visit_enabled: merged.company.field_visit_enabled,
+          field_visit_allowed: merged.company.field_visit_allowed,
+          field_visit_admin_allowed: merged.company.field_visit_admin_allowed,
+          field_visit_admin_message: merged.company.field_visit_admin_message,
+          subscription: merged.company.subscription,
+        } : null,
+        language: merged.language,
+      }));
+      return merged;
+    });
   };
 
   const hasSupervisorPermission = (key: keyof import('../types').SupervisorPermissionsMap): boolean => {

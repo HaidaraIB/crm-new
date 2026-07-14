@@ -2,8 +2,7 @@ import React from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { dashboardSurface } from './dashboardStyles';
 import type { ClientAIInsightResponse } from '../../services/api';
-import { Button, Loader } from '../index';
-import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
+import { Button } from '../index';
 import { pickInsightText } from '../../utils/aiInsightText';
 
 export type AIInsightCardItem = ClientAIInsightResponse & {
@@ -13,20 +12,11 @@ export type AIInsightCardItem = ClientAIInsightResponse & {
 type AIInsightsCardProps = {
   title: string;
   poweredByLabel: string;
-  pendingTitle: string;
   priorityTitle: string;
   scoreLabel: string;
   emptyLabel: string;
   viewLeadLabel: string;
-  approveLabel: string;
-  dismissLabel: string;
-  suggestedDateLabel: string;
-  pending: AIInsightCardItem[];
   priority: AIInsightCardItem[];
-  onApprove: (id: number) => void;
-  onDismiss: (id: number) => void;
-  approvingId?: number | null;
-  dismissingId?: number | null;
 };
 
 function leadInitials(name: string): string {
@@ -36,53 +26,15 @@ function leadInitials(name: string): string {
   return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
 }
 
-function formatReminderDate(iso: string | null, locale: string, emptyLabel: string): string {
-  if (!iso) return emptyLabel;
-  try {
-    const date = new Date(iso);
-    if (Number.isNaN(date.getTime())) return emptyLabel;
-    const loc = locale === 'ar' ? ARABIC_DATE_LOCALE : undefined;
-    return date.toLocaleString(
-      loc,
-      withLatinDigits({
-        dateStyle: 'short',
-        timeStyle: 'short',
-      }),
-    );
-  } catch {
-    return emptyLabel;
-  }
-}
-
 function InsightRow({
   item,
   scoreLabel,
   viewLeadLabel,
-  suggestedDateLabel,
-  approveLabel,
-  dismissLabel,
-  showActions,
-  onApprove,
-  onDismiss,
-  approving,
-  dismissing,
-  locale,
-  emptyDateLabel,
   language,
 }: {
   item: AIInsightCardItem;
   scoreLabel: string;
   viewLeadLabel: string;
-  suggestedDateLabel: string;
-  approveLabel: string;
-  dismissLabel: string;
-  showActions: boolean;
-  onApprove: (id: number) => void;
-  onDismiss: (id: number) => void;
-  approving: boolean;
-  dismissing: boolean;
-  locale: string;
-  emptyDateLabel: string;
   language: string;
 }) {
   const summaryText = pickInsightText(item, 'summary', language);
@@ -107,29 +59,8 @@ function InsightRow({
             </span>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">{summaryText}</p>
-          <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">
-            {suggestedDateLabel}: {formatReminderDate(item.suggested_reminder_date, locale, emptyDateLabel)}
-          </p>
-          {showActions ? (
-            <div className="flex flex-wrap gap-2 mt-3">
-              <Button
-                size="sm"
-                onClick={() => onApprove(item.id)}
-                disabled={approving || dismissing}
-              >
-                {approving ? <Loader className="h-3 w-3" /> : approveLabel}
-              </Button>
-              <Button size="sm" variant="secondary" onClick={() => onDismiss(item.id)} disabled={approving || dismissing}>
-                {dismissing ? <Loader className="h-3 w-3" /> : dismissLabel}
-              </Button>
-              {item.onView ? (
-                <Button size="sm" variant="secondary" onClick={item.onView}>
-                  {viewLeadLabel}
-                </Button>
-              ) : null}
-            </div>
-          ) : item.onView ? (
-            <Button size="sm" variant="secondary" className="mt-2" onClick={item.onView}>
+          {item.onView ? (
+            <Button size="sm" variant="secondary" className="mt-3" onClick={item.onView}>
               {viewLeadLabel}
             </Button>
           ) : null}
@@ -142,26 +73,14 @@ function InsightRow({
 export const AIInsightsCard = ({
   title,
   poweredByLabel,
-  pendingTitle,
   priorityTitle,
   scoreLabel,
   emptyLabel,
   viewLeadLabel,
-  approveLabel,
-  dismissLabel,
-  suggestedDateLabel,
-  pending,
   priority,
-  onApprove,
-  onDismiss,
-  approvingId,
-  dismissingId,
 }: AIInsightsCardProps) => {
-  const { language, t } = useAppContext();
-  const locale = language === 'ar' ? 'ar' : 'en';
+  const { language } = useAppContext();
   const uiLanguage = language === 'ar' ? 'ar' : 'en';
-  const emptyDateLabel = t('notAvailable');
-  const hasContent = pending.length > 0 || priority.length > 0;
 
   return (
     <div className={`${dashboardSurface} p-5 sm:p-6`}>
@@ -176,64 +95,24 @@ export const AIInsightsCard = ({
         </div>
       </div>
 
-      {!hasContent ? (
+      {priority.length === 0 ? (
         <div className="rounded-xl bg-gray-50 dark:bg-gray-950/40 border border-dashed border-gray-200 dark:border-gray-700 px-4 py-8 text-center">
           <p className="text-sm text-gray-600 dark:text-gray-400">{emptyLabel}</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {pending.length > 0 ? (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">{pendingTitle}</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {pending.map((item) => (
-                  <InsightRow
-                    key={`pending-${item.id}`}
-                    item={item}
-                    scoreLabel={scoreLabel}
-                    viewLeadLabel={viewLeadLabel}
-                    suggestedDateLabel={suggestedDateLabel}
-                    approveLabel={approveLabel}
-                    dismissLabel={dismissLabel}
-                    showActions
-                    onApprove={onApprove}
-                    onDismiss={onDismiss}
-                    approving={approvingId === item.id}
-                    dismissing={dismissingId === item.id}
-                    locale={locale}
-                    emptyDateLabel={emptyDateLabel}
-                    language={uiLanguage}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
-          {priority.length > 0 ? (
-            <div>
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">{priorityTitle}</h3>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {priority.map((item) => (
-                  <InsightRow
-                    key={`priority-${item.id}`}
-                    item={item}
-                    scoreLabel={scoreLabel}
-                    viewLeadLabel={viewLeadLabel}
-                    suggestedDateLabel={suggestedDateLabel}
-                    approveLabel={approveLabel}
-                    dismissLabel={dismissLabel}
-                    showActions={item.status === 'pending'}
-                    onApprove={onApprove}
-                    onDismiss={onDismiss}
-                    approving={approvingId === item.id}
-                    dismissing={dismissingId === item.id}
-                    locale={locale}
-                    emptyDateLabel={emptyDateLabel}
-                    language={uiLanguage}
-                  />
-                ))}
-              </div>
-            </div>
-          ) : null}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">{priorityTitle}</h3>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {priority.map((item) => (
+              <InsightRow
+                key={`priority-${item.id}`}
+                item={item}
+                scoreLabel={scoreLabel}
+                viewLeadLabel={viewLeadLabel}
+                language={uiLanguage}
+              />
+            ))}
+          </div>
         </div>
       )}
     </div>

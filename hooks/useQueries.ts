@@ -48,11 +48,15 @@ import {
   getAIInsightsDashboardAPI,
   getAIManagementReportAPI,
   generateAIManagementReportAPI,
+  getEmployeeReportAPI,
+  getTeamsReportAPI,
+  getMarketingReportAPI,
+  getCallReportAPI,
   approveAIInsightAPI,
   dismissAIInsightAPI,
   runAIAnalysisAPI,
 } from '../services/api';
-import type { MissionBarSummary } from '../services/api';
+import type { MissionBarSummary, ReportQueryParams, CallReportResponse } from '../services/api';
 
 // ==================== Query Keys ====================
 export const queryKeys = {
@@ -62,6 +66,10 @@ export const queryKeys = {
   leads: (filters?: LeadApiFilters, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
   leadStatusCounts: (filters?: LeadApiFilters) => ['leadStatusCounts', filters] as const,
   missionBarSummary: ['missionBarSummary'] as const,
+  employeeReport: (params?: ReportQueryParams) => ['employeeReport', params] as const,
+  teamsReport: (params?: ReportQueryParams) => ['teamsReport', params] as const,
+  marketingReport: (params?: ReportQueryParams) => ['marketingReport', params] as const,
+  callReport: (params?: ReportQueryParams) => ['callReport', params] as const,
   deals: (page?: number, pageSize?: number) => ['deals', page ?? 'all', pageSize ?? 'default'] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
@@ -487,6 +495,54 @@ export const useStatuses = (options?: Omit<UseQueryOptions<any, Error>, 'queryKe
     queryKey: queryKeys.statuses,
     queryFn: () => getStatusesAPI(),
     staleTime: 5 * 60 * 1000, // 5 minutes
+    ...options,
+  });
+};
+
+export const useEmployeeReport = (
+  params?: ReportQueryParams,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.employeeReport(params),
+    queryFn: () => getEmployeeReportAPI(params),
+    staleTime: 60 * 1000,
+    ...options,
+  });
+};
+
+export const useTeamsReport = (
+  params?: ReportQueryParams,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.teamsReport(params),
+    queryFn: () => getTeamsReportAPI(params),
+    staleTime: 60 * 1000,
+    ...options,
+  });
+};
+
+export const useMarketingReport = (
+  params?: ReportQueryParams,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.marketingReport(params),
+    queryFn: () => getMarketingReportAPI(params),
+    staleTime: 60 * 1000,
+    ...options,
+  });
+};
+
+export const useCallReport = (
+  params?: ReportQueryParams,
+  options?: Omit<UseQueryOptions<CallReportResponse, Error>, 'queryKey' | 'queryFn'>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.callReport(params),
+    queryFn: () => getCallReportAPI(params),
+    staleTime: 60 * 1000,
     ...options,
   });
 };

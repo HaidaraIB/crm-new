@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
 import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal, LegalLinks } from '../components/index';
-import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI, type CreatePaymentSessionResult } from '../services/api';
+import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI, updateUserAPI, type CreatePaymentSessionResult } from '../services/api';
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDaysRemainingLabel } from '../utils/planEntitlements';
@@ -64,6 +64,15 @@ export const ProfilePage = () => {
     const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [saveError, setSaveError] = useState<string>('');
+    const [loginTwoFactorEnabled, setLoginTwoFactorEnabled] = useState(true);
+    const [isUpdatingTwoFactor, setIsUpdatingTwoFactor] = useState(false);
+    const [twoFactorFeedback, setTwoFactorFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+    const isCompanyOwner = Boolean(
+        currentUser?.is_company_owner ??
+        currentUser?.isCompanyOwner ??
+        normalizeRole(currentUser?.role) === 'Owner'
+    );
 
     const isFibSessionPayload = (response: any) =>
         response?.payment_id != null &&
@@ -166,10 +175,56 @@ export const ProfilePage = () => {
             setEmail(currentUser.email || '');
             setPhone(currentUser.phone || '');
             setProfilePhotoPreview(currentUser.profile_photo || currentUser.avatar || '');
+            setLoginTwoFactorEnabled(
+                currentUser.login_two_factor_enabled ??
+                currentUser.loginTwoFactorEnabled ??
+                true
+            );
         }
     }, [currentUser]);
 
     if (!currentUser) return null;
+
+    const handleLoginTwoFactorToggle = async (enabled: boolean) => {
+        const baseUser = contextCurrentUser || currentUserData;
+        if (!baseUser?.id || !isCompanyOwner) return;
+
+        const previous = loginTwoFactorEnabled;
+        setLoginTwoFactorEnabled(enabled);
+        setIsUpdatingTwoFactor(true);
+        setSaveError('');
+        setTwoFactorFeedback(null);
+
+        try {
+            const response = await updateUserAPI(baseUser.id, { login_two_factor_enabled: enabled });
+            const updatedUser = normalizeUser({
+                ...baseUser,
+                ...response,
+                login_two_factor_enabled: enabled,
+                loginTwoFactorEnabled: enabled,
+                company:
+                    response?.company && typeof response.company === 'object'
+                        ? response.company
+                        : baseUser.company,
+            });
+            setCurrentUser(updatedUser);
+            queryClient.setQueryData(queryKeys.currentUser, updatedUser);
+            setTwoFactorFeedback({
+                type: 'success',
+                message: enabled
+                    ? (t('loginTwoFactorEnabledSuccess') || 'Two-factor authentication enabled for your account.')
+                    : (t('loginTwoFactorDisabledSuccess') || 'Two-factor authentication disabled for your account.'),
+            });
+        } catch (error: any) {
+            setLoginTwoFactorEnabled(previous);
+            setTwoFactorFeedback({
+                type: 'error',
+                message: error?.message || t('loginTwoFactorUpdateFailed') || 'Failed to update two-factor authentication setting.',
+            });
+        } finally {
+            setIsUpdatingTwoFactor(false);
+        }
+    };
 
     const handleSave = async () => {
         if (!currentUser?.id) return;
@@ -451,9 +506,52 @@ export const ProfilePage = () => {
 
                 <Card>
                     <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('security')}</h2>
-                    <Button onClick={() => setIsChangePasswordModalOpen(true)}>
-                        {t('changePassword')}
-                    </Button>
+                    <div className="space-y-4">
+                        {isCompanyOwner && (
+                            <div className="space-y-2">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div>
+                                        <p className="text-sm font-medium text-gray-800 dark:text-gray-200">
+                                            {t('loginTwoFactorSettingTitle')}
+                                        </p>
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                            {t('loginTwoFactorSettingHint')}
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        role="switch"
+                                        aria-checked={loginTwoFactorEnabled}
+                                        disabled={isUpdatingTwoFactor}
+                                        onClick={() => handleLoginTwoFactorToggle(!loginTwoFactorEnabled)}
+                                        className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-60 ${
+                                            loginTwoFactorEnabled ? 'bg-primary-600' : 'bg-gray-200 dark:bg-gray-700'
+                                        }`}
+                                    >
+                                        <span
+                                            className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                                                loginTwoFactorEnabled
+                                                    ? (isRTL ? '-translate-x-5' : 'translate-x-5')
+                                                    : 'translate-x-0.5'
+                                            }`}
+                                        />
+                                    </button>
+                                </div>
+                                {twoFactorFeedback && (
+                                    <p className={`text-xs ${
+                                        twoFactorFeedback.type === 'success'
+                                            ? 'text-green-600 dark:text-green-400'
+                                            : 'text-red-600 dark:text-red-400'
+                                    }`}>
+                                        {twoFactorFeedback.message}
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                        <Button onClick={() => setIsChangePasswordModalOpen(true)}>
+                            {t('changePassword')}
+                        </Button>
+                    </div>
                 </Card>
 
                 {subscriptionInfo && normalizeRole(currentUser?.role) === 'Owner' && (

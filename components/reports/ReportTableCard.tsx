@@ -1,7 +1,13 @@
 import React from 'react';
 import { dashboardSurface } from '../dashboard/dashboardStyles';
 import { TableHorizontalScroll } from '../TableHorizontalScroll';
-import { reportTableChrome, reportTheadRow, reportTableRowInteractive, reportTbodyCell } from './reportStyles';
+import {
+  reportTableChrome,
+  reportTheadRow,
+  reportTheadCell,
+  reportTableRowInteractive,
+  reportTbodyCell,
+} from './reportStyles';
 
 type ReportTableCardProps = {
   title: string;
@@ -24,7 +30,9 @@ export const ReportTableCard = ({ title, children, empty, emptyMessage, minWidth
     ) : (
       <TableHorizontalScroll scrollClassName={`${reportTableChrome} py-2 px-1`}>
         <div style={{ minWidth }}>
-          <table className="w-full text-sm text-center rtl:text-right text-gray-600 dark:text-gray-400">{children}</table>
+          <table className="w-full text-sm text-center text-gray-600 dark:text-gray-400 [&_th]:text-center [&_td]:text-center">
+            {children}
+          </table>
         </div>
       </TableHorizontalScroll>
     )}
@@ -34,6 +42,7 @@ export const ReportTableCard = ({ title, children, empty, emptyMessage, minWidth
 /** Table shell pieces for use inside ReportTableCard children */
 export const ReportTableDefaults = {
   theadRow: reportTheadRow,
+  theadCell: reportTheadCell,
   tbodyRow: reportTableRowInteractive,
   tbodyCell: reportTbodyCell,
 };

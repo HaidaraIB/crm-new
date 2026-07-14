@@ -1983,6 +1983,128 @@ export const getMissionBarSummaryAPI = async () => {
   return apiRequest<MissionBarSummary>('/clients/mission-bar-summary/');
 };
 
+export type ReportQueryParams = {
+  from?: string;
+  to?: string;
+  lead_type?: string;
+  user_id?: number | string;
+  campaign_id?: number | string;
+};
+
+export type EmployeeReportSummary = {
+  total_calls: number;
+  answered_calls: number;
+  not_answered_calls: number;
+  employee_count: number;
+};
+
+export type TeamReportSummary = EmployeeReportSummary & {
+  total_teams: number;
+  total_leads: number;
+  total_activities: number;
+  total_deals: number;
+};
+
+export type MarketingReportSummary = {
+  total_campaigns: number;
+  total_budget: number;
+  total_leads: number;
+  avg_conversion_rate: string;
+};
+
+function buildReportQuery(params?: ReportQueryParams): string {
+  const search = new URLSearchParams();
+  if (params?.from) search.set('from', params.from);
+  if (params?.to) search.set('to', params.to);
+  if (params?.lead_type && params.lead_type !== 'all') search.set('lead_type', params.lead_type);
+  if (params?.user_id && params.user_id !== 'all') search.set('user_id', String(params.user_id));
+  if (params?.campaign_id && params.campaign_id !== 'all') {
+    search.set('campaign_id', String(params.campaign_id));
+  }
+  const query = search.toString();
+  return query ? `?${query}` : '';
+}
+
+export const getEmployeeReportAPI = async (params?: ReportQueryParams) => {
+  return apiRequest<{ rows: any[]; summary: EmployeeReportSummary }>(
+    `/reports/employees/${buildReportQuery(params)}`,
+  );
+};
+
+export const getTeamsReportAPI = async (params?: ReportQueryParams) => {
+  return apiRequest<{ rows: any[]; summary: TeamReportSummary }>(
+    `/reports/teams/${buildReportQuery(params)}`,
+  );
+};
+
+export const getMarketingReportAPI = async (params?: ReportQueryParams) => {
+  return apiRequest<{ rows: any[]; summary: MarketingReportSummary }>(
+    `/reports/marketing/${buildReportQuery(params)}`,
+  );
+};
+
+export type CallReportResponse = {
+  crm: {
+    summary: {
+      total: number;
+      manual: number;
+      pbx_linked: number;
+      answered: number;
+      missed: number;
+      unknown: number;
+    };
+    by_user: Array<{
+      id: number | null;
+      name: string;
+      total: number;
+      answered: number;
+      missed: number;
+      manual: number;
+      pbx_linked: number;
+    }>;
+    by_method: Array<{
+      name: string;
+      total: number;
+      answered: number;
+      missed: number;
+    }>;
+  };
+  pbx: {
+    enabled: boolean;
+    summary: {
+      total: number;
+      inbound: number;
+      outbound: number;
+      answered: number;
+      missed: number;
+      avg_duration_sec: number;
+    } | null;
+    agents: Array<{
+      extension: string;
+      user_id: number | null;
+      username: string | null;
+      total: number;
+      answered: number;
+      missed: number;
+      avg_duration_sec: number;
+    }>;
+  };
+  combined: {
+    summary: {
+      total: number;
+      answered: number;
+      missed: number;
+      manual: number;
+      pbx_cdr_unlinked: number;
+      avg_duration_sec: number;
+    };
+  };
+};
+
+export const getCallReportAPI = async (params?: ReportQueryParams) => {
+  return apiRequest<CallReportResponse>(`/reports/calls/${buildReportQuery(params)}`);
+};
+
 /**
  * إنشاء Client جديد (Lead)
  * POST /api/clients/

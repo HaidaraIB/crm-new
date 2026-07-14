@@ -6,7 +6,7 @@ import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionL
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useAIManagementReport, useGenerateAIManagementReport, useApproveAIInsight, useDismissAIInsight, useMissionBarSummary, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
+import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useAIManagementReport, useGenerateAIManagementReport, useMissionBarSummary, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
 import { useDashboardDerivedMetrics } from '../hooks/useDashboardDerivedMetrics';
 import { presetTodosFromMissionBar, todayDateInputValue } from '../utils/missionBarNavigation';
 import { getCompanyViewLeadRoute } from '../utils/routing';
@@ -121,11 +121,6 @@ export const DashboardPage = () => {
     const showManagementReport = isAdmin && !!aiInsightsData?.ai_enabled;
     const { data: managementReport, isLoading: managementReportLoading } = useAIManagementReport(showManagementReport);
     const generateManagementReport = useGenerateAIManagementReport();
-    const approveAI = useApproveAIInsight(language);
-    const dismissAI = useDismissAIInsight();
-    const [aiActionId, setAiActionId] = useState<number | null>(null);
-    const [aiActionType, setAiActionType] = useState<'approve' | 'dismiss' | null>(null);
-
     const isDashboardLoading =
         isLeadsLoading ||
         isDealsLoading ||
@@ -620,7 +615,7 @@ export const DashboardPage = () => {
         ];
     }, [clientTasks, deals, leads, t]);
 
-    const mapAIInsight = (item: (typeof aiInsightsData)['pending'][0]) => {
+    const mapAIInsight = (item: (typeof aiInsightsData)['priority'][0]) => {
         const lead = leads.find((l: any) => l.id === item.client_id);
         return {
             ...item,
@@ -630,10 +625,6 @@ export const DashboardPage = () => {
         };
     };
 
-    const aiPendingItems = useMemo(
-        () => (aiInsightsData?.pending || []).map(mapAIInsight),
-        [aiInsightsData?.pending, leads, openViewLead],
-    );
     const aiPriorityItems = useMemo(
         () => (aiInsightsData?.priority || []).map(mapAIInsight),
         [aiInsightsData?.priority, leads, openViewLead],
@@ -1049,48 +1040,11 @@ export const DashboardPage = () => {
                         <AIInsightsCard
                             title={t('aiInsights')}
                             poweredByLabel={t('aiInsightsPoweredBy')}
-                            pendingTitle={t('aiPendingApproval')}
                             priorityTitle={t('aiPriorityLeads')}
                             scoreLabel={t('aiScore')}
                             emptyLabel={t('aiNoInsights')}
                             viewLeadLabel={t('viewLead')}
-                            approveLabel={t('aiApproveReminder')}
-                            dismissLabel={t('aiDismiss')}
-                            suggestedDateLabel={t('aiSuggestedDate')}
-                            pending={aiPendingItems}
                             priority={aiPriorityItems}
-                            onApprove={(id) => {
-                                setAiActionId(id);
-                                setAiActionType('approve');
-                                approveAI.mutate(id, {
-                                    onError: () => {
-                                        setAlertMessage(t('failedToApproveAIInsight'));
-                                        setAlertVariant('error');
-                                        setIsAlertModalOpen(true);
-                                    },
-                                    onSettled: () => {
-                                        setAiActionId(null);
-                                        setAiActionType(null);
-                                    },
-                                });
-                            }}
-                            onDismiss={(id) => {
-                                setAiActionId(id);
-                                setAiActionType('dismiss');
-                                dismissAI.mutate(id, {
-                                    onError: () => {
-                                        setAlertMessage(t('failedToDismissAIInsight'));
-                                        setAlertVariant('error');
-                                        setIsAlertModalOpen(true);
-                                    },
-                                    onSettled: () => {
-                                        setAiActionId(null);
-                                        setAiActionType(null);
-                                    },
-                                });
-                            }}
-                            approvingId={aiActionType === 'approve' ? aiActionId : null}
-                            dismissingId={aiActionType === 'dismiss' ? aiActionId : null}
                         />
                     ) : null}
                     {showManagementReport ? (

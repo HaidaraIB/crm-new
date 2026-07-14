@@ -66,6 +66,12 @@ export const normalizeUser = (userData: any): User => {
           ? null
           : Number(userData.weekly_day_off)
         : undefined,
+    is_company_owner: userData.is_company_owner ?? userData.isCompanyOwner,
+    isCompanyOwner: userData.is_company_owner ?? userData.isCompanyOwner,
+    login_two_factor_enabled:
+      userData.login_two_factor_enabled ?? userData.loginTwoFactorEnabled ?? true,
+    loginTwoFactorEnabled:
+      userData.login_two_factor_enabled ?? userData.loginTwoFactorEnabled ?? true,
   };
 };
 

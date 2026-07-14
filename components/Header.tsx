@@ -9,6 +9,7 @@ import { Dropdown, DropdownItem } from './Dropdown';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { getTenantChatConversationsAPI } from '../services/api';
 import { useNotificationsUnreadCount } from './NotificationsDialog';
+import { useCurrentUser } from '../hooks/useQueries';
 
 type HeaderProps = {
     isInternetOnline: boolean;
@@ -16,9 +17,11 @@ type HeaderProps = {
 
 export const Header = ({ isInternetOnline }: HeaderProps) => {
     const { t, theme, setTheme, language, setLanguage, setIsSidebarOpen, currentUser, setCurrentPage, setIsChangePasswordModalOpen, setIsLoggedIn, canAccessPage, isTeamChatDialogOpen, setIsTeamChatDialogOpen, isNotificationsDialogOpen, setIsNotificationsDialogOpen } = useAppContext();
+    const { data: queryUser } = useCurrentUser();
+    const effectiveUser = currentUser || queryUser || null;
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
-    const teamChatEnabled = Boolean(currentUser && canAccessPage('Team Chat'));
+    const teamChatEnabled = Boolean(effectiveUser && canAccessPage('Team Chat'));
     const tenantChatUnreadQuery = useQuery({
         queryKey: ['tenant-chat-conversations'],
         queryFn: () => getTenantChatConversationsAPI(),
@@ -34,10 +37,10 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
         [tenantChatUnreadQuery.data]
     );
 
-    const notificationsUnreadQuery = useNotificationsUnreadCount(Boolean(currentUser));
+    const notificationsUnreadQuery = useNotificationsUnreadCount(Boolean(effectiveUser));
     const notificationsUnreadTotal = notificationsUnreadQuery.data ?? 0;
 
-    if (!currentUser) return null;
+    if (!effectiveUser) return null;
 
     return (
         <header className="sticky top-0 z-20 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-800 p-2 sm:p-4 flex justify-between items-center min-h-16">
@@ -125,15 +128,15 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                 <Dropdown
                     trigger={
                         <button className={`flex items-center ${language === 'ar' ? 'space-x-reverse' : ''} gap-2 cursor-pointer`}>
-                            <img src={currentUser.avatar} alt={currentUser.name} className="h-8 w-8 rounded-full object-cover" />
-                            <span className="hidden md:inline text-sm font-medium text-gray-900 dark:text-gray-100">{currentUser.name}</span>
+                            <img src={effectiveUser.avatar} alt={effectiveUser.name} className="h-8 w-8 rounded-full object-cover" />
+                            <span className="hidden md:inline text-sm font-medium text-gray-900 dark:text-gray-100">{effectiveUser.name}</span>
                             <ChevronDownIcon className="w-4 h-4 text-gray-500 dark:text-gray-400" />
                         </button>
                     }
                 >
                     <DropdownItem onClick={() => {
                         setCurrentPage('Profile');
-                        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Profile');
+                        navigateToCompanyRoute(effectiveUser?.company?.name, effectiveUser?.company?.domain, 'Profile');
                     }}>
                         {t('profile')}
                     </DropdownItem>

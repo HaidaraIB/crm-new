@@ -18,14 +18,13 @@ type ReportSummaryTileProps = {
 };
 
 export const ReportSummaryTile = ({ title, value, icon, accent = 'indigo' }: ReportSummaryTileProps) => (
-  <div className={`${dashboardSurface} p-5 sm:p-6 hover:shadow-2xl hover:shadow-primary-500/10 dark:hover:ring-primary-500/20 transition-all duration-300`}>
-    <div className="flex items-start justify-between gap-4">
-      <div className="min-w-0">
-        <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">{title}</p>
-        <p className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-gray-50 mt-2 tracking-tight tabular-nums">
-          {value}
-        </p>
-      </div>
+  <div
+    className={`${dashboardSurface} h-full p-5 sm:p-6 flex flex-col hover:shadow-2xl hover:shadow-primary-500/10 dark:hover:ring-primary-500/20 transition-all duration-300`}
+  >
+    <div className="flex items-start justify-between gap-3">
+      <p className="flex-1 min-w-0 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 leading-snug line-clamp-3 min-h-[3.75rem]">
+        {title}
+      </p>
       {icon ? (
         <div
           className={`flex-shrink-0 w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-gradient-to-br ${TILE_BLOBS[accent]} text-white shadow-lg shadow-black/15 flex items-center justify-center`}
@@ -34,5 +33,8 @@ export const ReportSummaryTile = ({ title, value, icon, accent = 'indigo' }: Rep
         </div>
       ) : null}
     </div>
+    <p className="text-3xl sm:text-4xl font-extrabold text-gray-900 dark:text-gray-50 mt-3 tracking-tight tabular-nums leading-none">
+      {value}
+    </p>
   </div>
 );

@@ -3417,7 +3417,28 @@ export interface PbxExtensionRow {
 }
 
 export const getPbxSettingsAPI = async (): Promise<PbxSettingsResponse> => {
-  return apiRequest<PbxSettingsResponse>('/integrations/pbx/settings/');
+  try {
+    return await apiRequest<PbxSettingsResponse>('/integrations/pbx/settings/');
+  } catch (error: any) {
+    // Older APIs returned 403 when PBX was off-plan; treat as disabled for feature probes.
+    const code = error?.code || error?.data?.error?.code;
+    if (
+      code === 'plan_integration_not_included' ||
+      code === 'integration_disabled' ||
+      (typeof error?.message === 'string' &&
+        (error.message.toLowerCase().includes('not included in your current plan') ||
+          error.message.toLowerCase().includes('disabled by the administrator') ||
+          error.message.toLowerCase().includes('disabled for your company')))
+    ) {
+      return {
+        is_enabled: false,
+        softphone_enabled: false,
+        screen_pop_enabled: false,
+        auto_log_calls: false,
+      };
+    }
+    throw error;
+  }
 };
 
 export const updatePbxSettingsAPI = async (data: {
@@ -3449,7 +3470,22 @@ export const rotatePbxConnectorKeyAPI = async (): Promise<{ connector_api_key: s
 };
 
 export const getPbxExtensionsAPI = async (): Promise<PbxExtensionRow[]> => {
-  return apiRequest<PbxExtensionRow[]>('/integrations/pbx/extensions/');
+  try {
+    return await apiRequest<PbxExtensionRow[]>('/integrations/pbx/extensions/');
+  } catch (error: any) {
+    const code = error?.code || error?.data?.error?.code;
+    if (
+      code === 'plan_integration_not_included' ||
+      code === 'integration_disabled' ||
+      (typeof error?.message === 'string' &&
+        (error.message.toLowerCase().includes('not included in your current plan') ||
+          error.message.toLowerCase().includes('disabled by the administrator') ||
+          error.message.toLowerCase().includes('disabled for your company')))
+    ) {
+      return [];
+    }
+    throw error;
+  }
 };
 
 export const savePbxExtensionAPI = async (data: {

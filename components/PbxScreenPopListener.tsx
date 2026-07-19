@@ -14,6 +14,7 @@ export const PbxScreenPopListener = () => {
     queryKey: ['pbxSettings', 'screen-pop'],
     queryFn: getPbxSettingsAPI,
     staleTime: 60_000,
+    retry: false,
   });
   const screenPopActive =
     !!pbxSettings?.is_enabled && pbxSettings.screen_pop_enabled !== false;

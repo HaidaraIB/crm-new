@@ -10,6 +10,8 @@ export function usePbxDialEnabled(): boolean {
   const { data: pbxSettings } = useQuery({
     queryKey: ['pbxSettings'],
     queryFn: getPbxSettingsAPI,
+    staleTime: 60_000,
+    retry: false,
   });
   const pbxEnabled = !!pbxSettings?.is_enabled;
 
@@ -18,6 +20,7 @@ export function usePbxDialEnabled(): boolean {
     queryFn: getPbxExtensionsAPI,
     enabled: pbxEnabled && userId != null,
     staleTime: 60_000,
+    retry: false,
   });
 
   if (!pbxEnabled || userId == null) return false;

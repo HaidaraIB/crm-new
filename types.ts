@@ -77,7 +77,7 @@ export interface SupervisorPermissionPayload {
 
 export interface Supervisor {
   id: number;
-  user: { id: number; username: string; email: string; first_name: string; last_name: string; phone?: string; is_active?: boolean };
+  user: { id: number; username: string; email: string; first_name: string; last_name: string; phone?: string; is_active?: boolean; can_delete_clients?: boolean };
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -90,6 +90,8 @@ export interface Supervisor {
   can_manage_services: boolean;
   can_manage_real_estate: boolean;
   can_manage_settings: boolean;
+  /** Stored on User; grantable by company owner */
+  can_delete_clients?: boolean;
 }
 
 export interface User {
@@ -116,6 +118,8 @@ export interface User {
   /** 0=Mon .. 6=Sun; null/undefined = no fixed weekly day off */
   weekly_day_off?: number | null;
   is_active?: boolean;
+  /** When true, employee/supervisor may delete customers (clients) */
+  can_delete_clients?: boolean;
 }
 
 export interface TimelineEntry {

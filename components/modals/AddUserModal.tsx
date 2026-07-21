@@ -40,6 +40,7 @@ export const AddUserModal = () => {
         phone: '',
         role: 'employee',
         weeklyDayOff: '' as string,
+        canDeleteClients: false,
     });
 
     useEffect(() => {
@@ -171,6 +172,9 @@ export const AddUserModal = () => {
                 userData.weekly_day_off =
                     formData.weeklyDayOff === '' ? null : parseInt(formData.weeklyDayOff, 10);
             }
+            if (formData.role === 'employee' || formData.role === 'doctor') {
+                userData.can_delete_clients = formData.canDeleteClients;
+            }
 
             await createUserMutation.mutateAsync(userData);
 
@@ -183,6 +187,7 @@ export const AddUserModal = () => {
                 phone: '',
                 role: defaultStaffRole,
                 weeklyDayOff: '',
+                canDeleteClients: false,
             });
             setErrors({});
             
@@ -241,9 +246,9 @@ export const AddUserModal = () => {
         }
     };
 
-    const handleChange = (field: string, value: string) => {
+    const handleChange = (field: string, value: string | boolean) => {
         setFormData(prev => ({ ...prev, [field]: value }));
-        if (errors[field]) {
+        if (typeof value !== 'boolean' && errors[field]) {
             setErrors(prev => {
                 const newErrors = { ...prev };
                 delete newErrors[field];
@@ -252,19 +257,24 @@ export const AddUserModal = () => {
         }
     };
 
+    const resetForm = () => {
+        setFormData({
+            name: '',
+            username: '',
+            email: '',
+            password: '',
+            phone: '',
+            role: defaultStaffRole,
+            weeklyDayOff: '',
+            canDeleteClients: false,
+        });
+        setErrors({});
+    };
+
     return (
         <Modal isOpen={isAddUserModalOpen} onClose={() => {
             setIsAddUserModalOpen(false);
-            setFormData({
-                name: '',
-                username: '',
-                email: '',
-                password: '',
-                phone: '',
-                role: defaultStaffRole,
-                weeklyDayOff: '',
-            });
-            setErrors({});
+            resetForm();
         }} title={t('createEmployee')}>
             <div className="space-y-4">
                 {errors._general && (
@@ -372,21 +382,29 @@ export const AddUserModal = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
                     </div>
                 )}
+                {(formData.role === 'employee' || formData.role === 'doctor') && (
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="add-user-can-delete-clients"
+                                type="checkbox"
+                                checked={formData.canDeleteClients}
+                                onChange={(e) => handleChange('canDeleteClients', e.target.checked)}
+                                className="rounded"
+                            />
+                            <label htmlFor="add-user-can-delete-clients" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {t('canDeleteClients')}
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('canDeleteClientsHelp')}</p>
+                    </div>
+                )}
                 <div className="flex justify-end gap-2 pt-2">
                     <Button 
                         variant="secondary" 
                         onClick={() => {
                             setIsAddUserModalOpen(false);
-                            setFormData({
-                                name: '',
-                                username: '',
-                                email: '',
-                                password: '',
-                                phone: '',
-                                role: defaultStaffRole,
-                                weeklyDayOff: '',
-                            });
-                            setErrors({});
+                            resetForm();
                             setSuccessMessage('');
                         }}
                         disabled={isLoading}

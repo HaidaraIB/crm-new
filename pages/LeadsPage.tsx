@@ -470,8 +470,15 @@ export const LeadsPage = () => {
     const canDeleteLead = (lead: Lead) => {
         const currentRole = normalizeRole(currentUser?.role);
         const isAdmin = currentRole === 'Owner';
-        const isSupervisorWithLeads = currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_leads');
-        const isAssignedEmployee = lead.assignedTo === currentUser?.id;
+        const canDelete = Boolean(currentUser?.can_delete_clients);
+        const isSupervisorWithLeads =
+            currentRole === 'Supervisor' &&
+            hasSupervisorPermission('can_manage_leads') &&
+            canDelete;
+        const isAssignedEmployee =
+            canDelete &&
+            (currentRole === 'Employee' || currentRole === 'Doctor') &&
+            lead.assignedTo === currentUser?.id;
         return isAdmin || isSupervisorWithLeads || isAssignedEmployee;
     };
 

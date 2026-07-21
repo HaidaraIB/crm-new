@@ -1865,6 +1865,7 @@ export const createSupervisorAPI = async (data: {
   can_manage_services?: boolean;
   can_manage_real_estate?: boolean;
   can_manage_settings?: boolean;
+  can_delete_clients?: boolean;
 }) => {
   return apiRequest<any>('/supervisors/', {
     method: 'POST',
@@ -1885,6 +1886,7 @@ export const updateSupervisorAPI = async (id: number, data: Partial<{
   can_manage_services: boolean;
   can_manage_real_estate: boolean;
   can_manage_settings: boolean;
+  can_delete_clients: boolean;
 }>) => {
   return apiRequest<any>(`/supervisors/${id}/`, {
     method: 'PATCH',

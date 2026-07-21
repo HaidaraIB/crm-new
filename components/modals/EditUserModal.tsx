@@ -41,6 +41,7 @@ export const EditUserModal = () => {
         password: '',
         role: 'employee' as string,
         weeklyDayOff: '' as string,
+        canDeleteClients: false,
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [passwordVisible, setPasswordVisible] = useState(false);
@@ -89,6 +90,7 @@ export const EditUserModal = () => {
                 role: roleForForm,
                 weeklyDayOff:
                     wdo !== undefined && wdo !== null ? String(wdo) : '',
+                canDeleteClients: Boolean(selectedUser.can_delete_clients),
             });
             setPasswordVisible(false);
         }
@@ -190,6 +192,7 @@ export const EditUserModal = () => {
             password: '',
             role: isMedicalCompany ? 'doctor' : 'employee',
             weeklyDayOff: '',
+            canDeleteClients: false,
         });
         setErrors({});
         setPasswordVisible(false);
@@ -233,6 +236,9 @@ export const EditUserModal = () => {
             ) {
                 payload.weekly_day_off =
                     formState.weeklyDayOff === '' ? null : parseInt(formState.weeklyDayOff, 10);
+            }
+            if (roleToSend === 'employee' || roleToSend === 'doctor') {
+                payload.can_delete_clients = formState.canDeleteClients;
             }
 
             await updateUserMutation.mutateAsync({
@@ -397,6 +403,29 @@ export const EditUserModal = () => {
                             <option value="6">{t('dayOffSunday')}</option>
                         </Select>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
+                    </div>
+                )}
+                {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
+                    (formState.role === 'employee' || formState.role === 'doctor') && (
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="edit-user-canDeleteClients"
+                                type="checkbox"
+                                checked={formState.canDeleteClients}
+                                onChange={(e) =>
+                                    setFormState((prev) => ({ ...prev, canDeleteClients: e.target.checked }))
+                                }
+                                className="rounded"
+                            />
+                            <label
+                                htmlFor="edit-user-canDeleteClients"
+                                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
+                                {t('canDeleteClients')}
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('canDeleteClientsHelp')}</p>
                     </div>
                 )}
                 <div className="flex justify-end gap-2">

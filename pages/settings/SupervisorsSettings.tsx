@@ -95,6 +95,7 @@ export const SupervisorsSettings = () => {
             can_manage_services: data.can_manage_services,
             can_manage_real_estate: data.can_manage_real_estate,
             can_manage_settings: data.can_manage_settings,
+            can_delete_clients: data.can_delete_clients,
           }),
         ]);
       } else {
@@ -115,6 +116,7 @@ export const SupervisorsSettings = () => {
           can_manage_services: data.can_manage_services,
           can_manage_real_estate: data.can_manage_real_estate,
           can_manage_settings: data.can_manage_settings,
+          can_delete_clients: data.can_delete_clients,
           });
       }
       await loadSupervisors();
@@ -284,7 +286,13 @@ export const SupervisorsSettings = () => {
                           {permissionLabels[k]}
                         </span>
                       ))}
-                      {permKeys.filter((k) => (s as any)[k]).length === 0 && (
+                      {(s.can_delete_clients || s.user?.can_delete_clients) && (
+                        <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300 rounded">
+                          {t('canDeleteClients')}
+                        </span>
+                      )}
+                      {permKeys.filter((k) => (s as any)[k]).length === 0 &&
+                        !(s.can_delete_clients || s.user?.can_delete_clients) && (
                         <span className="text-xs text-gray-400">{t('supervisorsNoPermissions')}</span>
                       )}
                     </div>

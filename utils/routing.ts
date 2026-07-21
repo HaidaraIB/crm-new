@@ -67,10 +67,17 @@ export const isOnSubdomain = (): boolean => {
 };
 
 /**
- * Convert page name to URL path segment (e.g. "All Leads" -> "all-leads")
+ * Convert page name to URL path segment.
+ * Examples: "All Leads" -> "all-leads", "CreateLead" -> "create-lead"
  */
 const pageToPathSegment = (page: string): string => {
-  return page.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  return page
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .toLowerCase()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
 };
 
 /** Sanitize to subdomain-like slug (lowercase, hyphens, no spaces/special chars) */

@@ -12,7 +12,9 @@ export type TimelineEventFormatContext = {
 const EDIT_NOTE_FIELD_KEYS: Record<string, keyof typeof translations.en> = {
     budget: 'timelineFieldBudgetUpdated',
     'budget max': 'timelineFieldBudgetMaxUpdated',
+    budget_max: 'timelineFieldBudgetMaxUpdated',
     'communication way': 'timelineFieldCommunicationWayUpdated',
+    communication_way: 'timelineFieldCommunicationWayUpdated',
     name: 'timelineFieldNameUpdated',
     priority: 'timelineFieldPriorityUpdated',
     type: 'timelineFieldTypeUpdated',
@@ -20,9 +22,13 @@ const EDIT_NOTE_FIELD_KEYS: Record<string, keyof typeof translations.en> = {
     profession: 'timelineFieldProfessionUpdated',
     residence: 'timelineFieldResidenceUpdated',
     'lead company name': 'timelineFieldLeadCompanyNameUpdated',
+    lead_company_name: 'timelineFieldLeadCompanyNameUpdated',
     'interested developer': 'timelineFieldInterestedDeveloperUpdated',
+    interested_developer: 'timelineFieldInterestedDeveloperUpdated',
     'interested project': 'timelineFieldInterestedProjectUpdated',
+    interested_project: 'timelineFieldInterestedProjectUpdated',
     'interested unit': 'timelineFieldInterestedUnitUpdated',
+    interested_unit: 'timelineFieldInterestedUnitUpdated',
 };
 
 const EVENT_TYPE_ACTION_KEYS: Record<string, keyof typeof translations.en> = {
@@ -93,7 +99,17 @@ export function timelineEventActorFallback(
 
 export function parseEditFieldKeyFromNotes(notes: string | null | undefined): keyof typeof translations.en | null {
     if (!notes) return null;
-    const match = notes.match(/^(.+?)\s+updated$/i);
+    const trimmed = notes.trim();
+
+    // New machine keys: field_updated:communication_way
+    const keyMatch = trimmed.match(/^field_updated:([a-z0-9_]+)$/i);
+    if (keyMatch) {
+        const slug = normalizeToken(keyMatch[1]);
+        return EDIT_NOTE_FIELD_KEYS[slug] ?? EDIT_NOTE_FIELD_KEYS[slug.replace(/_/g, ' ')] ?? null;
+    }
+
+    // Legacy English prose: "Communication way updated"
+    const match = trimmed.match(/^(.+?)\s+updated$/i);
     if (!match) return null;
     const slug = normalizeToken(match[1].replace(/_/g, ' '));
     return EDIT_NOTE_FIELD_KEYS[slug] ?? null;

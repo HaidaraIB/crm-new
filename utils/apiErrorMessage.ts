@@ -8,6 +8,7 @@ const API_ERROR_CODE_TO_KEY: Partial<Record<string, TranslationKey>> = {
   auto_assign_disabled: 'errorAutoAssignDisabled',
   no_employees: 'errorNoActiveEmployees',
   employee_weekly_day_off: 'errorEmployeeWeeklyDayOff',
+  cannot_delete_clients: 'cannot_delete_clients',
   no_extension: 'errorPbxNoExtension',
   pbx_not_enabled: 'errorPbxNotEnabled',
   pbx_no_phone: 'errorPbxNoPhoneNumber',
@@ -16,6 +17,8 @@ const API_ERROR_CODE_TO_KEY: Partial<Record<string, TranslationKey>> = {
 };
 
 const API_ERROR_MESSAGE_TO_KEY: Partial<Record<string, TranslationKey>> = {
+  'You do not have permission to delete customers.': 'cannot_delete_clients',
+  'You do not have permission to delete customers': 'cannot_delete_clients',
   'No PBX extension mapped for your user.': 'errorPbxNoExtension',
   'No PBX extension mapped for your user': 'errorPbxNoExtension',
   'PBX integration is not enabled.': 'errorPbxNotEnabled',

@@ -30,6 +30,7 @@ export interface SupervisorFormData {
   can_manage_services: boolean;
   can_manage_real_estate: boolean;
   can_manage_settings: boolean;
+  can_delete_clients: boolean;
 }
 
 const PERMISSION_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'password' | 'first_name' | 'last_name' | 'phone' | 'is_active'>)[] = [
@@ -110,6 +111,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     can_manage_services: false,
     can_manage_real_estate: false,
     can_manage_settings: false,
+    can_delete_clients: false,
   });
 
   useEffect(() => {
@@ -132,6 +134,9 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         can_manage_services: editingSupervisor.can_manage_services,
         can_manage_real_estate: editingSupervisor.can_manage_real_estate,
         can_manage_settings: editingSupervisor.can_manage_settings,
+        can_delete_clients: Boolean(
+          editingSupervisor.can_delete_clients ?? editingSupervisor.user?.can_delete_clients
+        ),
       });
     } else {
       setFormData({
@@ -151,6 +156,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         can_manage_services: false,
         can_manage_real_estate: false,
         can_manage_settings: false,
+        can_delete_clients: false,
       });
     }
   }, [editingSupervisor, isOpen]);
@@ -367,6 +373,19 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
                   <label className="text-sm text-gray-700 dark:text-gray-300">{t((permLabelKey[key] || 'supervisorsPermissions') as any)}</label>
                 </div>
               ))}
+            </div>
+            <div className="mt-3 space-y-1">
+              <div className="flex items-center gap-2">
+                <input
+                  name="can_delete_clients"
+                  type="checkbox"
+                  checked={formData.can_delete_clients}
+                  onChange={handleChange}
+                  className="rounded"
+                />
+                <label className="text-sm text-gray-700 dark:text-gray-300">{t('canDeleteClients')}</label>
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('canDeleteClientsHelp')}</p>
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">

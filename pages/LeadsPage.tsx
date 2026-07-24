@@ -299,18 +299,34 @@ export const LeadsPage = () => {
                 throw new Error('Company ID not found');
             }
             
-            // Prepare update data
+            const assignedRaw = (originalLead as any).assigned_to ?? lead.assignedTo;
+            const assignedToId =
+                assignedRaw && typeof assignedRaw === 'object'
+                    ? (assignedRaw as { id?: number }).id ?? null
+                    : assignedRaw
+                      ? Number(assignedRaw)
+                      : null;
+            const communicationRaw =
+                (originalLead as any).communication_way ?? lead.communicationWay;
+            const communicationWayId =
+                communicationRaw && typeof communicationRaw === 'object'
+                    ? (communicationRaw as { id?: number }).id ?? null
+                    : communicationRaw
+                      ? Number(communicationRaw)
+                      : null;
+
+            // Prepare update data (snake_case for Django serializer)
             const updateData: any = {
                 name: lead.name,
-                phone: lead.phone,
+                phone_number: lead.phone || (originalLead as any).phone_number || '',
                 budget: lead.budget,
                 budget_max: (originalLead as any).budget_max ?? (lead as any).budgetMax ?? null,
-                assignedTo: lead.assignedTo,
+                assigned_to: assignedToId,
                 type: lead.type,
-                communicationWay: lead.communicationWay,
+                communication_way: communicationWayId,
                 priority: lead.priority,
-                status: status.id, // Send status ID
-                company: companyId, // Include company ID
+                status: status.id,
+                company: companyId,
                 lead_company_name:
                     (originalLead as any).lead_company_name ??
                     (lead as any).leadCompanyName ??
@@ -319,9 +335,12 @@ export const LeadsPage = () => {
                 notes: (originalLead as any).notes ?? (lead as any).notes ?? null,
             };
             
-            // Include phoneNumbers if they exist
-            if (lead.phoneNumbers && lead.phoneNumbers.length > 0) {
-                updateData.phoneNumbers = lead.phoneNumbers;
+            const phoneNumbers =
+                lead.phoneNumbers ||
+                (originalLead as any).phone_numbers ||
+                [];
+            if (phoneNumbers.length > 0) {
+                updateData.phone_numbers = phoneNumbers;
             }
             
             await updateLeadMutation.mutateAsync({

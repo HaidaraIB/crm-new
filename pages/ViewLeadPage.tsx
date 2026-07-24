@@ -63,15 +63,30 @@ export const ViewLeadPage = () => {
                 throw new Error('Company ID not found');
             }
             
-            // Prepare update data
+            const assignedRaw = lead.assigned_to ?? lead.assignedTo;
+            const assignedToId =
+                assignedRaw && typeof assignedRaw === 'object'
+                    ? (assignedRaw as { id?: number }).id ?? null
+                    : assignedRaw
+                      ? Number(assignedRaw)
+                      : null;
+            const communicationRaw = lead.communication_way ?? lead.communicationWay;
+            const communicationWayId =
+                communicationRaw && typeof communicationRaw === 'object'
+                    ? (communicationRaw as { id?: number }).id ?? null
+                    : communicationRaw
+                      ? Number(communicationRaw)
+                      : null;
+
+            // Prepare update data (snake_case for Django serializer)
             const updateData: any = {
                 name: lead.name,
-                phone: lead.phone_number || lead.phone || '',
+                phone_number: lead.phone_number || lead.phone || '',
                 budget: lead.budget || 0,
                 budget_max: lead.budget_max ?? lead.budgetMax ?? null,
-                assignedTo: lead.assigned_to || 0,
+                assigned_to: assignedToId,
                 type: lead.type || '',
-                communicationWay: lead.communication_way || '',
+                communication_way: communicationWayId,
                 priority: lead.priority || '',
                 status: status.id,
                 company: companyId,
@@ -79,9 +94,9 @@ export const ViewLeadPage = () => {
                 profession: lead.profession ?? null,
             };
             
-            // Include phoneNumbers if they exist
+            // Include phone_numbers if they exist
             if (lead.phone_numbers && lead.phone_numbers.length > 0) {
-                updateData.phoneNumbers = lead.phone_numbers;
+                updateData.phone_numbers = lead.phone_numbers;
             }
             
             await updateLeadMutation.mutateAsync({
@@ -349,14 +364,29 @@ export const ViewLeadPage = () => {
         }
         setUpdatingMetaQualification(true);
         try {
+            const assignedRaw = (lead as any).assigned_to ?? lead.assignedTo;
+            const assignedToId =
+                assignedRaw && typeof assignedRaw === 'object'
+                    ? assignedRaw.id ?? null
+                    : assignedRaw
+                      ? Number(assignedRaw)
+                      : null;
+            const communicationRaw = (lead as any).communication_way ?? lead.communicationWay;
+            const communicationWayId =
+                communicationRaw && typeof communicationRaw === 'object'
+                    ? communicationRaw.id ?? null
+                    : communicationRaw
+                      ? Number(communicationRaw)
+                      : null;
+
             const updateData: Record<string, unknown> = {
                 name: lead.name,
-                phone: (lead as any).phone_number || lead.phone || '',
+                phone_number: (lead as any).phone_number || lead.phone || '',
                 budget: lead.budget || 0,
                 budget_max: (lead as any).budget_max ?? lead.budgetMax ?? null,
-                assignedTo: (lead as any).assigned_to || 0,
+                assigned_to: assignedToId,
                 type: lead.type || '',
-                communicationWay: (lead as any).communication_way || '',
+                communication_way: communicationWayId,
                 priority: lead.priority || '',
                 status: (lead as any).status?.id ?? (lead as any).status,
                 company: companyId,
@@ -365,7 +395,7 @@ export const ViewLeadPage = () => {
                 meta_qualification_status: newStatus === '' ? null : newStatus,
             };
             if ((lead as any).phone_numbers?.length) {
-                updateData.phoneNumbers = (lead as any).phone_numbers;
+                updateData.phone_numbers = (lead as any).phone_numbers;
             }
             await updateLeadMutation.mutateAsync({ id: displayLead.id, data: updateData });
             await refetchLeads();

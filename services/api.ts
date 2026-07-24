@@ -4879,6 +4879,12 @@ export async function markNotificationReadAPI(notificationId: number) {
   });
 }
 
+export async function deleteNotificationAPI(notificationId: number) {
+  return apiRequest<unknown>(`/notifications/${notificationId}/delete/`, {
+    method: 'DELETE',
+  });
+}
+
 export async function markAllNotificationsReadAPI() {
   return apiRequest<{ count?: number }>(`/notifications/mark_all_read/`, {
     method: 'POST',

@@ -10,6 +10,7 @@ import { Page as PageType } from '../types';
 import { ChevronDownIcon, XIcon } from './icons';
 import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
+import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 
 type SidebarItemProps = { 
     name: string; 
@@ -92,7 +93,7 @@ export const Sidebar = () => {
         setOpenSubMenus(prev => ({ ...prev, [name]: !prev[name] }));
     };
     
-    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio' | 'otpiq' | 'openai'>> = {
+    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio' | 'otpiq' | 'openai' | 'api' | 'mujeb' | 'pbx'>> = {
         Integrations: 'meta',
         Meta: 'meta',
         TikTok: 'tiktok',
@@ -100,6 +101,8 @@ export const Sidebar = () => {
         'Messaging Center': 'whatsapp',
         Twilio: 'twilio',
         AI: 'openai',
+        'Lead API': 'api',
+        Mujeb: 'mujeb',
         PBX: 'pbx',
     };
 
@@ -126,7 +129,9 @@ export const Sidebar = () => {
                     const otpiqOk = policies?.otpiq?.enabled !== false;
                     if (!twilioOk && !otpiqOk) {
                         const policy = policies?.otpiq?.enabled === false ? policies.otpiq : policies?.twilio;
-                        setAlertMessage(policy?.message || 'This integration is currently disabled.');
+                        setAlertMessage(
+                            resolveIntegrationPolicyMessage(policy?.message, policy?.scope, t),
+                        );
                         setAlertVariant('warning');
                         setIsAlertModalOpen(true);
                         return;
@@ -134,7 +139,9 @@ export const Sidebar = () => {
                 } else {
                     const policy = policies?.[platform];
                     if (policy && policy.enabled === false) {
-                        setAlertMessage(policy.message || 'This integration is currently disabled.');
+                        setAlertMessage(
+                            resolveIntegrationPolicyMessage(policy.message, policy.scope, t),
+                        );
                         setAlertVariant('warning');
                         setIsAlertModalOpen(true);
                         return;

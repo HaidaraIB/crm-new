@@ -67,10 +67,21 @@ export const isOnSubdomain = (): boolean => {
 };
 
 /**
+ * Brand / product page names that must stay as a single slug.
+ * Without this, camelCase splitting turns "WhatsApp" → "whats-app" and
+ * "TikTok" → "tik-tok", which do not match the router map and fall back to Dashboard.
+ */
+const PAGE_PATH_OVERRIDES: Record<string, string> = {
+  WhatsApp: 'whatsapp',
+  TikTok: 'tiktok',
+};
+
+/**
  * Convert page name to URL path segment.
  * Examples: "All Leads" -> "all-leads", "CreateLead" -> "create-lead"
  */
 const pageToPathSegment = (page: string): string => {
+  if (PAGE_PATH_OVERRIDES[page]) return PAGE_PATH_OVERRIDES[page];
   return page
     .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
     .toLowerCase()
@@ -186,7 +197,9 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
     'dashboard', 'leads', 'activities', 'properties', 'owners', 'services',
     'products', 'suppliers', 'deals', 'employees', 'users', 'marketing',
     'campaigns',
-    'messaging-center', 'team-chat', 'todos', 'reports', 'integrations', 'twilio', 'ai', 'openai', 'settings', 'profile',
+    'messaging-center', 'team-chat', 'todos', 'reports', 'integrations',
+    'meta', 'tiktok', 'tik-tok', 'whatsapp', 'whats-app', 'twilio', 'ai', 'openai', 'lead-api', 'pbx',
+    'settings', 'profile',
     'billing', 'payment', 'subscription', 'support-center', 'support', 'login', 'register', 'forgot-password',
     'reset-password', 'verify-email', 'verify-phone', '2fa', 'payment-success', 'change-plan',
     'create-lead', 'edit-lead', 'view-lead', 'create-deal',

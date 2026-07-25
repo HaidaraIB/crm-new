@@ -15,8 +15,11 @@ export type Page =
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
   | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'PBX'
   | 'Call Reports'
-  | 'Change Plan' | 'Payment' | 'Subscription'
+  | 'Change Plan' | 'Payment' | 'Subscription' | 'PaymentSuccess'
   | 'Support Center'
+  // Auth / onboarding pages
+  | 'Login' | 'Register' | 'ForgotPassword' | 'ResetPassword'
+  | 'VerifyEmail' | 'VerifyPhone' | 'TwoFactorAuth'
   // Legal pages
   | 'TermsOfService' | 'PrivacyPolicy' | 'DataDeletionPolicy';
 

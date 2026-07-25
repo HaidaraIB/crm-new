@@ -5,6 +5,9 @@ import { PageWrapper, Input, Button, Modal, TableHorizontalScroll } from '../com
 import { EyeIcon, RefreshIcon } from '../components/icons';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
 import { withLatinDigits } from '../utils/dateUtils';
+import { translations } from '../constants';
+
+type TranslationKey = keyof typeof translations.en;
 
 type TicketAttachment = { id: number; file: string; url: string; created_at: string };
 
@@ -33,7 +36,7 @@ const Label = ({
   </label>
 );
 
-const statusLabelKey: Record<string, string> = {
+const statusLabelKey: Record<string, TranslationKey> = {
   open: 'statusOpen',
   in_progress: 'statusInProgress',
   closed: 'statusClosed',
@@ -48,6 +51,7 @@ export const SupportCenterPage = () => {
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [selectedTicket, setSelectedTicket] = useState<TicketItem | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isSubmittingRef = useRef(false);
 
   const { data: ticketsData, isLoading: ticketsLoading, isFetching: ticketsFetching, refetch: refetchTickets } = useQuery({
     queryKey: ['support-tickets'],
@@ -68,7 +72,9 @@ export const SupportCenterPage = () => {
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    if (isSubmittingRef.current) return;
     if (!validateForm()) return;
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
     setSuccessMessage(null);
     try {
@@ -87,6 +93,7 @@ export const SupportCenterPage = () => {
       const msg = err?.message || 'Failed to submit. Please try again.';
       setErrors({ submit: msg });
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -108,9 +115,11 @@ export const SupportCenterPage = () => {
                 value={formData.title}
                 onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
                 placeholder={t('supportTicketTitle') || 'Subject'}
-                error={errors.title}
                 className="w-full"
               />
+              {errors.title && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.title}</p>
+              )}
             </div>
             <div>
               <Label htmlFor="support-description">{t('supportTicketDescription') || 'Description'}</Label>
@@ -215,7 +224,7 @@ export const SupportCenterPage = () => {
             </div>
           ) : tickets.length === 0 ? (
             <div className="p-6 text-gray-500 dark:text-gray-400 text-center">
-              {t('noData') || 'No tickets yet.'}
+              {t('noDataAvailable') || 'No tickets yet.'}
             </div>
           ) : (
             <TableHorizontalScroll>
@@ -261,7 +270,7 @@ export const SupportCenterPage = () => {
                               : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
                           }`}
                         >
-                          {t(statusLabelKey[ticket.status] || 'statusOpen') || ticket.status}
+                          {t(statusLabelKey[ticket.status] ?? 'statusOpen') || ticket.status}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-gray-500 dark:text-gray-400">
@@ -323,7 +332,7 @@ export const SupportCenterPage = () => {
                         : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
                     }`}
                   >
-                    {t(statusLabelKey[selectedTicket.status] || 'statusOpen') || selectedTicket.status}
+                    {t(statusLabelKey[selectedTicket.status] ?? 'statusOpen') || selectedTicket.status}
                   </span>
                 </div>
                 <div className="rounded-lg bg-gray-50 dark:bg-gray-700/40 p-3 border border-gray-100 dark:border-gray-600/40">

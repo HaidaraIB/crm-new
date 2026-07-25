@@ -1,6 +1,7 @@
 
 export * from './icons';
 export * from './Button';
+export * from './FilterButton';
 export * from './Card';
 export * from './TableHorizontalScroll';
 export * from './Input';

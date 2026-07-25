@@ -2,7 +2,9 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, Loader, PlusIcon, EditIcon, TrashIcon, EditTodoModal, TableHorizontalScroll } from '../components/index';
-import { Todo, TaskStage } from '../types';
+import { Todo, TaskStage, Stage } from '../types';
+
+type CallMethodItem = { id: number; name: string; color?: string };
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { isSameDay, ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import {
@@ -166,7 +168,9 @@ export const TodosPage = () => {
 
     // Transform ClientTasks and ClientCalls to unified task format
     const transformedClientTasks = useMemo(() => {
-        return allClientTasks.map((ct: any) => {
+        return allClientTasks
+            .filter((ct: any) => !ct.reminder_completed_at && !ct.reminderCompletedAt)
+            .map((ct: any) => {
             const clientId = ct.client || ct.clientId;
             const clientName = ct.client_name || '';
             const stageName = ct.stage_name || ct.stage || '';
@@ -195,7 +199,9 @@ export const TodosPage = () => {
     }, [allClientTasks]);
     
     const transformedClientCalls = useMemo(() => {
-        return allClientCalls.map((cc: any) => {
+        return allClientCalls
+            .filter((cc: any) => !cc.follow_up_completed_at && !cc.followUpCompletedAt)
+            .map((cc: any) => {
             const clientId = cc.client || cc.clientId;
             const clientName = cc.client_name || '';
             const callMethodName = cc.call_method_name || cc.call_method || '';
@@ -329,13 +335,13 @@ export const TodosPage = () => {
     // Fetch stages (not statuses - stages are used for tasks)
     const { data: stagesData, isLoading: stagesLoading } = useStages();
     // Handle both array response and object with results property
-    const stages = Array.isArray(stagesData) 
+    const stages: Stage[] = Array.isArray(stagesData) 
         ? stagesData 
         : (stagesData?.results || []);
     
     // Fetch call methods (for client calls)
     const { data: callMethodsData } = useCallMethods();
-    const callMethods = Array.isArray(callMethodsData) 
+    const callMethods: CallMethodItem[] = Array.isArray(callMethodsData) 
         ? callMethodsData 
         : (callMethodsData?.results || []);
 

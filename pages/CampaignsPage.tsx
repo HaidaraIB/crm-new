@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterIcon, EditIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterButton, EditIcon, TableHorizontalScroll } from '../components/index';
 import { Campaign } from '../types';
 import { CampaignsFilterDrawer } from '../components/drawers/CampaignsFilterDrawer';
 import { useCampaigns, useDeleteCampaign } from '../hooks/useQueries';
@@ -242,9 +242,7 @@ export const CampaignsPage = () => {
             title={t('campaigns')}
             actions={
                 <>
-                    <Button variant="secondary" onClick={() => setIsCampaignsFilterDrawerOpen(true)}>
-                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
-                    </Button>
+                    <FilterButton onClick={() => setIsCampaignsFilterDrawerOpen(true)} />
                     {isAdmin && (
                         <Button onClick={() => setIsAddCampaignModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addCampaign')}

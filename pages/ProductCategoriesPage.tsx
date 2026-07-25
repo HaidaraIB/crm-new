@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
 import { ProductCategory } from '../types';
 import { useProductCategories, useDeleteProductCategory } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -225,9 +225,7 @@ export const ProductCategoriesPage = () => {
             title={t('productCategories')}
             actions={
                 <>
-                    <Button variant="secondary" onClick={() => setIsProductCategoryFilterDrawerOpen(true)}>
-                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
-                    </Button>
+                    <FilterButton onClick={() => setIsProductCategoryFilterDrawerOpen(true)} />
                     {isAdmin && (
                         <Button onClick={() => setIsAddProductCategoryModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addProductCategory') || 'Add Product Category'}

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
 import { Product, ProductCategory, Supplier } from '../types';
 import { AddProductModal } from '../components/modals/AddProductModal';
 import { EditProductModal } from '../components/modals/EditProductModal';

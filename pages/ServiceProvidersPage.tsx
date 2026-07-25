@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
 import { ServiceProvider } from '../types';
 import { useServiceProviders, useDeleteServiceProvider } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -226,9 +226,7 @@ export const ServiceProvidersPage = () => {
             title={t('serviceProviders')}
             actions={
                 <>
-                    <Button variant="secondary" onClick={() => setIsServiceProviderFilterDrawerOpen(true)}>
-                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
-                    </Button>
+                    <FilterButton onClick={() => setIsServiceProviderFilterDrawerOpen(true)} />
                     {isAdmin && (
                         <Button onClick={() => setIsAddServiceProviderModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addServiceProvider') || 'Add Service Provider'}

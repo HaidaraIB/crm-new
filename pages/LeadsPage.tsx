@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList } from '../components/index';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
@@ -568,7 +568,7 @@ export const LeadsPage = () => {
             title={pageTitle}
             actions={
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
-                        <Button variant="secondary" onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto shrink-0"><FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span></Button>
+                        <FilterButton onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto shrink-0" />
                         {!isDataEntryUser && (
                         <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={isExportingLeads || totalLeadsCount === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{isExportingLeads ? (t('loading') || 'Loading...') : t('export')}</span><span className="hidden sm:inline">{isExportingLeads ? (t('loading') || 'Loading...') : (t('exportLeads') || 'Export to Excel')}</span></Button>
                         )}

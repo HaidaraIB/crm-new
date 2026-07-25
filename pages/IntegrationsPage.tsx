@@ -711,8 +711,9 @@ export const IntegrationsPage = () => {
         setIsAlertModalOpen(true);
     };
 
-    const isEmployee = (currentUser?.role ?? '').toLowerCase() === 'employee';
     const userRole = normalizeRole(currentUser?.role);
+    // Same staff roles as Sidebar: may use WhatsApp chats, but not connect/manage accounts.
+    const isEmployee = userRole === 'Employee' || userRole === 'Doctor';
 
     // Get platform param based on currentPage
     const platformParam = useMemo(() => {
@@ -790,9 +791,10 @@ export const IntegrationsPage = () => {
         return 'chats';
     });
     const setWhatsAppTabPersisted = (tab: 'chats' | 'templates' | 'accounts' | 'campaigns') => {
-        setWhatsAppTab(tab);
+        const next = isEmployee && tab === 'accounts' ? 'chats' : tab;
+        setWhatsAppTab(next);
         try {
-            localStorage.setItem('whatsapp_messaging_tab', tab);
+            localStorage.setItem('whatsapp_messaging_tab', next);
         } catch (_) {}
     };
     const [editingTemplate, setEditingTemplate] = useState<MessageTemplateType | null>(null);
@@ -808,6 +810,13 @@ export const IntegrationsPage = () => {
     const [optimisticMessages, setOptimisticMessages] = useState<ManualChatMessage[]>([]);
     const [chatToast, setChatToast] = useState<{ message: string; variant: 'error' | 'warning' } | null>(null);
     const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
+
+    // Staff must not stay on Accounts if role/localStorage left them there.
+    useEffect(() => {
+        if (isEmployee && whatsAppTab === 'accounts') {
+            setWhatsAppTabPersisted('chats');
+        }
+    }, [isEmployee, whatsAppTab]);
 
     const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations();
     const isWhatsAppOrMessagingCenter = currentPage === 'WhatsApp' || currentPage === 'Messaging Center';

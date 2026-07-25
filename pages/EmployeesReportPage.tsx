@@ -1,7 +1,7 @@
 import React, { useMemo } from 'react';
-import { PageWrapper, Button, Loader } from '../components/index';
+import { PageWrapper, Button, Loader, FilterButton } from '../components/index';
 import { useAppContext } from '../context/AppContext';
-import { FilterIcon, PhoneIcon, CheckIcon, ClockIcon, UsersIcon } from '../components/icons';
+import { PhoneIcon, CheckIcon, ClockIcon, UsersIcon } from '../components/icons';
 import { useEmployeeReport } from '../hooks/useQueries';
 import { translations } from '../constants';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -87,14 +87,11 @@ export const EmployeesReportPage = () => {
       title={t('employeesReport')}
       actions={
         <div className="flex flex-col sm:flex-row flex-wrap gap-2.5">
-          <Button
-            variant="secondary"
+          <FilterButton
             onClick={() => setIsEmployeesReportFilterDrawerOpen(true)}
-            className="w-full sm:w-auto rounded-xl px-5 py-2.5 border border-gray-200/90 dark:border-gray-600 bg-white/90 dark:bg-gray-800 shadow-sm hover:shadow-md"
-          >
-            <FilterIcon className="h-4 w-4 shrink-0" />
-            {t('filter') || 'Filter'}
-          </Button>
+            hideLabelOnMobile={false}
+            className="w-full sm:w-auto"
+          />
           <Button
             variant="secondary"
             onClick={handleExport}

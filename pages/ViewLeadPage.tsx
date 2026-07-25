@@ -560,7 +560,6 @@ export const ViewLeadPage = () => {
                 details: (cv.summary as string) || '',
                 date: formatTimelineDate(visitDateRaw, lang),
                 timestamp,
-                stage: t('fieldVisit'),
                 callDatetime: visitDt,
                 followUpDate: upcoming || undefined,
                 locationPhotoUrl:

@@ -201,19 +201,19 @@ export const isToday = (utcDateString: string | null | undefined): boolean => {
 
 /**
  * Checks if two dates are the same day (in local timezone)
- * @param utcDateString1 - First ISO date string
- * @param utcDateString2 - Second ISO date string or Date object
+ * @param date1 - First ISO date string or Date object
+ * @param date2 - Second ISO date string or Date object
  * @returns true if both dates are the same day
  */
 export const isSameDay = (
-    utcDateString1: string | null | undefined,
-    utcDateString2: string | Date | null | undefined
+    date1Input: string | Date | null | undefined,
+    date2Input: string | Date | null | undefined
 ): boolean => {
-    if (!utcDateString1 || !utcDateString2) return false;
+    if (!date1Input || !date2Input) return false;
     
     try {
-        const date1 = parseUTCDate(utcDateString1);
-        const date2 = utcDateString2 instanceof Date ? utcDateString2 : parseUTCDate(utcDateString2);
+        const date1 = date1Input instanceof Date ? date1Input : parseUTCDate(date1Input);
+        const date2 = date2Input instanceof Date ? date2Input : parseUTCDate(date2Input);
         
         return (
             date1.getDate() === date2.getDate() &&

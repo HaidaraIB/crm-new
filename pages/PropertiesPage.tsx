@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterIcon, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
 import { Developer, Project, Unit } from '../types';
 import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -405,9 +405,7 @@ export const PropertiesPage = () => {
     
     const pageActions = (
         <>
-            <Button variant="secondary" onClick={handleFilterClick}>
-                <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
-            </Button>
+            <FilterButton onClick={handleFilterClick} />
             {isAdmin && (
                 <Button onClick={handleAddClick}>
                     <PlusIcon className="w-4 h-4"/> {getAddButtonLabel()}

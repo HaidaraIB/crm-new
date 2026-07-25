@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
 import { Supplier } from '../types';
 import { useSuppliers, useDeleteSupplier } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -221,9 +221,7 @@ export const SuppliersPage = () => {
             title={t('suppliers')}
             actions={
                 <>
-                    <Button variant="secondary" onClick={() => setIsSupplierFilterDrawerOpen(true)}>
-                        <FilterIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('filter')}</span>
-                    </Button>
+                    <FilterButton onClick={() => setIsSupplierFilterDrawerOpen(true)} />
                     {isAdmin && (
                         <Button onClick={() => setIsAddSupplierModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addSupplier') || 'Add Supplier'}

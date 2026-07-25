@@ -17,6 +17,7 @@ import { Button, Card, Input, Loader, PageWrapper } from '../index';
 import { EditIcon, EyeIcon, EyeOffIcon, TrashIcon } from '../icons';
 import { formatDateTimeToLocal } from '../../utils/dateUtils';
 import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
+import { resolveIntegrationPolicyMessage } from '../../utils/integrationPolicyMessage';
 
 type IntegrationPolicyEntry = { enabled: boolean; message: string; scope: string };
 
@@ -301,7 +302,11 @@ export function PbxSettingsForm({
     <div className="space-y-6 max-w-3xl">
       {pbxPolicyDisabled ? (
         <div className="rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
-          {integrationPolicyMap?.pbx?.message || t('integrationDisabledDefaultMessage')}
+          {resolveIntegrationPolicyMessage(
+            integrationPolicyMap?.pbx?.message,
+            integrationPolicyMap?.pbx?.scope,
+            t,
+          )}
         </div>
       ) : null}
 

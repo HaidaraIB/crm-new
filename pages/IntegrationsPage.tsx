@@ -22,6 +22,7 @@ import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon, ClockIcon } from '..
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { MessageLogsPanel } from '../components/messaging/MessageLogsPanel';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
 import { LeadApiDocumentation } from '../components/integrations/LeadApiDocumentation';
 import { leadApiDocT } from '../constants/leadApiDocumentation';
@@ -1049,9 +1050,7 @@ export const IntegrationsPage = () => {
                         >
                             <div className="font-semibold">{title}</div>
                             <div className="mt-1">
-                                {policy?.message ||
-                                    t('integrationDisabledDefaultMessage') ||
-                                    'This integration is currently disabled by your administrator.'}
+                                {resolveIntegrationPolicyMessage(policy?.message, policy?.scope, t)}
                             </div>
                         </div>
                     );
@@ -1068,7 +1067,9 @@ export const IntegrationsPage = () => {
         return (
             <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                 <div className="font-semibold">{t('integrationStatusDisabled') || 'Integration is disabled'}</div>
-                <div className="mt-1">{policy.message || (t('integrationDisabledDefaultMessage') || 'This integration is currently disabled by your administrator.')}</div>
+                <div className="mt-1">
+                    {resolveIntegrationPolicyMessage(policy.message, policy.scope, t)}
+                </div>
             </div>
         );
     }
@@ -1096,7 +1097,7 @@ export const IntegrationsPage = () => {
                     <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                         <div className="font-semibold">{t('integrationStatusDisabled')}</div>
                         <div className="mt-1">
-                            {openaiPolicy.message || t('integrationDisabledDefaultMessage')}
+                            {resolveIntegrationPolicyMessage(openaiPolicy.message, openaiPolicy.scope, t)}
                         </div>
                     </div>
                 ) : null}
@@ -1108,12 +1109,13 @@ export const IntegrationsPage = () => {
     if (currentPage === 'Mujeb') {
         const endpointUrl = mujebConfig?.endpoint_url || '';
         const statusRaw = String(mujebConfig?.integration_status || 'disconnected');
-        const isConnected = statusRaw === 'connected' || (mujebConfig?.keys?.length ?? 0) > 0;
+        const mujebPolicy = integrationPolicyMap?.mujeb;
+        const mujebDisabled = mujebPolicy?.enabled === false;
+        const isConnected = !mujebDisabled && (statusRaw === 'connected' || (mujebConfig?.keys?.length ?? 0) > 0);
         const lastReceivedAt = mujebConfig?.last_received_at
             ? new Date(mujebConfig.last_received_at).toLocaleString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))
             : null;
         const isCompanyAdmin = userRole === 'Owner';
-        const mujebPolicy = integrationPolicyMap?.mujeb;
         const setupSteps = [
             { step: 1, text: t('mujebStep1') },
             { step: 2, text: t('mujebStep2') },
@@ -1121,6 +1123,10 @@ export const IntegrationsPage = () => {
             { step: 4, text: t('mujebStep4') },
         ];
         const handleGenerateKey = async () => {
+            if (mujebDisabled) {
+                showAlert(resolveIntegrationPolicyMessage(mujebPolicy?.message, mujebPolicy?.scope, t), 'warning');
+                return;
+            }
             const name = leadApiKeyName.trim();
             if (!name) {
                 showAlert(t('leadApiKeyName') || 'Key name', 'warning');
@@ -1140,6 +1146,10 @@ export const IntegrationsPage = () => {
             }
         };
         const handleRotateKey = async (keyId: number) => {
+            if (mujebDisabled) {
+                showAlert(resolveIntegrationPolicyMessage(mujebPolicy?.message, mujebPolicy?.scope, t), 'warning');
+                return;
+            }
             setLeadApiKeyBusy(true);
             try {
                 const data = await rotateLeadApiKeyAPI(keyId);
@@ -1154,12 +1164,7 @@ export const IntegrationsPage = () => {
         };
         return (
             <PageWrapper title={t('mujebTitle')}>
-                {mujebPolicy?.enabled === false ? (
-                    <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
-                        <div className="font-semibold">{t('integrationStatusDisabled')}</div>
-                        <div className="mt-1">{mujebPolicy.message || t('integrationDisabledDefaultMessage')}</div>
-                    </div>
-                ) : null}
+                {renderPolicyBanner()}
                 <Card>
                     <div className="max-w-2xl space-y-6">
                         <div className="flex items-center gap-3">
@@ -1176,14 +1181,20 @@ export const IntegrationsPage = () => {
                                 <div className="mt-2 flex flex-wrap items-center gap-2">
                                     <span
                                         className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                            isConnected
+                                            mujebDisabled
+                                                ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                                : isConnected
                                                 ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                                 : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
                                         }`}
                                     >
-                                        {isConnected ? t('mujebStatusConnected') : t('mujebStatusPending')}
+                                        {mujebDisabled
+                                            ? t('integrationStatusDisabled')
+                                            : isConnected
+                                            ? t('mujebStatusConnected')
+                                            : t('mujebStatusPending')}
                                     </span>
-                                    {lastReceivedAt && (
+                                    {!mujebDisabled && lastReceivedAt && (
                                         <span className="text-xs text-gray-500 dark:text-gray-400">
                                             {t('mujebLastReceived')} {lastReceivedAt}
                                         </span>
@@ -1210,6 +1221,7 @@ export const IntegrationsPage = () => {
                                         />
                                         <Button
                                             variant="secondary"
+                                            disabled={mujebDisabled}
                                             onClick={() => { if (endpointUrl) navigator.clipboard.writeText(endpointUrl); showAlert(t('copied') || 'Copied', 'info'); }}
                                         >
                                             {t('copy')}
@@ -1226,7 +1238,7 @@ export const IntegrationsPage = () => {
                                         ))}
                                     </ol>
                                 </div>
-                                <div className="space-y-4">
+                                <div className={`space-y-4 ${mujebDisabled ? 'opacity-60 pointer-events-none' : ''}`}>
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                                             {t('leadApiKeys')}
@@ -1254,12 +1266,13 @@ export const IntegrationsPage = () => {
                                                         value={leadApiKeyName}
                                                         onChange={(e) => setLeadApiKeyName(e.target.value)}
                                                         placeholder={t('leadApiKeyNamePlaceholder')}
+                                                        disabled={mujebDisabled}
                                                     />
                                                 </div>
                                                 <Button
                                                     variant="primary"
                                                     className="shrink-0 w-full sm:w-auto"
-                                                    disabled={leadApiKeyBusy}
+                                                    disabled={leadApiKeyBusy || mujebDisabled}
                                                     loading={leadApiKeyBusy}
                                                     onClick={handleGenerateKey}
                                                 >
@@ -1332,7 +1345,7 @@ export const IntegrationsPage = () => {
                                                                     <Button
                                                                         variant="secondary"
                                                                         className="flex-1 sm:flex-none text-sm px-3 py-1.5"
-                                                                        disabled={leadApiKeyBusy}
+                                                                        disabled={leadApiKeyBusy || mujebDisabled}
                                                                         title={t('leadApiRotateKey')}
                                                                         onClick={() => handleRotateKey(k.id)}
                                                                     >
@@ -1341,7 +1354,7 @@ export const IntegrationsPage = () => {
                                                                     <Button
                                                                         variant="danger"
                                                                         className="flex-1 sm:flex-none text-sm px-3 py-1.5 inline-flex items-center justify-center gap-1.5"
-                                                                        disabled={leadApiKeyBusy}
+                                                                        disabled={leadApiKeyBusy || mujebDisabled}
                                                                         title={t('leadApiRevokeKey')}
                                                                         onClick={() => {
                                                                             setConfirmDeleteConfig({
@@ -1468,7 +1481,7 @@ export const IntegrationsPage = () => {
                 {apiPolicy?.enabled === false ? (
                     <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                         <div className="font-semibold">{t('integrationStatusDisabled')}</div>
-                        <div className="mt-1">{apiPolicy.message || t('integrationDisabledDefaultMessage')}</div>
+                        <div className="mt-1">{resolveIntegrationPolicyMessage(apiPolicy.message, apiPolicy.scope, t)}</div>
                     </div>
                 ) : null}
                 <div className="mb-4 flex flex-wrap gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">

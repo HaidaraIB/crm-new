@@ -965,6 +965,8 @@ export const translations = {
     integrationStatusEnabled: "Integration is active",
     integrationStatusDisabled: "Integration is disabled",
     integrationDisabledDefaultMessage: "This integration is currently disabled by your administrator.",
+    integrationDisabledCompanyMessage: "This integration is currently disabled for your company.",
+    integrationDisabledPlanMessage: "This integration is not included in your current plan.",
     smsProviderDisabledTitle: "{provider} SMS is unavailable",
     smsProviderUnavailable: "unavailable",
     // TikTok Lead Gen
@@ -3172,6 +3174,8 @@ export const translations = {
     integrationStatusEnabled: "التكامل مفعّل",
     integrationStatusDisabled: "التكامل معطّل",
     integrationDisabledDefaultMessage: "هذا التكامل معطّل حالياً من قبل المسؤول.",
+    integrationDisabledCompanyMessage: "هذا التكامل معطّل حالياً لشركتك.",
+    integrationDisabledPlanMessage: "هذا التكامل غير مشمول في خطتك الحالية.",
     smsProviderDisabledTitle: "رسائل {provider} غير متاحة",
     smsProviderUnavailable: "غير متاح",
     // TikTok Lead Gen

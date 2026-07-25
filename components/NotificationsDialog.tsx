@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './Button';
 import {
+  deleteAllNotificationsAPI,
   deleteNotificationAPI,
   getNotificationsAPI,
   getNotificationsUnreadCountAPI,
@@ -12,6 +13,7 @@ import {
   type AppNotification,
 } from '../services/api';
 import { formatDateTimeToLocal } from '../utils/dateUtils';
+import { getNotificationDisplay } from '../utils/notificationDisplay';
 import { getCompanyViewLeadRoute, navigateToCompanyRoute } from '../utils/routing';
 
 const NOTIFICATIONS_QK = ['notifications', 'list'] as const;
@@ -41,7 +43,7 @@ type NotificationsDialogProps = {
 };
 
 export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
-  const { t, setCurrentPage, setSelectedLead, currentUser } = useAppContext();
+  const { t, language, setCurrentPage, setSelectedLead, currentUser } = useAppContext();
   const queryClient = useQueryClient();
   const companyName = currentUser?.company?.name;
   const companyDomain = currentUser?.company?.domain;
@@ -54,6 +56,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
   const invalidateInbox = () => {
     void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QK });
     void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_UNREAD_QK });
+    void queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
 
   const markOne = useMutation({
@@ -71,16 +74,34 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
     onSuccess: invalidateInbox,
   });
 
+  const deleteAll = useMutation({
+    mutationFn: (params?: { type?: string | string[] }) => deleteAllNotificationsAPI(params),
+    onSuccess: invalidateInbox,
+  });
+
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (markAll.isPending || markOne.isPending || deleteOne.isPending) return;
+      if (
+        markAll.isPending ||
+        markOne.isPending ||
+        deleteOne.isPending ||
+        deleteAll.isPending
+      ) {
+        return;
+      }
       e.preventDefault();
       onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose, markAll.isPending, markOne.isPending, deleteOne.isPending]);
+  }, [
+    onClose,
+    markAll.isPending,
+    markOne.isPending,
+    deleteOne.isPending,
+    deleteAll.isPending,
+  ]);
 
   const openLead = (leadId: number) => {
     setSelectedLead({ id: leadId } as any);
@@ -181,7 +202,24 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
   const rawItems: AppNotification[] = listQuery.data?.results ?? [];
   const items = rawItems.filter((n) => !isTenantChatEcho(n));
   const unreadInList = items.filter((n) => !n.read).length;
-  const actionsBusy = markOne.isPending || deleteOne.isPending || markAll.isPending;
+  const callAlertsInList = items.filter(
+    (n) => n.type === 'pbx_incoming_call' || n.type === 'pbx_call_missed',
+  ).length;
+  const actionsBusy =
+    markOne.isPending ||
+    deleteOne.isPending ||
+    markAll.isPending ||
+    deleteAll.isPending;
+
+  const confirmDeleteAll = () => {
+    if (!window.confirm(t('notificationsDeleteAllConfirm'))) return;
+    deleteAll.mutate(undefined);
+  };
+
+  const confirmDeleteCallAlerts = () => {
+    if (!window.confirm(t('notificationsDeleteCallNotificationsConfirm'))) return;
+    deleteAll.mutate({ type: ['pbx_incoming_call', 'pbx_call_missed'] });
+  };
 
   return createPortal(
     <div
@@ -198,23 +236,45 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
         className="flex max-h-[90vh] w-full max-w-[min(36rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">
           <div className="min-w-0">
             <h2 id="notifications-dialog-title" className="truncate text-lg font-semibold text-gray-900 dark:text-white">
               {t('notificationsTitle')}
             </h2>
             <p className="truncate text-xs text-gray-500 dark:text-gray-300">{t('notificationsSubtitle')}</p>
           </div>
-          <div className="flex shrink-0 items-center gap-2">
+          <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
             {unreadInList > 0 ? (
               <Button
                 type="button"
                 variant="secondary"
                 className="whitespace-nowrap px-3 py-1.5 text-xs"
-                disabled={markAll.isPending}
+                disabled={actionsBusy}
                 onClick={() => markAll.mutate()}
               >
                 {t('notificationsMarkAllRead')}
+              </Button>
+            ) : null}
+            {callAlertsInList > 0 ? (
+              <Button
+                type="button"
+                variant="secondary"
+                className="whitespace-nowrap px-3 py-1.5 text-xs"
+                disabled={actionsBusy}
+                onClick={confirmDeleteCallAlerts}
+              >
+                {t('notificationsDeleteCallNotifications')}
+              </Button>
+            ) : null}
+            {items.length > 0 ? (
+              <Button
+                type="button"
+                variant="danger"
+                className="whitespace-nowrap px-3 py-1.5 text-xs"
+                disabled={actionsBusy}
+                onClick={confirmDeleteAll}
+              >
+                {t('notificationsDeleteAll')}
               </Button>
             ) : null}
             <button
@@ -253,26 +313,26 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
             <ul className="space-y-2">
               {items.map((n) => {
                 const navigable = canNavigateFromNotification(n.type);
+                const display = getNotificationDisplay(n, language);
                 const bodyContent = (
                   <>
                     <div className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1">
-                        <span className="block text-sm font-semibold text-gray-900 dark:text-white">
-                          {n.title}
+                        <span
+                          className="block text-sm font-semibold text-gray-900 dark:text-white"
+                          dir={
+                            n.type === 'pbx_incoming_call' ||
+                            n.type === 'pbx_call_missed' ||
+                            n.type === 'softphone_incoming_call'
+                              ? 'ltr'
+                              : undefined
+                          }
+                        >
+                          {display.title}
                         </span>
-                        {n.type === 'pbx_incoming_call' ? (
-                          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
-                            {t('incomingCall')}
-                          </span>
-                        ) : n.type === 'pbx_call_missed' ? (
-                          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
-                            {t('pbxMissedCall')}
-                          </span>
-                        ) : n.type_display ? (
-                          <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
-                            {n.type_display}
-                          </span>
-                        ) : null}
+                        <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
+                          {display.typeLabel}
+                        </span>
                       </span>
                       {!n.read ? (
                         <span
@@ -282,7 +342,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                       ) : null}
                     </div>
                     <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-gray-600 dark:text-gray-200">
-                      {n.body}
+                      {display.body}
                     </p>
                     <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400" dir="ltr">
                       {n.created_at || n.sent_at
@@ -293,57 +353,57 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                 );
 
                 return (
-                <li key={n.id}>
-                  <div
-                    className={`rounded-xl border px-3 py-3 text-start transition-colors ${
-                      n.read
-                        ? 'border-gray-200/80 bg-white/80 dark:border-gray-600 dark:bg-gray-800/80'
-                        : 'border-primary/25 bg-white shadow-sm ring-1 ring-primary/15 dark:border-primary/40 dark:bg-gray-800/90 dark:ring-primary/30'
-                    } ${navigable ? 'hover:border-primary/40 dark:hover:border-primary/50' : ''}`}
-                  >
-                    {navigable ? (
-                      <button
-                        type="button"
-                        disabled={actionsBusy}
-                        onClick={() => {
-                          if (!n.read) markOne.mutate(n.id);
-                          navigateFromNotification(n);
-                        }}
-                        className="w-full text-start disabled:opacity-60"
-                      >
-                        {bodyContent}
-                      </button>
-                    ) : (
-                      <div className="w-full text-start">{bodyContent}</div>
-                    )}
-                    <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2 dark:border-gray-600">
-                      {!n.read ? (
+                  <li key={n.id}>
+                    <div
+                      className={`rounded-xl border px-3 py-3 text-start transition-colors ${
+                        n.read
+                          ? 'border-gray-200/80 bg-white/80 dark:border-gray-600 dark:bg-gray-800/80'
+                          : 'border-primary/25 bg-white shadow-sm ring-1 ring-primary/15 dark:border-primary/40 dark:bg-gray-800/90 dark:ring-primary/30'
+                      } ${navigable ? 'hover:border-primary/40 dark:hover:border-primary/50' : ''}`}
+                    >
+                      {navigable ? (
+                        <button
+                          type="button"
+                          disabled={actionsBusy}
+                          onClick={() => {
+                            if (!n.read) markOne.mutate(n.id);
+                            navigateFromNotification(n);
+                          }}
+                          className="w-full text-start disabled:opacity-60"
+                        >
+                          {bodyContent}
+                        </button>
+                      ) : (
+                        <div className="w-full text-start">{bodyContent}</div>
+                      )}
+                      <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-2 dark:border-gray-600">
+                        {!n.read ? (
+                          <button
+                            type="button"
+                            disabled={actionsBusy}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              markOne.mutate(n.id);
+                            }}
+                            className="rounded-md px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary/10 disabled:opacity-50 dark:text-primary-200 dark:hover:bg-primary/20 dark:hover:text-white"
+                          >
+                            {t('notificationsMarkRead')}
+                          </button>
+                        ) : null}
                         <button
                           type="button"
                           disabled={actionsBusy}
                           onClick={(e) => {
                             e.stopPropagation();
-                            markOne.mutate(n.id);
+                            deleteOne.mutate(n.id);
                           }}
-                          className="rounded-md px-2 py-1 text-xs font-medium text-primary-700 hover:bg-primary/10 disabled:opacity-50 dark:text-primary-200 dark:hover:bg-primary/20 dark:hover:text-white"
+                          className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-200"
                         >
-                          {t('notificationsMarkRead')}
+                          {t('notificationsDelete')}
                         </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        disabled={actionsBusy}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          deleteOne.mutate(n.id);
-                        }}
-                        className="rounded-md px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50 dark:text-red-300 dark:hover:bg-red-950/40 dark:hover:text-red-200"
-                      >
-                        {t('notificationsDelete')}
-                      </button>
+                      </div>
                     </div>
-                  </div>
-                </li>
+                  </li>
                 );
               })}
             </ul>

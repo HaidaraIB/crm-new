@@ -4899,3 +4899,15 @@ export async function markAllNotificationsReadAPI() {
   });
 }
 
+export async function deleteAllNotificationsAPI(params?: { type?: string | string[] }) {
+  const search = new URLSearchParams();
+  if (params?.type != null) {
+    const types = Array.isArray(params.type) ? params.type.join(',') : params.type;
+    if (types) search.set('type', types);
+  }
+  const q = search.toString();
+  return apiRequest<{ count?: number }>(`/notifications/delete_all/${q ? `?${q}` : ''}`, {
+    method: 'DELETE',
+  });
+}
+

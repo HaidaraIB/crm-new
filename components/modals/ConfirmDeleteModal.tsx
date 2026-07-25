@@ -70,7 +70,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={handleClose} title={title}>
+        <Modal isOpen={isOpen} onClose={handleClose} title={title} overlayClassName="z-[110]">
             <div className="space-y-4">
                 {errorMessage && (
                     <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">

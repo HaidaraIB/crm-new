@@ -43,7 +43,15 @@ type NotificationsDialogProps = {
 };
 
 export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
-  const { t, language, setCurrentPage, setSelectedLead, currentUser } = useAppContext();
+  const {
+    t,
+    language,
+    setCurrentPage,
+    setSelectedLead,
+    currentUser,
+    setConfirmDeleteConfig,
+    setIsConfirmDeleteModalOpen,
+  } = useAppContext();
   const queryClient = useQueryClient();
   const companyName = currentUser?.company?.name;
   const companyDomain = currentUser?.company?.domain;
@@ -212,13 +220,31 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
     deleteAll.isPending;
 
   const confirmDeleteAll = () => {
-    if (!window.confirm(t('notificationsDeleteAllConfirm'))) return;
-    deleteAll.mutate(undefined);
+    setConfirmDeleteConfig({
+      title: t('notificationsDeleteAll'),
+      message: t('notificationsDeleteAllConfirm'),
+      confirmButtonText: t('notificationsDeleteAll'),
+      confirmButtonVariant: 'danger',
+      showWarning: false,
+      onConfirm: async () => {
+        await deleteAll.mutateAsync(undefined);
+      },
+    });
+    setIsConfirmDeleteModalOpen(true);
   };
 
   const confirmDeleteCallAlerts = () => {
-    if (!window.confirm(t('notificationsDeleteCallNotificationsConfirm'))) return;
-    deleteAll.mutate({ type: ['pbx_incoming_call', 'pbx_call_missed'] });
+    setConfirmDeleteConfig({
+      title: t('notificationsDeleteCallNotifications'),
+      message: t('notificationsDeleteCallNotificationsConfirm'),
+      confirmButtonText: t('notificationsDeleteCallNotifications'),
+      confirmButtonVariant: 'danger',
+      showWarning: false,
+      onConfirm: async () => {
+        await deleteAll.mutateAsync({ type: ['pbx_incoming_call', 'pbx_call_missed'] });
+      },
+    });
+    setIsConfirmDeleteModalOpen(true);
   };
 
   return createPortal(

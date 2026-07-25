@@ -4055,6 +4055,13 @@ export const getLeadApiConfigAPI = async () => {
   return apiRequest<LeadApiConfig>('/integrations/accounts/lead-api-config/');
 };
 
+/** Mujeb mini app: endpoint URL and shared Lead API keys. GET /integrations/accounts/mujeb-config/ */
+export type MujebConfig = LeadApiConfig;
+
+export const getMujebConfigAPI = async () => {
+  return apiRequest<MujebConfig>('/integrations/accounts/mujeb-config/');
+};
+
 export const createLeadApiKeyAPI = async (name: string) => {
   return apiRequest<LeadApiKeySummary & { api_key: string }>(
     '/integrations/accounts/lead-api-keys/',

@@ -109,6 +109,7 @@ export const Sidebar = () => {
             AI: 'ai',
             Twilio: 'twilio',
             'Lead API': 'leadApi',
+            'Mujeb': 'mujeb',
             PBX: 'pbxIntegration',
             'Call Reports': 'callReports',
         };

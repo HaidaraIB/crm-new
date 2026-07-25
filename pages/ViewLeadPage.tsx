@@ -1068,6 +1068,12 @@ export const ViewLeadPage = () => {
                                                 {t('leadApiSource') || 'Custom API'}
                                             </span>
                                         );
+                                    } else if (source === 'mujeb') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200">
+                                                {t('mujebSource') || 'Mujeb'}
+                                            </span>
+                                        );
                                     }
                                     return (
                                         <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">

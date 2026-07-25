@@ -43,6 +43,7 @@ const EVENT_TYPE_ACTION_KEYS: Record<string, keyof typeof translations.en> = {
 const SOURCE_VALUE_KEYS: Record<string, keyof typeof translations.en> = {
     'custom lead api': 'leadApiSource',
     'custom api': 'leadApiSource',
+    mujeb: 'mujebSource',
     whatsapp: 'whatsappSource',
     tiktok: 'tiktokSource',
     meta: 'metaLeadForm',
@@ -181,6 +182,11 @@ export function localizeTimelineEventNotes(
         if (lower.includes('custom lead api') || lower.includes('custom api')) {
             const emailMatch = trimmed.match(/email:\s*(.+)/i);
             const base = t('timelineLeadFromCustomApi');
+            return emailMatch ? `${base} · ${emailMatch[1].trim()}` : base;
+        }
+        if (lower.includes('mujeb')) {
+            const emailMatch = trimmed.match(/email:\s*(.+)/i);
+            const base = t('timelineLeadFromMujeb');
             return emailMatch ? `${base} · ${emailMatch[1].trim()}` : base;
         }
         if (lower.includes('tiktok')) return t('timelineLeadFromTikTok');

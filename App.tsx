@@ -85,6 +85,7 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
         case 'Twilio':
         case 'AI':
         case 'Lead API':
+        case 'Mujeb':
         case 'PBX':
             return <IntegrationsPage key={currentPage} />;
         case 'Billing':
@@ -394,6 +395,7 @@ const TheApp = () => {
                 'openai': 'AI',
                 'lead api': 'Lead API',
                 'lead-api': 'Lead API',
+                'mujeb': 'Mujeb',
                 'pbx': 'PBX',
                 'call reports': 'Call Reports',
                 'call-reports': 'Call Reports',
@@ -666,6 +668,7 @@ const TheApp = () => {
             'openai': 'AI',
             'lead api': 'Lead API',
             'lead-api': 'Lead API',
+            'mujeb': 'Mujeb',
             'pbx': 'PBX',
             'call reports': 'Call Reports',
             'call-reports': 'Call Reports',

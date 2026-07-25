@@ -7,7 +7,7 @@ import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, Se
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, type MetaHealthResponse } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, getMujebConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
@@ -729,12 +729,14 @@ export const IntegrationsPage = () => {
             return 'openai';
         } else if (currentPage === 'Lead API') {
             return 'api';
+        } else if (currentPage === 'Mujeb') {
+            return 'mujeb';
         } else if (currentPage === 'PBX') {
             return 'pbx';
         }
         return undefined;
     }, [currentPage]);
-    const needsIntegrationPolicy = !!platformParam || currentPage === 'Twilio' || currentPage === 'AI' || currentPage === 'Lead API' || currentPage === 'PBX';
+    const needsIntegrationPolicy = !!platformParam || currentPage === 'Twilio' || currentPage === 'AI' || currentPage === 'Lead API' || currentPage === 'Mujeb' || currentPage === 'PBX';
     const { data: integrationPolicyMap } = useQuery({
         queryKey: ['integrationPolicy'],
         queryFn: getIntegrationPolicyAPI,
@@ -774,6 +776,12 @@ export const IntegrationsPage = () => {
         queryKey: ['leadApiConfig'],
         queryFn: getLeadApiConfigAPI,
         enabled: isLeadApiPage,
+    });
+    const isMujebPage = currentPage === 'Mujeb';
+    const { data: mujebConfig, isLoading: mujebLoading, refetch: refetchMujebConfig } = useQuery({
+        queryKey: ['mujebConfig'],
+        queryFn: getMujebConfigAPI,
+        enabled: isMujebPage,
     });
     const [leadApiKeyName, setLeadApiKeyName] = useState('');
     const [leadApiSecretModal, setLeadApiSecretModal] = useState<string | null>(null);
@@ -1097,6 +1105,317 @@ export const IntegrationsPage = () => {
         );
     }
 
+    if (currentPage === 'Mujeb') {
+        const endpointUrl = mujebConfig?.endpoint_url || '';
+        const statusRaw = String(mujebConfig?.integration_status || 'disconnected');
+        const isConnected = statusRaw === 'connected' || (mujebConfig?.keys?.length ?? 0) > 0;
+        const lastReceivedAt = mujebConfig?.last_received_at
+            ? new Date(mujebConfig.last_received_at).toLocaleString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))
+            : null;
+        const isCompanyAdmin = userRole === 'Owner';
+        const mujebPolicy = integrationPolicyMap?.mujeb;
+        const setupSteps = [
+            { step: 1, text: t('mujebStep1') },
+            { step: 2, text: t('mujebStep2') },
+            { step: 3, text: t('mujebStep3') },
+            { step: 4, text: t('mujebStep4') },
+        ];
+        const handleGenerateKey = async () => {
+            const name = leadApiKeyName.trim();
+            if (!name) {
+                showAlert(t('leadApiKeyName') || 'Key name', 'warning');
+                return;
+            }
+            setLeadApiKeyBusy(true);
+            try {
+                const data = await createLeadApiKeyAPI(name);
+                setLeadApiKeyName('');
+                setLeadApiSecretModal(data.api_key);
+                setShowLeadApiSecret(true);
+                refetchMujebConfig();
+            } catch (e: any) {
+                showAlert(e?.message || t('leadApiKeyCreateFailed'), 'error');
+            } finally {
+                setLeadApiKeyBusy(false);
+            }
+        };
+        const handleRotateKey = async (keyId: number) => {
+            setLeadApiKeyBusy(true);
+            try {
+                const data = await rotateLeadApiKeyAPI(keyId);
+                setLeadApiSecretModal(data.api_key);
+                setShowLeadApiSecret(true);
+                refetchMujebConfig();
+            } catch (e: any) {
+                showAlert(e?.message || t('leadApiKeyRotateFailed'), 'error');
+            } finally {
+                setLeadApiKeyBusy(false);
+            }
+        };
+        return (
+            <PageWrapper title={t('mujebTitle')}>
+                {mujebPolicy?.enabled === false ? (
+                    <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
+                        <div className="font-semibold">{t('integrationStatusDisabled')}</div>
+                        <div className="mt-1">{mujebPolicy.message || t('integrationDisabledDefaultMessage')}</div>
+                    </div>
+                ) : null}
+                <Card>
+                    <div className="max-w-2xl space-y-6">
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-14 w-14 items-center justify-center rounded-xl bg-teal-500/10 ring-1 ring-teal-500/25">
+                                <FileTextIcon className="h-8 w-8 text-teal-700 dark:text-teal-200" />
+                            </span>
+                            <div>
+                                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                                    {t('mujebTitle')}
+                                </h2>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {t('mujebDescription')}
+                                </p>
+                                <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <span
+                                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                            isConnected
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300'
+                                        }`}
+                                    >
+                                        {isConnected ? t('mujebStatusConnected') : t('mujebStatusPending')}
+                                    </span>
+                                    {lastReceivedAt && (
+                                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                                            {t('mujebLastReceived')} {lastReceivedAt}
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        {mujebLoading ? (
+                            <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                        ) : (
+                            <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        {t('mujebEndpoint')}
+                                    </label>
+                                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                                        {t('mujebEndpointHint')}
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            readOnly
+                                            value={endpointUrl}
+                                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm font-mono"
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => { if (endpointUrl) navigator.clipboard.writeText(endpointUrl); showAlert(t('copied') || 'Copied', 'info'); }}
+                                        >
+                                            {t('copy')}
+                                        </Button>
+                                    </div>
+                                </div>
+                                <div className="border border-gray-200 dark:border-gray-600 rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/50">
+                                    <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200 mb-3">
+                                        {t('mujebSetupSteps')}
+                                    </h3>
+                                    <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700 dark:text-gray-300">
+                                        {setupSteps.map(({ step, text }) => (
+                                            <li key={step}>{text}</li>
+                                        ))}
+                                    </ol>
+                                </div>
+                                <div className="space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
+                                        <h3 className="text-sm font-semibold text-gray-800 dark:text-gray-200">
+                                            {t('leadApiKeys')}
+                                        </h3>
+                                        {(mujebConfig?.keys?.length ?? 0) > 0 && (
+                                            <span className="inline-flex items-center rounded-full bg-teal-500/10 px-2.5 py-0.5 text-xs font-medium text-teal-800 dark:text-teal-200">
+                                                {mujebConfig?.keys?.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {!isCompanyAdmin && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400">{t('leadApiAdminOnly')}</p>
+                                    )}
+                                    {isCompanyAdmin && (
+                                        <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/80 dark:bg-gray-800/40 p-4">
+                                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-3">
+                                                {t('leadApiGenerateKey')}
+                                            </p>
+                                            <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
+                                                <div className="flex-1 min-w-0">
+                                                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                                        {t('leadApiKeyName')}
+                                                    </label>
+                                                    <Input
+                                                        value={leadApiKeyName}
+                                                        onChange={(e) => setLeadApiKeyName(e.target.value)}
+                                                        placeholder={t('leadApiKeyNamePlaceholder')}
+                                                    />
+                                                </div>
+                                                <Button
+                                                    variant="primary"
+                                                    className="shrink-0 w-full sm:w-auto"
+                                                    disabled={leadApiKeyBusy}
+                                                    loading={leadApiKeyBusy}
+                                                    onClick={handleGenerateKey}
+                                                >
+                                                    <PlusIcon className="h-4 w-4" />
+                                                    {t('leadApiGenerateKey')}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    )}
+                                    {(mujebConfig?.keys?.length ?? 0) === 0 ? (
+                                        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 px-4 py-8 text-center">
+                                            <FileTextIcon className="mx-auto h-10 w-10 text-gray-300 dark:text-gray-600 mb-2" />
+                                            <p className="text-sm text-gray-500 dark:text-gray-400">{t('leadApiNoKeys')}</p>
+                                        </div>
+                                    ) : (
+                                        <ul className="space-y-3">
+                                            {(mujebConfig?.keys || []).map((k) => {
+                                                const dateLocale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
+                                                const dateOpts = withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' });
+                                                const createdLabel = k.created_at
+                                                    ? new Date(k.created_at).toLocaleString(dateLocale, dateOpts)
+                                                    : '—';
+                                                const lastUsedLabel = k.last_used_at
+                                                    ? new Date(k.last_used_at).toLocaleString(dateLocale, dateOpts)
+                                                    : t('leadApiKeyNeverUsed');
+                                                return (
+                                                    <li
+                                                        key={k.id}
+                                                        className="rounded-xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800/60 shadow-sm overflow-hidden"
+                                                    >
+                                                        <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                                            <div className="flex min-w-0 flex-1 items-start gap-3">
+                                                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-100 dark:bg-teal-900/40 text-teal-700 dark:text-teal-300">
+                                                                    <FileTextIcon className="h-5 w-5" />
+                                                                </span>
+                                                                <div className="min-w-0 flex-1">
+                                                                    <p className="font-semibold text-gray-900 dark:text-white truncate">
+                                                                        {k.name}
+                                                                    </p>
+                                                                    <bdi
+                                                                        dir="ltr"
+                                                                        className="mt-1 block max-w-full rounded-md bg-gray-100 dark:bg-gray-900/80 px-2 py-1 font-mono text-xs text-gray-600 dark:text-gray-300 text-left [unicode-bidi:isolate]"
+                                                                    >
+                                                                        <span className="text-gray-900 dark:text-gray-100">{k.key_prefix}</span>
+                                                                        <span className="text-gray-400 dark:text-gray-500 select-none tracking-wider">
+                                                                            {'•'.repeat(12)}
+                                                                        </span>
+                                                                        {k.key_suffix ? (
+                                                                            <span className="text-gray-900 dark:text-gray-100">{k.key_suffix}</span>
+                                                                        ) : null}
+                                                                    </bdi>
+                                                                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 dark:text-gray-400">
+                                                                        <span>
+                                                                            <span className="font-medium text-gray-600 dark:text-gray-300">
+                                                                                {t('leadApiKeyCreated')}:
+                                                                            </span>{' '}
+                                                                            {createdLabel}
+                                                                        </span>
+                                                                        <span>
+                                                                            <span className="font-medium text-gray-600 dark:text-gray-300">
+                                                                                {t('leadApiKeyLastUsed')}:
+                                                                            </span>{' '}
+                                                                            {lastUsedLabel}
+                                                                        </span>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                            {isCompanyAdmin && (
+                                                                <div className="flex shrink-0 flex-row gap-2 sm:flex-col sm:items-stretch lg:flex-row">
+                                                                    <Button
+                                                                        variant="secondary"
+                                                                        className="flex-1 sm:flex-none text-sm px-3 py-1.5"
+                                                                        disabled={leadApiKeyBusy}
+                                                                        title={t('leadApiRotateKey')}
+                                                                        onClick={() => handleRotateKey(k.id)}
+                                                                    >
+                                                                        {t('leadApiRotateKey')}
+                                                                    </Button>
+                                                                    <Button
+                                                                        variant="danger"
+                                                                        className="flex-1 sm:flex-none text-sm px-3 py-1.5 inline-flex items-center justify-center gap-1.5"
+                                                                        disabled={leadApiKeyBusy}
+                                                                        title={t('leadApiRevokeKey')}
+                                                                        onClick={() => {
+                                                                            setConfirmDeleteConfig({
+                                                                                title: t('leadApiRevokeKey'),
+                                                                                message: t('leadApiConfirmRevokeMessage'),
+                                                                                itemName: k.name,
+                                                                                onConfirm: async () => {
+                                                                                    setLeadApiKeyBusy(true);
+                                                                                    try {
+                                                                                        await revokeLeadApiKeyAPI(k.id);
+                                                                                        refetchMujebConfig();
+                                                                                        showAlert(t('leadApiRevokeKey'), 'info');
+                                                                                    } catch (e: any) {
+                                                                                        showAlert(e?.message || t('leadApiKeyRevokeFailed'), 'error');
+                                                                                    } finally {
+                                                                                        setLeadApiKeyBusy(false);
+                                                                                    }
+                                                                                },
+                                                                            });
+                                                                            setIsConfirmDeleteModalOpen(true);
+                                                                        }}
+                                                                    >
+                                                                        <TrashIcon className="h-4 w-4" />
+                                                                        {t('leadApiRevokeKey')}
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </li>
+                                                );
+                                            })}
+                                        </ul>
+                                    )}
+                                </div>
+                            </>
+                        )}
+                    </div>
+                </Card>
+                <Modal
+                    isOpen={!!leadApiSecretModal}
+                    onClose={() => { setLeadApiSecretModal(null); setShowLeadApiSecret(false); }}
+                    title={t('leadApiNewKeyTitle')}
+                >
+                    <p className="text-sm text-amber-600 dark:text-amber-400 mb-3">{t('leadApiNewKeyWarning')}</p>
+                    <div className="flex gap-2">
+                        <input
+                            readOnly
+                            type={showLeadApiSecret ? 'text' : 'password'}
+                            value={leadApiSecretModal || ''}
+                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 px-3 py-2 text-sm font-mono"
+                        />
+                        <button
+                            type="button"
+                            className="p-2 text-gray-500 hover:text-gray-700"
+                            onClick={() => setShowLeadApiSecret((v) => !v)}
+                            aria-label="Toggle visibility"
+                        >
+                            {showLeadApiSecret ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                        </button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                if (leadApiSecretModal) navigator.clipboard.writeText(leadApiSecretModal);
+                                showAlert(t('copied') || 'Copied', 'info');
+                            }}
+                        >
+                            {t('copy')}
+                        </Button>
+                    </div>
+                </Modal>
+            </PageWrapper>
+        );
+    }
+
     if (currentPage === 'Lead API') {
         const endpointUrl = leadApiConfig?.endpoint_url || '';
         const docLanguage = language === 'ar' ? 'ar' : 'en';
@@ -1126,7 +1445,7 @@ export const IntegrationsPage = () => {
                 setShowLeadApiSecret(true);
                 refetchLeadApiConfig();
             } catch (e: any) {
-                showAlert(e?.message || 'Failed to create key', 'error');
+                showAlert(e?.message || t('leadApiKeyCreateFailed'), 'error');
             } finally {
                 setLeadApiKeyBusy(false);
             }
@@ -1139,7 +1458,7 @@ export const IntegrationsPage = () => {
                 setShowLeadApiSecret(true);
                 refetchLeadApiConfig();
             } catch (e: any) {
-                showAlert(e?.message || 'Failed to rotate key', 'error');
+                showAlert(e?.message || t('leadApiKeyRotateFailed'), 'error');
             } finally {
                 setLeadApiKeyBusy(false);
             }
@@ -1385,7 +1704,7 @@ export const IntegrationsPage = () => {
                                                                                         refetchLeadApiConfig();
                                                                                         showAlert(t('leadApiRevokeKey'), 'info');
                                                                                     } catch (e: any) {
-                                                                                        showAlert(e?.message || 'Failed to revoke key', 'error');
+                                                                                        showAlert(e?.message || t('leadApiKeyRevokeFailed'), 'error');
                                                                                     } finally {
                                                                                         setLeadApiKeyBusy(false);
                                                                                     }

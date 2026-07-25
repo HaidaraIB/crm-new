@@ -832,6 +832,12 @@ export const LeadsPage = () => {
                                                                     {t('leadApiSource') || 'Custom API'}
                                                                 </span>
                                                             );
+                                                        } else if (source === 'mujeb') {
+                                                            return (
+                                                                <span className={`${sourceBadgeClass} bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200`}>
+                                                                    {t('mujebSource') || 'Mujeb'}
+                                                                </span>
+                                                            );
                                                         }
                                                         return (
                                                             <span className={`${sourceBadgeClass} bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200`}>

@@ -13,7 +13,7 @@ export type Page =
   | 'Campaigns'
   | 'Messaging Center'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
-  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'PBX'
+  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'Mujeb' | 'PBX'
   | 'Call Reports'
   | 'Change Plan' | 'Payment' | 'Subscription' | 'PaymentSuccess'
   | 'Support Center'

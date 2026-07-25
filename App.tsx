@@ -112,7 +112,7 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
 }
 
 const TheApp = () => {
-    const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, isTeamChatDialogOpen, setIsTeamChatDialogOpen, isNotificationsDialogOpen, setIsNotificationsDialogOpen, selectedLead } = useAppContext();
+    const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, isUserDataReady, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, isTeamChatDialogOpen, setIsTeamChatDialogOpen, isNotificationsDialogOpen, setIsNotificationsDialogOpen, selectedLead } = useAppContext();
     const fieldVisitsAllowed = useFieldVisitAllowed();
     useTeamChatAwayNotifications();
     React.useEffect(() => {
@@ -979,7 +979,7 @@ const TheApp = () => {
             <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
                 <Header isInternetOnline={isInternetOnline} />
                 {/* Check if payment success message exists - if so, don't show email verification message */}
-                {!hasPaymentSuccessMessage && isLoggedIn && currentUser && currentUser.emailVerified === false && (
+                {!hasPaymentSuccessMessage && isLoggedIn && isUserDataReady && currentUser && currentUser.emailVerified === false && (
                     <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3 flex-1">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">

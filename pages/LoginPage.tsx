@@ -185,6 +185,13 @@ export const LoginPage = () => {
                     specialization: (userData.company_specialization || (typeof userData.company === 'object' ? userData.company.specialization : 'real_estate')) as 'real_estate' | 'services' | 'products' | 'medical',
                 } : undefined,
                 language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
+                ...((() => {
+                    const verified =
+                        userData.email_verified ?? userData.is_email_verified ?? userData.emailVerified;
+                    if (verified === undefined || verified === null) return {};
+                    const emailVerified = Boolean(verified);
+                    return { emailVerified, email_verified: emailVerified };
+                })()),
             };
 
             localStorage.setItem('accessToken', accessToken);

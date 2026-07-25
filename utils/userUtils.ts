@@ -54,7 +54,20 @@ export const normalizeUser = (userData: any): User => {
         : '',
       subscription: typeof userData.company === 'object' ? userData.company.subscription : undefined,
     } : undefined,
-    emailVerified: userData.email_verified || userData.is_email_verified || userData.emailVerified || false,
+    // Only treat as unverified when the API/storage explicitly says so — never
+    // default missing fields to false (that caused a login banner flash).
+    emailVerified: (() => {
+      if (
+        !('email_verified' in userData) &&
+        !('is_email_verified' in userData) &&
+        !('emailVerified' in userData)
+      ) {
+        return undefined;
+      }
+      return Boolean(
+        userData.email_verified ?? userData.is_email_verified ?? userData.emailVerified
+      );
+    })(),
     supervisor_permissions: userData.supervisor_permissions ?? undefined,
     language: (userData.language === 'ar' || userData.language === 'en') ? userData.language : undefined,
     last_seen_at: userData.last_seen_at ?? null,

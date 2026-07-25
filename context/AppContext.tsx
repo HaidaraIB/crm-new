@@ -101,6 +101,8 @@ export interface AppContextType {
   setSelectedUser: (user: User | null) => void;
   currentUser: User | null;
   setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
+  /** True after auth profile has been loaded/synced (avoid UI flashes from stale localStorage). */
+  isUserDataReady: boolean;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (isOpen: boolean) => void;
   isAddLeadModalOpen: boolean;
@@ -1408,6 +1410,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     selectedLeadForDeal, setSelectedLeadForDeal,
     selectedUser, setSelectedUser,
     currentUser, setCurrentUser,
+    isUserDataReady: dataLoaded,
     hasSupervisorPermission,
     canAccessPage,
     isSidebarOpen, setIsSidebarOpen,

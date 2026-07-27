@@ -18,7 +18,7 @@ import {
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
-  createLeadAPI, updateLeadAPI, deleteLeadAPI,
+  createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
   createDealAPI, updateDealAPI, deleteDealAPI,
@@ -660,6 +660,26 @@ export const useUpdateLead = (options?: UseMutationOptions<any, Error, { id: num
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       // Return the updated data so components can use it
+      return data;
+    },
+    ...options,
+  });
+};
+
+/** Partial lead update (e.g. Kanban status move) — uses PATCH. */
+export const usePatchLead = (
+  options?: UseMutationOptions<any, Error, { id: number; data: Record<string, unknown> }>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
+      patchLeadAPI(id, data),
+    onSuccess: (data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.id) });
+      queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       return data;
     },
     ...options,

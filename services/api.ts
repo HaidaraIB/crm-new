@@ -2134,6 +2134,17 @@ export const updateLeadAPI = async (leadId: number, leadData: any) => {
 };
 
 /**
+ * Partial update Client (Lead) — e.g. status-only moves on the Kanban board.
+ * PATCH /api/clients/:id/
+ */
+export const patchLeadAPI = async (leadId: number, leadData: Record<string, unknown>) => {
+  return apiRequest<any>(`/clients/${leadId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(leadData),
+  });
+};
+
+/**
  * حذف Client (Lead)
  * DELETE /api/clients/:id/
  */

@@ -105,3 +105,4 @@ export * from './PaymentGatewaySelector';
 export * from './LeadContactPhone';
 export * from './LegalLinks';
 export * from './PlanEntitlementsSummary';
+export * from './kanban';

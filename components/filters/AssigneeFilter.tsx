@@ -94,7 +94,7 @@ export const AssigneeFilter = () => {
 
       {isOpen && (
         <div className="absolute z-30 mt-2 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
-          <div className="p-2 border-b border-gray-100 dark:border-gray-800">
+          <div className="p-2 border-b border-gray-200 dark:border-gray-700">
             <input
               ref={searchInputRef}
               type="text"
@@ -102,7 +102,7 @@ export const AssigneeFilter = () => {
               onChange={(e) => setQuery(e.target.value)}
               placeholder={t('search' as any) || 'Search'}
               dir={language === 'ar' ? 'rtl' : 'ltr'}
-              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+              className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
             />
           </div>
 
@@ -110,18 +110,18 @@ export const AssigneeFilter = () => {
             <button
               type="button"
               onClick={() => applyFilter('All')}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${currentValue === 'All' ? 'font-semibold text-primary' : 'text-gray-800 dark:text-gray-200'}`}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${currentValue === 'All' ? 'font-semibold bg-primary/10 text-primary-700 dark:bg-primary/25 dark:text-primary-200' : 'text-gray-800 dark:text-gray-200'}`}
             >
               {currentValue === 'All' ? '✓ ' : ''}{t('allEmployees' as any) || 'All employees'}
             </button>
             <button
               type="button"
               onClick={() => applyFilter('Unassigned')}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${currentValue === 'Unassigned' ? 'font-semibold text-primary' : 'text-gray-800 dark:text-gray-200'}`}
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${currentValue === 'Unassigned' ? 'font-semibold bg-primary/10 text-primary-700 dark:bg-primary/25 dark:text-primary-200' : 'text-gray-800 dark:text-gray-200'}`}
             >
               {currentValue === 'Unassigned' ? '✓ ' : ''}{t('unassigned' as any) || 'Unassigned'}
             </button>
-            <div className="my-1 border-t border-gray-100 dark:border-gray-800" />
+            <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
             {visibleUsers.map((user) => {
               const value = user.id.toString();
               const selected = currentValue === value;
@@ -130,7 +130,7 @@ export const AssigneeFilter = () => {
                   key={user.id}
                   type="button"
                   onClick={() => applyFilter(value)}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${selected ? 'font-semibold text-primary' : 'text-gray-800 dark:text-gray-200'}`}
+                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${selected ? 'font-semibold bg-primary/10 text-primary-700 dark:bg-primary/25 dark:text-primary-200' : 'text-gray-800 dark:text-gray-200'}`}
                 >
                   {selected ? '✓ ' : ''}{getUserDisplayName(user)}
                 </button>

@@ -1,0 +1,40 @@
+---
+description: Reusable Kanban board pattern for table/board entity views (leads, deals, etc.)
+globs: "**/components/kanban/**,**/components/leads/**,**/pages/LeadsPage.tsx,**/pages/DealsPage.tsx"
+alwaysApply: false
+---
+
+# Kanban board view pattern
+
+Use the shared module in `components/kanban/` whenever an entity list needs a **table | board** preference with drag-and-drop column moves (status/stage pipeline).
+
+## Public API
+
+Import from `components/kanban` (also re-exported from `components/index`):
+
+- `useEntityViewMode(entity)` — persists `table | board` in `localStorage` under `crm:viewMode:{entity}`. **Default is `table`.**
+- `ViewModeToggle` — localized segmented control
+- `KanbanBoard` — generic DnD board (`@dnd-kit/core`)
+- Types: `EntityViewMode`, `KanbanColumnDef`, `KanbanMoveEvent`
+
+## How to adopt (e.g. Deals)
+
+1. `const [viewMode, setViewMode] = useEntityViewMode('deals')`
+2. Render `<ViewModeToggle value={viewMode} onChange={setViewMode} />` next to list toolbar controls
+3. When `viewMode === 'board'`:
+   - Columns = pipeline axis: for **Deals use `Deal.stage`** (`won` | `lost` | `on_hold` | `in_progress` | `cancelled`), not reservation/contract status
+   - For **Leads use company `Status` rows** (`settings/statuses`), column id = status id
+4. Pass domain cards via `renderCard`; keep DnD in `KanbanBoard` / `KanbanCardShell`
+5. On `onMove`, **PATCH only the moved field** (leads: `{ status: id }` via `patchLeadAPI` / `usePatchLead`; deals: `{ stage }` via existing deal update). Prefer PATCH over full PUT payloads
+6. **Optimistic UI** + rollback on failure; invalidate the entity list + related count queries
+7. **Per-column pagination** (page size ~30 + Load more) — do not fetch the entire entity set into the board
+8. Disable table list query when board is active (`enabled: viewMode === 'table'`) and vice versa for board column queries
+9. Hide status/stage filter tabs in board mode (columns already represent that axis)
+10. Respect role permissions (e.g. DataEntry: no drag / no open), RTL, and **localize every string** in `constants.ts` (`en` + `ar`) with `t()`
+
+## Do not
+
+- Duplicate a one-off DnD board inside a page when `components/kanban` can host it
+- Change the default view away from `table` without product approval
+- Block or rewrite the existing table path when adding board mode
+- Touch `crm_mobile` for this pattern unless explicitly requested

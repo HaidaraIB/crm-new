@@ -2,8 +2,9 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode } from '../components/index';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
+import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead, LeadApiFilters } from '../types';
@@ -79,8 +80,10 @@ export const LeadsPage = () => {
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
     const [leadsPageSize, setLeadsPageSize] = useState(20);
     const [activeStatusFilter, setActiveStatusFilter] = useState<Lead['status']>('All');
+    const [viewMode, setViewMode] = useEntityViewMode('leads');
+    const isBoardView = viewMode === 'board';
 
-    const apiFilters = useMemo((): LeadApiFilters => {
+    const baseLeadFilters = useMemo((): LeadApiFilters => {
         const filters: LeadApiFilters = {};
 
         switch (currentPage) {
@@ -101,12 +104,6 @@ export const LeadsPage = () => {
             filters.priority = leadFilters.priority.toLowerCase();
         }
 
-        if (leadFilters.status && leadFilters.status !== 'All') {
-            filters.status = leadFilters.status;
-        } else if (activeStatusFilter !== 'All') {
-            filters.status = activeStatusFilter;
-        }
-
         if (currentPage !== 'My Leads' && leadFilters.assignedTo && leadFilters.assignedTo !== 'All') {
             filters.assignedTo = leadFilters.assignedTo === 'Unassigned' ? 'unassigned' : leadFilters.assignedTo;
         }
@@ -120,14 +117,34 @@ export const LeadsPage = () => {
         if (leadFilters.createdAtTo) filters.createdAtTo = leadFilters.createdAtTo;
 
         return filters;
-    }, [currentPage, leadFilters, activeStatusFilter]);
+    }, [currentPage, leadFilters]);
+
+    const apiFilters = useMemo((): LeadApiFilters => {
+        const filters: LeadApiFilters = { ...baseLeadFilters };
+
+        if (leadFilters.status && leadFilters.status !== 'All') {
+            filters.status = leadFilters.status;
+        } else if (activeStatusFilter !== 'All') {
+            filters.status = activeStatusFilter;
+        }
+
+        return filters;
+    }, [baseLeadFilters, leadFilters.status, activeStatusFilter]);
+
+    /** Board columns are statuses — never filter the board by a single status. */
+    const boardBaseFilters = baseLeadFilters;
 
     const statusCountsFilters = useMemo((): LeadApiFilters => {
         const { status: _status, ...rest } = apiFilters;
         return rest;
     }, [apiFilters]);
 
-    const { data: leadsResponse, isLoading: leadsLoading, error: leadsError } = useLeads(apiFilters, leadsPageNumber, undefined, leadsPageSize);
+    const { data: leadsResponse, isLoading: leadsLoading, error: leadsError } = useLeads(
+        apiFilters,
+        leadsPageNumber,
+        { enabled: !isBoardView },
+        leadsPageSize,
+    );
     const { data: statusCounts } = useLeadStatusCounts(statusCountsFilters);
     const allLeads = leadsResponse?.results || [];
     const totalLeadsCount = leadsResponse?.count || 0;
@@ -527,7 +544,7 @@ export const LeadsPage = () => {
     
     const isAllSelected = normalizedLeads.length > 0 && checkedLeadIds.size === normalizedLeads.length;
 
-    if (leadsLoading) {
+    if (!isBoardView && leadsLoading) {
         return (
             <PageWrapper title={pageTitle}>
                 <PageLoadingState label={t('loadingLeads') || 'Loading leads'} />
@@ -535,7 +552,7 @@ export const LeadsPage = () => {
         );
     }
 
-    if (leadsError) {
+    if (!isBoardView && leadsError) {
         return (
             <PageWrapper title={pageTitle}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
@@ -622,6 +639,7 @@ export const LeadsPage = () => {
                     </div>
             }
         >
+            {!isBoardView && (
             <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-thin">
                 {leadStatusFilters.map(status => {
                     const count = statusCounts?.[status] ?? 0;
@@ -645,6 +663,7 @@ export const LeadsPage = () => {
                     )
                 })}
             </div>
+            )}
             <div className="flex w-full flex-col gap-2 mt-3 mb-4">
                 <div className="flex w-full flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex w-full min-w-0 gap-2">
@@ -689,11 +708,36 @@ export const LeadsPage = () => {
                             {t('search')}
                         </Button>
                     </div>
-                    {canUseAssigneeQuickFilter && (
-                        <AssigneeFilter />
-                    )}
+                    <div className="flex w-full sm:w-auto items-center justify-between sm:justify-end gap-2 shrink-0">
+                        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                        {canUseAssigneeQuickFilter && (
+                            <AssigneeFilter />
+                        )}
+                    </div>
                 </div>
             </div>
+            {isBoardView ? (
+                <div className="mt-2">
+                    <LeadsKanbanView
+                        baseFilters={boardBaseFilters}
+                        statuses={statuses}
+                        statusCounts={statusCounts}
+                        users={users}
+                        canDrag={!isDataEntryUser}
+                        canOpenLead={!isDataEntryUser}
+                        onOpenLead={(lead) => handleViewLead(lead as Lead)}
+                        getStatusLabel={(statusName) =>
+                            t(getStatusTranslationKey(statusName as Lead['status']) as any) || statusName
+                        }
+                        enabled={isBoardView}
+                        showPhoneActions={!isDataEntryUser}
+                        onSms={(lead, phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
+                        onWhatsApp={(lead, phone) =>
+                            setSendWhatsAppModal({ leadId: lead.id, phone, lead })
+                        }
+                    />
+                </div>
+            ) : (
             <Card>
                 <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
                     <div className="min-w-full block">
@@ -1064,6 +1108,7 @@ export const LeadsPage = () => {
                     </div>
                 </div>
             </Card>
+            )}
         </PageWrapper>
         <ImportLeadsModal
             isOpen={isImportLeadsModalOpen}

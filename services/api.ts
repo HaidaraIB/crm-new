@@ -1159,19 +1159,9 @@ export interface CheckPaymentStatusResponse {
 export const checkPaymentStatusAPI = async (
   subscriptionId: number
 ): Promise<CheckPaymentStatusResponse> => {
-  const response = await fetch(`${BASE_URL}/payment-status/${subscriptionId}/`, {
+  return apiRequest<CheckPaymentStatusResponse>(`/payment-status/${subscriptionId}/`, {
     method: 'GET',
-    headers: getHeadersWithApiKey({
-      'Content-Type': 'application/json',
-    }),
   });
-
-  const raw = await readJsonResponse(response);
-
-  if (!response.ok) {
-    throwApiError(raw, 'Failed to check payment status');
-  }
-  return unwrapApiSuccess<CheckPaymentStatusResponse>(raw);
 };
 
 /**
@@ -1245,6 +1235,56 @@ export const scheduleSubscriptionDowngradeAPI = async (
     }),
     body: JSON.stringify(body),
   });
+};
+
+/** POST /api/subscriptions/cancel-pending-plan-change/ */
+export const cancelPendingPlanChangeAPI = async () => {
+  return apiRequest<any>('/subscriptions/cancel-pending-plan-change/', {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+    }),
+  });
+};
+
+export type CompanyInvoiceListItem = {
+  id: number;
+  payment?: number | null;
+  invoice_number: string;
+  company_name?: string;
+  amount: string | number;
+  currency?: string;
+  payment_status?: string;
+  due_date?: string | null;
+  created_at?: string;
+};
+
+/** GET /api/invoices/ — tenant company admin sees own company invoices */
+export const getMyCompanyInvoicesAPI = async (params?: {
+  ordering?: string;
+}): Promise<CompanyInvoiceListItem[]> => {
+  const search = new URLSearchParams();
+  if (params?.ordering) search.set('ordering', params.ordering);
+  const qs = search.toString();
+  const data = await apiRequest<any>(`/invoices/${qs ? `?${qs}` : ''}`, {
+    method: 'GET',
+  });
+  if (Array.isArray(data)) return data;
+  if (Array.isArray(data?.results)) return data.results;
+  return [];
+};
+
+/** GET /api/invoices/{id}/pdf/ — binary PDF for company admin / platform admin */
+export const downloadMyInvoicePdfAPI = async (id: number): Promise<Blob> => {
+  const headers = getAuthenticatedBinaryRequestHeaders();
+  const response = await fetch(`${BASE_URL}/invoices/${id}/pdf/`, {
+    method: 'GET',
+    headers,
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to download invoice PDF (${response.status})`);
+  }
+  return response.blob();
 };
 
 /**

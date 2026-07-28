@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, PlanEntitlementsSummary } from '../components/index';
+import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, PlanEntitlementsSummary, PaymentResultBanner } from '../components/index';
 import {
     getPublicPlansAPI,
     createPaymentSessionAPI,
@@ -12,6 +12,9 @@ import {
 } from '../services/api';
 import { isRedundantPlanDescription, isFreeTrialPlan } from '../utils/planEntitlements';
 import { withLatinDigits } from '../utils/dateUtils';
+import { isFibSessionPayload, routeToFibPaymentPage, getPendingSubscriptionId } from '../utils/paymentSession';
+import { hydratePaymentAccessToken } from '../utils/paymentAuth';
+import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
 
 type PublicPlan = {
     id: number;
@@ -51,21 +54,6 @@ export const ChangePlanPage = () => {
     } | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
 
-    const isFibSessionPayload = (response: any) =>
-        response?.payment_id != null &&
-        (response?.qr_code || response?.readable_code || response?.personal_app_link);
-
-    const routeToFibPaymentPage = (subId: string, response: any) => {
-        try {
-            sessionStorage.setItem(`fibPaymentData:${subId}`, JSON.stringify(response));
-            sessionStorage.setItem('fibPaymentLatestSubscriptionId', String(subId));
-            localStorage.setItem('pendingSubscriptionId', String(subId));
-        } catch (e) {
-            console.warn('Failed to cache FIB payment payload:', e);
-        }
-        window.location.href = `/payment?subscription_id=${subId}`;
-    };
-
     useEffect(() => {
         // Get subscription_id from URL
         const urlParams = new URLSearchParams(window.location.search);
@@ -103,8 +91,8 @@ export const ChangePlanPage = () => {
                         }
                     } catch (error) {
                         console.error('Error loading subscription ID:', error);
-                        // Fallback to localStorage
-                        const pendingSubId = localStorage.getItem('pendingSubscriptionId');
+                        // Fallback to pending subscription handoff
+                        const pendingSubId = getPendingSubscriptionId();
                         if (pendingSubId) {
                             setSubscriptionId(pendingSubId);
                         }
@@ -112,8 +100,7 @@ export const ChangePlanPage = () => {
                 };
                 loadSubscriptionId();
             } else {
-                // Try to get from localStorage
-                const pendingSubId = localStorage.getItem('pendingSubscriptionId');
+                const pendingSubId = getPendingSubscriptionId();
                 if (pendingSubId) {
                     setSubscriptionId(pendingSubId);
                 }
@@ -227,11 +214,7 @@ export const ChangePlanPage = () => {
         }
 
         if (currentPlanId != null && selectedPlan === currentPlanId) {
-            alert(
-                language === 'ar'
-                    ? 'أنت مشترك بالفعل في هذه الخطة. اختر خطة أخرى.'
-                    : 'This is already your current plan. Choose a different plan.'
-            );
+            alert(t('alreadyOnCurrentPlan') || 'This is already your current plan. Choose a different plan.');
             return;
         }
 
@@ -253,9 +236,8 @@ export const ChangePlanPage = () => {
                     setIsProcessing(true);
                     await scheduleSubscriptionDowngradeAPI(selectedPlan, billingCycle);
                     alert(
-                        language === 'ar'
-                            ? 'تم جدولة التخفيض لنهاية فترة الفوترة الحالية.'
-                            : 'Downgrade scheduled for the end of your current billing period.'
+                        t('downgradeScheduledSuccess') ||
+                            'Downgrade scheduled for the end of your current billing period.',
                     );
                 } catch (e: any) {
                     alert(e?.message || 'Error');
@@ -275,6 +257,7 @@ export const ChangePlanPage = () => {
 
         try {
             setIsProcessing(true);
+            hydratePaymentAccessToken();
             const response: CreatePaymentSessionResult = await createPaymentSessionAPI(
                 parseInt(subscriptionId),
                 selectedGateway,
@@ -282,8 +265,18 @@ export const ChangePlanPage = () => {
                 billingCycle
             );
             if (response.redirect_url) {
+                setPaymentCheckoutContext({
+                    returnTo: 'ChangePlan',
+                    messageKey: 'planChangeSuccess',
+                    titleKey: 'paymentSuccess',
+                });
                 window.location.href = response.redirect_url;
             } else if (isFibSessionPayload(response)) {
+                setPaymentCheckoutContext({
+                    returnTo: 'ChangePlan',
+                    messageKey: 'planChangeSuccess',
+                    titleKey: 'paymentSuccess',
+                });
                 routeToFibPaymentPage(subscriptionId, response);
             } else {
                 alert(t('paymentRedirectError') || 'Failed to get payment URL');
@@ -308,6 +301,7 @@ export const ChangePlanPage = () => {
 
     return (
         <PageWrapper title={t('changePlan') || 'Change Plan'}>
+            <PaymentResultBanner autoHideMs={20000} />
             <div className="max-w-6xl mx-auto space-y-6">
                 <Card>
                     <h2 className="text-2xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">
@@ -425,16 +419,16 @@ export const ChangePlanPage = () => {
                                     }}
                                     className={`p-6 border-2 rounded-lg transition-all ${
                                         isLocked
-                                            ? 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/40 opacity-75 cursor-not-allowed'
+                                            ? 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-800/60 cursor-not-allowed'
                                             : `cursor-pointer ${
                                                   selectedPlan === plan.id
                                                       ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                                                      : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
+                                                      : 'border-gray-200 dark:border-gray-600 hover:border-primary/50'
                                               }`
                                     }`}
                                 >
                                     <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-xl font-semibold">
+                                        <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                                             {displayName}
                                         </h3>
                                         {isCurrentPlan && (
@@ -456,11 +450,11 @@ export const ChangePlanPage = () => {
                                         )}
                                     </div>
                                     {showPlanDescription && (
-                                        <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
+                                        <p className="text-gray-600 dark:text-gray-300 mb-4 text-sm">
                                             {resolvedDesc}
                                         </p>
                                     )}
-                                    <div className="text-2xl font-bold text-primary mb-4">
+                                    <div className="text-2xl font-bold text-primary-700 dark:text-primary-300 mb-4">
                                         {getPlanPriceLabel(plan)}
                                     </div>
                                     <PlanEntitlementsSummary

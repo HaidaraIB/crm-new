@@ -200,7 +200,7 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
     'messaging-center', 'team-chat', 'todos', 'reports', 'integrations',
     'meta', 'tiktok', 'tik-tok', 'whatsapp', 'whats-app', 'twilio', 'ai', 'openai', 'lead-api', 'mujeb', 'pbx',
     'settings', 'profile',
-    'billing', 'payment', 'subscription', 'support-center', 'support', 'login', 'register', 'forgot-password',
+    'billing', 'payment', 'payment/success', 'payment/return', 'subscription', 'support-center', 'support', 'login', 'register', 'forgot-password',
     'reset-password', 'verify-email', 'verify-phone', '2fa', 'payment-success', 'change-plan',
     'create-lead', 'edit-lead', 'view-lead', 'create-deal',
     'terms-of-service', 'terms', 'privacy-policy', 'privacy', 'data-deletion-policy', 'data-deletion'

@@ -8,6 +8,16 @@ import {
     type CheckPaymentStatusResponse,
 } from '../services/api';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import { hydratePaymentAccessToken, paymentLoginUrl } from '../utils/paymentAuth';
+import {
+    getFibPaymentSession,
+    resolveSubscriptionIdFromContext,
+    setFibPaymentSession,
+    setPendingSubscriptionId,
+    paymentSuccessUrl,
+    type FibPaymentSessionPayload,
+} from '../utils/paymentSession';
+import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
 
 type FibPaymentData = {
     payment_id: string;
@@ -18,6 +28,18 @@ type FibPaymentData = {
     personal_app_link: string | null;
     valid_until: string | null;
 };
+
+function toFibPaymentData(parsed: FibPaymentSessionPayload): FibPaymentData {
+    return {
+        payment_id: String(parsed.payment_id),
+        qr_code: (parsed.qr_code as string) || null,
+        readable_code: (parsed.readable_code as string) || null,
+        business_app_link: (parsed.business_app_link as string) || null,
+        corporate_app_link: (parsed.corporate_app_link as string) || null,
+        personal_app_link: (parsed.personal_app_link as string) || null,
+        valid_until: (parsed.valid_until as string) || null,
+    };
+}
 
 const FIB_INITIAL_STATUS_DELAY_MS = 15000;
 const FIB_POLL_INTERVAL_MS = 5000;
@@ -34,78 +56,38 @@ export const PaymentPage = () => {
     const pollStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        // Get subscription_id from URL (with resilient fallbacks for FIB renewal/change flows)
+        hydratePaymentAccessToken();
+
         const urlParams = new URLSearchParams(window.location.search);
         const subIdFromUrl = urlParams.get('subscription_id');
         const status = urlParams.get('status');
         const gatewayId = urlParams.get('gateway_id');
-        let subId = subIdFromUrl;
+        const subId = resolveSubscriptionIdFromContext(subIdFromUrl);
 
-        if (!subId) {
-            subId = localStorage.getItem('pendingSubscriptionId');
-        }
-        if (!subId) {
-            subId = sessionStorage.getItem('fibPaymentLatestSubscriptionId');
-        }
-        if (!subId) {
-            try {
-                const fibKeys: string[] = [];
-                for (let i = 0; i < sessionStorage.length; i += 1) {
-                    const key = sessionStorage.key(i);
-                    if (key && key.startsWith('fibPaymentData:')) fibKeys.push(key);
-                }
-                if (fibKeys.length === 1) {
-                    subId = fibKeys[0].replace('fibPaymentData:', '');
-                }
-            } catch (_) {}
-        }
-        
-        // If we have status parameter, we're coming back from payment gateway - redirect to success
         if (status && subId) {
-            window.location.href = `/payment/success?subscription_id=${subId}&status=${status}`;
-            return;
-        }
-        
-        // If no subscription_id, show error and redirect to login
-        if (!subId) {
-            console.error('No subscription_id found in payment page');
-            setError(t('paymentSubscriptionIdRequired') || 'Subscription ID is required');
-            setTimeout(() => {
-                window.location.href = '/login';
-            }, 3000);
+            window.location.href = paymentSuccessUrl(subId, status);
             return;
         }
 
+        if (!subId) {
+            setError(t('paymentSubscriptionIdRequired') || 'Subscription ID is required');
+            setShowGatewaySelection(false);
+            return;
+        }
+
+        setPendingSubscriptionId(subId);
         if (!subIdFromUrl) {
             window.history.replaceState({}, '', `/payment?subscription_id=${subId}`);
         }
-        
+
         setSubscriptionId(subId);
 
-        // If a previous flow (billing/change-plan) already created an FIB payment session,
-        // reuse it here so the user sees the same FIB QR/app-links screen as registration.
-        try {
-            const cachedFibData = sessionStorage.getItem(`fibPaymentData:${subId}`);
-            if (cachedFibData) {
-                const parsed = JSON.parse(cachedFibData);
-                if (parsed?.payment_id != null) {
-                    setFibPaymentData({
-                        payment_id: String(parsed.payment_id),
-                        qr_code: parsed.qr_code || null,
-                        readable_code: parsed.readable_code || null,
-                        business_app_link: parsed.business_app_link || null,
-                        corporate_app_link: parsed.corporate_app_link || null,
-                        personal_app_link: parsed.personal_app_link || null,
-                        valid_until: parsed.valid_until || null,
-                    });
-                    setShowGatewaySelection(false);
-                }
-            }
-        } catch (e) {
-            console.warn('Failed to parse cached FIB payment payload:', e);
+        const cachedFibData = getFibPaymentSession(subId);
+        if (cachedFibData) {
+            setFibPaymentData(toFibPaymentData(cachedFibData));
+            setShowGatewaySelection(false);
         }
-        
-        // If gateway_id is provided in URL, use it and skip to payment (will auto-proceed in effect)
+
         if (gatewayId) {
             setSelectedGateway(parseInt(gatewayId, 10));
             setShowGatewaySelection(false);
@@ -134,11 +116,7 @@ export const PaymentPage = () => {
                     if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
                     pollStartTimeoutRef.current = null;
                     setFibPaymentData(null);
-                    setError(
-                        language === 'ar'
-                            ? 'انتهت صلاحية طلب الدفع. الرجاء إنشاء طلب جديد.'
-                            : 'Payment request expired. Please create a new one.'
-                    );
+                    setError(t('paymentRequestExpired'));
                     return;
                 }
 
@@ -148,18 +126,14 @@ export const PaymentPage = () => {
                     pollIntervalRef.current = null;
                     if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
                     pollStartTimeoutRef.current = null;
-                    window.location.href = `/payment/success?subscription_id=${subscriptionId}&status=success`;
+                    window.location.href = paymentSuccessUrl(subscriptionId, 'success');
                 } else if (data.gateway_status === 'declined' || data.payment_status === 'failed') {
                     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                     pollIntervalRef.current = null;
                     if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
                     pollStartTimeoutRef.current = null;
                     setFibPaymentData(null);
-                    setError(
-                        language === 'ar'
-                            ? 'تم رفض عملية الدفع أو إلغاؤها.'
-                            : 'Payment was declined or cancelled.'
-                    );
+                    setError(t('paymentDeclinedOrCancelled'));
                 }
             } catch (_) {}
         };
@@ -186,13 +160,20 @@ export const PaymentPage = () => {
             setIsLoading(true);
             setError(null);
             setFibPaymentData(null);
+            if (!hydratePaymentAccessToken()) {
+                setError(t('paymentAuthRequired'));
+                setIsLoading(false);
+                setShowGatewaySelection(true);
+                return;
+            }
             const result: CreatePaymentSessionResult = await createPaymentSessionAPI(parseInt(subscriptionId), selectedGateway);
             
             if (result.redirect_url) {
+                setPaymentCheckoutContext({ returnTo: 'Login' });
                 window.location.href = result.redirect_url;
             } else if (result.payment_id != null && (result.qr_code || result.readable_code || result.personal_app_link)) {
-                // FIB: show QR and app links, poll for completion
-                setFibPaymentData({
+                setPaymentCheckoutContext({ returnTo: 'Login' });
+                const fibPayload = {
                     payment_id: String(result.payment_id),
                     qr_code: result.qr_code || null,
                     readable_code: result.readable_code || null,
@@ -200,7 +181,9 @@ export const PaymentPage = () => {
                     corporate_app_link: result.corporate_app_link || null,
                     personal_app_link: result.personal_app_link || null,
                     valid_until: result.valid_until || null,
-                });
+                };
+                setFibPaymentSession(subscriptionId, fibPayload);
+                setFibPaymentData(fibPayload);
                 setIsLoading(false);
             } else {
                 setError(t('paymentRedirectError') || 'Failed to get payment URL');
@@ -210,16 +193,26 @@ export const PaymentPage = () => {
         } catch (err: any) {
             // If error is about subscription already active, redirect to success
             if (err.message && err.message.includes('already active')) {
-                window.location.href = `/payment/success?subscription_id=${subscriptionId}&status=success`;
+                window.location.href = paymentSuccessUrl(subscriptionId, 'success');
                 return;
             }
             if (err.code === 'phone_verification_required') {
-                setError(
-                    t('phoneVerificationRequiredPayment') ||
-                        'Phone verification is required before payment. Complete WhatsApp verification from registration, then try again.',
-                );
+                setError(t('phoneVerificationRequiredPayment'));
                 setIsLoading(false);
                 setShowGatewaySelection(true);
+                return;
+            }
+            if (
+                err.status === 401 ||
+                err.code === 'authentication_required' ||
+                (typeof err.message === 'string' && /auth|unauthor/i.test(err.message))
+            ) {
+                setError(t('paymentAuthRequired'));
+                setIsLoading(false);
+                setShowGatewaySelection(true);
+                window.setTimeout(() => {
+                    window.location.href = paymentLoginUrl(subscriptionId);
+                }, 2000);
                 return;
             }
 
@@ -241,11 +234,11 @@ export const PaymentPage = () => {
                     <div className="flex items-center gap-3 mb-2 border-b pb-2 dark:border-gray-700">
                         <img src="/fib_logo.png" alt="FIB" className="h-10 w-auto object-contain" />
                         <h2 className="text-xl font-semibold">
-                            {language === 'ar' ? 'الدفع عبر FIB (البنك العراقي الأول)' : 'Pay with FIB (First Iraqi Bank)'}
+                            {t('fibPayTitle')}
                         </h2>
                     </div>
                     <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-                        {language === 'ar' ? 'امسح رمز QR بتطبيق FIB أو استخدم الرابط أدناه للدفع.' : 'Scan the QR code with the FIB app or use the link below to pay.'}
+                        {t('fibPayHint')}
                     </p>
                     {fibPaymentData.qr_code && (
                         <div className="flex justify-center mb-4">
@@ -254,32 +247,32 @@ export const PaymentPage = () => {
                     )}
                     {fibPaymentData.readable_code && (
                         <p className="text-center text-gray-700 dark:text-gray-300 font-mono mb-4">
-                            {language === 'ar' ? 'الكود: ' : 'Code: '}{fibPaymentData.readable_code}
+                            {t('fibCodeLabel')} {fibPaymentData.readable_code}
                         </p>
                     )}
                     <div className="space-y-2 text-sm">
                         {fibPaymentData.personal_app_link && (
                             <a href={fibPaymentData.personal_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                                {language === 'ar' ? 'فتح تطبيق FIB الشخصي' : 'Open FIB Personal App'}
+                                {t('fibOpenPersonalApp')}
                             </a>
                         )}
                         {fibPaymentData.business_app_link && (
                             <a href={fibPaymentData.business_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                                {language === 'ar' ? 'فتح تطبيق FIB للأعمال' : 'Open FIB Business App'}
+                                {t('fibOpenBusinessApp')}
                             </a>
                         )}
                         {fibPaymentData.corporate_app_link && (
                             <a href={fibPaymentData.corporate_app_link} target="_blank" rel="noopener noreferrer" className={linkClass}>
-                                {language === 'ar' ? 'فتح تطبيق FIB للشركات' : 'Open FIB Corporate App'}
+                                {t('fibOpenCorporateApp')}
                             </a>
                         )}
                     </div>
                     <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-4">
-                        {language === 'ar' ? 'ننتظر تحديث الدفع من FIB، ثم سنبدأ التحقق تلقائيًا...' : 'Waiting for FIB callback, then automatic status checks will start...'}
+                        {t('fibWaitingCallback')}
                     </p>
                     {fibPaymentData.valid_until && (
                         <p className="text-center text-gray-500 dark:text-gray-400 text-xs mt-2">
-                            {language === 'ar' ? 'صالح حتى: ' : 'Valid until: '}
+                            {t('fibValidUntil')}{' '}
                             {new Date(fibPaymentData.valid_until).toLocaleString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' }))}
                         </p>
                     )}
@@ -314,7 +307,7 @@ export const PaymentPage = () => {
 
                     <div className="flex justify-end gap-4">
                         <Button
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => window.location.href = '/register'}
                         >
                             {t('cancel') || 'Cancel'}
@@ -346,17 +339,47 @@ export const PaymentPage = () => {
     }
 
     if (error) {
+        const missingSubId = !subscriptionId;
         return (
-            <div className={`min-h-screen flex items-center justify-center ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
+            <div className={`min-h-screen flex items-center justify-center p-4 ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
                 <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
                     <div className="text-red-500 text-5xl mb-4">⚠️</div>
                     <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
                         {t('paymentError') || 'Payment Error'}
                     </h2>
                     <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
-                    <Button onClick={() => window.location.href = '/register'} className="w-full">
-                        {t('backToRegistration') || 'Back to Registration'}
-                    </Button>
+                    <div className="flex flex-col gap-3">
+                        {subscriptionId && (
+                            <Button
+                                onClick={() => {
+                                    setError(null);
+                                    setShowGatewaySelection(true);
+                                    setFibPaymentData(null);
+                                }}
+                                className="w-full"
+                            >
+                                {t('tryAgain') || 'Try again'}
+                            </Button>
+                        )}
+                        <Button
+                            variant="secondary"
+                            onClick={() => {
+                                window.location.href = missingSubId
+                                    ? '/login'
+                                    : paymentLoginUrl(subscriptionId);
+                            }}
+                            className="w-full"
+                        >
+                            {t('goToLogin') || 'Go to Login'}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => (window.location.href = '/register')}
+                            className="w-full"
+                        >
+                            {t('backToRegistration') || 'Back to Registration'}
+                        </Button>
+                    </div>
                 </div>
             </div>
         );

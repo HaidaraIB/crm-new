@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll } from '../components/index';
+import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll, PaymentResultBanner } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -54,8 +54,6 @@ export const DashboardPage = () => {
         setIsAlertModalOpen,
     } = useAppContext();
     const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
-    const [showPaymentSuccess, setShowPaymentSuccess] = useState(false);
-    const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string>('');
     const [chartDaysRange, setChartDaysRange] = useState<7 | 14 | 30>(7);
     const [leadSourceFilter, setLeadSourceFilter] = useState<'all' | 'meta_lead_form' | 'whatsapp' | 'manual'>('all');
     const [teamDailyTarget] = useState(5);
@@ -129,32 +127,6 @@ export const DashboardPage = () => {
         isClientTasksLoading ||
         isStagesLoading ||
         (belowFoldEnabled && (isClientCallsLoading || isClientVisitsLoading));
-
-    // Check for payment success message on mount
-    useEffect(() => {
-        const paymentSuccessData = localStorage.getItem('paymentSuccessMessage');
-        if (paymentSuccessData) {
-            try {
-                const data = JSON.parse(paymentSuccessData);
-                // Only show if message is recent (within last 10 seconds)
-                const timeElapsed = Date.now() - data.timestamp;
-                if (timeElapsed < 10000) {
-                    setPaymentSuccessMessage(data.message);
-                    setShowPaymentSuccess(true);
-                    // Remove from localStorage after remaining time (don't remove immediately)
-                    const remainingTime = 10000 - timeElapsed;
-                    setTimeout(() => {
-                        localStorage.removeItem('paymentSuccessMessage');
-                        setShowPaymentSuccess(false);
-                    }, remainingTime);
-                } else {
-                    localStorage.removeItem('paymentSuccessMessage');
-                }
-            } catch (e) {
-                localStorage.removeItem('paymentSuccessMessage');
-            }
-        }
-    }, []);
 
     // Calculate statistics
     const stats = useMemo(() => {
@@ -946,6 +918,8 @@ export const DashboardPage = () => {
     return (
         <PageWrapper title={t('dashboard')}>
             <div className="mx-auto max-w-[1600px] w-full">
+            {/* Payment result — top of dashboard so it isn't buried under the welcome card */}
+            <PaymentResultBanner autoHideMs={20000} />
             {/* Welcome & Quick Actions */}
             {!isDashboardLoading && (
                 <div className={`mb-6 rounded-2xl bg-gradient-to-br from-white via-primary-50/40 to-blue-50/70 dark:from-gray-900 dark:via-gray-900 dark:to-primary-950/35 shadow-xl shadow-gray-200/80 dark:shadow-none dark:ring-1 dark:ring-gray-700/60 p-5 sm:p-7 ${language === 'ar' ? 'font-arabic' : ''}`}>
@@ -991,37 +965,6 @@ export const DashboardPage = () => {
             {/* Loading state */}
             {isDashboardLoading && (
                 <SectionLoadingState className="py-16 mb-6" label={t('loadingDashboard') || 'Loading dashboard'} />
-            )}
-            {/* Payment Success Notification */}
-            {showPaymentSuccess && (
-                <div className={`mb-6 p-5 sm:p-6 rounded-2xl border-2 border-green-500 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 dark:border-green-500/50 shadow-xl shadow-green-500/15 animate-slide-down ${language === 'ar' ? 'font-arabic' : 'font-sans'}`}>
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                            <div className="flex-shrink-0 w-10 h-10 bg-green-500 rounded-full flex items-center justify-center">
-                                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                            </div>
-                            <div>
-                                <h3 className="text-lg font-bold text-green-800 dark:text-green-300">
-                                    {t('paymentSuccess') || 'Payment Successful!'}
-                                </h3>
-                                <p className="text-sm text-green-700 dark:text-green-400 mt-1">
-                                    {paymentSuccessMessage || (t('paymentSuccessMessage') || 'Your payment has been processed successfully. Your subscription is now active.')}
-                                </p>
-                            </div>
-                        </div>
-                        <button
-                            onClick={() => setShowPaymentSuccess(false)}
-                            className="flex-shrink-0 text-green-600 hover:text-green-800 dark:text-green-400 dark:hover:text-green-300 transition-colors"
-                            aria-label="Close"
-                        >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-                </div>
             )}
             
             <div className="space-y-6 mb-6">
@@ -1258,7 +1201,7 @@ export const DashboardPage = () => {
                             </ResponsiveContainer>
                           </div>
                           {/* Legend */}
-                          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2 max-h-32 overflow-y-auto px-1">
+                          <div className="pt-4 border-t border-gray-200 dark:border-gray-700 space-y-2 max-h-32 overflow-y-auto custom-scrollbar px-1">
                             {stagesReportData.map((entry, index) => (
                                 <div key={index} className="flex items-center justify-between text-xs">
                                     <div className="flex items-center gap-2 min-w-0 flex-1">

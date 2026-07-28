@@ -19,6 +19,7 @@ import {
 import { navigateToCompanyRoute } from '../utils/routing';
 import { isRedundantPlanDescription } from '../utils/planEntitlements';
 import { withLatinDigits } from '../utils/dateUtils';
+import { setPendingSubscriptionId } from '../utils/paymentSession';
 
 type PublicPlan = {
     id: number;
@@ -453,6 +454,7 @@ export const RegisterPage = () => {
                     // Check if payment is required after email verification
                     if (userData.requiresPayment && userData.subscriptionId) {
                         localStorage.setItem('pendingUserData', JSON.stringify(userData));
+                        setPendingSubscriptionId(userData.subscriptionId);
                         window.location.href = `/payment?subscription_id=${userData.subscriptionId}`;
                     } else {
                         // No payment required - go to dashboard
@@ -492,6 +494,7 @@ export const RegisterPage = () => {
             // Check if payment is required after skipping verification
             if (pendingUserData.requiresPayment && pendingUserData.subscriptionId) {
                 localStorage.setItem('pendingUserData', JSON.stringify(pendingUserData));
+                setPendingSubscriptionId(pendingUserData.subscriptionId);
                 window.location.href = `/payment?subscription_id=${pendingUserData.subscriptionId}`;
             } else {
                 // No payment required - go to dashboard
@@ -1093,6 +1096,7 @@ export const RegisterPage = () => {
                     refreshToken: response.refresh,
                 };
                 localStorage.setItem('pendingUserData', JSON.stringify(pendingData));
+                setPendingSubscriptionId(subscriptionId);
                 window.location.href = `/payment?subscription_id=${subscriptionId}`;
                 return;
             }
@@ -1175,7 +1179,7 @@ export const RegisterPage = () => {
                     </Button>
                 </div>
                 <AuthHero />
-                <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8 overflow-y-auto">
+                <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8 overflow-y-auto custom-scrollbar">
                     <div className="max-w-md w-full space-y-8">
                         <div className="flex flex-col items-center">
                             <img

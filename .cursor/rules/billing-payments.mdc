@@ -1,0 +1,31 @@
+---
+description: Payment page auth hydrate, hosted checkout UX, session handoff
+globs: "**/pages/Payment*.tsx,**/pages/BillingPage.tsx,**/pages/RegisterPage.tsx,**/pages/ChangePlanPage.tsx,**/pages/ProfilePage.tsx,**/utils/paymentAuth.ts,**/utils/paymentFeedback.ts,**/utils/paymentSession*,**/services/api.ts,**/components/PaymentGatewaySelector.tsx,**/components/PaymentResultBanner.tsx"
+alwaysApply: false
+---
+
+# Billing payments (web)
+
+## Flow map
+
+- Register (paid) → `/payment?subscription_id=` → gateway → `/payment/success` → login (`PaymentResultBanner`)
+- Billing renew / Change Plan upgrade → create-session (or FIB via `routeToFibPaymentPage`) → same payment pages
+- Downgrade / paid→free → `schedule-downgrade` / `switch-plan-free` (no checkout); cancel via `cancel-pending-plan-change`
+
+## Auth
+
+- Create-session and payment-status require JWT. Call `hydratePaymentAccessToken()` from `utils/paymentAuth.ts` before those calls (registration stores tokens on `pendingUserData`).
+- On 401: show a clear EN/AR message and send the user to login with `subscription_id` context — no blank redirect.
+- Never put gateway secrets or Stripe Elements / publishable-key card flows in the client (hosted redirect or FIB QR only).
+
+## Session / UX
+
+- Keep `subscription_id` in the URL on `/payment` and `/payment/success`.
+- Use `utils/paymentSession.ts` for pending subscription + FIB payload (`setPendingSubscriptionId`, `routeToFibPaymentPage`, `clearPaymentSessionHandoff`). Do not invent new storage keys.
+- Logged-in users must still render `PaymentSuccessPage` for `/payment/success` (and gateway return query params). Never rewrite those URLs to `/company/dashboard`.
+- Disable the pay CTA while a session is being created; retries are safe (server reuses pending sessions).
+- After checkout verification, write result via `setPaymentFeedback()` and show `PaymentResultBanner` (login, billing, dashboard, profile, change plan).
+- Before gateway redirect from Billing / Profile / Change Plan, call `setPaymentCheckoutContext({ returnTo })` so success keeps the session and returns there. Registration uses `returnTo: 'Login'`.
+- Pricing / proration: call preview/schedule APIs — never compute proration in the UI.
+- Billing history: `getMyCompanyInvoicesAPI` / `downloadMyInvoicePdfAPI` (company admin). Localize via `t()` EN+AR.
+- Mobile registration/payment is out of scope unless explicitly requested.

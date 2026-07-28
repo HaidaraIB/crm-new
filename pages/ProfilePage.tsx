@@ -4,13 +4,16 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
-import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal, LegalLinks } from '../components/index';
+import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal, LegalLinks, PaymentResultBanner } from '../components/index';
 import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI, updateUserAPI, type CreatePaymentSessionResult } from '../services/api';
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { formatDaysRemainingLabel } from '../utils/planEntitlements';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole } from '../utils/roles';
+import { isFibSessionPayload, routeToFibPaymentPage } from '../utils/paymentSession';
+import { hydratePaymentAccessToken } from '../utils/paymentAuth';
+import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -73,21 +76,6 @@ export const ProfilePage = () => {
         currentUser?.isCompanyOwner ??
         normalizeRole(currentUser?.role) === 'Owner'
     );
-
-    const isFibSessionPayload = (response: any) =>
-        response?.payment_id != null &&
-        (response?.qr_code || response?.readable_code || response?.personal_app_link);
-
-    const routeToFibPaymentPage = (subscriptionId: number, response: any) => {
-        try {
-            sessionStorage.setItem(`fibPaymentData:${subscriptionId}`, JSON.stringify(response));
-            sessionStorage.setItem('fibPaymentLatestSubscriptionId', String(subscriptionId));
-            localStorage.setItem('pendingSubscriptionId', String(subscriptionId));
-        } catch (e) {
-            console.warn('Failed to cache FIB payment payload:', e);
-        }
-        window.location.href = `/payment?subscription_id=${subscriptionId}`;
-    };
 
     // Load subscription info
     useEffect(() => {
@@ -348,6 +336,7 @@ export const ProfilePage = () => {
             }
 
             // Create payment session for renewal (no plan_id change, just extend subscription)
+            hydratePaymentAccessToken();
             const response: CreatePaymentSessionResult = await createPaymentSessionAPI(
                 subscriptionInfo.id,
                 selectedGateway,
@@ -356,8 +345,18 @@ export const ProfilePage = () => {
             );
             
             if (response.redirect_url) {
+                setPaymentCheckoutContext({
+                    returnTo: 'Profile',
+                    messageKey: 'paymentSuccessMessage',
+                    titleKey: 'paymentSuccess',
+                });
                 window.location.href = response.redirect_url;
             } else if (isFibSessionPayload(response)) {
+                setPaymentCheckoutContext({
+                    returnTo: 'Profile',
+                    messageKey: 'paymentSuccessMessage',
+                    titleKey: 'paymentSuccess',
+                });
                 routeToFibPaymentPage(subscriptionInfo.id, response);
             } else {
                 alert(t('paymentRedirectError') || 'Failed to get payment URL');
@@ -400,6 +399,7 @@ export const ProfilePage = () => {
     return (
         <PageWrapper title={t('profile')}>
             <div className="max-w-4xl mx-auto space-y-6">
+                <PaymentResultBanner autoHideMs={20000} />
                 <Card>
                     <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('profileSettings')}</h2>
                     <div className={`space-y-4 ${isRTL ? 'text-right' : 'text-left'}`}>

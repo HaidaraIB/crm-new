@@ -13,6 +13,12 @@ import { MaintenanceScreen } from './components/MaintenanceScreen';
 import { fetchMaintenanceStatusAPI } from './services/api';
 import { subscribeMaintenanceMode } from './utils/maintenanceMode';
 import type { MaintenanceRetryResult } from './utils/maintenanceDisplay';
+import { hasRecentPaymentSuccess } from './utils/paymentFeedback';
+import {
+    ensurePaymentSuccessLocation,
+    isGatewayPaymentReturnSearch,
+    isPaymentSuccessPath,
+} from './utils/paymentSession';
 
 /** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
 function CurrentPageContent({ currentPage }: { currentPage: Page }) {
@@ -94,6 +100,8 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <ChangePlanPage />;
         case 'Payment':
             return <PaymentPage />;
+        case 'PaymentSuccess':
+            return <PaymentSuccessPage />;
         case 'Subscription':
             return <BillingPage />;
         case 'Support Center':
@@ -136,19 +144,10 @@ const TheApp = () => {
             || normalizedPath === '/privacy-policy' || normalizedPath === '/privacy' || normalizedPath.endsWith('/privacy-policy') || normalizedPath.endsWith('/privacy');
     };
     
-    // Track payment success message to prevent email verification message from showing
-    const [hasPaymentSuccessMessage, setHasPaymentSuccessMessage] = React.useState(() => {
-        const paymentSuccessData = localStorage.getItem('paymentSuccessMessage');
-        if (paymentSuccessData) {
-            try {
-                const data = JSON.parse(paymentSuccessData);
-                return Date.now() - data.timestamp < 10000; // Show for 10 seconds
-            } catch {
-                return false;
-            }
-        }
-        return false;
-    });
+    // Track payment success feedback to prevent email verification message from showing over it
+    const [hasPaymentSuccessMessage, setHasPaymentSuccessMessage] = React.useState(() =>
+        hasRecentPaymentSuccess(),
+    );
     const [isInternetOnline, setIsInternetOnline] = React.useState<boolean>(() =>
         typeof navigator !== 'undefined' ? navigator.onLine : true,
     );
@@ -157,29 +156,13 @@ const TheApp = () => {
     const previousInternetStatusRef = React.useRef<boolean>(isInternetOnline);
     const probeInFlightRef = React.useRef(false);
     
-    // Monitor payment success message changes
     React.useEffect(() => {
         const checkPaymentSuccess = () => {
-            const paymentSuccessData = localStorage.getItem('paymentSuccessMessage');
-            if (paymentSuccessData) {
-                try {
-                    const data = JSON.parse(paymentSuccessData);
-                    const isValid = Date.now() - data.timestamp < 10000;
-                    setHasPaymentSuccessMessage(isValid);
-                    // Auto-remove after 10 seconds
-                    if (!isValid) {
-                        localStorage.removeItem('paymentSuccessMessage');
-                    }
-                } catch {
-                    setHasPaymentSuccessMessage(false);
-                }
-            } else {
-                setHasPaymentSuccessMessage(false);
-            }
+            setHasPaymentSuccessMessage(hasRecentPaymentSuccess());
         };
         
         checkPaymentSuccess();
-        const interval = setInterval(checkPaymentSuccess, 1000); // Check every second
+        const interval = setInterval(checkPaymentSuccess, 2000);
         
         return () => clearInterval(interval);
     }, []);
@@ -320,6 +303,12 @@ const TheApp = () => {
             // Never rewrite OAuth callback popup URL (with or without company prefix)
             if (currentPath.includes('oauth-callback') || oauthResultInQuery) return;
             if (isPublicLegalPath(currentPath)) return;
+            // PayTabs/Stripe/etc. return must stay on PaymentSuccess (do not rewrite to /company/dashboard)
+            if (isPaymentSuccessPath(currentPath) || isGatewayPaymentReturnSearch(window.location.search)) {
+                ensurePaymentSuccessLocation();
+                if (currentPage !== 'PaymentSuccess') setCurrentPage('PaymentSuccess');
+                return;
+            }
             const companyFromPath = extractCompanyFromPath(currentPath);
             const pageFromPath = extractPageFromPath(currentPath);
             const subdomainSlug = getCompanySubdomainSlug();
@@ -403,6 +392,9 @@ const TheApp = () => {
                 'change plan': 'Change Plan',
                 'change-plan': 'Change Plan',
                 'payment': 'Payment',
+                'payment/success': 'PaymentSuccess',
+                'payment-success': 'PaymentSuccess',
+                'payment/return': 'PaymentSuccess',
                 'subscription': 'Subscription',
                 'support-center': 'Support Center',
                 'support': 'Support Center',
@@ -572,6 +564,11 @@ const TheApp = () => {
         
         // OAuth popup callback: preserve ?connected=true&account_id=... so IntegrationsPage can show "close window" message
         const urlParams = new URLSearchParams(window.location.search);
+        if (isPaymentSuccessPath(pathnameToCheck) || isGatewayPaymentReturnSearch(window.location.search)) {
+            ensurePaymentSuccessLocation();
+            if (currentPage !== 'PaymentSuccess') setCurrentPage('PaymentSuccess');
+            return;
+        }
         const isOAuthPopupCallback = typeof window !== 'undefined' && !!window.opener && urlParams.get('connected') === 'true' && urlParams.get('account_id');
         const preserveSearchParams = isOAuthPopupCallback
             || pathnameToCheck.includes('/payment')
@@ -676,6 +673,9 @@ const TheApp = () => {
             'change plan': 'Change Plan',
             'change-plan': 'Change Plan',
             'payment': 'Payment',
+            'payment/success': 'PaymentSuccess',
+            'payment-success': 'PaymentSuccess',
+            'payment/return': 'PaymentSuccess',
             'subscription': 'Subscription',
             'support-center': 'Support Center',
             'support': 'Support Center',
@@ -966,6 +966,18 @@ const TheApp = () => {
         window.history.replaceState({}, '', '/login');
         return <LoginPage />;
     }
+
+    // Logged-in PayTabs/Stripe/etc. return: process feedback before dashboard shell
+    // (otherwise company URL rewrite turns /payment/success into /test/dashboard?…)
+    if (
+        currentPage === 'PaymentSuccess' ||
+        isPaymentSuccessPath(pathname) ||
+        isGatewayPaymentReturnSearch(window.location.search)
+    ) {
+        ensurePaymentSuccessLocation();
+        return <PaymentSuccessPage />;
+    }
+
     return (
         <div className={`flex h-full min-h-0 overflow-hidden ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
             <Sidebar />

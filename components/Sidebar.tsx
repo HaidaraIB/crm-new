@@ -151,24 +151,17 @@ export const Sidebar = () => {
                 // Ignore policy fetch failures to avoid blocking navigation.
             }
         }
-        console.log('[Sidebar] handleNavigation called with page:', page);
-        console.log('[Sidebar] currentUser:', currentUser);
-        console.log('[Sidebar] subscription_id:', currentUser?.company?.subscription?.id);
-        
         setCurrentPage(page);
         
         // For Billing pages, we need to add subscription_id to URL
         const billingPages = ['Payment', 'Change Plan', 'Subscription'];
         if (billingPages.includes(page)) {
             const subscriptionId = currentUser?.company?.subscription?.id;
-            console.log('[Sidebar] Billing page detected, subscriptionId:', subscriptionId);
             if (subscriptionId) {
                 const route = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
                 const url = `${route}?subscription_id=${subscriptionId}`;
-                console.log('[Sidebar] Navigating to URL:', url);
                 window.history.replaceState({}, '', url);
             } else {
-                console.warn('[Sidebar] No subscription_id found, navigating without it');
                 // If no subscription_id, still navigate but page will handle the error
                 navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
             }

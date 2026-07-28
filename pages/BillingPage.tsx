@@ -1,11 +1,14 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState } from '../components/index';
-import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI } from '../services/api';
+import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState, PaymentResultBanner } from '../components/index';
+import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI, cancelPendingPlanChangeAPI, getMyCompanyInvoicesAPI, downloadMyInvoicePdfAPI, type CompanyInvoiceListItem } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
 import { formatDaysRemainingLabel, isFreeTrialPlan } from '../utils/planEntitlements';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import { isFibSessionPayload, routeToFibPaymentPage } from '../utils/paymentSession';
+import { hydratePaymentAccessToken } from '../utils/paymentAuth';
+import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
 
 type SubscriptionInfo = {
     id: number;
@@ -30,12 +33,21 @@ type SubscriptionInfo = {
     endDate?: string;
     billingCycle?: 'monthly' | 'yearly';
     daysRemainingInPeriod?: number;
-    pendingPlan?: { id?: number; name?: string; tier?: number } | null;
+    pendingPlan?: { id?: number; name?: string; name_ar?: string; tier?: number } | null;
     subscriptionStatus?: string;
 };
 
 export const BillingPage = () => {
-    const { t, language, currentUser } = useAppContext();
+    const {
+        t,
+        language,
+        currentUser,
+        setConfirmDeleteConfig,
+        setIsConfirmDeleteModalOpen,
+        showAlert,
+        setSuccessMessage,
+        setIsSuccessModalOpen,
+    } = useAppContext();
     const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isRenewing, setIsRenewing] = useState(false);
@@ -47,125 +59,158 @@ export const BillingPage = () => {
     const [availablePlans, setAvailablePlans] = useState<any[]>([]);
     const [plansLoading, setPlansLoading] = useState(false);
     const [freeTrialConsumed, setFreeTrialConsumed] = useState(false);
-
-    const isFibSessionPayload = (response: any) =>
-        response?.payment_id != null &&
-        (response?.qr_code || response?.readable_code || response?.personal_app_link);
-
-    const routeToFibPaymentPage = (subscriptionId: number, response: any) => {
-        try {
-            sessionStorage.setItem(`fibPaymentData:${subscriptionId}`, JSON.stringify(response));
-            sessionStorage.setItem('fibPaymentLatestSubscriptionId', String(subscriptionId));
-            localStorage.setItem('pendingSubscriptionId', String(subscriptionId));
-        } catch (e) {
-            console.warn('Failed to cache FIB payment payload:', e);
-        }
-        window.location.href = `/payment?subscription_id=${subscriptionId}`;
-    };
+    const [invoices, setInvoices] = useState<CompanyInvoiceListItem[]>([]);
+    const [invoicesLoading, setInvoicesLoading] = useState(false);
+    const [invoicesError, setInvoicesError] = useState<string | null>(null);
+    const [downloadingInvoiceId, setDownloadingInvoiceId] = useState<number | null>(null);
 
     const planLang = language === 'ar' ? 'ar' : 'en';
 
-    // Load subscription info
-    useEffect(() => {
-        const loadSubscriptionInfo = async () => {
-            if (!currentUser) {
-                setIsLoading(false);
-                return;
-            }
+    const loadSubscriptionInfo = useCallback(async (opts?: { showPageLoading?: boolean }) => {
+        if (!currentUser) {
+            setIsLoading(false);
+            return;
+        }
 
-            try {
-                setIsLoading(true);
-                const userData = await getCurrentUserAPI();
-                
-                setFreeTrialConsumed(!!userData?.company?.free_trial_consumed);
-                if (userData?.company?.subscription) {
-                    const subscription = userData.company.subscription;
-                    const subscriptionId = subscription.id;
-                    
-                    // Get detailed subscription status
-                    let detailedStatus = null;
-                    try {
-                        detailedStatus = await checkPaymentStatusAPI(subscriptionId);
-                    } catch (error) {
-                        console.error('Error checking payment status:', error);
-                    }
+        const showPageLoading = opts?.showPageLoading !== false;
+        try {
+            if (showPageLoading) setIsLoading(true);
+            const userData = await getCurrentUserAPI();
 
-                    // Get plan details from public plans
-                    let planDetails = null;
-                    if (subscription.plan?.id) {
-                        try {
-                            const publicPlans = await getPublicPlansAPI();
-                            const publicPlan = Array.isArray(publicPlans) 
-                                ? publicPlans.find((p: any) => p.id === subscription.plan?.id)
-                                : null;
-                            if (publicPlan) {
-                                planDetails = {
-                                    id: publicPlan.id,
-                                    name: publicPlan.name,
-                                    name_ar: publicPlan.name_ar,
-                                    description: publicPlan.description,
-                                    description_ar: publicPlan.description_ar,
-                                    price_monthly: publicPlan.price_monthly,
-                                    price_yearly: publicPlan.price_yearly,
-                                    trial_days: publicPlan.trial_days,
-                                    users: publicPlan.users,
-                                    clients: publicPlan.clients,
-                                    features: publicPlan.features || {},
-                                    limits: publicPlan.limits || {},
-                                    usage_limits_monthly: publicPlan.usage_limits_monthly || {},
-                                };
-                            }
-                        } catch (error) {
-                            console.error('Error fetching plan details:', error);
-                        }
-                    }
+            setFreeTrialConsumed(!!userData?.company?.free_trial_consumed);
+            if (userData?.company?.subscription) {
+                const subscription = userData.company.subscription;
+                const subscriptionId = subscription.id;
 
-                    // Determine billing cycle from subscription duration (paid plans only).
-                    // Free/trial plans do not have a billing cycle.
-                    let billingCycle: 'monthly' | 'yearly' | undefined = 'monthly';
-                    const pm = Number(planDetails?.price_monthly ?? subscription.plan?.price_monthly ?? 0);
-                    const py = Number(planDetails?.price_yearly ?? subscription.plan?.price_yearly ?? 0);
-                    const trialDays = Number(planDetails?.trial_days ?? 0);
-                    const isFreeOrTrial = pm <= 0 && py <= 0;
-                    if (isFreeOrTrial) {
-                        billingCycle = undefined;
-                    } else if (subscription.billing_cycle === 'yearly' || subscription.billing_cycle === 'monthly') {
-                        billingCycle = subscription.billing_cycle;
-                    } else if (subscription.start_date && subscription.end_date) {
-                        const startDate = new Date(subscription.start_date);
-                        const endDate = new Date(subscription.end_date);
-                        const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-                        billingCycle = daysDiff >= 330 ? 'yearly' : 'monthly';
-                    }
-
-                    setSubscriptionInfo({
-                        id: subscriptionId,
-                        isActive: detailedStatus?.is_truly_active ?? subscription.is_active === true,
-                        plan: planDetails || {
-                            id: subscription.plan?.id,
-                            name: subscription.plan?.name,
-                            name_ar: subscription.plan?.name_ar,
-                            tier: subscription.plan?.tier,
-                        },
-                        startDate: subscription.start_date,
-                        endDate: detailedStatus?.end_date || subscription.end_date,
-                        billingCycle: billingCycle as any,
-                        daysRemainingInPeriod: subscription.days_remaining_in_period,
-                        pendingPlan: subscription.pending_plan,
-                        subscriptionStatus: subscription.subscription_status,
-                    });
-                } else {
-                    setSubscriptionInfo(null);
+                let detailedStatus = null;
+                try {
+                    detailedStatus = await checkPaymentStatusAPI(subscriptionId);
+                } catch (error) {
+                    console.error('Error checking payment status:', error);
                 }
-            } catch (error) {
-                console.error('Error loading subscription info:', error);
+
+                let planDetails = null;
+                if (subscription.plan?.id) {
+                    try {
+                        const publicPlans = await getPublicPlansAPI();
+                        const publicPlan = Array.isArray(publicPlans)
+                            ? publicPlans.find((p: any) => p.id === subscription.plan?.id)
+                            : null;
+                        if (publicPlan) {
+                            planDetails = {
+                                id: publicPlan.id,
+                                name: publicPlan.name,
+                                name_ar: publicPlan.name_ar,
+                                description: publicPlan.description,
+                                description_ar: publicPlan.description_ar,
+                                price_monthly: publicPlan.price_monthly,
+                                price_yearly: publicPlan.price_yearly,
+                                trial_days: publicPlan.trial_days,
+                                users: publicPlan.users,
+                                clients: publicPlan.clients,
+                                features: publicPlan.features || {},
+                                limits: publicPlan.limits || {},
+                                usage_limits_monthly: publicPlan.usage_limits_monthly || {},
+                            };
+                        }
+                    } catch (error) {
+                        console.error('Error fetching plan details:', error);
+                    }
+                }
+
+                // Paid plans only — free/trial have no billing cycle.
+                let billingCycle: 'monthly' | 'yearly' | undefined = 'monthly';
+                const pm = Number(planDetails?.price_monthly ?? subscription.plan?.price_monthly ?? 0);
+                const py = Number(planDetails?.price_yearly ?? subscription.plan?.price_yearly ?? 0);
+                const isFreeOrTrial = pm <= 0 && py <= 0;
+                if (isFreeOrTrial) {
+                    billingCycle = undefined;
+                } else if (subscription.billing_cycle === 'yearly' || subscription.billing_cycle === 'monthly') {
+                    billingCycle = subscription.billing_cycle;
+                } else if (subscription.start_date && subscription.end_date) {
+                    const startDate = new Date(subscription.start_date);
+                    const endDate = new Date(subscription.end_date);
+                    const daysDiff = Math.floor((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+                    billingCycle = daysDiff >= 330 ? 'yearly' : 'monthly';
+                }
+
+                setSubscriptionInfo({
+                    id: subscriptionId,
+                    isActive: detailedStatus?.is_truly_active ?? subscription.is_active === true,
+                    plan: planDetails || {
+                        id: subscription.plan?.id,
+                        name: subscription.plan?.name,
+                        name_ar: subscription.plan?.name_ar,
+                        tier: subscription.plan?.tier,
+                    },
+                    startDate: subscription.start_date,
+                    endDate: detailedStatus?.end_date || subscription.end_date,
+                    billingCycle: billingCycle as any,
+                    daysRemainingInPeriod: subscription.days_remaining_in_period,
+                    pendingPlan: subscription.pending_plan,
+                    subscriptionStatus: subscription.subscription_status,
+                });
+            } else {
+                setSubscriptionInfo(null);
+            }
+        } catch (error) {
+            console.error('Error loading subscription info:', error);
+        } finally {
+            if (showPageLoading) setIsLoading(false);
+        }
+    }, [currentUser]);
+
+    useEffect(() => {
+        loadSubscriptionInfo();
+    }, [loadSubscriptionInfo]);
+
+    useEffect(() => {
+        if (!currentUser) {
+            setInvoices([]);
+            return;
+        }
+        let cancelled = false;
+        const loadInvoices = async () => {
+            setInvoicesLoading(true);
+            setInvoicesError(null);
+            try {
+                const rows = await getMyCompanyInvoicesAPI({ ordering: '-created_at' });
+                if (!cancelled) setInvoices(rows);
+            } catch (error: any) {
+                if (!cancelled) {
+                    setInvoices([]);
+                    setInvoicesError(
+                        error?.message || t('billingHistoryLoadError') || 'Could not load billing history.',
+                    );
+                }
             } finally {
-                setIsLoading(false);
+                if (!cancelled) setInvoicesLoading(false);
             }
         };
+        loadInvoices();
+        return () => {
+            cancelled = true;
+        };
+    }, [currentUser, t]);
 
-        loadSubscriptionInfo();
-    }, [currentUser]);
+    const handleDownloadInvoice = async (invoiceId: number) => {
+        try {
+            setDownloadingInvoiceId(invoiceId);
+            const blob = await downloadMyInvoicePdfAPI(invoiceId);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `invoice-${invoiceId}.pdf`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch (error: any) {
+            showAlert(error?.message || t('billingHistoryLoadError'), 'error');
+        } finally {
+            setDownloadingInvoiceId(null);
+        }
+    };
 
     // Load available plans for change plan modal
     useEffect(() => {
@@ -182,6 +227,11 @@ export const BillingPage = () => {
                 }
             };
             loadPlans();
+
+            // Restore last selection, or highlight a scheduled pending plan
+            if (selectedPlan == null && subscriptionInfo?.pendingPlan?.id != null) {
+                setSelectedPlan(subscriptionInfo.pendingPlan.id);
+            }
         }
     }, [showChangePlanModal]);
 
@@ -201,6 +251,27 @@ export const BillingPage = () => {
         }
     }, [freeTrialConsumed, selectedPlan, availablePlans]);
 
+    const handleCancelPendingPlan = () => {
+        if (!subscriptionInfo?.pendingPlan) return;
+        setConfirmDeleteConfig({
+            title: t('cancelPendingPlan') || 'Cancel change',
+            message:
+                t('cancelPendingPlanConfirm') ||
+                'Cancel the scheduled plan change and keep your current plan?',
+            confirmButtonText: t('cancelPendingPlan') || 'Cancel change',
+            confirmButtonVariant: 'primary',
+            showWarning: false,
+            showSuccessMessage: true,
+            successMessage:
+                t('cancelPendingPlanSuccess') || 'Scheduled plan change cancelled.',
+            onConfirm: async () => {
+                await cancelPendingPlanChangeAPI();
+                await loadSubscriptionInfo({ showPageLoading: false });
+            },
+        });
+        setIsConfirmDeleteModalOpen(true);
+    };
+
     const handleRenewSubscription = async () => {
         if (!subscriptionInfo || !subscriptionInfo.id) {
             alert(t('subscriptionNotFound') || 'Subscription not found');
@@ -212,7 +283,7 @@ export const BillingPage = () => {
         const currentPy = Number(subscriptionInfo.plan?.price_yearly ?? 0);
         const isCurrentFreeOrTrial = currentPm <= 0 && currentPy <= 0;
         if (isCurrentFreeOrTrial) {
-            alert(language === 'ar' ? 'لا يوجد تجديد للخطة المجانية/التجريبية.' : 'Free/trial plans do not require renewal.');
+            alert(t('freeTrialNoRenewal') || 'Free/trial plans do not require renewal.');
             return;
         }
 
@@ -223,6 +294,7 @@ export const BillingPage = () => {
 
         try {
             setIsRenewing(true);
+            hydratePaymentAccessToken();
             const billingCycle = subscriptionInfo.billingCycle || 'monthly';
 
             const response = await createPaymentSessionAPI(
@@ -233,8 +305,18 @@ export const BillingPage = () => {
             );
             
             if (response.redirect_url) {
+                setPaymentCheckoutContext({
+                    returnTo: 'Billing',
+                    messageKey: 'paymentSuccessMessage',
+                    titleKey: 'paymentSuccess',
+                });
                 window.location.href = response.redirect_url;
             } else if (isFibSessionPayload(response)) {
+                setPaymentCheckoutContext({
+                    returnTo: 'Billing',
+                    messageKey: 'paymentSuccessMessage',
+                    titleKey: 'paymentSuccess',
+                });
                 routeToFibPaymentPage(subscriptionInfo.id, response);
             } else {
                 alert(t('paymentRedirectError') || 'Failed to get payment URL');
@@ -260,11 +342,7 @@ export const BillingPage = () => {
         }
 
         if (currentPlanId != null && selectedPlan === currentPlanId) {
-            alert(
-                language === 'ar'
-                    ? 'أنت مشترك بالفعل في هذه الخطة. اختر خطة أخرى.'
-                    : 'This is already your current plan. Choose a different plan.'
-            );
+            alert(t('alreadyOnCurrentPlan') || 'This is already your current plan. Choose a different plan.');
             return;
         }
 
@@ -281,25 +359,40 @@ export const BillingPage = () => {
         try {
             setIsRenewing(true);
             if (isSelectedFreeOrTrial) {
-                await switchSubscriptionPlanFreeAPI(selectedPlan);
-                // Refresh subscription info in-place
-                const refreshed = await getCurrentUserAPI();
-                setFreeTrialConsumed(!!refreshed?.company?.free_trial_consumed);
-                if (refreshed?.company?.subscription) {
-                    const s = refreshed.company.subscription;
-                    setSubscriptionInfo((prev) => prev ? ({
-                        ...prev,
-                        id: s.id,
-                        isActive: s.is_active === true,
-                        startDate: s.start_date,
-                        endDate: s.end_date,
-                    }) : prev);
+                const result = await switchSubscriptionPlanFreeAPI(selectedPlan);
+                await loadSubscriptionInfo({ showPageLoading: false });
+
+                if (result?.scheduled) {
+                    const planName =
+                        (language === 'ar' &&
+                            (result.pending_plan_name_ar || selectedPlanObj?.name_ar)?.trim())
+                            ? (result.pending_plan_name_ar || selectedPlanObj?.name_ar)
+                            : (result.pending_plan_name || selectedPlanObj?.name) ||
+                              '';
+                    const endRaw = result.current_period_end || subscriptionInfo.endDate;
+                    const endLabel = endRaw
+                        ? new Date(endRaw).toLocaleDateString(
+                              language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+                              withLatinDigits({ year: 'numeric', month: 'long', day: 'numeric' }),
+                          )
+                        : '';
+                    showAlert(
+                        (t('planChangeScheduled') ||
+                            'Your plan will switch to {plan} at the end of your current billing period ({date}).')
+                            .replace('{plan}', planName)
+                            .replace('{date}', endLabel),
+                        'info',
+                    );
+                } else {
+                    setSuccessMessage(t('planChangeSuccess') || 'Your plan has been updated.');
+                    setIsSuccessModalOpen(true);
                 }
             } else {
                 if (!selectedGateway) {
                     alert(t('paymentGatewayRequired') || 'Please select a payment method');
                     return;
                 }
+                hydratePaymentAccessToken();
                 const response = await createPaymentSessionAPI(
                     subscriptionInfo.id,
                     selectedGateway,
@@ -307,8 +400,18 @@ export const BillingPage = () => {
                     billingCycle
                 );
                 if (response.redirect_url) {
+                    setPaymentCheckoutContext({
+                        returnTo: 'Billing',
+                        messageKey: 'planChangeSuccess',
+                        titleKey: 'paymentSuccess',
+                    });
                     window.location.href = response.redirect_url;
                 } else if (isFibSessionPayload(response)) {
+                    setPaymentCheckoutContext({
+                        returnTo: 'Billing',
+                        messageKey: 'planChangeSuccess',
+                        titleKey: 'paymentSuccess',
+                    });
                     routeToFibPaymentPage(subscriptionInfo.id, response);
                 } else {
                     alert(t('paymentRedirectError') || 'Failed to get payment URL');
@@ -422,6 +525,7 @@ export const BillingPage = () => {
     return (
         <PageWrapper title={t('billing') || 'Billing'}>
             <div className="max-w-4xl mx-auto space-y-6">
+                <PaymentResultBanner autoHideMs={20000} />
                 {/* Current Subscription Status */}
                 <Card>
                     <div className="flex items-center gap-3 mb-6">
@@ -479,6 +583,40 @@ export const BillingPage = () => {
                             {/* Plan Details */}
                             {subscriptionInfo.plan && (
                                 <div className="space-y-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    {subscriptionInfo.pendingPlan && (
+                                        <div className="rounded-lg border border-amber-500/40 bg-amber-50 dark:bg-amber-950/40 px-3 py-2.5 text-sm text-amber-950 dark:text-amber-50 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                                            <div className="min-w-0">
+                                                <p className="font-semibold mb-0.5">
+                                                    {t('pendingPlanChange') || 'Scheduled plan change'}
+                                                </p>
+                                                <p className="text-amber-900/90 dark:text-amber-100/95">
+                                                    {(
+                                                        t('pendingPlanChangeMessage') ||
+                                                        "You'll switch to {plan} on {date}."
+                                                    )
+                                                        .replace(
+                                                            '{plan}',
+                                                            (language === 'ar' &&
+                                                            subscriptionInfo.pendingPlan.name_ar?.trim()
+                                                                ? subscriptionInfo.pendingPlan.name_ar
+                                                                : subscriptionInfo.pendingPlan.name) ||
+                                                                '-',
+                                                        )
+                                                        .replace(
+                                                            '{date}',
+                                                            formatDate(subscriptionInfo.endDate),
+                                                        )}
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                onClick={handleCancelPendingPlan}
+                                                className="shrink-0 self-start sm:self-center text-sm font-semibold text-amber-950 dark:text-white underline underline-offset-2 decoration-amber-700/50 dark:decoration-amber-200/50 hover:decoration-amber-900 dark:hover:decoration-white"
+                                            >
+                                                {t('cancelPendingPlan') || 'Cancel change'}
+                                            </button>
+                                        </div>
+                                    )}
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                     <div>
                                         <p className="text-sm text-gray-600 dark:text-gray-400 mb-1">
@@ -609,14 +747,106 @@ export const BillingPage = () => {
                     )}
                 </Card>
 
-                {/* Billing History - Placeholder for future implementation */}
+                {/* Billing History */}
                 <Card>
                     <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">
                         {t('billingHistory') || 'Billing History'}
                     </h2>
-                    <p className="text-gray-600 dark:text-gray-400 text-center py-8">
-                        {t('billingHistoryComingSoon') || 'Billing history will be available soon'}
-                    </p>
+                    {invoicesLoading ? (
+                        <div className="py-8 flex justify-center">
+                            <Loader />
+                        </div>
+                    ) : invoicesError ? (
+                        <p className="text-red-600 dark:text-red-400 text-center py-6">{invoicesError}</p>
+                    ) : invoices.length === 0 ? (
+                        <p className="text-gray-600 dark:text-gray-400 text-center py-8">
+                            {t('noInvoicesYet') || 'No invoices yet'}
+                        </p>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full text-sm">
+                                <thead>
+                                    <tr className="text-center text-gray-500 dark:text-gray-400 border-b dark:border-gray-700">
+                                        <th className="py-2 px-3 font-medium">{t('invoiceNumber') || 'Invoice'}</th>
+                                        <th className="py-2 px-3 font-medium">{t('invoiceDate') || 'Date'}</th>
+                                        <th className="py-2 px-3 font-medium">{t('invoiceAmount') || 'Amount'}</th>
+                                        <th className="py-2 px-3 font-medium">{t('invoiceStatus') || 'Status'}</th>
+                                        <th className="py-2 px-3 font-medium" />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {invoices.map((inv) => {
+                                        const created = inv.created_at
+                                            ? new Date(inv.created_at).toLocaleDateString(
+                                                  language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+                                                  withLatinDigits({
+                                                      year: 'numeric',
+                                                      month: 'short',
+                                                      day: 'numeric',
+                                                  }),
+                                              )
+                                            : '—';
+                                        const amountLabel = inv.currency
+                                            ? `${inv.amount} ${inv.currency}`
+                                            : String(inv.amount);
+                                        const statusKey = String(inv.payment_status || '')
+                                            .trim()
+                                            .toLowerCase();
+                                        const statusLabel =
+                                            statusKey === 'completed'
+                                                ? t('completed')
+                                                : statusKey === 'pending'
+                                                  ? t('messageLogStatus_pending')
+                                                  : statusKey === 'failed'
+                                                    ? t('messageLogStatus_failed')
+                                                    : inv.payment_status || '—';
+                                        const statusClass =
+                                            statusKey === 'completed'
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                                                : statusKey === 'pending'
+                                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                                                  : statusKey === 'failed'
+                                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
+                                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
+                                        return (
+                                            <tr
+                                                key={inv.id}
+                                                className="border-b border-gray-100 dark:border-gray-800 text-gray-800 dark:text-gray-200 text-center"
+                                            >
+                                                <td className="py-3 px-3 font-mono text-xs sm:text-sm">
+                                                    {inv.invoice_number}
+                                                </td>
+                                                <td className="py-3 px-3">{created}</td>
+                                                <td className="py-3 px-3" dir="ltr">
+                                                    {amountLabel}
+                                                </td>
+                                                <td className="py-3 px-3">
+                                                    <span
+                                                        className={`inline-flex items-center justify-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${statusClass}`}
+                                                    >
+                                                        {statusLabel}
+                                                    </span>
+                                                </td>
+                                                <td className="py-3 px-3">
+                                                    <div className="flex justify-center">
+                                                        <Button
+                                                            variant="secondary"
+                                                            className="!h-8 !px-3 text-xs"
+                                                            loading={downloadingInvoiceId === inv.id}
+                                                            disabled={downloadingInvoiceId != null}
+                                                            onClick={() => handleDownloadInvoice(inv.id)}
+                                                        >
+                                                            {t('downloadInvoicePdf') || 'Download PDF'}
+                                                        </Button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
                 </Card>
             </div>
 
@@ -662,11 +892,7 @@ export const BillingPage = () => {
             {/* Change Plan Modal */}
             <Modal
                 isOpen={showChangePlanModal}
-                onClose={() => {
-                    setShowChangePlanModal(false);
-                    setSelectedGateway(null);
-                    setSelectedPlan(null);
-                }}
+                onClose={() => setShowChangePlanModal(false)}
                 title={t('changePlan') || 'Change Plan'}
                 maxWidth="2xl"
             >
@@ -708,13 +934,16 @@ export const BillingPage = () => {
                     {plansLoading ? (
                         <SectionLoadingState label={t('loadingPlans') || 'Loading plans'} />
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto custom-scrollbar">
                             {availablePlans.map((plan) => {
                                 const price = billingCycle === 'monthly' 
                                     ? Number(plan.price_monthly || 0) 
                                     : Number(plan.price_yearly || 0);
                                 const isFreeOrTrial = Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0;
                                 const isCurrentPlan = currentPlanId != null && plan.id === currentPlanId;
+                                const isPendingPlan =
+                                    subscriptionInfo?.pendingPlan?.id != null &&
+                                    plan.id === subscriptionInfo.pendingPlan.id;
                                 const trialLocked = freeTrialConsumed && isFreeTrialPlan(plan);
                                 const isLocked = isCurrentPlan || trialLocked;
                                 const isSelected = !isLocked && selectedPlan === plan.id;
@@ -737,23 +966,29 @@ export const BillingPage = () => {
                                         }}
                                         className={`p-4 border-2 rounded-lg transition-all ${
                                             isLocked
-                                                ? 'border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/40 opacity-75 cursor-not-allowed'
+                                                ? 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-800/60 cursor-not-allowed'
                                                 : `cursor-pointer ${
                                                       isSelected
                                                           ? 'border-primary bg-primary/5 dark:bg-primary/10'
-                                                          : 'border-gray-200 dark:border-gray-700 hover:border-primary/50'
+                                                          : 'border-gray-200 dark:border-gray-600 hover:border-primary/50'
                                                   }`
                                         }`}
                                     >
-                                        <div className="flex items-center justify-between mb-2">
-                                            <h3 className="font-semibold">
+                                        <div className="flex items-center justify-between mb-2 gap-2">
+                                            <h3 className="font-semibold text-gray-900 dark:text-white">
                                                 {language === 'ar' && plan.name_ar && plan.name_ar.trim()
                                                     ? plan.name_ar
                                                     : plan.name}
                                             </h3>
+                                            <div className="flex flex-wrap items-center justify-end gap-1.5 shrink-0">
                                             {isCurrentPlan && (
                                                 <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-100">
                                                     {t('currentPlan') || 'Current plan'}
+                                                </span>
+                                            )}
+                                            {isPendingPlan && !isCurrentPlan && (
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-amber-900/30 text-amber-200 border border-amber-700/50">
+                                                    {t('scheduledBadge') || 'Scheduled'}
                                                 </span>
                                             )}
                                             {trialLocked && !isCurrentPlan && (
@@ -768,13 +1003,14 @@ export const BillingPage = () => {
                                                     </svg>
                                                 </div>
                                             )}
+                                            </div>
                                         </div>
-                                        <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                        <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">
                                             {language === 'ar' && plan.description_ar && plan.description_ar.trim()
                                                 ? plan.description_ar
                                                 : plan.description}
                                         </p>
-                                        <p className="text-lg font-bold text-primary" dir={isRTL ? 'rtl' : 'ltr'}>
+                                        <p className="text-lg font-bold text-primary-700 dark:text-primary-300" dir={isRTL ? 'rtl' : 'ltr'}>
                                             {isFreeOrTrial
                                                 ? (t('free') || 'Free')
                                                 : renderPricePeriodLine(
@@ -803,23 +1039,32 @@ export const BillingPage = () => {
                     {(() => {
                         const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
                         const isSelectedFreeOrTrial = Number(selectedPlanObj?.price_monthly ?? 0) <= 0 && Number(selectedPlanObj?.price_yearly ?? 0) <= 0;
-                        return !isSelectedFreeOrTrial ? (
-                            <PaymentGatewaySelector
-                                selectedGateway={selectedGateway}
-                                onSelect={setSelectedGateway}
-                            />
-                        ) : null;
+                        const isCurrentPaid =
+                            Number(subscriptionInfo?.plan?.price_monthly ?? 0) > 0 ||
+                            Number(subscriptionInfo?.plan?.price_yearly ?? 0) > 0;
+                        return (
+                            <>
+                                {!isSelectedFreeOrTrial ? (
+                                    <PaymentGatewaySelector
+                                        selectedGateway={selectedGateway}
+                                        onSelect={setSelectedGateway}
+                                    />
+                                ) : null}
+                                {isSelectedFreeOrTrial && isCurrentPaid && selectedPlan != null && (
+                                    <p className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-500/30 rounded-lg px-3 py-2">
+                                        {t('planDowngradeAppliesAtPeriodEnd') ||
+                                            'Downgrading to a free plan takes effect at the end of your current billing period. You keep your paid plan until then.'}
+                                    </p>
+                                )}
+                            </>
+                        );
                     })()}
 
                     {/* Action Buttons */}
                     <div className="flex justify-end gap-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                         <Button
-                            variant="outline"
-                            onClick={() => {
-                                setShowChangePlanModal(false);
-                                setSelectedGateway(null);
-                                setSelectedPlan(null);
-                            }}
+                            variant="secondary"
+                            onClick={() => setShowChangePlanModal(false)}
                         >
                             {t('cancel') || 'Cancel'}
                         </Button>

@@ -1,15 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks } from '../components/index';
+import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PaymentResultBanner } from '../components/index';
 import { loginAPI, getCurrentUserAPI } from '../services/api';
 import { AuthHero } from '../components/AuthHero';
 
 export const LoginPage = () => {
     // Check if this is a logout redirect and clear any remaining data
-    // Also check for payment success message
-    const [paymentSuccessMessage, setPaymentSuccessMessage] = useState<string | null>(null);
-    
     React.useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get('logout') === 'true') {
@@ -35,34 +32,7 @@ export const LoginPage = () => {
             localStorage.removeItem('pendingSubscriptionId');
             sessionStorage.removeItem('2fa_username');
             sessionStorage.removeItem('2fa_password');
-
-            const storedMessage = localStorage.getItem('paymentSuccessMessage');
-            if (storedMessage) {
-                try {
-                    const messageData = JSON.parse(storedMessage);
-                    setPaymentSuccessMessage(messageData.message);
-                    window.history.replaceState({}, '', '/login');
-                } catch (e) {
-                    console.error('Error parsing payment success message:', e);
-                }
-            }
-        } else {
-            // Also check localStorage for payment success message (in case URL param was removed)
-            const storedMessage = localStorage.getItem('paymentSuccessMessage');
-            if (storedMessage) {
-                try {
-                    const messageData = JSON.parse(storedMessage);
-                    // Only show if message is recent (within last 5 minutes)
-                    const messageAge = Date.now() - messageData.timestamp;
-                    if (messageAge < 5 * 60 * 1000) {
-                        setPaymentSuccessMessage(messageData.message);
-                    } else {
-                        localStorage.removeItem('paymentSuccessMessage');
-                    }
-                } catch (e) {
-                    console.error('Error parsing payment success message:', e);
-                }
-            }
+            window.history.replaceState({}, '', '/login');
         }
     }, []);
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -80,11 +50,12 @@ export const LoginPage = () => {
     // Check for pending subscription ID and error message on mount
     useEffect(() => {
         const loginErrorMessage = localStorage.getItem('loginErrorMessage');
-        const pendingSubId = localStorage.getItem('pendingSubscriptionId');
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlSubId = urlParams.get('subscription_id');
+        const pendingSubId = urlSubId || localStorage.getItem('pendingSubscriptionId');
         
         if (loginErrorMessage) {
             // Only show error if payment_success is not in URL (to avoid showing error after successful payment)
-            const urlParams = new URLSearchParams(window.location.search);
             if (urlParams.get('payment_success') !== 'true') {
                 if (loginErrorMessage === 'ACCOUNT_TEMPORARILY_INACTIVE') {
                     setError('ACCOUNT_TEMPORARILY_INACTIVE');
@@ -97,18 +68,13 @@ export const LoginPage = () => {
             }
             // Clear error message after showing
             localStorage.removeItem('loginErrorMessage');
-        } else if (pendingSubId) {
+        } else if (pendingSubId && urlParams.get('payment_success') !== 'true') {
             setSubscriptionId(pendingSubId);
-            // Only show error if payment_success is not in URL (to avoid showing error after successful payment)
-            const urlParams = new URLSearchParams(window.location.search);
-            if (urlParams.get('payment_success') !== 'true') {
-                // Set a flag error that will trigger the link display
-                setError('SUBSCRIPTION_INACTIVE');
-            }
+            setError('SUBSCRIPTION_INACTIVE');
         }
         
-        // Clear pending subscription ID after showing
-        if (pendingSubId) {
+        // Clear stale localStorage backup after reading (URL is source of truth when present)
+        if (localStorage.getItem('pendingSubscriptionId')) {
             localStorage.removeItem('pendingSubscriptionId');
         }
     }, [t]);
@@ -318,13 +284,7 @@ export const LoginPage = () => {
                         <p className="mt-2 text-center text-sm text-secondary">{t('signInToContinue')}</p>
                     </div>
                     <div className="space-y-6">
-                        {paymentSuccessMessage && (
-                            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                                <div>
-                                    {paymentSuccessMessage}
-                                </div>
-                            </div>
-                        )}
+                        <PaymentResultBanner compact clearOnDismiss={false} />
                         {verificationGate && (
                             <div className="bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-100 px-4 py-3 rounded-md text-sm space-y-2">
                                 {verificationGate.verifyEmailUrl ? (

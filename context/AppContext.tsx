@@ -430,6 +430,7 @@ export const useAppContext = () => {
 };
 
 import { normalizeUser, getAvatarUrl } from '../utils/userUtils';
+import { clearImpersonation, isImpersonating } from '../utils/impersonation';
 
 // FIX: Made children optional to fix missing children prop error.
 type AppProviderProps = { children?: ReactNode };
@@ -830,25 +831,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         return;
       }
 
-      // Right after impersonate redirect we have valid user in localStorage; use it and skip API to avoid 401/refresh race
-      try {
-        if (typeof window !== 'undefined' && sessionStorage.getItem('impersonate_just_done') === '1') {
-          sessionStorage.removeItem('impersonate_just_done');
-          const raw = localStorage.getItem('currentUser');
-          if (raw) {
-            const u = JSON.parse(raw);
-            if (u && (u.id || u.email)) {
-              u.role = normalizeRole(u.role);
-              setCurrentUserState(u);
-              setDataLoaded(true);
-              return;
-            }
-          }
-        }
-      } catch {
-        // fall through to API
-      }
-
       try {
         const userData = await getCurrentUserAPI();
         
@@ -893,8 +875,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           hasActiveSubscription = userData.company?.subscription?.is_active === true;
         }
         
-        // If subscription is inactive, logout the user (both employees and admins)
-        if (!hasActiveSubscription) {
+        // Support impersonation must stay in for expired tenants (banner shows warning).
+        if (!hasActiveSubscription && !isImpersonating()) {
           setIsLoggedIn(false);
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
@@ -904,11 +886,15 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           window.location.href = '/login';
           return;
         }
-        
-        // Reset subscription inactive flag since subscription is active
-        setIsCompanySubscriptionInactive(false);
-        localStorage.removeItem('isCompanySubscriptionInactive');
-        
+
+        if (!hasActiveSubscription && isImpersonating()) {
+          setIsCompanySubscriptionInactive(true);
+          localStorage.setItem('isCompanySubscriptionInactive', 'true');
+        } else {
+          // Reset subscription inactive flag since subscription is active
+          setIsCompanySubscriptionInactive(false);
+          localStorage.removeItem('isCompanySubscriptionInactive');
+        }
         // Convert user data from API to Frontend format using the helper
         const frontendUser = normalizeUser(userData);
         
@@ -1022,6 +1008,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         
         // Check if subscription expired
         if (!status.is_truly_active) {
+          if (isImpersonating()) {
+            setIsCompanySubscriptionInactive(true);
+            localStorage.setItem('isCompanySubscriptionInactive', 'true');
+            return;
+          }
           // Subscription expired, logout user
           setIsLoggedInState(false);
           localStorage.removeItem('accessToken');
@@ -1097,6 +1088,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('pendingUserData');
       localStorage.removeItem('isCompanySubscriptionInactive');
+      clearImpersonation();
       sessionStorage.clear(); // Clear session storage as well
       
       setCurrentUserState(null);

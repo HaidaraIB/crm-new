@@ -6,6 +6,7 @@
  */
 
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
+import { isImpersonating, isTabSuperseded } from '../utils/impersonation';
 import type { LeadApiFilters } from '../types';
 
 function normalizeApiBaseUrl(raw: string): string {
@@ -305,6 +306,13 @@ async function apiRequest<T>(
   options: RequestInit = {},
   retryOn401: boolean = true
 ): Promise<T> {
+  // Another tab took the shared CRM session — do not refresh or wipe tokens.
+  if (typeof window !== 'undefined' && isTabSuperseded()) {
+    const err: Error & { code?: string } = new Error('This tab session was replaced.');
+    err.code = 'SESSION_SUPERSEDED';
+    throw err;
+  }
+
   const token = localStorage.getItem('accessToken'); // JWT access token
   
   const isFormData = options.body instanceof FormData;
@@ -362,6 +370,10 @@ async function apiRequest<T>(
       }
       return apiRequest<T>(endpoint, options, false);
     } catch (refreshError) {
+      // Do not wipe shared tokens if another tab already owns the session.
+      if (isTabSuperseded()) {
+        throw refreshError;
+      }
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('isLoggedIn');
@@ -386,6 +398,14 @@ async function apiRequest<T>(
         errorMessage.toLowerCase().includes('اشتراك') ||
         errorMessage.toLowerCase().includes('active') ||
         errorMessage.toLowerCase().includes('not active')) {
+      // Support impersonation must not wipe the session on inactive subscription 403s.
+      if (isImpersonating()) {
+        const subscriptionError: any = new Error('SUBSCRIPTION_INACTIVE');
+        subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
+        subscriptionError.impersonation = true;
+        throw subscriptionError;
+      }
+
       // احفظ subscription ID من localStorage إذا كان موجوداً
       const currentUserStr = localStorage.getItem('currentUser');
       if (currentUserStr) {
@@ -1729,6 +1749,11 @@ export const verifyTwoFactorAuthAPI = async (payload: {
  * Response: { access: string, refresh?: string } — عند تفعيل ROTATE_REFRESH_TOKENS يجب حفظ refresh الجديد وإلا يُبطّل الرمز القديم بالقائمة السوداء.
  */
 export const refreshTokenAPI = async () => {
+  if (isTabSuperseded()) {
+    const err: Error & { code?: string } = new Error('This tab session was replaced.');
+    err.code = 'SESSION_SUPERSEDED';
+    throw err;
+  }
   const refreshToken = localStorage.getItem('refreshToken');
   if (!refreshToken) {
     throw new Error('No refresh token available');
@@ -1745,9 +1770,17 @@ export const refreshTokenAPI = async () => {
   const raw = await readJsonResponse(response);
 
   if (!response.ok) {
-    localStorage.removeItem('accessToken');
-    localStorage.removeItem('refreshToken');
+    if (!isTabSuperseded()) {
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('refreshToken');
+    }
     throwApiError(raw, 'Token refresh failed');
+  }
+
+  if (isTabSuperseded()) {
+    const err: Error & { code?: string } = new Error('This tab session was replaced.');
+    err.code = 'SESSION_SUPERSEDED';
+    throw err;
   }
 
   const data = unwrapApiSuccess<{ access: string; refresh?: string }>(raw);
@@ -1766,6 +1799,21 @@ export const refreshTokenAPI = async () => {
  */
 export const getCurrentUserAPI = async () => {
   return apiRequest<any>('/users/me/');
+};
+
+/**
+ * End an active support impersonation session.
+ * POST /api/auth/impersonate-end/
+ */
+export const impersonateEndAPI = async () => {
+  const refresh = typeof window !== 'undefined' ? localStorage.getItem('refreshToken') : null;
+  return apiRequest<{ ended?: boolean; impersonation_sid?: number | string }>(
+    '/auth/impersonate-end/',
+    {
+      method: 'POST',
+      body: JSON.stringify(refresh ? { refresh } : {}),
+    }
+  );
 };
 
 /**

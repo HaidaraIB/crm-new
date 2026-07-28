@@ -10,6 +10,8 @@ import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionMod
 import { ActivitiesPage, CampaignsPage, CreateDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage } from './pages';
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
+import ImpersonationBanner from './components/ImpersonationBanner';
+import ImpersonationSessionGuard from './components/ImpersonationSessionGuard';
 import { fetchMaintenanceStatusAPI } from './services/api';
 import { subscribeMaintenanceMode } from './utils/maintenanceMode';
 import type { MaintenanceRetryResult } from './utils/maintenanceDisplay';
@@ -838,23 +840,6 @@ const TheApp = () => {
         }
     }, [isLoggedIn, authProcessed]); // Run when isLoggedIn changes or on mount
 
-    // After impersonate: one quick reload so URL + profile always match (needed for correct UI)
-    React.useEffect(() => {
-        if (typeof window === 'undefined') return;
-        if (sessionStorage.getItem('impersonate_just_done') === '1') {
-            sessionStorage.removeItem('impersonate_just_done');
-            window.location.reload();
-            return;
-        }
-        const params = new URLSearchParams(window.location.search);
-        if (params.has('_')) {
-            params.delete('_');
-            const cleanSearch = params.toString();
-            const clean = window.location.pathname + (cleanSearch ? '?' + cleanSearch : '') + (window.location.hash || '');
-            window.history.replaceState({}, '', clean);
-        }
-    }, []);
-
     if (isMaintenanceMode) {
         return (
             <MaintenanceScreen
@@ -989,6 +974,7 @@ const TheApp = () => {
                 ></div>
             )}
             <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
+                <ImpersonationBanner />
                 <Header isInternetOnline={isInternetOnline} />
                 {/* Check if payment success message exists - if so, don't show email verification message */}
                 {!hasPaymentSuccessMessage && isLoggedIn && isUserDataReady && currentUser && currentUser.emailVerified === false && (
@@ -1127,7 +1113,9 @@ function App() {
   return (
     // FIX: The AppProvider component requires children.
     <AppProvider>
-      <TheApp />
+      <ImpersonationSessionGuard>
+        <TheApp />
+      </ImpersonationSessionGuard>
     </AppProvider>
   );
 }

@@ -354,6 +354,21 @@ export const translations = {
     logout: "Logout",
     logoutConfirmTitle: "Confirm Logout",
     logoutConfirmMessage: "Are you sure you want to log out?",
+    impersonationBannerPrefix: "Impersonating",
+    impersonationBannerBy: "started by",
+    impersonationUnknownCompany: "Unknown company",
+    impersonationExit: "Exit",
+    impersonationExiting: "Exiting…",
+    impersonationEndedTitle: "Impersonation ended",
+    impersonationEndedMessage: "You can close this tab and return to the admin panel.",
+    impersonationBackToLogin: "Back to login",
+    impersonationSupersededTitle: "Session replaced",
+    impersonationSupersededMessage:
+      "A newer CRM session was started in another tab. This tab is no longer active so it cannot overwrite that session.",
+    impersonationSupersededMessageWithCompany:
+      "A newer session for {company} was started in another tab. This tab is no longer active.",
+    impersonationCloseTab: "Close tab",
+    impersonationCloseTabHint: "If the tab does not close, you can close it manually.",
     // Dashboard
     leadsToContactToday: "Leads to Contact Today",
     leadsToContactTodayDescription: "Leads that need to be contacted today based on scheduled reminders",
@@ -2681,6 +2696,21 @@ export const translations = {
     logout: "تسجيل الخروج",
     logoutConfirmTitle: "تأكيد تسجيل الخروج",
     logoutConfirmMessage: "هل أنت متأكد أنك تريد تسجيل الخروج؟",
+    impersonationBannerPrefix: "أنت تتصفح كـ",
+    impersonationBannerBy: "بواسطة",
+    impersonationUnknownCompany: "شركة غير معروفة",
+    impersonationExit: "إنهاء",
+    impersonationExiting: "جاري الإنهاء…",
+    impersonationEndedTitle: "انتهت جلسة الدخول البديل",
+    impersonationEndedMessage: "يمكنك إغلاق هذه النافذة والعودة إلى لوحة الإدارة.",
+    impersonationBackToLogin: "العودة لتسجيل الدخول",
+    impersonationSupersededTitle: "تم استبدال الجلسة",
+    impersonationSupersededMessage:
+      "تم بدء جلسة CRM أحدث في تبويب آخر. هذا التبويب لم يعد نشطاً حتى لا يستبدل تلك الجلسة.",
+    impersonationSupersededMessageWithCompany:
+      "تم بدء جلسة أحدث لـ {company} في تبويب آخر. هذا التبويب لم يعد نشطاً.",
+    impersonationCloseTab: "إغلاق التبويب",
+    impersonationCloseTabHint: "إذا لم يُغلق التبويب تلقائياً، يمكنك إغلاقه يدوياً.",
     // Dashboard
     leadsToContactToday: "عملاء يجب الاتصال بهم اليوم",
     leadsToContactTodayDescription: "العملاء الذين يجب الاتصال بهم اليوم بناءً على التذكيرات المجدولة",

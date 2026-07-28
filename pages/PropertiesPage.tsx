@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_UNIT_FILTERS } from '../components/drawers/UnitsFilterDrawer';
+import { DEFAULT_PROJECT_FILTERS } from '../components/drawers/ProjectsFilterDrawer';
+import { DEFAULT_DEVELOPER_FILTERS } from '../components/drawers/DevelopersFilterDrawer';
 import { Developer, Project, Unit } from '../types';
 import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProject, useDeleteUnit } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -290,22 +293,28 @@ export const PropertiesPage = () => {
     const { data: unitsResponse, isLoading: unitsLoading } = useUnits(unitFilters, unitsPageNumber, undefined, unitsPageSize);
     const unitsRaw = unitsResponse?.results || [];
     
-    // Transform units: convert project from object/ID to string name
+    // Transform units: keep project name for display + projectId for filter matching
     const units = useMemo(() => {
         return unitsRaw.map((unit: any) => {
             let projectName = '';
+            let projectId: number | null = null;
             if (typeof unit.project === 'object' && unit.project?.name) {
                 projectName = unit.project.name;
+                projectId = unit.project.id ?? null;
             } else if (typeof unit.project === 'number') {
+                projectId = unit.project;
                 const proj = projectsRaw.find((p: any) => p.id === unit.project);
                 projectName = proj?.name || '';
             } else if (typeof unit.project === 'string') {
                 projectName = unit.project;
+                const proj = projectsRaw.find((p: any) => p.name === unit.project);
+                projectId = proj?.id ?? null;
             }
-            
+
             return {
                 ...unit,
                 project: projectName,
+                projectId,
             };
         });
     }, [unitsRaw, projectsRaw]);
@@ -405,7 +414,16 @@ export const PropertiesPage = () => {
     
     const pageActions = (
         <>
-            <FilterButton onClick={handleFilterClick} />
+            <FilterButton
+                onClick={handleFilterClick}
+                hasActiveFilters={
+                    activeTab === 'units'
+                        ? hasActiveFilters(unitFilters, DEFAULT_UNIT_FILTERS)
+                        : activeTab === 'projects'
+                          ? hasActiveFilters(projectFilters, DEFAULT_PROJECT_FILTERS)
+                          : hasActiveFilters(developerFilters, DEFAULT_DEVELOPER_FILTERS)
+                }
+            />
             {isAdmin && (
                 <Button onClick={handleAddClick}>
                     <PlusIcon className="w-4 h-4"/> {getAddButtonLabel()}
@@ -529,9 +547,10 @@ export const PropertiesPage = () => {
     const filteredUnits = useMemo(() => {
         let filtered = units;
         if (unitFilters.project && unitFilters.project !== 'All') {
-            filtered = filtered.filter(unit => {
-                const projectName = unit.project || '';
-                return projectName === unitFilters.project;
+            filtered = filtered.filter((unit: any) => {
+                // Prefer id match (drawer stores project id); fall back to name for legacy values
+                if (unit.projectId != null && String(unit.projectId) === unitFilters.project) return true;
+                return (unit.project || '') === unitFilters.project;
             });
         }
         if (unitFilters.type && unitFilters.type !== 'All') {

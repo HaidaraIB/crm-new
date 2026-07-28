@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { PageWrapper, Button, Loader, FilterButton } from '../components/index';
+import { PageWrapper, Button, Loader, FilterButton, hasActiveFilters } from '../components/index';
+import { DEFAULT_EMPLOYEES_REPORT_FILTERS } from '../components/drawers/EmployeesReportFilterDrawer';
 import { useAppContext } from '../context/AppContext';
 import { PhoneIcon, CheckIcon, ClockIcon, UsersIcon } from '../components/icons';
 import { useEmployeeReport } from '../hooks/useQueries';
@@ -91,6 +92,7 @@ export const EmployeesReportPage = () => {
             onClick={() => setIsEmployeesReportFilterDrawerOpen(true)}
             hideLabelOnMobile={false}
             className="w-full sm:w-auto"
+            hasActiveFilters={hasActiveFilters(employeesReportFilters, DEFAULT_EMPLOYEES_REPORT_FILTERS)}
           />
           <Button
             variant="secondary"

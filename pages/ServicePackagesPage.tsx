@@ -1,7 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_SERVICE_PACKAGE_FILTERS } from '../components/drawers/ServicePackagesFilterDrawer';
 import { ServicePackage } from '../types';
 import { useServicePackages, useDeleteServicePackage } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -183,9 +184,9 @@ export const ServicePackagesPage = () => {
     const filteredPackages = useMemo(() => {
         let filtered = allPackages;
 
-        // Status filter
-        if (servicePackageFilters.status && servicePackageFilters.status !== 'All') {
-            filtered = filtered.filter(pkg => pkg.isActive === (servicePackageFilters.status === 'Active'));
+        // Status filter (drawer stores isActive as 'true' | 'false')
+        if (servicePackageFilters.isActive && servicePackageFilters.isActive !== 'All') {
+            filtered = filtered.filter(pkg => pkg.isActive === (servicePackageFilters.isActive === 'true'));
         }
 
         // Price range filter
@@ -247,7 +248,10 @@ export const ServicePackagesPage = () => {
             title={t('servicePackages')}
             actions={
                 <>
-                    <FilterButton onClick={() => setIsServicePackageFilterDrawerOpen(true)} />
+                    <FilterButton
+                        onClick={() => setIsServicePackageFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(servicePackageFilters, DEFAULT_SERVICE_PACKAGE_FILTERS)}
+                    />
                     {isAdmin && (
                         <Button onClick={() => setIsAddServicePackageModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addServicePackage') || 'Add Service Package'}

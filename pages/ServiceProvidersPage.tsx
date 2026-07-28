@@ -1,7 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_SERVICE_PROVIDER_FILTERS } from '../components/drawers/ServiceProvidersFilterDrawer';
 import { ServiceProvider } from '../types';
 import { useServiceProviders, useDeleteServiceProvider } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -226,7 +227,10 @@ export const ServiceProvidersPage = () => {
             title={t('serviceProviders')}
             actions={
                 <>
-                    <FilterButton onClick={() => setIsServiceProviderFilterDrawerOpen(true)} />
+                    <FilterButton
+                        onClick={() => setIsServiceProviderFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(serviceProviderFilters, DEFAULT_SERVICE_PROVIDER_FILTERS)}
+                    />
                     {isAdmin && (
                         <Button onClick={() => setIsAddServiceProviderModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addServiceProvider') || 'Add Service Provider'}

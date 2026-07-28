@@ -1,7 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_SUPPLIER_FILTERS } from '../components/drawers/SuppliersFilterDrawer';
 import { Supplier } from '../types';
 import { useSuppliers, useDeleteSupplier } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -221,7 +222,10 @@ export const SuppliersPage = () => {
             title={t('suppliers')}
             actions={
                 <>
-                    <FilterButton onClick={() => setIsSupplierFilterDrawerOpen(true)} />
+                    <FilterButton
+                        onClick={() => setIsSupplierFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(supplierFilters, DEFAULT_SUPPLIER_FILTERS)}
+                    />
                     {isAdmin && (
                         <Button onClick={() => setIsAddSupplierModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addSupplier') || 'Add Supplier'}

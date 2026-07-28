@@ -2,7 +2,8 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Loader, FilterButton, SearchIcon, Input, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Card, Loader, FilterButton, SearchIcon, Input, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_ACTIVITY_FILTERS } from '../components/drawers/ActivitiesFilterDrawer';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 
 /** صف جدول الأنشطة بعد دمج client_task و client_call (المعرّف نصي لتفادي التعارض بين الأنواع) */
@@ -217,7 +218,10 @@ export const ActivitiesPage = () => {
             <PageWrapper
                 title={t('activities')}
                 actions={
-                    <FilterButton onClick={() => setIsActivitiesFilterDrawerOpen(true)} />
+                    <FilterButton
+                        onClick={() => setIsActivitiesFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(activityFilters, DEFAULT_ACTIVITY_FILTERS)}
+                    />
                 }
             >
                 <Card>

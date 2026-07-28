@@ -15,7 +15,7 @@ export const AssigneeFilter = () => {
   const usersArray = useMemo(() => {
     const baseUsers = Array.isArray(usersResponse)
       ? usersResponse
-      : (usersResponse?.results || []);
+      : usersResponse?.results || [];
     return usersForOperationalEmployeeLists(baseUsers as User[], currentUser ?? null);
   }, [usersResponse, currentUser]);
 
@@ -36,11 +36,14 @@ export const AssigneeFilter = () => {
       ? usersArray.find((u) => u.id === Number(currentValue))
       : undefined;
 
-  const label = currentValue === 'All'
-    ? (t('allEmployees' as any) || 'All employees')
-    : currentValue === 'Unassigned'
-      ? (t('unassigned' as any) || 'Unassigned')
-      : (selectedUser ? getUserDisplayName(selectedUser) : (t('assignedTo' as any) || 'Assigned To'));
+  const label =
+    currentValue === 'All'
+      ? t('allEmployees')
+      : currentValue === 'Unassigned'
+        ? t('unassigned')
+        : selectedUser
+          ? getUserDisplayName(selectedUser)
+          : t('assignedTo');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -75,11 +78,20 @@ export const AssigneeFilter = () => {
 
   const isActive = currentValue !== 'All';
 
+  const optionClass = (selected: boolean) =>
+    `w-full text-start px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${
+      selected
+        ? 'font-semibold bg-primary/10 text-primary-700 dark:bg-primary/25 dark:text-primary-200'
+        : 'text-gray-800 dark:text-gray-200'
+    }`;
+
   return (
     <div className="relative w-full sm:w-[270px]" ref={wrapperRef}>
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
+        aria-expanded={isOpen}
+        aria-haspopup="listbox"
         className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm rounded-md border transition-colors ${
           isActive
             ? 'border-primary/70 text-gray-900 dark:text-white bg-primary/20 dark:bg-primary/35'
@@ -87,20 +99,26 @@ export const AssigneeFilter = () => {
         }`}
       >
         <span className="truncate">
-          {t('assignedTo' as any) || 'Assigned To'}: {label}
+          {t('assignedTo')}: {label}
         </span>
-        <span className="text-xs opacity-80">▾</span>
+        <span className="text-xs opacity-80" aria-hidden>
+          ▾
+        </span>
       </button>
 
       {isOpen && (
-        <div className="absolute z-30 mt-2 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg">
+        <div
+          className="absolute z-30 mt-2 w-full rounded-md border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg"
+          role="listbox"
+          aria-label={t('assignedTo')}
+        >
           <div className="p-2 border-b border-gray-200 dark:border-gray-700">
             <input
               ref={searchInputRef}
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder={t('search' as any) || 'Search'}
+              placeholder={t('search')}
               dir={language === 'ar' ? 'rtl' : 'ltr'}
               className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400"
             />
@@ -109,17 +127,21 @@ export const AssigneeFilter = () => {
           <div className="max-h-72 overflow-y-auto py-1">
             <button
               type="button"
+              role="option"
+              aria-selected={currentValue === 'All'}
               onClick={() => applyFilter('All')}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${currentValue === 'All' ? 'font-semibold bg-primary/10 text-primary-700 dark:bg-primary/25 dark:text-primary-200' : 'text-gray-800 dark:text-gray-200'}`}
+              className={optionClass(currentValue === 'All')}
             >
-              {currentValue === 'All' ? '✓ ' : ''}{t('allEmployees' as any) || 'All employees'}
+              {t('allEmployees')}
             </button>
             <button
               type="button"
+              role="option"
+              aria-selected={currentValue === 'Unassigned'}
               onClick={() => applyFilter('Unassigned')}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${currentValue === 'Unassigned' ? 'font-semibold bg-primary/10 text-primary-700 dark:bg-primary/25 dark:text-primary-200' : 'text-gray-800 dark:text-gray-200'}`}
+              className={optionClass(currentValue === 'Unassigned')}
             >
-              {currentValue === 'Unassigned' ? '✓ ' : ''}{t('unassigned' as any) || 'Unassigned'}
+              {t('unassigned')}
             </button>
             <div className="my-1 border-t border-gray-200 dark:border-gray-700" />
             {visibleUsers.map((user) => {
@@ -129,16 +151,18 @@ export const AssigneeFilter = () => {
                 <button
                   key={user.id}
                   type="button"
+                  role="option"
+                  aria-selected={selected}
                   onClick={() => applyFilter(value)}
-                  className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${selected ? 'font-semibold bg-primary/10 text-primary-700 dark:bg-primary/25 dark:text-primary-200' : 'text-gray-800 dark:text-gray-200'}`}
+                  className={optionClass(selected)}
                 >
-                  {selected ? '✓ ' : ''}{getUserDisplayName(user)}
+                  {getUserDisplayName(user)}
                 </button>
               );
             })}
             {visibleUsers.length === 0 && (
               <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">
-                {t('noResultsFound' as any) || 'No results found'}
+                {t('noResultsFound')}
               </div>
             )}
           </div>

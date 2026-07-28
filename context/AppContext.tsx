@@ -478,6 +478,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     createdAtFrom: '',
     createdAtTo: '',
     search: '',
+    source: 'All',
+    campaign: 'All',
+    createdBy: 'All',
+    interestedDeveloper: 'All',
+    interestedProject: 'All',
+    lastContactedFrom: '',
+    lastContactedTo: '',
   });
   const [todosPagePreset, setTodosPagePreset] = useState<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>(null);
   const [activityFilters, setActivityFilters] = useState<ActivityFilters>({

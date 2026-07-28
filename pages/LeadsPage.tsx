@@ -2,7 +2,8 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters } from '../components/index';
+import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
 import SendSMSModal from '../components/modals/SendSMSModal';
@@ -115,6 +116,23 @@ export const LeadsPage = () => {
         if (leadFilters.budgetMax) filters.budgetMax = leadFilters.budgetMax;
         if (leadFilters.createdAtFrom) filters.createdAtFrom = leadFilters.createdAtFrom;
         if (leadFilters.createdAtTo) filters.createdAtTo = leadFilters.createdAtTo;
+        if (leadFilters.source && leadFilters.source !== 'All') {
+            filters.source = leadFilters.source;
+        }
+        if (leadFilters.campaign && leadFilters.campaign !== 'All') {
+            filters.campaign = leadFilters.campaign === 'None' ? 'none' : leadFilters.campaign;
+        }
+        if (leadFilters.createdBy && leadFilters.createdBy !== 'All') {
+            filters.createdBy = leadFilters.createdBy === 'None' ? 'none' : leadFilters.createdBy;
+        }
+        if (leadFilters.interestedDeveloper && leadFilters.interestedDeveloper !== 'All') {
+            filters.interestedDeveloper = leadFilters.interestedDeveloper;
+        }
+        if (leadFilters.interestedProject && leadFilters.interestedProject !== 'All') {
+            filters.interestedProject = leadFilters.interestedProject;
+        }
+        if (leadFilters.lastContactedFrom) filters.lastContactedFrom = leadFilters.lastContactedFrom;
+        if (leadFilters.lastContactedTo) filters.lastContactedTo = leadFilters.lastContactedTo;
 
         return filters;
     }, [currentPage, leadFilters]);
@@ -586,7 +604,11 @@ export const LeadsPage = () => {
             title={pageTitle}
             actions={
                 <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
-                        <FilterButton onClick={() => setIsFilterDrawerOpen(true)} className="w-full sm:w-auto shrink-0" />
+                        <FilterButton
+                            onClick={() => setIsFilterDrawerOpen(true)}
+                            hasActiveFilters={hasActiveFilters(leadFilters, DEFAULT_LEAD_FILTERS)}
+                            className="w-full sm:w-auto shrink-0"
+                        />
                         {!isDataEntryUser && (
                         <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={isExportingLeads || totalLeadsCount === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{isExportingLeads ? (t('loading') || 'Loading...') : t('export')}</span><span className="hidden sm:inline">{isExportingLeads ? (t('loading') || 'Loading...') : (t('exportLeads') || 'Export to Excel')}</span></Button>
                         )}
@@ -650,8 +672,18 @@ export const LeadsPage = () => {
                     return (
                         <button 
                             key={status}
-                            onClick={() => setActiveStatusFilter(status)}
-                            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap flex-shrink-0 flex items-center gap-2 transition-colors ${activeStatusFilter === status ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
+                            onClick={() => {
+                                setActiveStatusFilter(status);
+                                // Tabs own the status axis — clear drawer status so they do not fight
+                                if (leadFilters.status !== 'All') {
+                                    setLeadFilters((prev) => ({ ...prev, status: 'All' }));
+                                }
+                            }}
+                            className={`px-3 sm:px-4 py-2 text-xs sm:text-sm whitespace-nowrap flex-shrink-0 flex items-center gap-2 transition-colors ${
+                                (leadFilters.status !== 'All' ? leadFilters.status === status : activeStatusFilter === status)
+                                    ? PAGE_TAB_ACTIVE
+                                    : PAGE_TAB_INACTIVE
+                            }`}
                         >
                            {statusConfig?.color && (
                                <div 

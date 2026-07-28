@@ -1,7 +1,8 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_SERVICE_FILTERS } from '../components/drawers/ServicesFilterDrawer';
 import { Service } from '../types';
 import { useServices, useDeleteService } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -246,7 +247,10 @@ export const ServicesPage = () => {
             title={t('services')}
             actions={
                 <>
-                    <FilterButton onClick={() => setIsServiceFilterDrawerOpen(true)} />
+                    <FilterButton
+                        onClick={() => setIsServiceFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(serviceFilters, DEFAULT_SERVICE_FILTERS)}
+                    />
                     {isAdmin && (
                         <Button onClick={() => setIsAddServiceModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addService') || 'Add Service'}

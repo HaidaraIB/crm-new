@@ -246,16 +246,24 @@ function throwApiError(errorData: unknown, fallbackMessage: string): never {
   if (code) err.code = code;
   attachErrorFields(err, errorData);
   const raw = errorData as Record<string, unknown> | null;
-  const sid = raw && (raw.subscriptionId ?? raw.subscription_id);
-  if (sid != null) err.subscriptionId = String(sid);
+  let sid = raw && (raw.subscriptionId ?? raw.subscription_id);
   if (raw && raw.success === false && raw.error && typeof raw.error === 'object') {
     const er = raw.error as Record<string, unknown>;
+    if (sid == null) {
+      sid = er.subscriptionId ?? er.subscription_id;
+    }
+    const details = er.details;
+    if (sid == null && details && typeof details === 'object' && !Array.isArray(details)) {
+      const d = details as Record<string, unknown>;
+      sid = d.subscriptionId ?? d.subscription_id;
+    }
     if (typeof er.hint === 'string') err.hint = er.hint;
     if (Array.isArray(er.actions)) err.actions = er.actions as LoginVerificationAction[];
     if (typeof er.change_credentials_note === 'string') err.changeCredentialsNote = er.change_credentials_note;
     if (typeof er.verify_email_url === 'string') err.verifyEmailUrl = er.verify_email_url;
     if (typeof er.verify_phone_url === 'string') err.verifyPhoneUrl = er.verify_phone_url;
   }
+  if (sid != null) err.subscriptionId = String(sid);
   throw err;
 }
 
@@ -1946,6 +1954,14 @@ function appendLeadApiFilters(queryParams: URLSearchParams, filters?: LeadApiFil
   if (filters.budgetMax) queryParams.append('budget_max', filters.budgetMax);
   if (filters.createdAtFrom) queryParams.append('created_at_from', filters.createdAtFrom);
   if (filters.createdAtTo) queryParams.append('created_at_to', filters.createdAtTo);
+  appendCsvFilter(queryParams, 'source', filters.source);
+  appendCsvFilter(queryParams, 'campaign', filters.campaign);
+  appendCsvFilter(queryParams, 'created_by', filters.createdBy);
+  appendCsvFilter(queryParams, 'interested_developer', filters.interestedDeveloper);
+  appendCsvFilter(queryParams, 'interested_project', filters.interestedProject);
+  appendCsvFilter(queryParams, 'interested_unit', filters.interestedUnit);
+  if (filters.lastContactedFrom) queryParams.append('last_contacted_at_from', filters.lastContactedFrom);
+  if (filters.lastContactedTo) queryParams.append('last_contacted_at_to', filters.lastContactedTo);
 }
 
 /**
@@ -2191,12 +2207,19 @@ export const bulkAssignLeadsAPI = async (clientIds: number[], userId: number | n
  * GET /api/deals/
  * Response: { count, next, previous, results: Deal[] }
  */
-export const getDealsAPI = async (page?: number, pageSize?: number) => {
+export const getDealsAPI = async (
+  page?: number,
+  pageSize?: number,
+  filters?: { search?: string },
+) => {
   const queryParams = new URLSearchParams();
   if (page) queryParams.append('page', String(page));
   if (pageSize) queryParams.append('page_size', String(pageSize));
+  if (filters?.search?.trim()) queryParams.append('search', filters.search.trim());
   const endpoint = `/deals/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-  return page ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint) : fetchAllPaginatedPages<any>(endpoint);
+  return page
+    ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint)
+    : fetchAllPaginatedPages<any>(endpoint);
 };
 
 /**

@@ -2,9 +2,9 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterButton, EditIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterButton, EditIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_CAMPAIGN_FILTERS } from '../components/drawers/CampaignsFilterDrawer';
 import { Campaign } from '../types';
-import { CampaignsFilterDrawer } from '../components/drawers/CampaignsFilterDrawer';
 import { useCampaigns, useDeleteCampaign } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -242,7 +242,10 @@ export const CampaignsPage = () => {
             title={t('campaigns')}
             actions={
                 <>
-                    <FilterButton onClick={() => setIsCampaignsFilterDrawerOpen(true)} />
+                    <FilterButton
+                        onClick={() => setIsCampaignsFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(campaignFilters, DEFAULT_CAMPAIGN_FILTERS)}
+                    />
                     {isAdmin && (
                         <Button onClick={() => setIsAddCampaignModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addCampaign')}
@@ -258,7 +261,6 @@ export const CampaignsPage = () => {
                     onDelete={handleDelete}
                 />
             </Card>
-            <CampaignsFilterDrawer />
         </PageWrapper>
     );
 };

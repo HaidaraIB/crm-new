@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { PageWrapper, Button, Loader, FilterButton } from '../components/index';
+import { PageWrapper, Button, Loader, FilterButton, hasActiveFilters } from '../components/index';
+import { DEFAULT_MARKETING_REPORT_FILTERS } from '../components/drawers/MarketingReportFilterDrawer';
 import { useAppContext } from '../context/AppContext';
 import { MegaphoneIcon, TargetIcon, CheckIcon, ChartIcon } from '../components/icons';
 import { useMarketingReport } from '../hooks/useQueries';
@@ -87,6 +88,7 @@ export const MarketingReportPage = () => {
             onClick={() => setIsMarketingReportFilterDrawerOpen(true)}
             hideLabelOnMobile={false}
             className="w-full sm:w-auto"
+            hasActiveFilters={hasActiveFilters(marketingReportFilters, DEFAULT_MARKETING_REPORT_FILTERS)}
           />
           <Button
             variant="secondary"

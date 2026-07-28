@@ -3,7 +3,8 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_OWNER_FILTERS } from '../components/drawers/OwnersFilterDrawer';
 import { Owner } from '../types';
 import { useOwners, useDeleteOwner } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
@@ -174,7 +175,10 @@ export const OwnersPage = () => {
             title={t('owners')}
             actions={
                 <>
-                    <FilterButton onClick={() => setIsOwnerFilterDrawerOpen(true)} />
+                    <FilterButton
+                        onClick={() => setIsOwnerFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(ownerFilters, DEFAULT_OWNER_FILTERS)}
+                    />
                     {isAdmin && (
                         <Button onClick={() => setIsAddOwnerModalOpen(true)}>
                             <PlusIcon className="w-4 h-4"/> {t('addOwner')}

@@ -113,19 +113,49 @@ export const LoginPage = () => {
         }
     }, [t]);
 
+    const normalizeErrorCode = (code: unknown): string =>
+        String(code || '').trim().toUpperCase();
+
+    const isSubscriptionInactiveError = (code: string, message: string): boolean => {
+        const lower = message.toLowerCase();
+        return (
+            code === 'SUBSCRIPTION_INACTIVE' ||
+            lower.includes('subscription is not active') ||
+            lower.includes('complete your payment')
+        );
+    };
+
+    const isAccountTemporarilyInactiveError = (code: string, message: string): boolean => {
+        const lower = message.toLowerCase();
+        return (
+            code === 'ACCOUNT_TEMPORARILY_INACTIVE' ||
+            lower.includes('account is temporarily inactive')
+        );
+    };
+
     const translateLoginError = (errorMessage: string): string => {
         const lowerMessage = errorMessage.toLowerCase();
-        
+
+        // Subscription / renew must be checked before broad "inactive" / "invalid" matches
+        if (
+            lowerMessage.includes('subscription is not active') ||
+            lowerMessage.includes('complete your payment')
+        ) {
+            return t('noActiveSubscription');
+        }
+        if (lowerMessage.includes('account is temporarily inactive')) {
+            return t('accountTemporarilyInactive');
+        }
         if (lowerMessage.includes('no active account') || lowerMessage.includes('active account')) {
             return t('loginErrorNoActiveAccount') || 'No active account found with the given credentials';
         }
         if (lowerMessage.includes('unable to log in') || lowerMessage.includes('unable to login')) {
             return t('loginErrorUnableToLogin') || 'Unable to log in with provided credentials';
         }
-        if (lowerMessage.includes('account is inactive') || lowerMessage.includes('inactive')) {
+        if (lowerMessage.includes('account is inactive')) {
             return t('loginErrorAccountInactive') || 'Account is inactive';
         }
-        if (lowerMessage.includes('invalid') || lowerMessage.includes('incorrect')) {
+        if (lowerMessage.includes('invalid username') || lowerMessage.includes('invalid credentials') || lowerMessage.includes('incorrect password') || lowerMessage.includes('incorrect username')) {
             return t('loginErrorInvalidCredentials') || 'Invalid username or password';
         }
         
@@ -209,26 +239,28 @@ export const LoginPage = () => {
         } catch (error: any) {
             console.error('❌ Login error:', error);
             const errorMessage = error.message || '';
+            const errorCode = normalizeErrorCode(error.code || errorMessage);
             console.error('❌ Error message:', errorMessage);
             console.error('❌ Error status:', error.status);
             console.error('❌ Full error:', error);
             
             // Check if it's an account temporarily inactive error (for employees)
-            if (error.code === 'ACCOUNT_TEMPORARILY_INACTIVE' || errorMessage === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+            if (isAccountTemporarilyInactiveError(errorCode, errorMessage)) {
                 setError('ACCOUNT_TEMPORARILY_INACTIVE');
             } 
             // Check if it's a subscription inactive error (for admins)
-            else if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
+            else if (isSubscriptionInactiveError(errorCode, errorMessage)) {
                 const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
                 if (subId) {
-                    setSubscriptionId(subId);
+                    setSubscriptionId(String(subId));
+                    localStorage.setItem('pendingSubscriptionId', String(subId));
                     setError('SUBSCRIPTION_INACTIVE');
                 } else {
                     setError(t('noActiveSubscription'));
                 }
             } else if (
                 ['email_not_verified', 'phone_not_verified', 'email_phone_not_verified'].includes(
-                    String(error.code || '')
+                    String(error.code || '').toLowerCase()
                 )
             ) {
                 const verifyEmailUrl = (error as { verifyEmailUrl?: string }).verifyEmailUrl;

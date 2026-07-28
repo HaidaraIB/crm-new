@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
     DndContext,
     DragOverlay,
@@ -35,6 +35,7 @@ export function KanbanBoard<TItem>({
 }: KanbanBoardProps<TItem>) {
     const [activeId, setActiveId] = useState<string | null>(null);
     const [announce, setAnnounce] = useState('');
+    const scrollContainerRef = useRef<HTMLDivElement>(null);
 
     const sensors = useSensors(
         useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
@@ -97,7 +98,6 @@ export function KanbanBoard<TItem>({
         try {
             await onMove({ itemId, fromColumnId, toColumnId });
         } finally {
-            // Clear announce after a beat so screen readers pick up the change.
             window.setTimeout(() => setAnnounce(''), 800);
         }
     };
@@ -109,7 +109,7 @@ export function KanbanBoard<TItem>({
     const activeItem = activeId ? itemLookup.get(activeId) ?? null : null;
 
     return (
-        <div className={className}>
+        <div className={`max-w-full min-w-0 overflow-hidden ${className}`}>
             {dragInstructionsLabel ? (
                 <p className="sr-only">{dragInstructionsLabel}</p>
             ) : null}
@@ -124,8 +124,18 @@ export function KanbanBoard<TItem>({
                 onDragOver={handleDragOver}
                 onDragEnd={handleDragEnd}
                 onDragCancel={handleDragCancel}
+                autoScroll={{
+                    // Only scroll the board strip — avoid expanding/scrolling the page off-screen.
+                    canScroll: (element) => element === scrollContainerRef.current,
+                    threshold: { x: 0.15, y: 0.15 },
+                    acceleration: 12,
+                    layoutShiftCompensation: false,
+                }}
             >
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin -mx-1 px-1">
+                <div
+                    ref={scrollContainerRef}
+                    className="flex gap-3 overflow-x-auto overflow-y-hidden pb-2 scrollbar-thin max-w-full"
+                >
                     {columns.map((column) => {
                         const colKey = toKey(column.id);
                         const items = itemsByColumn[colKey] || [];
@@ -160,10 +170,12 @@ export function KanbanBoard<TItem>({
                     })}
                 </div>
 
-                <DragOverlay dropAnimation={null}>
-                    {activeItem
-                        ? renderCard(activeItem, { isDragging: true, disabled: false })
-                        : null}
+                <DragOverlay dropAnimation={null} style={{ cursor: 'grabbing' }}>
+                    {activeItem ? (
+                        <div className="w-[268px] sm:w-[284px] pointer-events-none shadow-xl rounded-lg">
+                            {renderCard(activeItem, { isDragging: true, disabled: false })}
+                        </div>
+                    ) : null}
                 </DragOverlay>
             </DndContext>
         </div>

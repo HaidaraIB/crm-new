@@ -1,6 +1,5 @@
 import React from 'react';
 import { useDraggable } from '@dnd-kit/core';
-import { CSS } from '@dnd-kit/utilities';
 
 type KanbanCardShellProps = {
     id: string;
@@ -9,29 +8,26 @@ type KanbanCardShellProps = {
     className?: string;
 };
 
+/**
+ * Source card stays in place while dragging; visual movement is handled by DragOverlay.
+ * Applying transform here would expand the horizontal scroll container off-screen.
+ */
 export const KanbanCardShell = ({
     id,
     disabled = false,
     children,
     className = '',
 }: KanbanCardShellProps) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+    const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id,
         disabled,
     });
 
-    const style: React.CSSProperties = {
-        transform: CSS.Translate.toString(transform),
-        opacity: isDragging ? 0.45 : 1,
-        zIndex: isDragging ? 20 : undefined,
-    };
-
     return (
         <div
             ref={setNodeRef}
-            style={style}
             className={`touch-manipulation ${disabled ? 'cursor-default' : 'cursor-grab active:cursor-grabbing'} ${
-                isDragging ? 'ring-2 ring-primary/40 rounded-lg' : ''
+                isDragging ? 'opacity-40 ring-2 ring-primary/40 rounded-lg' : ''
             } ${className}`}
             {...(disabled ? {} : { ...listeners, ...attributes })}
         >

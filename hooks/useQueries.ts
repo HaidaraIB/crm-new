@@ -70,7 +70,8 @@ export const queryKeys = {
   teamsReport: (params?: ReportQueryParams) => ['teamsReport', params] as const,
   marketingReport: (params?: ReportQueryParams) => ['marketingReport', params] as const,
   callReport: (params?: ReportQueryParams) => ['callReport', params] as const,
-  deals: (page?: number, pageSize?: number) => ['deals', page ?? 'all', pageSize ?? 'default'] as const,
+  deals: (page?: number, pageSize?: number, search?: string) =>
+    ['deals', page ?? 'all', pageSize ?? 'default', search ?? ''] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
   clientTasks: ['clientTasks'] as const,
@@ -194,13 +195,15 @@ export const useMissionBarSummary = (
 export const useDeals = (
   pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
   options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
-  pageSize?: number
+  pageSize?: number,
+  search?: string,
 ) => {
   const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
   const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
+  const searchKey = search?.trim() || '';
   return useQuery({
-    queryKey: queryKeys.deals(page, pageSize),
-    queryFn: () => getDealsAPI(page, pageSize),
+    queryKey: queryKeys.deals(page, pageSize, searchKey),
+    queryFn: () => getDealsAPI(page, pageSize, searchKey ? { search: searchKey } : undefined),
     staleTime: 1 * 60 * 1000, // 1 minute
     ...resolvedOptions,
   });
@@ -348,10 +351,22 @@ export const useUnits = (
   const specialization = currentUser?.company?.specialization;
   const shouldEnable = specialization === 'real_estate';
   const { enabled: optionsEnabled, ...restOptions } = resolvedOptions || {};
-  
+
+  // Only project + bedrooms hit the API — keep queryKey aligned to avoid extra refetches
+  const apiFilters =
+    filters == null
+      ? undefined
+      : {
+          ...(filters.project && filters.project !== 'All' ? { project: String(filters.project) } : {}),
+          ...(filters.bedrooms && filters.bedrooms !== 'All' ? { bedrooms: String(filters.bedrooms) } : {}),
+        };
+  const apiFiltersKey =
+    apiFilters && Object.keys(apiFilters).length > 0 ? apiFilters : undefined;
+
   return useQuery({
-    queryKey: queryKeys.units(filters, page, pageSize),
-    queryFn: () => getUnitsAPI({ ...(filters || {}), ...(pageSize ? { page_size: pageSize } : {}) }, page),
+    queryKey: queryKeys.units(apiFiltersKey, page, pageSize),
+    queryFn: () =>
+      getUnitsAPI({ ...(apiFiltersKey || {}), ...(pageSize ? { page_size: pageSize } : {}) }, page),
     staleTime: 1 * 60 * 1000, // 1 minute
     enabled: shouldEnable && (optionsEnabled !== false),
     ...restOptions,

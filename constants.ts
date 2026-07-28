@@ -552,7 +552,10 @@ export const translations = {
     leadApiSource: "Custom API",
     mujebSource: "Mujeb",
     manualSource: "Manual",
+    otherSource: "Other",
     createdBy: "Created by",
+    createdBySystem: "System / integration",
+    lastContactedAtRange: "Last contacted",
     // Activities
     allUsers: "All users",
     today: "Today",
@@ -2834,7 +2837,10 @@ export const translations = {
     leadApiSource: "واجهة API",
     mujebSource: "مجيب",
     manualSource: "يدوي",
+    otherSource: "أخرى",
     createdBy: "أنشأه",
+    createdBySystem: "النظام / التكامل",
+    lastContactedAtRange: "آخر تواصل",
     // Activities
     allUsers: "كل المستخدمين",
     today: "اليوم",

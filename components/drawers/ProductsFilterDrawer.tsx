@@ -1,176 +1,207 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import { XIcon } from '../icons';
-import { Button } from '../Button';
+import { useProducts } from '../../hooks/useQueries';
 import { NumberInput } from '../NumberInput';
+import type { ProductFilters } from '../../types';
+import {
+  FilterDrawerShell,
+  FilterSection,
+  FilterLabel,
+  FilterSelect,
+  FilterInput,
+} from '../filters';
 
-const FilterSection = ({ title, children }: { title: string, children?: React.ReactNode }) => (
-    <details className="group" open>
-        <summary className="flex cursor-pointer list-none items-center justify-between py-2 text-sm font-medium text-gray-900 dark:text-white">
-            {title}
-            <span className="transition group-open:rotate-180">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-4 w-4"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
-            </span>
-        </summary>
-        <div className="py-2 text-gray-500 dark:text-gray-400">
-            {children}
-        </div>
-    </details>
-);
-
-const FilterLabel = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
-    <label htmlFor={htmlFor} className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{children}</label>
-);
-
-const FilterSelect = ({ id, value, onChange, children }: { id: string; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; children?: React.ReactNode }) => {
-    const { language } = useAppContext();
-    return (
-        <select id={id} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100">
-            {children}
-        </select>
-    );
-};
-
-const FilterInput = ({ id, type = 'text', placeholder, value, onChange }: { id: string; type?: string; placeholder?: string; value?: string; onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void }) => {
-    const { language } = useAppContext();
-    return (
-        <input type={type} id={id} placeholder={placeholder} value={value} onChange={onChange} dir={language === 'ar' ? 'rtl' : 'ltr'} className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100" />
-    );
+export const DEFAULT_PRODUCT_FILTERS: ProductFilters = {
+  category: 'All',
+  supplier: 'All',
+  isActive: 'All',
+  stockMin: '',
+  stockMax: '',
+  priceMin: '',
+  priceMax: '',
+  search: '',
 };
 
 export const ProductsFilterDrawer = () => {
-    const { isProductFilterDrawerOpen, setIsProductFilterDrawerOpen, t, productFilters, setProductFilters, products, productCategories, suppliers } = useAppContext();
-    const [localFilters, setLocalFilters] = useState(productFilters);
+  const {
+    isProductFilterDrawerOpen,
+    setIsProductFilterDrawerOpen,
+    t,
+    productFilters,
+    setProductFilters,
+  } = useAppContext();
+  const [localFilters, setLocalFilters] = useState(productFilters);
 
-    useEffect(() => {
-        setLocalFilters(productFilters);
-    }, [productFilters]);
+  const { data } = useProducts();
+  const products = Array.isArray(data) ? data : data?.results || [];
 
-    const handleFilterChange = (key: keyof typeof localFilters, value: string) => {
-        setLocalFilters(prev => ({ ...prev, [key]: value }));
-    };
+  const syncDraft = useCallback(() => {
+    setLocalFilters(productFilters);
+  }, [productFilters]);
 
-    const handleReset = () => {
-        const resetFilters = {
-            category: 'All',
-            supplier: 'All',
-            isActive: 'All',
-            stockMin: '',
-            stockMax: '',
-            priceMin: '',
-            priceMax: '',
-            search: '',
-        };
-        setLocalFilters(resetFilters);
-        setProductFilters(resetFilters);
-    };
+  const handleClose = () => {
+    setLocalFilters(productFilters);
+    setIsProductFilterDrawerOpen(false);
+  };
 
-    const handleApply = () => {
-        setProductFilters(localFilters);
-        setIsProductFilterDrawerOpen(false);
-    };
+  const handleFilterChange = (key: keyof ProductFilters, value: string) => {
+    setLocalFilters((prev) => ({ ...prev, [key]: value }));
+  };
 
-    const uniqueCategories = Array.from(new Set((products || []).map(p => p.category).filter(Boolean)));
-    const uniqueSuppliers = Array.from(new Set((products || []).map(p => p.supplier).filter(Boolean)));
+  const handleReset = () => {
+    setLocalFilters(DEFAULT_PRODUCT_FILTERS);
+    setProductFilters(DEFAULT_PRODUCT_FILTERS);
+  };
 
-    // Helper function to translate status
-    const translateStatus = (status: string): string => {
-        if (!status) return status;
-        const statusLower = status.toLowerCase();
-        const statusMap: { [key: string]: string } = {
-            'true': t('active') || 'Active',
-            'false': t('inactive') || 'Inactive',
-        };
-        return statusMap[statusLower] || status;
-    };
+  const handleApply = () => {
+    setProductFilters(localFilters);
+    setIsProductFilterDrawerOpen(false);
+  };
 
-    return (
-        <>
-            <aside className={`fixed inset-y-0 end-0 z-50 flex h-full w-full max-w-xs flex-col bg-card dark:bg-dark-card border-s dark:border-gray-800 transform transition-transform duration-300 ease-in-out 
-                                ${isProductFilterDrawerOpen ? 'translate-x-0' : 'translate-x-full rtl:-translate-x-full'}`}>
-                <div className="flex items-center justify-between p-4 border-b dark:border-gray-800 h-16">
-                    <h2 className="text-lg font-semibold">{t('filterProducts')}</h2>
-                    <Button variant="ghost" className="p-1" onClick={() => setIsProductFilterDrawerOpen(false)}>
-                        <XIcon className="h-6 w-6" />
-                    </Button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-200 dark:divide-gray-700">
-                    <FilterSection title={t('productInfo')}>
-                        <div className="space-y-4 pt-2">
-                            <div>
-                                <FilterLabel htmlFor="products-filter-category">{t('category')}</FilterLabel>
-                                <FilterSelect id="products-filter-category" value={localFilters.category} onChange={(e) => handleFilterChange('category', e.target.value)}>
-                                    <option value="All">{t('all')}</option>
-                                    {uniqueCategories.map(category => (
-                                        <option key={category} value={category}>{category}</option>
-                                    ))}
-                                </FilterSelect>
-                            </div>
+  const uniqueCategories = useMemo(
+    () =>
+      Array.from(new Set<string>(
+          products
+            .map((p: any) => p.category as string | undefined)
+            .filter((c): c is string => Boolean(c)),
+        ),
+      ),
+    [products],
+  );
+  const uniqueSuppliers = useMemo(
+    () =>
+      Array.from(new Set<string>(
+          products
+            .map((p: any) => p.supplier as string | undefined)
+            .filter((s): s is string => Boolean(s)),
+        ),
+      ),
+    [products],
+  );
 
-                            <div>
-                                <FilterLabel htmlFor="products-filter-supplier">{t('supplier')}</FilterLabel>
-                                <FilterSelect id="products-filter-supplier" value={localFilters.supplier} onChange={(e) => handleFilterChange('supplier', e.target.value)}>
-                                    <option value="All">{t('all')}</option>
-                                    {uniqueSuppliers.map(supplier => (
-                                        <option key={supplier} value={supplier}>{supplier}</option>
-                                    ))}
-                                </FilterSelect>
-                            </div>
+  return (
+    <FilterDrawerShell
+      isOpen={isProductFilterDrawerOpen}
+      onClose={handleClose}
+      onOpen={syncDraft}
+      title={t('filterProducts')}
+      onReset={handleReset}
+      onApply={handleApply}
+    >
+      <FilterSection title={t('productInfo')}>
+        <div className="space-y-4 pt-2">
+          <div>
+            <FilterLabel htmlFor="products-filter-category">{t('category')}</FilterLabel>
+            <FilterSelect
+              id="products-filter-category"
+              value={localFilters.category}
+              onChange={(e) => handleFilterChange('category', e.target.value)}
+            >
+              <option value="All">{t('all')}</option>
+              {uniqueCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </FilterSelect>
+          </div>
 
-                            <div>
-                                <FilterLabel htmlFor="products-filter-status">{t('status')}</FilterLabel>
-                                <FilterSelect id="products-filter-status" value={localFilters.isActive} onChange={(e) => handleFilterChange('isActive', e.target.value)}>
-                                    <option value="All">{t('all')}</option>
-                                    <option value="true">{translateStatus('true')}</option>
-                                    <option value="false">{translateStatus('false')}</option>
-                                </FilterSelect>
-                            </div>
+          <div>
+            <FilterLabel htmlFor="products-filter-supplier">{t('supplier')}</FilterLabel>
+            <FilterSelect
+              id="products-filter-supplier"
+              value={localFilters.supplier}
+              onChange={(e) => handleFilterChange('supplier', e.target.value)}
+            >
+              <option value="All">{t('all')}</option>
+              {uniqueSuppliers.map((supplier) => (
+                <option key={supplier} value={supplier}>
+                  {supplier}
+                </option>
+              ))}
+            </FilterSelect>
+          </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <FilterLabel htmlFor="products-filter-stock-min">{t('stockRangeStart')}</FilterLabel>
-                                    <NumberInput id="products-filter-stock-min" name="products-filter-stock-min" value={localFilters.stockMin} onChange={(e) => handleFilterChange('stockMin', e.target.value)} placeholder="0" min={0} step={1} />
-                                </div>
-                                <div>
-                                    <FilterLabel htmlFor="products-filter-stock-max">{t('stockRangeEnd')}</FilterLabel>
-                                    <NumberInput id="products-filter-stock-max" name="products-filter-stock-max" value={localFilters.stockMax} onChange={(e) => handleFilterChange('stockMax', e.target.value)} placeholder="100" min={0} step={1} />
-                                </div>
-                            </div>
+          <div>
+            <FilterLabel htmlFor="products-filter-status">{t('status')}</FilterLabel>
+            <FilterSelect
+              id="products-filter-status"
+              value={localFilters.isActive}
+              onChange={(e) => handleFilterChange('isActive', e.target.value)}
+            >
+              <option value="All">{t('all')}</option>
+              <option value="true">{t('active')}</option>
+              <option value="false">{t('inactive')}</option>
+            </FilterSelect>
+          </div>
 
-                            <div className="grid grid-cols-2 gap-2">
-                                <div>
-                                    <FilterLabel htmlFor="products-filter-price-min">{t('priceRangeStart')}</FilterLabel>
-                                    <NumberInput id="products-filter-price-min" name="products-filter-price-min" value={localFilters.priceMin} onChange={(e) => handleFilterChange('priceMin', e.target.value)} placeholder={t('eg500000')} min={0} step={1} />
-                                </div>
-                                <div>
-                                    <FilterLabel htmlFor="products-filter-price-max">{t('priceRangeEnd')}</FilterLabel>
-                                    <NumberInput id="products-filter-price-max" name="products-filter-price-max" value={localFilters.priceMax} onChange={(e) => handleFilterChange('priceMax', e.target.value)} placeholder={t('eg1000000')} min={0} step={1} />
-                                </div>
-                            </div>
-                        </div>
-                    </FilterSection>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <FilterLabel htmlFor="products-filter-stock-min">{t('stockRangeStart')}</FilterLabel>
+              <NumberInput
+                id="products-filter-stock-min"
+                name="products-filter-stock-min"
+                value={localFilters.stockMin}
+                onChange={(e) => handleFilterChange('stockMin', e.target.value)}
+                placeholder="0"
+                min={0}
+                step={1}
+              />
+            </div>
+            <div>
+              <FilterLabel htmlFor="products-filter-stock-max">{t('stockRangeEnd')}</FilterLabel>
+              <NumberInput
+                id="products-filter-stock-max"
+                name="products-filter-stock-max"
+                value={localFilters.stockMax}
+                onChange={(e) => handleFilterChange('stockMax', e.target.value)}
+                placeholder="100"
+                min={0}
+                step={1}
+              />
+            </div>
+          </div>
 
-                    <FilterSection title={t('search')}>
-                        <div className="pt-2">
-                            <FilterLabel htmlFor="products-filter-search">{t('searchByNameOrCode')}</FilterLabel>
-                            <FilterInput id="products-filter-search" placeholder={t('search')} value={localFilters.search} onChange={(e) => handleFilterChange('search', e.target.value)} />
-                        </div>
-                    </FilterSection>
-                </div>
-                <div className="p-4 border-t dark:border-gray-800 flex gap-2">
-                    <Button variant="secondary" className="w-full" onClick={handleReset}>{t('reset')}</Button>
-                    <Button className="w-full" onClick={handleApply}>{t('applyFilters')}</Button>
-                </div>
-            </aside>
-            {isProductFilterDrawerOpen && (
-                <div
-                    className="fixed inset-0 bg-black/60 z-40"
-                    aria-hidden="true"
-                    onClick={() => setIsProductFilterDrawerOpen(false)}
-                ></div>
-            )}
-        </>
-    );
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <FilterLabel htmlFor="products-filter-price-min">{t('priceRangeStart')}</FilterLabel>
+              <NumberInput
+                id="products-filter-price-min"
+                name="products-filter-price-min"
+                value={localFilters.priceMin}
+                onChange={(e) => handleFilterChange('priceMin', e.target.value)}
+                placeholder={t('eg500000')}
+                min={0}
+                step={1}
+              />
+            </div>
+            <div>
+              <FilterLabel htmlFor="products-filter-price-max">{t('priceRangeEnd')}</FilterLabel>
+              <NumberInput
+                id="products-filter-price-max"
+                name="products-filter-price-max"
+                value={localFilters.priceMax}
+                onChange={(e) => handleFilterChange('priceMax', e.target.value)}
+                placeholder={t('eg1000000')}
+                min={0}
+                step={1}
+              />
+            </div>
+          </div>
+        </div>
+      </FilterSection>
+
+      <FilterSection title={t('search')}>
+        <div className="pt-2">
+          <FilterLabel htmlFor="products-filter-search">{t('searchByNameOrCode')}</FilterLabel>
+          <FilterInput
+            id="products-filter-search"
+            placeholder={t('search')}
+            value={localFilters.search}
+            onChange={(e) => handleFilterChange('search', e.target.value)}
+          />
+        </div>
+      </FilterSection>
+    </FilterDrawerShell>
+  );
 };
-

@@ -1,0 +1,37 @@
+---
+description: Shared filter drawer pattern for list/report pages
+globs: "**/components/filters/**,**/components/drawers/*Filter*.tsx,**/pages/**/*Page.tsx"
+alwaysApply: false
+---
+
+# Filter drawer pattern
+
+Use the shared module in `components/filters/` for every entity filter drawer.
+
+## Public API
+
+Import from `components/filters` (also re-exported from `components/index`):
+
+- `FilterDrawerShell` — slide-over layout, overlay, Escape/backdrop close, Reset / Apply
+- `FilterSection`, `FilterLabel`, `FilterSelect`, `FilterInput` — field primitives (RTL via `language`)
+- `isFilterActive`, `countActiveFilters`, `hasActiveFilters`, `areFiltersEqual` — active-state helpers
+- `AssigneeFilter` — leads toolbar assignee quick filter
+
+## How to adopt
+
+1. Keep filter **committed** state in AppContext (`*Filters` + `is*FilterDrawerOpen`)
+2. Keep **draft** state inside the drawer; sync from committed on open (`onOpen` / `useEffect`)
+3. Wrap content in `FilterDrawerShell`; do not copy-paste aside/overlay markup
+4. On close without Apply: discard draft (re-sync from committed next open)
+5. Reset updates draft **and** committed defaults immediately
+6. Wire the page `FilterButton` with `hasActiveFilters={hasActiveFilters(filters, defaults)}`
+7. Localize every string in `constants.ts` (`en` + `ar`) with `t()` — no English fallbacks for shipped keys
+8. Prefer toolbar/tabs for primary axes (e.g. leads assignee + status); avoid duplicating them in the drawer
+
+## Do not
+
+- Redefine `FilterSection` / `FilterLabel` / `FilterSelect` / `FilterInput` inside a drawer file
+- Fetch full entity lists inside a drawer only to populate known enums
+- Put API-ignored filter fields into React Query keys
+- Live-refetch lists on every keystroke in the drawer (Apply-gated commits only)
+- Touch `crm_mobile` for this pattern unless explicitly requested

@@ -41,7 +41,7 @@ export * from './drawers/ServicesFilterDrawer';
 export * from './drawers/ServicePackagesFilterDrawer';
 export * from './drawers/ServiceProvidersFilterDrawer';
 export * from './drawers/CampaignsFilterDrawer';
-export * from './filters/AssigneeFilter';
+export * from './filters';
 export * from './Timeline';
 export * from './Dropdown';
 export * from './drawers/UnitsFilterDrawer';

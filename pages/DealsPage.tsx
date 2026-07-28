@@ -2,7 +2,8 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { DEFAULT_DEAL_FILTERS } from '../components/drawers/DealsFilterDrawer';
 import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -243,8 +244,13 @@ export const DealsPage = () => {
     const [dealsPageNumber, setDealsPageNumber] = useState(1);
     const [dealsPageSize, setDealsPageSize] = useState(20);
 
-    // Fetch deals using React Query
-    const { data: dealsResponse, isLoading: dealsLoading, error: dealsError } = useDeals(dealsPageNumber, undefined, dealsPageSize);
+    // Fetch deals using React Query (search is server-side)
+    const { data: dealsResponse, isLoading: dealsLoading, error: dealsError } = useDeals(
+        dealsPageNumber,
+        undefined,
+        dealsPageSize,
+        dealFilters.search || undefined,
+    );
     const dealsRaw = dealsResponse?.results || [];
     const hasNextPage = Boolean(dealsResponse?.next);
     const hasPreviousPage = Boolean(dealsResponse?.previous);
@@ -385,14 +391,7 @@ export const DealsPage = () => {
             }
         }
 
-        // Search filter
-        if (dealFilters.search) {
-            const searchLower = dealFilters.search.toLowerCase();
-            filtered = filtered.filter(deal => 
-                (deal.clientName || '').toLowerCase().includes(searchLower) || 
-                deal.id.toString().includes(searchLower)
-            );
-        }
+        // Search is applied server-side via useDeals
 
         return filtered;
     }, [allDeals, dealFilters, isRealEstate]);
@@ -480,7 +479,7 @@ export const DealsPage = () => {
     if (dealsLoading) {
         return (
             <PageWrapper title={t('deals')}>
-                <PageLoadingState label={t('loadingDeals') || 'Loading deals'} />
+                <PageLoadingState label={t('loading')} />
             </PageWrapper>
         );
     }
@@ -507,7 +506,11 @@ export const DealsPage = () => {
             title={t('deals')}
             actions={
                 <>
-                    <FilterButton onClick={() => setIsDealsFilterDrawerOpen(true)} className="w-full sm:w-auto" />
+                    <FilterButton
+                        onClick={() => setIsDealsFilterDrawerOpen(true)}
+                        className="w-full sm:w-auto"
+                        hasActiveFilters={hasActiveFilters(dealFilters, DEFAULT_DEAL_FILTERS)}
+                    />
                     <Button variant="secondary" onClick={handleExportDeals} className="w-full sm:w-auto" type="button" disabled={filteredDeals.length === 0}>
                         <span className="hidden sm:inline">{t('exportDeals') || 'Export to Excel'}</span>
                     </Button>

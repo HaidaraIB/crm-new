@@ -235,6 +235,13 @@ export interface LeadFilters {
   createdAtFrom: string; // Date from
   createdAtTo: string; // Date to
   search: string; // Search by name or phone
+  source: string; // 'All' or source key (manual, meta_lead_form, …)
+  campaign: string; // 'All' | 'None' | campaign id
+  createdBy: string; // 'All' | 'None' | user id
+  interestedDeveloper: string; // 'All' or developer id (real estate)
+  interestedProject: string; // 'All' or project id (real estate)
+  lastContactedFrom: string;
+  lastContactedTo: string;
 }
 
 /** Query params sent to GET /clients/ and /clients/status-counts/ */
@@ -250,6 +257,14 @@ export interface LeadApiFilters {
   budgetMax?: string;
   createdAtFrom?: string;
   createdAtTo?: string;
+  source?: string | string[];
+  campaign?: string | string[];
+  createdBy?: string | string[];
+  interestedDeveloper?: string | string[];
+  interestedProject?: string | string[];
+  interestedUnit?: string | string[];
+  lastContactedFrom?: string;
+  lastContactedTo?: string;
 }
 
 export interface Deal {
@@ -340,7 +355,7 @@ export interface ProjectFilters {
 }
 
 export interface UnitFilters {
-  project: string; // 'All' or project name
+  project: string; // 'All' or project id (stringified)
   type: string; // 'All' or specific type
   finishing: string; // 'All' or specific finishing
   city: string; // 'All' or specific city

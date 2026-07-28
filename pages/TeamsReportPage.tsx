@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
-import { PageWrapper, Button, Loader, FilterButton } from '../components/index';
+import { PageWrapper, Button, Loader, FilterButton, hasActiveFilters } from '../components/index';
+import { DEFAULT_TEAMS_REPORT_FILTERS } from '../components/drawers/TeamsReportFilterDrawer';
 import { useAppContext } from '../context/AppContext';
 import { UsersIcon, TargetIcon, CheckSquareIcon, DealIcon } from '../components/icons';
 import { useTeamsReport } from '../hooks/useQueries';
@@ -86,6 +87,7 @@ export const TeamsReportPage = () => {
             onClick={() => setIsTeamsReportFilterDrawerOpen(true)}
             hideLabelOnMobile={false}
             className="w-full sm:w-auto"
+            hasActiveFilters={hasActiveFilters(teamsReportFilters, DEFAULT_TEAMS_REPORT_FILTERS)}
           />
           <Button
             variant="secondary"

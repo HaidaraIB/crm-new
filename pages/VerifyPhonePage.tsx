@@ -316,7 +316,11 @@ export const VerifyPhonePage = () => {
                                 {otpChannel ? <p className="text-sm text-secondary text-center">{phoneHint}</p> : null}
                                 <div>
                                     <label htmlFor="phone-prelogin-otp" className="block text-sm font-medium text-secondary mb-1">
-                                        {t('verificationCode')}
+                                        {otpChannel === 'twilio_sms'
+                                            ? t('verificationCodeLabelSms')
+                                            : otpChannel
+                                                ? t('verificationCodeLabelWhatsApp')
+                                                : t('verificationCode')}
                                     </label>
                                     <Input
                                         id="phone-prelogin-otp"

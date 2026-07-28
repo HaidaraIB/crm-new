@@ -31,7 +31,7 @@ export const Input = forwardRef<HTMLInputElement, {
                 onChange={onChange}
                 defaultValue={defaultValue}
                 dir={language === 'ar' ? 'rtl' : 'ltr'}
-                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 ${paddingClass} ${className}`}
+                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-300 ${paddingClass} ${className}`}
                 {...rest}
             />
             {icon && <div className={`absolute inset-y-0 ${iconPosition} flex items-center text-gray-600 dark:text-gray-400`}>{icon}</div>}

@@ -1169,11 +1169,20 @@ export const checkPaymentStatusAPI = async (
 /**
  * الحصول على جميع الخطط المتاحة علنياً للاشتراك
  * GET /api/public/plans/
+ * Public — do not send JWT (stale tokens can trigger refresh/redirect and break registration).
  */
 export const getPublicPlansAPI = async () => {
-  return apiRequest<any[]>('/public/plans/', {
+  const response = await fetch(`${BASE_URL}/public/plans/`, {
     method: 'GET',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+    }),
   });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to load plans');
+  }
+  return parseSuccessJsonResponse<any[]>(response);
 };
 
 /**
@@ -1253,8 +1262,14 @@ export const checkRegistrationAvailabilityAPI = async (payload: {
   if (!response.ok) {
     const error: any = new Error(getApiErrorMessage(raw, 'Availability check failed'));
     const details = getErrorDetailsFromBody(raw);
-    if (details && typeof details === 'object') {
-      error.fields = details as Record<string, unknown>;
+    // Backend wraps field errors as details: { available: false, errors: { email: [...] } }
+    if (details && typeof details === 'object' && !Array.isArray(details)) {
+      const d = details as Record<string, unknown>;
+      if (d.errors && typeof d.errors === 'object' && !Array.isArray(d.errors)) {
+        error.fields = d.errors as Record<string, unknown>;
+      } else {
+        error.fields = d;
+      }
     } else if (raw && typeof raw === 'object' && (raw as any).errors) {
       error.fields = (raw as any).errors;
     }

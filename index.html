@@ -90,8 +90,8 @@
             /* Dark mode text colors */
             --text-primary: 248 250 252; /* slate-50 - for main headings and important text */
             --text-secondary: 226 232 240; /* slate-200 - for body text */
-            --text-tertiary: 203 213 225; /* slate-300 - for labels and secondary info */
-            --text-muted: 148 163 184; /* slate-400 - for placeholder and disabled text */
+            --text-tertiary: 226 232 240; /* slate-200 - clearer helper/label text on dark bg */
+            --text-muted: 203 213 225; /* slate-300 - clearer placeholders on dark inputs */
             --text-inverse: 15 23 42; /* slate-900 - for text on light backgrounds */
         }
         
@@ -135,6 +135,18 @@
         
         .text-inverse {
             color: rgb(var(--text-inverse));
+        }
+
+        /* Keep autofilled inputs readable in dark mode (Chrome paints a light fill by default) */
+        .dark input:-webkit-autofill,
+        .dark input:-webkit-autofill:hover,
+        .dark input:-webkit-autofill:focus,
+        .dark textarea:-webkit-autofill,
+        .dark select:-webkit-autofill {
+            -webkit-text-fill-color: #f3f4f6;
+            caret-color: #f3f4f6;
+            box-shadow: 0 0 0 1000px #1f2937 inset;
+            transition: background-color 99999s ease-out 0s;
         }
         /* Scrollbar styling — scoped to main content + custom-scrollbar (avoids nested * scrollbars) */
         .app-main-scroll::-webkit-scrollbar,

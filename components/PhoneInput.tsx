@@ -234,7 +234,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
                     onChange={handlePhoneChange}
                     placeholder={placeholder}
                     dir={isRTL ? 'rtl' : 'ltr'}
-                    className={`flex-1 px-3 py-2 bg-transparent border-0 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 min-w-0 ${
+                    className={`flex-1 px-3 py-2 bg-transparent border-0 focus:outline-none text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-300 min-w-0 ${
                         isRTL ? 'text-right' : 'text-left'
                     }`}
                 />

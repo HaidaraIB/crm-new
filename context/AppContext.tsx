@@ -202,6 +202,11 @@ export interface AppContextType {
     message: string;
     itemName?: string;
     onConfirm: () => void | Promise<void>;
+    confirmButtonText?: string;
+    confirmButtonVariant?: 'danger' | 'primary';
+    showWarning?: boolean;
+    showSuccessMessage?: boolean;
+    successMessage?: string;
   } | null>>;
   isEditProjectModalOpen: boolean;
   setIsEditProjectModalOpen: (isOpen: boolean) => void;

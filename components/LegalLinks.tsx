@@ -15,8 +15,8 @@ export const LegalLinks: React.FC<LegalLinksProps> = ({
     const { language } = useAppContext();
 
     const linkClass = size === 'sm' 
-        ? 'text-xs text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors'
-        : 'text-sm text-gray-500 dark:text-gray-400 hover:text-primary-600 dark:hover:text-primary-400 transition-colors';
+        ? 'text-xs text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors'
+        : 'text-sm text-gray-600 dark:text-gray-300 hover:text-primary-600 dark:hover:text-primary-400 transition-colors';
 
     const containerClass = variant === 'horizontal'
         ? `flex flex-wrap items-center gap-x-4 gap-y-2 ${className}`

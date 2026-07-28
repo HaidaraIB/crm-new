@@ -7,7 +7,7 @@ import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/i
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
-import { Lead, LeadApiFilters } from '../types';
+import { Lead, LeadApiFilters, Status, User } from '../types';
 import { useLeads, useLeadStatusCounts, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { pbxDialAPI, getPbxDialStatusAPI, getLeadsAPI } from '../services/api';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
@@ -158,8 +158,8 @@ export const LeadsPage = () => {
         setLeadsPageNumber(1);
     }, [currentPage, apiFilters, leadsPageSize]);
     // Normalize API fields to frontend naming for consistent rendering (phone_numbers -> phoneNumbers, etc.)
-    const normalizedLeads = React.useMemo(() => {
-        return (allLeads || []).map((l: any) => {
+    const normalizedLeads = React.useMemo((): Lead[] => {
+        return (allLeads || []).map((l: any): Lead => {
             const phoneNumbers = l.phone_numbers || l.phoneNumbers || [];
             return {
             ...l,
@@ -186,17 +186,17 @@ export const LeadsPage = () => {
             profession: l.profession,
             budgetMax: l.budgetMax ?? l.budget_max,
             budget_max: l.budget_max,
-        };
+        } as Lead;
         });
     }, [allLeads]);
 
     // Fetch users and statuses
     const { data: usersResponse } = useUsers();
-    const users = usersResponse?.results || [];
+    const users: User[] = usersResponse?.results || [];
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
-    const statuses = Array.isArray(statusesData) 
+    const statuses: Status[] = Array.isArray(statusesData) 
         ? statusesData 
         : (statusesData?.results || []);
     
@@ -374,6 +374,7 @@ export const LeadsPage = () => {
 
     // Helper function to convert status to translation key
     const getStatusTranslationKey = (status: Lead['status']): string => {
+        if (!status) return '';
         const statusMap: Record<string, string> = {
             'All': 'all',
             'Untouched': 'untouched',
@@ -468,7 +469,7 @@ export const LeadsPage = () => {
             ];
             await exportToExcel(rows, columns, `leads-export-${new Date().toISOString().slice(0, 10)}`, t('leads') || 'Leads');
         } catch (e) {
-            setAlertMessage(getLocalizedApiErrorMessage(e, t, 'errorLoadingLeads'));
+            setAlertMessage(getLocalizedApiErrorMessage(e as { message?: string; code?: string; data?: unknown }, t, 'errorLoadingLeads'));
             setAlertVariant('error');
             setIsAlertModalOpen(true);
         } finally {
@@ -642,9 +643,9 @@ export const LeadsPage = () => {
             {!isBoardView && (
             <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-thin">
                 {leadStatusFilters.map(status => {
-                    const count = statusCounts?.[status] ?? 0;
+                    const count = status && statusCounts ? (statusCounts[status] ?? 0) : 0;
                     
-                    const statusConfig = status === 'All' ? null : statuses.find(s => s.name === status);
+                    const statusConfig = status === 'All' ? null : statuses.find((s: Status) => s.name === status);
                     
                     return (
                         <button 
@@ -839,7 +840,7 @@ export const LeadsPage = () => {
                                                             onSms={(phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
                                                             onWhatsApp={(phone) => setSendWhatsAppModal({ leadId: lead.id, phone, lead })}
                                                             onPbxDial={(phone) => handlePbxDial(lead.id, phone)}
-                                                            t={t}
+                                                            t={(key: string) => t(key as Parameters<typeof t>[0])}
                                                         />
                                                     </div>
                                                     )}
@@ -959,16 +960,21 @@ export const LeadsPage = () => {
                                                         {(() => {
                                                             // Use status_name from API if available, otherwise find by ID or name
                                                             const statusName = (lead as any).status_name || 
-                                                                (lead.status ? statuses.find(s => s.id.toString() === lead.status.toString() || s.name === lead.status)?.name : null);
+                                                                (lead.status
+                                                                    ? statuses.find((s: Status) =>
+                                                                        s.id.toString() === String(lead.status) ||
+                                                                        s.name === lead.status
+                                                                      )?.name
+                                                                    : null);
                                                             
                                                             // Find current status config
-                                                            const currentStatusConfig = statuses.find(s => 
+                                                            const currentStatusConfig = statuses.find((s: Status) => 
                                                                 s.name === statusName || 
                                                                 s.id.toString() === (lead.status?.toString() || '')
                                                             );
                                                             
                                                             // Get available statuses (non-hidden)
-                                                            const availableStatuses = statuses.filter(s => !s.isHidden);
+                                                            const availableStatuses = statuses.filter((s: Status) => !s.isHidden);
                                                             
                                                             const isUpdating = updatingLeadId === lead.id;
 

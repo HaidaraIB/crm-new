@@ -90,7 +90,8 @@ export const RegisterPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
     const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: OTP or Plan, 4: Plan when OTP required
-    const [phoneOtpRequired, setPhoneOtpRequired] = useState(true);
+    // Default OFF — only enable after the policy endpoint confirms it (avoids 403 send-otp when disabled).
+    const [phoneOtpRequired, setPhoneOtpRequired] = useState(false);
     const [phoneOtpChannel, setPhoneOtpChannel] = useState<RegistrationPhoneOtpChannel | null>(null);
     const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
     const [phoneOtpCode, setPhoneOtpCode] = useState('');
@@ -135,15 +136,144 @@ export const RegisterPage = () => {
     const normalizeErrorMessage = (value: any): string => {
         if (!value) return '';
         if (Array.isArray(value)) {
-            return value[0];
+            return normalizeErrorMessage(value[0]);
         }
         if (typeof value === 'string') {
             return value;
         }
         if (typeof value === 'object') {
-            return value.detail || JSON.stringify(value);
+            if (value.detail) return normalizeErrorMessage(value.detail);
+            if (value.message) return normalizeErrorMessage(value.message);
+            if (value.errors) return normalizeErrorMessage(value.errors);
+            const firstKey = Object.keys(value)[0];
+            if (firstKey) return normalizeErrorMessage(value[firstKey]);
+            return '';
         }
         return String(value);
+    };
+
+    /** Prefer nested `errors` when API wraps field errors as `{ available, errors }`. */
+    const unwrapApiFieldErrors = (raw: any): Record<string, unknown> => {
+        if (!raw || typeof raw !== 'object') return {};
+        if (raw.errors && typeof raw.errors === 'object' && !Array.isArray(raw.errors)) {
+            return raw.errors as Record<string, unknown>;
+        }
+        return raw as Record<string, unknown>;
+    };
+
+    const FIELD_ERROR_DOM_IDS: Record<string, string> = {
+        companyName: 'company-name',
+        companyDomain: 'company-domain',
+        specialization: 'specialization',
+        firstName: 'first-name',
+        lastName: 'last-name',
+        email: 'email',
+        username: 'username',
+        phone: 'phone',
+        password: 'password',
+        confirmPassword: 'confirm-password',
+        phoneOtp: 'phone-otp',
+        emailOtp: 'email-otp',
+    };
+
+    const FIELD_ERROR_LABELS: Record<string, string> = {
+        companyName: t('companyName') || 'Company Name',
+        companyDomain: t('companyDomain') || 'Company Domain',
+        firstName: t('firstName') || 'First Name',
+        lastName: t('lastName') || 'Last Name',
+        email: t('email') || 'Email',
+        username: t('username') || 'Username',
+        phone: t('phone') || 'Phone',
+        password: t('password') || 'Password',
+        confirmPassword: t('confirmPassword') || 'Confirm Password',
+        plan: t('selectPlan') || 'Plan',
+        phoneOtp: t('verificationCodeLabelWhatsApp') || 'Phone verification code',
+        emailOtp: t('verificationCodeLabelEmail') || 'Email verification code',
+    };
+
+    const scrollToFirstFieldError = (fieldErrors: Record<string, string>) => {
+        const firstKey = Object.keys(fieldErrors).find((k) => k !== 'general' && FIELD_ERROR_DOM_IDS[k]);
+        if (!firstKey) return;
+        const el = document.getElementById(FIELD_ERROR_DOM_IDS[firstKey]);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            try {
+                el.focus({ preventScroll: true });
+            } catch {
+                // ignore
+            }
+        }
+    };
+
+    const buildFieldErrorSummary = (fieldErrors: Record<string, string>): string => {
+        const labels = Object.keys(fieldErrors)
+            .filter((k) => k !== 'general')
+            .map((k) => FIELD_ERROR_LABELS[k] || k);
+        if (labels.length === 0) {
+            return t('pleaseFixHighlightedFields') || 'Please fix the highlighted fields below.';
+        }
+        if (labels.length === 1) {
+            return (
+                t('pleaseFixField')?.replace('{field}', labels[0]) ||
+                `Please fix the ${labels[0]} field below.`
+            );
+        }
+        return (
+            t('pleaseFixHighlightedFields') ||
+            'Please fix the highlighted fields below.'
+        );
+    };
+
+    const translateBackendError = (errorMessage: string, fieldHint?: string): string => {
+        const lowerMessage = (errorMessage || '').toLowerCase();
+        const hint = (fieldHint || '').toLowerCase();
+
+        const isTaken =
+            lowerMessage.includes('already exists') ||
+            lowerMessage.includes('already exist') ||
+            lowerMessage.includes('already taken') ||
+            lowerMessage.includes('already registered') ||
+            lowerMessage.includes('not available') ||
+            lowerMessage.includes('unavailable');
+
+        if (isTaken || hint) {
+            if (hint.includes('email') || lowerMessage.includes('email')) {
+                return t('emailAlreadyExists') || 'This email is already registered. Please use a different email.';
+            }
+            if (hint.includes('username') || lowerMessage.includes('username')) {
+                return t('usernameAlreadyExists') || 'This username is already taken. Please choose another.';
+            }
+            if (hint.includes('phone') || lowerMessage.includes('phone')) {
+                return t('phoneAlreadyExists') || 'This phone number is already registered. Please use a different number.';
+            }
+            if (
+                hint.includes('domain') ||
+                hint.includes('companydomain') ||
+                hint.includes('company_domain') ||
+                lowerMessage.includes('domain')
+            ) {
+                return t('domainAlreadyExists') || 'This company domain is already taken. Please choose another.';
+            }
+        }
+
+        if (lowerMessage.includes('enter a valid email') || lowerMessage.includes('valid email')) {
+            return t('invalidEmail') || 'Invalid email format';
+        }
+        if (lowerMessage.includes('required')) {
+            if (hint.includes('email')) return t('emailRequired') || 'Email is required';
+            if (hint.includes('username')) return t('usernameRequired') || 'Username is required';
+            if (hint.includes('phone')) return t('phoneRequired') || 'Phone is required';
+            if (hint.includes('password')) return t('passwordRequired') || 'Password is required';
+            if (hint.includes('domain')) return t('companyDomainRequired') || 'Company domain is required';
+            if (hint.includes('name') && hint.includes('company')) return t('companyNameRequired') || 'Company name is required';
+        }
+
+        // Never show vague "Not available." as a standalone message
+        if (lowerMessage === 'not available.' || lowerMessage === 'not available') {
+            return t('pleaseFixHighlightedFields') || 'Please fix the highlighted fields below.';
+        }
+
+        return errorMessage;
     };
 
     const mapBackendErrorsToFields = (apiFields: any) => {
@@ -151,6 +281,8 @@ export const RegisterPage = () => {
         if (!apiFields || typeof apiFields !== 'object') {
             return fieldErrors;
         }
+
+        const source = unwrapApiFieldErrors(apiFields);
 
         const ownerFieldMap: Record<string, string> = {
             first_name: 'firstName',
@@ -161,42 +293,67 @@ export const RegisterPage = () => {
             phone: 'phone',
         };
 
-        if (apiFields.company) {
-            const companyErrors = apiFields.company;
+        if (source.company && typeof source.company === 'object') {
+            const companyErrors = source.company as Record<string, unknown>;
             if (companyErrors.domain) {
-                fieldErrors.companyDomain = normalizeErrorMessage(companyErrors.domain);
+                fieldErrors.companyDomain = translateBackendError(
+                    normalizeErrorMessage(companyErrors.domain),
+                    'company_domain'
+                );
             }
             if (companyErrors.name) {
-                fieldErrors.companyName = normalizeErrorMessage(companyErrors.name);
+                fieldErrors.companyName = translateBackendError(
+                    normalizeErrorMessage(companyErrors.name),
+                    'company_name'
+                );
             }
             if (!fieldErrors.companyDomain && (Array.isArray(companyErrors) || typeof companyErrors === 'string')) {
                 const message = normalizeErrorMessage(companyErrors);
                 if (!fieldErrors.companyName && message.toLowerCase().includes('name')) {
-                    fieldErrors.companyName = message;
+                    fieldErrors.companyName = translateBackendError(message, 'company_name');
                 } else {
-                    fieldErrors.companyDomain = message;
+                    fieldErrors.companyDomain = translateBackendError(message, 'company_domain');
                 }
             }
         }
 
-        if (apiFields.company_domain) {
-            fieldErrors.companyDomain = normalizeErrorMessage(apiFields.company_domain);
+        if (source.company_domain) {
+            fieldErrors.companyDomain = translateBackendError(
+                normalizeErrorMessage(source.company_domain),
+                'company_domain'
+            );
         }
 
-        if (apiFields.owner && typeof apiFields.owner === 'object') {
+        if (source.owner && typeof source.owner === 'object' && !Array.isArray(source.owner)) {
             Object.entries(ownerFieldMap).forEach(([apiKey, uiKey]) => {
-                if (apiFields.owner[apiKey]) {
-                    fieldErrors[uiKey] = normalizeErrorMessage(apiFields.owner[apiKey]);
+                if ((source.owner as Record<string, unknown>)[apiKey]) {
+                    fieldErrors[uiKey] = translateBackendError(
+                        normalizeErrorMessage((source.owner as Record<string, unknown>)[apiKey]),
+                        apiKey
+                    );
                 }
             });
-            if (apiFields.owner.non_field_errors && !fieldErrors.password) {
-                fieldErrors.password = normalizeErrorMessage(apiFields.owner.non_field_errors);
+            const ownerObj = source.owner as Record<string, unknown>;
+            if (ownerObj.non_field_errors && !fieldErrors.password) {
+                fieldErrors.password = translateBackendError(
+                    normalizeErrorMessage(ownerObj.non_field_errors),
+                    'password'
+                );
             }
-            if (!fieldErrors.password && (Array.isArray(apiFields.owner) || typeof apiFields.owner === 'string')) {
-                fieldErrors.password = normalizeErrorMessage(apiFields.owner);
+        } else if (source.owner && (Array.isArray(source.owner) || typeof source.owner === 'string')) {
+            const msg = normalizeErrorMessage(source.owner);
+            const lower = msg.toLowerCase();
+            if (lower.includes('email')) {
+                fieldErrors.email = translateBackendError(msg, 'email');
+            } else if (lower.includes('username')) {
+                fieldErrors.username = translateBackendError(msg, 'username');
+            } else if (lower.includes('phone')) {
+                fieldErrors.phone = translateBackendError(msg, 'phone');
+            } else if (lower.includes('password')) {
+                fieldErrors.password = translateBackendError(msg, 'password');
+            } else {
+                fieldErrors.general = translateBackendError(msg);
             }
-        } else if (apiFields.owner) {
-            fieldErrors.password = normalizeErrorMessage(apiFields.owner);
         }
 
         const directMap: Record<string, string> = {
@@ -214,20 +371,13 @@ export const RegisterPage = () => {
         };
 
         Object.entries(directMap).forEach(([apiKey, uiKey]) => {
-            if (apiFields[apiKey]) {
-                fieldErrors[uiKey] = normalizeErrorMessage(apiFields[apiKey]);
+            if (source[apiKey] && !fieldErrors[uiKey]) {
+                fieldErrors[uiKey] = translateBackendError(normalizeErrorMessage(source[apiKey]), apiKey);
             }
         });
 
-        if (apiFields.non_field_errors) {
-            fieldErrors.general = normalizeErrorMessage(apiFields.non_field_errors);
-        }
-
-        if (apiFields.phone_verification_token) {
-            fieldErrors.phoneOtp = normalizeErrorMessage(apiFields.phone_verification_token);
-        }
-        if (apiFields.email_verification_token) {
-            fieldErrors.emailOtp = normalizeErrorMessage(apiFields.email_verification_token);
+        if (source.non_field_errors) {
+            fieldErrors.general = translateBackendError(normalizeErrorMessage(source.non_field_errors));
         }
 
         return fieldErrors;
@@ -251,10 +401,11 @@ export const RegisterPage = () => {
         && Number(selectedPlanDetails.price_monthly || 0) <= 0
         && Number(selectedPlanDetails.price_yearly || 0) <= 0;
     const clearFieldError = (field: string) => {
-        if (errors[field]) {
+        if (errors[field] || errors.general) {
             setErrors(prev => {
                 const newErrors = { ...prev };
                 delete newErrors[field];
+                delete newErrors.general;
                 return newErrors;
             });
         }
@@ -360,64 +511,72 @@ export const RegisterPage = () => {
         clearFieldError('plan');
     };
 
-    const translateBackendError = (errorMessage: string): string => {
-        const lowerMessage = errorMessage.toLowerCase();
-        
-        // Domain errors
-        if (lowerMessage.includes('domain') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-            return t('domainAlreadyExists') || 'Company domain already exists';
-        }
-        
-        // Email errors
-        if (lowerMessage.includes('email') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-            return t('emailAlreadyExists') || 'Email already exists';
-        }
-        
-        // Username errors
-        if (lowerMessage.includes('username') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-            return t('usernameAlreadyExists') || 'Username already exists';
-        }
-        
-        // Phone errors
-        if (lowerMessage.includes('phone') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-            return t('phoneAlreadyExists') || 'Phone number already exists';
-        }
-        
-        // Return original message if no translation found
-        return errorMessage;
-    };
-
-    const checkAvailability = async (fields: { company_domain?: string; email?: string; username?: string; phone?: string }) => {
+    const checkAvailability = async (fields: {
+        company_domain?: string;
+        email?: string;
+        username?: string;
+        phone?: string;
+    }) => {
         setStepCheckLoading(true);
         try {
             await checkRegistrationAvailabilityAPI(fields);
             return true;
         } catch (error: any) {
+            const backendErrors = unwrapApiFieldErrors(error.fields || {});
             const fieldErrors: { [key: string]: string } = {};
-            const backendErrors = error.fields || {};
-            
-            // Map backend field names to frontend field names and translate errors
-            if (backendErrors.company_domain) {
-                const errorMsg = normalizeErrorMessage(backendErrors.company_domain);
-                fieldErrors.companyDomain = translateBackendError(errorMsg);
+
+            const apiToUi: Array<{ api: string; ui: string; checked?: string }> = [
+                { api: 'company_domain', ui: 'companyDomain', checked: fields.company_domain },
+                { api: 'email', ui: 'email', checked: fields.email },
+                { api: 'username', ui: 'username', checked: fields.username },
+                { api: 'phone', ui: 'phone', checked: fields.phone },
+            ];
+
+            apiToUi.forEach(({ api, ui }) => {
+                if (backendErrors[api]) {
+                    fieldErrors[ui] = translateBackendError(normalizeErrorMessage(backendErrors[api]), api);
+                }
+            });
+
+            // Fallback: generic "Not available" with no field payload
+            if (Object.keys(fieldErrors).length === 0) {
+                const msg = String(error.message || '').toLowerCase();
+                const looksUnavailable =
+                    msg.includes('not available') ||
+                    msg.includes('already exist') ||
+                    msg.includes('unavailable') ||
+                    msg.includes('availability');
+                const checkedFields = apiToUi.filter(({ checked }) => !!checked);
+                if (looksUnavailable && checkedFields.length === 1) {
+                    const only = checkedFields[0];
+                    fieldErrors[only.ui] = translateBackendError(
+                        error.message || 'already exists',
+                        only.api
+                    );
+                } else if (looksUnavailable && checkedFields.length > 1) {
+                    setErrors((prev) => ({
+                        ...prev,
+                        general:
+                            t('registrationDetailsUnavailable') ||
+                            'One or more of these details (email, username, or phone) is already registered. Please change them and try again.',
+                    }));
+                    return false;
+                }
             }
-            if (backendErrors.email) {
-                const errorMsg = normalizeErrorMessage(backendErrors.email);
-                fieldErrors.email = translateBackendError(errorMsg);
-            }
-            if (backendErrors.username) {
-                const errorMsg = normalizeErrorMessage(backendErrors.username);
-                fieldErrors.username = translateBackendError(errorMsg);
-            }
-            if (backendErrors.phone) {
-                const errorMsg = normalizeErrorMessage(backendErrors.phone);
-                fieldErrors.phone = translateBackendError(errorMsg);
-            }
-            
+
             if (Object.keys(fieldErrors).length > 0) {
-                setErrors(prev => ({ ...prev, ...fieldErrors }));
+                setErrors((prev) => ({
+                    ...prev,
+                    ...fieldErrors,
+                    general: buildFieldErrorSummary(fieldErrors),
+                }));
+                // Defer scroll until React paints the field errors
+                requestAnimationFrame(() => scrollToFirstFieldError(fieldErrors));
             } else if (error.message) {
-                setErrors(prev => ({ ...prev, general: translateBackendError(error.message) }));
+                setErrors((prev) => ({
+                    ...prev,
+                    general: translateBackendError(error.message),
+                }));
             }
             return false;
         } finally {
@@ -467,6 +626,45 @@ export const RegisterPage = () => {
         };
     }, []);
 
+    // Retry plans when arriving on the plan step after a previous failure.
+    useEffect(() => {
+        if (currentStep !== planStep || !plansError || plansLoading || plans.length > 0) return;
+        let cancelled = false;
+        (async () => {
+            setPlansLoading(true);
+            setPlansError(null);
+            try {
+                const data = await getPublicPlansAPI();
+                if (cancelled) return;
+                const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
+                    id: plan.id,
+                    name: plan.name || '',
+                    name_ar: plan.name_ar || '',
+                    description: plan.description || '',
+                    description_ar: plan.description_ar || '',
+                    price_monthly: Number(plan.price_monthly || 0),
+                    price_yearly: Number(plan.price_yearly || 0),
+                    trial_days: Number(plan.trial_days || 0),
+                    users: plan.users,
+                    clients: plan.clients,
+                    features: plan.features || {},
+                    limits: plan.limits || {},
+                    usage_limits_monthly: plan.usage_limits_monthly || {},
+                }));
+                setPlans(normalizedPlans);
+            } catch (error: any) {
+                if (!cancelled) {
+                    setPlansError(error.message || t('failedToLoadPlans') || 'Failed to load plans');
+                }
+            } finally {
+                if (!cancelled) setPlansLoading(false);
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [currentStep, planStep]);
+
     useEffect(() => {
         let isMounted = true;
         const loadPhoneOtpRequirement = async () => {
@@ -484,7 +682,10 @@ export const RegisterPage = () => {
                 setEmailVerificationRequired(!!emailReq.email_verification_required);
                 if (!required) setCurrentStep((prev) => (prev === 4 ? 3 : prev));
             } catch {
-                // Keep secure default (required) if the requirement endpoint is unavailable.
+                // OTP off unless the server explicitly says otherwise.
+                if (!isMounted) return;
+                setPhoneOtpRequired(false);
+                setPhoneOtpChannel(null);
             }
         };
         loadPhoneOtpRequirement();
@@ -518,7 +719,11 @@ export const RegisterPage = () => {
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        if (Object.keys(newErrors).length > 0) {
+            requestAnimationFrame(() => scrollToFirstFieldError(newErrors));
+            return false;
+        }
+        return true;
     };
 
     const validateStep2 = (): boolean => {
@@ -542,6 +747,10 @@ export const RegisterPage = () => {
             newErrors.username = t('usernameRequired') || 'Username is required';
         } else if (username.length < 3) {
             newErrors.username = t('usernameMinLength') || 'Username must be at least 3 characters';
+        } else if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
+            newErrors.username =
+                t('invalidUsername') ||
+                'Username can only contain letters, numbers, dots, underscores, and hyphens';
         }
 
         const normalizedPhone = phone.trim();
@@ -557,6 +766,10 @@ export const RegisterPage = () => {
             newErrors.password = t('passwordRequired') || 'Password is required';
         } else if (password.length < 8) {
             newErrors.password = t('passwordMinLength') || 'Password must be at least 8 characters';
+        } else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
+            newErrors.password =
+                t('passwordRequirements') ||
+                'Use at least 8 characters with a mix of letters and numbers.';
         }
 
         if (!confirmPassword.trim()) {
@@ -566,7 +779,42 @@ export const RegisterPage = () => {
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        if (Object.keys(newErrors).length > 0) {
+            requestAnimationFrame(() => scrollToFirstFieldError(newErrors));
+            return false;
+        }
+        return true;
+    };
+
+    const resolveOtpPolicy = async (): Promise<{
+        phoneRequired: boolean;
+        emailRequired: boolean;
+        channel: RegistrationPhoneOtpChannel | null;
+    }> => {
+        try {
+            const [data, emailReq] = await Promise.all([
+                getPhoneOtpRequirementAPI(),
+                getRegistrationEmailRequirementAPI(),
+            ]);
+            const phoneRequired = data?.phone_otp_required === true;
+            const channel = phoneRequired
+                ? ((data.phone_otp_channel as RegistrationPhoneOtpChannel | null) ?? 'whatsapp')
+                : null;
+            const emailRequired = emailReq?.email_verification_required === true;
+            setPhoneOtpRequired(phoneRequired);
+            setPhoneOtpChannel(channel);
+            setEmailVerificationRequired(emailRequired);
+            return { phoneRequired, emailRequired, channel };
+        } catch {
+            // Do not call send-otp when policy cannot be confirmed.
+            setPhoneOtpRequired(false);
+            setPhoneOtpChannel(null);
+            return {
+                phoneRequired: false,
+                emailRequired: emailVerificationRequired,
+                channel: null,
+            };
+        }
     };
 
     const handleNext = async () => {
@@ -584,14 +832,18 @@ export const RegisterPage = () => {
                 phone: phone.trim(),
             });
             if (!ownerAvailable) return;
-            if (!anyOtpRequired) {
+
+            const { phoneRequired, emailRequired } = await resolveOtpPolicy();
+
+            if (!phoneRequired && !emailRequired) {
                 setPhoneVerificationToken(null);
                 setPhoneOtpCode('');
                 setEmailVerificationToken(null);
                 setEmailOtpCode('');
-                setCurrentStep(planStep);
+                setCurrentStep(3); // plan step when no OTP
                 return;
             }
+
             setOtpSending(true);
             setErrors((prev) => {
                 const next = { ...prev };
@@ -601,19 +853,35 @@ export const RegisterPage = () => {
                 return next;
             });
             try {
-                const tasks: Promise<unknown>[] = [];
-                if (phoneOtpRequired) {
-                    tasks.push(registerPhoneSendOtpAPI(phone.trim(), language));
+                let stillNeedPhone = phoneRequired;
+                if (stillNeedPhone) {
+                    try {
+                        await registerPhoneSendOtpAPI(phone.trim(), language);
+                    } catch (e: any) {
+                        // Backend says phone OTP is off — skip it and continue.
+                        if (e?.code === 'registration_otp_disabled') {
+                            stillNeedPhone = false;
+                            setPhoneOtpRequired(false);
+                            setPhoneOtpChannel(null);
+                        } else {
+                            throw e;
+                        }
+                    }
                 }
-                if (emailVerificationRequired) {
-                    tasks.push(registerEmailSendOtpAPI(email.trim(), language));
+                if (emailRequired) {
+                    await registerEmailSendOtpAPI(email.trim(), language);
                 }
-                await Promise.all(tasks);
+
                 setPhoneVerificationToken(null);
                 setPhoneOtpCode('');
                 setEmailVerificationToken(null);
                 setEmailOtpCode('');
-                setCurrentStep(otpStep);
+
+                if (!stillNeedPhone && !emailRequired) {
+                    setCurrentStep(3); // plan step when no OTP
+                } else {
+                    setCurrentStep(otpStep);
+                }
             } catch (e: any) {
                 setErrors((prev) => ({
                     ...prev,
@@ -679,14 +947,24 @@ export const RegisterPage = () => {
     const handleResendPhoneOtp = async () => {
         setOtpSending(true);
         try {
-            const tasks: Promise<unknown>[] = [];
             if (phoneOtpRequired) {
-                tasks.push(registerPhoneSendOtpAPI(phone.trim(), language));
+                try {
+                    await registerPhoneSendOtpAPI(phone.trim(), language);
+                } catch (e: any) {
+                    if (e?.code === 'registration_otp_disabled') {
+                        setPhoneOtpRequired(false);
+                        setPhoneOtpChannel(null);
+                        if (!emailVerificationRequired) {
+                            setCurrentStep(3);
+                        }
+                        return;
+                    }
+                    throw e;
+                }
             }
             if (emailVerificationRequired) {
-                tasks.push(registerEmailSendOtpAPI(email.trim(), language));
+                await registerEmailSendOtpAPI(email.trim(), language);
             }
-            await Promise.all(tasks);
         } catch (e: any) {
             setErrors((prev) => ({
                 ...prev,
@@ -776,13 +1054,16 @@ export const RegisterPage = () => {
             localStorage.removeItem('isLoggedIn');
             localStorage.removeItem('pendingUserData');
 
-            const userLang = (response.user.language === 'ar' || response.user.language === 'en') ? response.user.language : undefined;
+            const userLang: 'en' | 'ar' | undefined =
+                response.user.language === 'ar' || response.user.language === 'en'
+                    ? response.user.language
+                    : undefined;
             const frontendUser = {
                 id: response.user.id,
                 name: `${response.user.first_name || ''} ${response.user.last_name || ''}`.trim() || response.user.username,
                 username: response.user.username,
                 email: response.user.email,
-                role: 'Owner',
+                role: 'Owner' as const,
                 phone: response.user.phone || phone.trim(),
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(response.user.username)}&background=random`,
                 company: {
@@ -820,7 +1101,7 @@ export const RegisterPage = () => {
             localStorage.setItem('accessToken', response.access);
             localStorage.setItem('refreshToken', response.refresh);
             setCurrentUser(frontendUser);
-            if (frontendUser.language) setLanguage(frontendUser.language);
+            if (userLang) setLanguage(userLang);
             setIsLoggedIn(true);
             setTimeout(() => {
                 navigateToCompanyRoute(frontendUser.company?.name, frontendUser.company?.domain, 'Dashboard');
@@ -829,7 +1110,13 @@ export const RegisterPage = () => {
         } catch (error: any) {
             const backendFieldErrors = mapBackendErrorsToFields(error.fields || {});
             if (Object.keys(backendFieldErrors).length > 0) {
-                setErrors(backendFieldErrors);
+                const withSummary = {
+                    ...backendFieldErrors,
+                    general:
+                        backendFieldErrors.general ||
+                        buildFieldErrorSummary(backendFieldErrors),
+                };
+                setErrors(withSummary);
                 if (backendFieldErrors.companyName || backendFieldErrors.companyDomain) {
                     setCurrentStep(1);
                 } else if (
@@ -838,6 +1125,7 @@ export const RegisterPage = () => {
                     backendFieldErrors.email ||
                     backendFieldErrors.username ||
                     backendFieldErrors.password ||
+                    backendFieldErrors.confirmPassword ||
                     backendFieldErrors.phone
                 ) {
                     setCurrentStep(2);
@@ -846,11 +1134,21 @@ export const RegisterPage = () => {
                 } else if (backendFieldErrors.plan) {
                     setCurrentStep(planStep);
                 }
+                requestAnimationFrame(() => scrollToFirstFieldError(withSummary));
             } else {
                 const errorMessage = error.message || t('registrationFailed') || 'Registration failed. Please try again.';
-                setErrors({ general: errorMessage });
-                if (errorMessage.toLowerCase().includes('domain')) {
+                const translated = translateBackendError(errorMessage);
+                setErrors({ general: translated });
+                const lower = errorMessage.toLowerCase();
+                if (lower.includes('domain')) {
                     setCurrentStep(1);
+                } else if (
+                    lower.includes('email') ||
+                    lower.includes('username') ||
+                    lower.includes('phone') ||
+                    lower.includes('password')
+                ) {
+                    setCurrentStep(2);
                 } else {
                     setCurrentStep(2);
                 }
@@ -867,7 +1165,7 @@ export const RegisterPage = () => {
                 <div className={`absolute top-4 end-4 z-10 flex ${language === 'ar' ? 'gap-4' : 'gap-2'}`}>
                     <button
                         onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
-                        className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
+                        className="p-2 rounded-full text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"
                         aria-label={`Switch to ${language === 'ar' ? 'English' : 'Arabic'}`}
                     >
                         <span className="font-bold text-sm">{language === 'ar' ? 'EN' : 'AR'}</span>
@@ -898,10 +1196,10 @@ export const RegisterPage = () => {
                             {[1, 2, ...(anyOtpRequired ? [3, 4] : [3])].map((stepNumber, idx, all) => (
                                 <React.Fragment key={stepNumber}>
                                     <div
-                                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm ${
+                                        className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center text-xs sm:text-sm font-semibold ${
                                             currentStep >= stepNumber
-                                                ? 'bg-primary-600 text-inverse'
-                                                : 'bg-gray-300 dark:bg-gray-700 text-tertiary'
+                                                ? 'bg-primary-600 text-white'
+                                                : 'bg-gray-300 dark:bg-gray-700 text-gray-700 dark:text-gray-200'
                                         }`}
                                     >
                                         {stepNumber}
@@ -935,7 +1233,7 @@ export const RegisterPage = () => {
 
                                     <div>
                                         <label htmlFor="company-name" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('companyName') || 'Company Name'} <span className="text-red-500">*</span>
+                                            {t('companyName') || 'Company Name'} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
                                         <Input
                                             id="company-name"
@@ -943,13 +1241,7 @@ export const RegisterPage = () => {
                                             value={companyName}
                                             onChange={(e) => {
                                                 setCompanyName(e.target.value);
-                                                if (errors.companyName) {
-                                                    setErrors(prev => {
-                                                        const newErrors = { ...prev };
-                                                        delete newErrors.companyName;
-                                                        return newErrors;
-                                                    });
-                                                }
+                                                clearFieldError('companyName');
                                             }}
                                             onBlur={() => {
                                                 if (companyName.trim() && !companyDomain.trim()) {
@@ -965,7 +1257,7 @@ export const RegisterPage = () => {
 
                                     <div>
                                         <label htmlFor="company-domain" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('companyDomain') || 'Company Domain'} <span className="text-red-500">*</span>
+                                            {t('companyDomain') || 'Company Domain'} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
                                         <Input
                                             id="company-domain"
@@ -973,27 +1265,21 @@ export const RegisterPage = () => {
                                             value={companyDomain}
                                             onChange={(e) => {
                                                 setCompanyDomain(slugifyDomain(e.target.value));
-                                                if (errors.companyDomain) {
-                                                    setErrors(prev => {
-                                                        const newErrors = { ...prev };
-                                                        delete newErrors.companyDomain;
-                                                        return newErrors;
-                                                    });
-                                                }
+                                                clearFieldError('companyDomain');
                                             }}
                                             className={errors.companyDomain ? 'border-red-500' : ''}
                                         />
                                         {errors.companyDomain && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.companyDomain}</p>
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.companyDomain}</p>
                                         )}
-                                        <p className="mt-1 text-xs text-tertiary">
+                                        <p className="mt-1 text-xs text-gray-600 dark:text-gray-300">
                                             {t('domainHint') || 'This will be used as your company identifier'}
                                         </p>
                                     </div>
 
                                     <div>
                                         <label htmlFor="specialization" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('specialization') || 'Specialization'} <span className="text-red-500">*</span>
+                                            {t('specialization') || 'Specialization'} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
                                         <select
                                             id="specialization"
@@ -1002,7 +1288,7 @@ export const RegisterPage = () => {
                                                 setSpecialization(e.target.value as 'real_estate' | 'services' | 'products' | 'medical')
                                             }
                                             dir={language === 'ar' ? 'rtl' : 'ltr'}
-                                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+                                            className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
                                         >
                                             <option value="real_estate">{t('realEstate') || 'Real Estate'}</option>
                                             <option value="services">{t('services') || 'Services'}</option>
@@ -1023,7 +1309,7 @@ export const RegisterPage = () => {
                                     <div className="grid grid-cols-2 gap-4">
                                         <div>
                                             <label htmlFor="first-name" className="block text-sm font-medium text-secondary mb-1">
-                                                {t('firstName') || 'First Name'} <span className="text-red-500">*</span>
+                                                {t('firstName') || 'First Name'} <span className="text-red-500 dark:text-red-400">*</span>
                                             </label>
                                             <Input
                                                 id="first-name"
@@ -1031,24 +1317,18 @@ export const RegisterPage = () => {
                                                 value={firstName}
                                                 onChange={(e) => {
                                                     setFirstName(e.target.value);
-                                                    if (errors.firstName) {
-                                                        setErrors(prev => {
-                                                            const newErrors = { ...prev };
-                                                            delete newErrors.firstName;
-                                                            return newErrors;
-                                                        });
-                                                    }
+                                                    clearFieldError('firstName');
                                                 }}
                                                 className={errors.firstName ? 'border-red-500' : ''}
                                             />
                                             {errors.firstName && (
-                                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.firstName}</p>
+                                                <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.firstName}</p>
                                             )}
                                         </div>
 
                                         <div>
                                             <label htmlFor="last-name" className="block text-sm font-medium text-secondary mb-1">
-                                                {t('lastName') || 'Last Name'} <span className="text-red-500">*</span>
+                                                {t('lastName') || 'Last Name'} <span className="text-red-500 dark:text-red-400">*</span>
                                             </label>
                                             <Input
                                                 id="last-name"
@@ -1056,76 +1336,61 @@ export const RegisterPage = () => {
                                                 value={lastName}
                                                 onChange={(e) => {
                                                     setLastName(e.target.value);
-                                                    if (errors.lastName) {
-                                                        setErrors(prev => {
-                                                            const newErrors = { ...prev };
-                                                            delete newErrors.lastName;
-                                                            return newErrors;
-                                                        });
-                                                    }
+                                                    clearFieldError('lastName');
                                                 }}
                                                 className={errors.lastName ? 'border-red-500' : ''}
                                             />
                                             {errors.lastName && (
-                                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.lastName}</p>
+                                                <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.lastName}</p>
                                             )}
                                         </div>
                                     </div>
 
                                     <div>
                                         <label htmlFor="email" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('email') || 'Email'} <span className="text-red-500">*</span>
+                                            {t('email') || 'Email'} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
                                         <Input
                                             id="email"
                                             type="email"
+                                            autoComplete="email"
                                             placeholder={t('enterEmail') || 'Enter email address'}
                                             value={email}
                                             onChange={(e) => {
                                                 setEmail(e.target.value);
-                                                if (errors.email) {
-                                                    setErrors(prev => {
-                                                        const newErrors = { ...prev };
-                                                        delete newErrors.email;
-                                                        return newErrors;
-                                                    });
-                                                }
+                                                clearFieldError('email');
                                             }}
                                             className={errors.email ? 'border-red-500' : ''}
                                         />
                                         {errors.email && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.email}</p>
                                         )}
                                     </div>
 
                                     <div>
                                         <label htmlFor="username" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('username') || 'Username'} <span className="text-red-500">*</span>
+                                            {t('username') || 'Username'} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
                                         <Input
                                             id="username"
+                                            name="register-username"
+                                            autoComplete="username"
                                             placeholder={t('enterUsername') || 'Enter username'}
                                             value={username}
                                             onChange={(e) => {
                                                 setUsername(e.target.value);
-                                                if (errors.username) {
-                                                    setErrors(prev => {
-                                                        const newErrors = { ...prev };
-                                                        delete newErrors.username;
-                                                        return newErrors;
-                                                    });
-                                                }
+                                                clearFieldError('username');
                                             }}
                                             className={errors.username ? 'border-red-500' : ''}
                                         />
                                         {errors.username && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.username}</p>
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.username}</p>
                                         )}
                                     </div>
 
                                     <div>
                                         <label htmlFor="phone" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('phone') || 'Phone'} <span className="text-red-500">*</span>
+                                            {t('phone') || 'Phone'} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
                                         <PhoneInput
                                             id="phone"
@@ -1136,80 +1401,72 @@ export const RegisterPage = () => {
                                             defaultCountry="IQ"
                                         />
                                         {errors.phone && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.phone}</p>
                                         )}
                                     </div>
 
                                     <div className="relative">
                                         <label htmlFor="password" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('password')} <span className="text-red-500">*</span>
+                                            {t('password')} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
 
                                         <div className="relative">
                                             <Input
                                                 id="password"
+                                                name="register-password"
                                                 type={passwordVisible ? 'text' : 'password'}
+                                                autoComplete="new-password"
                                                 placeholder={t('enterPassword')}
                                                 value={password}
                                                 onChange={(e) => {
                                                     setPassword(e.target.value);
-                                                    if (errors.password) {
-                                                        setErrors(prev => {
-                                                            const newErrors = { ...prev };
-                                                            delete newErrors.password;
-                                                            return newErrors;
-                                                        });
-                                                    }
+                                                    clearFieldError('password');
                                                 }}
                                                 className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
                                             />
 
                                             <button
                                                 type="button"
-                                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
                                                 onClick={handlePasswordVisibilityToggle}
                                             >
                                                 {passwordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                                             </button>
                                         </div>
 
-                                        <p className="mt-2 text-xs text-tertiary">
+                                        <p className="mt-2 text-xs text-secondary">
                                             {t('passwordRequirements')}
                                         </p>
 
                                         {errors.password && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password}</p>
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.password}</p>
                                         )}
                                     </div>
 
 
                                     <div className="relative">
                                         <label htmlFor="confirm-password" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('confirmPassword')} <span className="text-red-500">*</span>
+                                            {t('confirmPassword')} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
 
                                         <div className="relative">
                                             <Input
                                                 id="confirm-password"
+                                                name="register-confirm-password"
                                                 type={confirmPasswordVisible ? 'text' : 'password'}
+                                                autoComplete="new-password"
                                                 placeholder={t('confirmPassword')}
                                                 value={confirmPassword}
                                                 onChange={(e) => {
                                                     setConfirmPassword(e.target.value);
-                                                    if (errors.confirmPassword) {
-                                                        setErrors(prev => {
-                                                            const newErrors = { ...prev };
-                                                            delete newErrors.confirmPassword;
-                                                            return newErrors;
-                                                        });
-                                                    }
+                                                    clearFieldError('confirmPassword');
                                                 }}
                                                 className={`pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
                                             />
 
                                             <button
                                                 type="button"
-                                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
                                                 onClick={handleConfirmPasswordVisibilityToggle}
                                             >
                                                 {confirmPasswordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
@@ -1217,7 +1474,7 @@ export const RegisterPage = () => {
                                         </div>
 
                                         {errors.confirmPassword && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">
                                                 {errors.confirmPassword}
                                             </p>
                                         )}
@@ -1246,7 +1503,9 @@ export const RegisterPage = () => {
                                     {phoneOtpRequired && (
                                     <div>
                                         <label htmlFor="phone-otp" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('verificationCode') || 'Verification code'}
+                                            {phoneOtpChannel === 'twilio_sms'
+                                                ? (t('verificationCodeLabelSms') || 'SMS verification code')
+                                                : (t('verificationCodeLabelWhatsApp') || 'WhatsApp verification code')}
                                         </label>
                                         <Input
                                             id="phone-otp"
@@ -1267,14 +1526,14 @@ export const RegisterPage = () => {
                                             className={errors.phoneOtp ? 'border-red-500' : ''}
                                         />
                                         {errors.phoneOtp && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phoneOtp}</p>
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.phoneOtp}</p>
                                         )}
                                     </div>
                                     )}
                                     {emailVerificationRequired && (
                                     <div>
                                         <label htmlFor="email-otp" className="block text-sm font-medium text-secondary mb-1">
-                                            {t('verificationCode') || 'Verification code'}
+                                            {t('verificationCodeLabelEmail') || 'Email verification code'}
                                         </label>
                                         <Input
                                             id="email-otp"
@@ -1295,7 +1554,7 @@ export const RegisterPage = () => {
                                             className={errors.emailOtp ? 'border-red-500' : ''}
                                         />
                                         {errors.emailOtp && (
-                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.emailOtp}</p>
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.emailOtp}</p>
                                         )}
                                     </div>
                                     )}
@@ -1355,8 +1614,43 @@ export const RegisterPage = () => {
                                         )}
 
                                         {plansError && !plansLoading && (
-                                            <div className="text-sm text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 rounded-md">
-                                                {plansError}
+                                            <div className="space-y-2">
+                                                <div className="text-sm text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 rounded-md">
+                                                    {plansError}
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                                                    onClick={async () => {
+                                                        setPlansLoading(true);
+                                                        setPlansError(null);
+                                                        try {
+                                                            const data = await getPublicPlansAPI();
+                                                            const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
+                                                                id: plan.id,
+                                                                name: plan.name || '',
+                                                                name_ar: plan.name_ar || '',
+                                                                description: plan.description || '',
+                                                                description_ar: plan.description_ar || '',
+                                                                price_monthly: Number(plan.price_monthly || 0),
+                                                                price_yearly: Number(plan.price_yearly || 0),
+                                                                trial_days: Number(plan.trial_days || 0),
+                                                                users: plan.users,
+                                                                clients: plan.clients,
+                                                                features: plan.features || {},
+                                                                limits: plan.limits || {},
+                                                                usage_limits_monthly: plan.usage_limits_monthly || {},
+                                                            }));
+                                                            setPlans(normalizedPlans);
+                                                        } catch (error: any) {
+                                                            setPlansError(error.message || t('failedToLoadPlans') || 'Failed to load plans');
+                                                        } finally {
+                                                            setPlansLoading(false);
+                                                        }
+                                                    }}
+                                                >
+                                                    {t('retry') || 'Retry'}
+                                                </button>
                                             </div>
                                         )}
 
@@ -1508,7 +1802,7 @@ export const RegisterPage = () => {
                             </div>
                             {/* Legal Links Footer */}
                             <footer className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
-                                <p className="text-xs text-center text-gray-500 dark:text-gray-400 mb-3">
+                                <p className="text-xs text-center text-gray-600 dark:text-gray-300 mb-3">
                                     {language === 'ar' 
                                         ? 'بإنشاء حساب، فإنك توافق على'
                                         : 'By creating an account, you agree to our'}
@@ -1523,7 +1817,7 @@ export const RegisterPage = () => {
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
                     <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-md relative">
                         <button
-                            className="absolute top-3 end-3 text-gray-400 hover:text-gray-200"
+                            className="absolute top-3 end-3 text-gray-500 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
                             onClick={handleSkipVerification}
                             aria-label={t('close') || 'Close'}
                         >

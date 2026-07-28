@@ -121,14 +121,28 @@ export async function obtainWhatsAppEmbeddedSignupCode(
           config_id: cfg.config_id,
           response_type: 'code',
           override_default_response_type: true,
+          // Enables Meta's dual setup screen (new Cloud number OR existing WhatsApp Business app).
+          // @see https://developers.facebook.com/docs/whatsapp/embedded-signup/custom-flows/onboarding-business-app-users/
+          extras: {
+            setup: {},
+            featureType: 'whatsapp_business_app_onboarding',
+            sessionInfoVersion: '3',
+          },
         }
       );
     });
 
     // WA_EMBEDDED_SIGNUP postMessage often arrives after the FB.login callback.
+    // Coexistence FINISH may return waba_id without phone_number_id.
     const deadline = Date.now() + 8000;
     while (Date.now() < deadline) {
       if (session.phone_number_id && session.waba_id) break;
+      if (
+        session.waba_id &&
+        session.signup_event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'
+      ) {
+        break;
+      }
       await new Promise((r) => setTimeout(r, 150));
     }
 

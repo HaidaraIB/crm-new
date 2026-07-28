@@ -2072,6 +2072,7 @@ export const IntegrationsPage = () => {
                     waba_id: signup.waba_id,
                     phone_number_id: signup.phone_number_id,
                     business_id: signup.business_id,
+                    signup_event: signup.signup_event,
                 });
                 if (!signup.waba_id || !signup.phone_number_id) {
                     showAlert(

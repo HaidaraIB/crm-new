@@ -2960,9 +2960,14 @@ export const connectIntegrationAccountAPI = async (accountId: number) => {
 export const completeWhatsAppEmbeddedSignupAPI = async (
   accountId: number,
   code: string,
-  session?: { waba_id?: string; phone_number_id?: string; business_id?: string }
+  session?: {
+    waba_id?: string;
+    phone_number_id?: string;
+    business_id?: string;
+    signup_event?: string;
+  }
 ) => {
-  return apiRequest<{ account_id: number; connected: boolean }>(
+  return apiRequest<{ account_id: number; connected: boolean; coexistence?: boolean }>(
     `/integrations/accounts/${accountId}/whatsapp/embedded-signup/complete/`,
     {
       method: 'POST',
@@ -2971,6 +2976,7 @@ export const completeWhatsAppEmbeddedSignupAPI = async (
         ...(session?.waba_id && { waba_id: session.waba_id }),
         ...(session?.phone_number_id && { phone_number_id: session.phone_number_id }),
         ...(session?.business_id && { business_id: session.business_id }),
+        ...(session?.signup_event && { signup_event: session.signup_event }),
       }),
     }
   );

@@ -219,7 +219,7 @@ export const AddServicePackageModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="services">{t('services')}</Label>
-                    <div className="max-h-40 overflow-y-auto border border-gray-300 dark:border-gray-600 rounded-md p-3 bg-gray-50 dark:bg-gray-700">
+                    <div className="max-h-40 overflow-y-auto custom-scrollbar border border-gray-300 dark:border-gray-600 rounded-md p-3 bg-gray-50 dark:bg-gray-700">
                         {services.length > 0 ? (
                             services.map(service => (
                                 <div key={service.id} className="flex items-center gap-2 mb-2">

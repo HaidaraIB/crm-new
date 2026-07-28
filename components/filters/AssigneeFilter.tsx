@@ -124,7 +124,7 @@ export const AssigneeFilter = () => {
             />
           </div>
 
-          <div className="max-h-72 overflow-y-auto py-1">
+          <div className="max-h-72 overflow-y-auto custom-scrollbar py-1">
             <button
               type="button"
               role="option"

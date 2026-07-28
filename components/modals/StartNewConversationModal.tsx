@@ -87,7 +87,7 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
           placeholder={t('searchConversations')}
           className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
         />
-        <div className="max-h-80 overflow-y-auto border border-gray-200 dark:border-gray-600 rounded-lg">
+        <div className="max-h-80 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-600 rounded-lg">
           {loading ? (
             <div className="flex justify-center py-8"><Loader variant="primary" className="h-8" /></div>
           ) : clients.length === 0 ? (

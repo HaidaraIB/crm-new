@@ -31,7 +31,7 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'md', overl
           <h3 className={`text-lg sm:text-xl font-semibold text-gray-900 dark:text-white ${language === 'ar' ? 'pr-2' : 'pl-2'}`}>{title}</h3>
           <button onClick={onClose} className="text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-secondary text-2xl sm:text-3xl leading-none flex-shrink-0">&times;</button>
         </div>
-        <div className="p-3 sm:p-4 overflow-y-auto flex-1">{children}</div>
+        <div className="p-3 sm:p-4 overflow-y-auto flex-1 custom-scrollbar">{children}</div>
       </div>
     </div>
   );

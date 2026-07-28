@@ -981,7 +981,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                 <h4 className="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">
                   {t('importLeadsDataExample') || 'Data example'}
                 </h4>
-                <div className="rounded border border-gray-200 dark:border-gray-600 p-2 bg-gray-50 dark:bg-gray-800/50 text-xs space-y-1 max-h-24 overflow-y-auto">
+                <div className="rounded border border-gray-200 dark:border-gray-600 p-2 bg-gray-50 dark:bg-gray-800/50 text-xs space-y-1 max-h-24 overflow-y-auto custom-scrollbar">
                   {rows.slice(0, 2).map((row, ri) => (
                     <div key={ri} className="flex flex-wrap gap-1">
                       {headers.map((h) => (
@@ -1063,7 +1063,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
             <p className="text-sm text-gray-600 dark:text-gray-400">
               {t('importLeadsPreview') || 'Found'} <strong>{previewRows.length}</strong> {t('importLeadsRows') || 'row(s)'}. {t('importLeadsPreviewConfirm') || 'Review and assign below, then click Import.'}
             </p>
-            <TableHorizontalScroll scrollClassName="max-h-[60vh] overflow-y-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <TableHorizontalScroll scrollClassName="max-h-[60vh] overflow-y-auto custom-scrollbar rounded-lg border border-gray-200 dark:border-gray-700">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
                   <tr>
@@ -1432,7 +1432,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
               {t('importLeadsComplete') || 'Import complete.'} <strong>{importedCount}</strong> {t('importLeadsImported') || 'imported'}, {failedCount} {t('importLeadsFailed') || 'failed'}.
             </p>
             {importErrors.length > 0 && (
-              <div className="max-h-40 overflow-y-auto rounded bg-gray-100 dark:bg-gray-700 p-2 text-xs text-red-600 dark:text-red-400">
+              <div className="max-h-40 overflow-y-auto custom-scrollbar rounded bg-gray-100 dark:bg-gray-700 p-2 text-xs text-red-600 dark:text-red-400">
                 {importErrors.map((msg, i) => <div key={i}>{msg}</div>)}
                 {failedCount > importErrors.length && (
                   <div>... +{failedCount - importErrors.length} more</div>

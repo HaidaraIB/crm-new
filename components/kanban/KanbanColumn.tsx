@@ -50,7 +50,7 @@ export const KanbanColumn = ({
 
             <div
                 ref={setNodeRef}
-                className={`flex flex-1 flex-col gap-2 overflow-y-auto p-2 min-h-[140px] max-h-[calc(100vh-280px)] scrollbar-thin ${bodyClassName}`}
+                className={`flex flex-1 flex-col gap-2 overflow-y-auto custom-scrollbar p-2 min-h-[140px] max-h-[calc(100vh-280px)] ${bodyClassName}`}
             >
                 {isEmpty ? (
                     <div

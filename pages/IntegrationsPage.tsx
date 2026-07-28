@@ -2918,7 +2918,7 @@ export const IntegrationsPage = () => {
                                         />
                                     </div>
                                 </div>
-                                <ul className="flex-1 overflow-y-auto">
+                                <ul className="flex-1 overflow-y-auto custom-scrollbar">
                                     {conversations.map(({ client }) => (
                                         <li key={String(client.id)} className="group relative">
                                             <button
@@ -2972,7 +2972,7 @@ export const IntegrationsPage = () => {
                                                 <TrashIcon className="w-4 h-4" />
                                             </button>
                                         </div>
-                                        <div className="flex-1 overflow-y-auto p-4 space-y-2">
+                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
                                             <p className="text-center text-xs text-gray-400 py-2">{t('today')}</p>
                                             {[
                                                 ...(leadWhatsAppMessages as any[])
@@ -3779,7 +3779,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                     ))}
                                 </select>
                             </div>
-                            <div className="space-y-2 max-h-64 overflow-auto">
+                            <div className="space-y-2 max-h-64 overflow-auto custom-scrollbar">
                                 {metaHealthData.pages.map((p) => (
                                     <div key={p.id} className="rounded border border-gray-100 dark:border-gray-700 p-2 text-sm">
                                         <div className="font-medium">{p.name}</div>

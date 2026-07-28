@@ -190,7 +190,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
                     {/* Dropdown */}
                     {isDropdownOpen && (
                         <div 
-                            className="absolute z-[9999] left-0 top-full mt-1 w-72 max-h-80 overflow-y-auto bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-xl"
+                            className="absolute z-[9999] left-0 top-full mt-1 w-72 max-h-80 overflow-y-auto custom-scrollbar bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md shadow-xl"
                             dir="ltr"
                             style={{ position: 'absolute' }}
                         >

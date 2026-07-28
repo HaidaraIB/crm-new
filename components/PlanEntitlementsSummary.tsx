@@ -75,10 +75,10 @@ export const PlanEntitlementsSummary: React.FC<Props> = ({
                         {featureKeys.map((k) => (
                             <span
                                 key={k}
-                                className="inline-flex items-center gap-1 rounded-full border border-primary-500/35 dark:border-primary-400/40 bg-primary-50/90 dark:bg-primary-900/25 px-2.5 py-1 text-xs text-primary-800 dark:text-primary-200"
+                                className="inline-flex items-center gap-1 rounded-full border border-primary-500/40 dark:border-primary-300/50 bg-primary-50/90 dark:bg-primary-900/40 px-2.5 py-1 text-xs text-primary-800 dark:text-primary-100"
                             >
                                 <svg
-                                    className="w-3.5 h-3.5 shrink-0 text-primary-600 dark:text-primary-400"
+                                    className="w-3.5 h-3.5 shrink-0 text-primary-600 dark:text-primary-300"
                                     fill="none"
                                     stroke="currentColor"
                                     viewBox="0 0 24 24"

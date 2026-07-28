@@ -60,7 +60,7 @@ export const FilterDrawerShell = ({
             <XIcon className="h-6 w-6" />
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 divide-y divide-gray-200 dark:divide-gray-700">
+        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2 divide-y divide-gray-200 dark:divide-gray-700">
           {children}
         </div>
         <div className="p-4 border-t dark:border-gray-800 flex gap-2">

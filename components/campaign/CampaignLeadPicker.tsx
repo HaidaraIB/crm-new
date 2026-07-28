@@ -234,7 +234,7 @@ function MultiSelectDropdown({
                             />
                         </div>
                     )}
-                    <div className="max-h-52 overflow-y-auto py-1">
+                    <div className="max-h-52 overflow-y-auto custom-scrollbar py-1">
                         {visible.map((opt) => {
                             const checked = selected.includes(opt.value);
                             return (
@@ -785,7 +785,7 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
                 )}
             </div>
 
-            <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
+            <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
                 {campaignLeadsLoading ? (
                     <div className="flex justify-center py-8">
                         <Loader variant="primary" className="h-8" />

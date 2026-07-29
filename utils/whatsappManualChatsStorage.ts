@@ -1,6 +1,6 @@
 import { resolveLeadPhoneRaw } from './smsSendHelpers';
 
-export type ChatMessageStatus = 'sending' | 'sent' | 'failed';
+export type ChatMessageStatus = 'sending' | 'sent' | 'failed' | 'delivered' | 'read';
 
 export type ManualChatMessage = {
   id?: string;

@@ -51,7 +51,7 @@ export function PbxSettingsForm({
   t,
   integrationPolicyMap,
 }: {
-  t: (key: string) => string;
+  t(key: string): string;
   integrationPolicyMap?: Record<string, IntegrationPolicyEntry>;
 }) {
   const pbxPolicyDisabled = integrationPolicyMap?.pbx?.enabled === false;
@@ -829,7 +829,7 @@ export function PbxSettingsForm({
   );
 }
 
-export function PbxSettingsPage({ t, integrationPolicyMap }: { t: (key: string) => string; integrationPolicyMap?: Record<string, IntegrationPolicyEntry> }) {
+export function PbxSettingsPage({ t, integrationPolicyMap }: { t(key: string): string; integrationPolicyMap?: Record<string, IntegrationPolicyEntry> }) {
   return (
     <PageWrapper title={t('pbxIntegrationTitle')}>
       <PbxSettingsForm t={t} integrationPolicyMap={integrationPolicyMap} />

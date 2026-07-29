@@ -13,7 +13,7 @@ const KNOWN_POLICY_DEFAULT_MESSAGES = new Set([
 export function resolveIntegrationPolicyMessage(
   apiMessage: string | null | undefined,
   scope: string | null | undefined,
-  t: (key: string) => string,
+  t: (key: any) => string,
 ): string {
   const trimmed = (apiMessage || '').trim();
   const normalized = trimmed.toLowerCase();

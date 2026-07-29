@@ -20,7 +20,7 @@ type Client = {
 type StartNewConversationModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  t: (key: string) => string;
+  t(key: string): string;
   onSelectClient: (client: Client) => void;
 };
 

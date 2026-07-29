@@ -15,7 +15,7 @@ export type SmsSendPreviewProps = {
     phoneNumber: string;
     messageBody: string;
     recipientCount?: number;
-    t: (key: string) => string;
+    t(key: string): string;
 };
 
 export const SmsSendPreviewModal = ({

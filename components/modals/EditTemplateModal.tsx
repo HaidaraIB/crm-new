@@ -92,7 +92,7 @@ type EditTemplateModalProps = {
   isOpen: boolean;
   onClose: () => void;
   template: MessageTemplateType | null;
-  t: (key: string) => string;
+  t(key: string): string;
   language: 'en' | 'ar';
   onSuccess: () => void;
   onSendToReview?: (templateId: number, language: string) => Promise<void>;

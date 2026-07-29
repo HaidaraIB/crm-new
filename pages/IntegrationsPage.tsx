@@ -70,7 +70,7 @@ const platformConfig: Record<string, { name: string; dataKey: keyof ReturnType<t
 /** Build props for SelectLeadFormModal from IntegrationAccount metadata.pages */
 function buildMetaLeadFormModalConfig(account: any, accountId: number) {
     const raw = account?.metadata?.pages || [];
-    const pages = raw.map((p: any) => ({
+    const pages: { id: string; name: string }[] = raw.map((p: any) => ({
         id: String(p.id),
         name: String(p.name || p.id),
     }));
@@ -79,7 +79,7 @@ function buildMetaLeadFormModalConfig(account: any, accountId: number) {
         account.metadata?.selected_page_id != null && String(account.metadata.selected_page_id).length
             ? String(account.metadata.selected_page_id)
             : '';
-    const defaultPage = pages.find((p) => p.id === linkedPid) || pages[0];
+    const defaultPage = pages.find((p: { id: string; name: string }) => p.id === linkedPid) || pages[0];
     const isLinkedContext = Boolean(linkedPid && defaultPage.id === linkedPid);
     const formId = isLinkedContext ? String(account.metadata?.selected_form_id || '') : '';
     const mapping = account.metadata?.form_campaign_mapping || {};
@@ -102,7 +102,7 @@ function TwilioSMSForm({
     replaceTwilio,
     integrationPolicyMap,
 }: {
-    t: (key: string) => string;
+    t(key: string): string;
     replaceTwilio: (str: string) => string;
     integrationPolicyMap?: Record<string, IntegrationPolicyEntry>;
 }) {
@@ -391,7 +391,7 @@ const OPENAI_MODEL_OPTIONS: { value: string; labelKey: 'openaiModelGpt4oMini' | 
     { value: 'gpt-4.1', labelKey: 'openaiModelGpt41' },
 ];
 
-function openaiTestErrorMessage(t: (key: string) => string, err: { code?: string; message?: string }): string {
+function openaiTestErrorMessage(t: { (key: string): string }, err: { code?: string; message?: string }): string {
     if (err?.code === 'openai_not_configured') return t('openaiNotConfigured');
     if (err?.code === 'openai_no_api_key') return t('openaiNoApiKey');
     return err?.message || t('openaiConnectionFailed');
@@ -401,7 +401,7 @@ function OpenAISettingsForm({
     t,
     integrationPolicyMap,
 }: {
-    t: (key: string) => string;
+    t(key: string): string;
     integrationPolicyMap?: Record<string, IntegrationPolicyEntry>;
 }) {
     const { currentUser } = useAppContext();
@@ -862,7 +862,7 @@ export const IntegrationsPage = () => {
                 id: contact.id,
                 name: contact.name,
                 phone_number: contact.phone_number || selectedChatPhone,
-                lead_company_name: contact.lead_company_name || '',
+                lead_company_name: contact.lead_company_name || contact.company_name || '',
             });
             saveSelectedManualPhone(companyId, null);
             refetchConversations();
@@ -1013,12 +1013,12 @@ export const IntegrationsPage = () => {
     useEffect(() => {
         setCampaignWhatsAppTemplateId(null);
     }, [campaignChannel]);
-    const accounts = useMemo(() => {
+    const accounts: Account[] = useMemo(() => {
         const accountsData = Array.isArray(accountsResponse) 
             ? accountsResponse 
             : (accountsResponse?.results || []);
         
-        return accountsData.map((acc: any) => ({
+        return accountsData.map((acc: any): Account => ({
             id: acc.id,
             name: acc.name,
             status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
@@ -1895,6 +1895,8 @@ export const IntegrationsPage = () => {
     const testConnectionMutation = useTestConnection();
     const queryClient = useQueryClient();
     const [isStartingConnect, setIsStartingConnect] = useState(false);
+    const [connectingAccountId, setConnectingAccountId] = useState<number | null>(null);
+    const connectingAccountIdRef = useRef<number | null>(null);
 
     useEffect(() => {
         const urlParams = new URLSearchParams(window.location.search);
@@ -2032,7 +2034,7 @@ export const IntegrationsPage = () => {
     };
 
     const handleDelete = (accountId: number) => {
-        const account = accounts.find(acc => acc.id === accountId);
+        const account = accounts.find((acc: Account) => acc.id === accountId);
         if (account) {
             setConfirmDeleteConfig({
                 title: t('disconnect') || 'Disconnect Account',
@@ -2066,7 +2068,17 @@ export const IntegrationsPage = () => {
         }
     };
 
+    const releaseConnectLock = (accountId: number) => {
+        if (connectingAccountIdRef.current !== accountId) return;
+        connectingAccountIdRef.current = null;
+        setConnectingAccountId(null);
+    };
+
     const openConnectPopup = async (accountId: number) => {
+        if (connectingAccountIdRef.current != null) return;
+        connectingAccountIdRef.current = accountId;
+        setConnectingAccountId(accountId);
+        let keepBlockedForPopup = false;
         try {
             const response = await connectIntegrationAccountAPI(accountId);
 
@@ -2078,7 +2090,7 @@ export const IntegrationsPage = () => {
                     graph_api_version: es.graph_api_version,
                 });
                 if (!signup.code) {
-                    showAlert(t('connectionCancelled') || 'Connection was cancelled.', 'info');
+                    showAlert(t('connectionCancelled'), 'info');
                     return;
                 }
                 await completeWhatsAppEmbeddedSignupAPI(accountId, signup.code, {
@@ -2114,14 +2126,17 @@ export const IntegrationsPage = () => {
                 showAlert(t('popupBlocked') || 'Please allow popups for this site and try again.', 'warning');
                 return;
             }
+            keepBlockedForPopup = true;
             const handleMessage = (event: MessageEvent) => {
                 if (event.origin !== window.location.origin) return;
                 if (event.data?.type === 'oauth_connected' && event.data?.accountId != null) {
                     window.removeEventListener('message', handleMessage);
+                    releaseConnectLock(accountId);
                     finalizeOAuthConnect(event.data.accountId);
                 }
                 if (event.data?.type === 'oauth_failed') {
                     window.removeEventListener('message', handleMessage);
+                    releaseConnectLock(accountId);
                     queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
                 }
             };
@@ -2130,16 +2145,22 @@ export const IntegrationsPage = () => {
                 if (popup.closed) {
                     clearInterval(poll);
                     window.removeEventListener('message', handleMessage);
+                    releaseConnectLock(accountId);
                     queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
                 }
             }, 500);
         } catch (error: any) {
             console.error('Error connecting account:', error);
             showAlert(error?.message || t('errorConnectingAccount') || 'Failed to connect account', 'error');
+        } finally {
+            if (!keepBlockedForPopup) {
+                releaseConnectLock(accountId);
+            }
         }
     };
 
     const handleConnect = (accountId: number) => {
+        if (connectingAccountIdRef.current != null) return;
         openConnectPopup(accountId);
     };
 
@@ -2185,6 +2206,7 @@ export const IntegrationsPage = () => {
             showAlert(t('oneIntegrationAccountPerPlatformHint'), 'info');
             return;
         }
+        if (connectingAccountIdRef.current != null || isStartingConnect) return;
         if (platformParam === 'meta' || platformParam === 'whatsapp') {
             setIsStartingConnect(true);
             try {
@@ -2284,7 +2306,7 @@ export const IntegrationsPage = () => {
                             id: contact.id,
                             name: contact.name,
                             phone_number: contact.phone_number || phone,
-                            lead_company_name: contact.lead_company_name || '',
+                            lead_company_name: contact.lead_company_name || contact.company_name || '',
                         });
                         saveSelectedManualPhone(companyId, null);
                         await refetchLeadWhatsApp();
@@ -2874,7 +2896,11 @@ export const IntegrationsPage = () => {
         }
 
         // WhatsApp (Integrations): only Chats and Accounts tabs
-        const effectiveTab = (whatsAppTab === 'templates' || whatsAppTab === 'campaigns') ? 'chats' : (isEmployee && whatsAppTab === 'accounts' ? 'chats' : whatsAppTab);
+        const effectiveTab = (
+            (whatsAppTab === 'templates' || whatsAppTab === 'campaigns')
+                ? 'chats'
+                : (isEmployee && whatsAppTab === 'accounts' ? 'chats' : whatsAppTab)
+        ) as 'chats' | 'templates' | 'accounts' | 'campaigns';
 
         return (
             <PageWrapper
@@ -2889,7 +2915,7 @@ export const IntegrationsPage = () => {
                 }
                 actions={
                     !isEmployee && effectiveTab === 'accounts' ? (
-                        <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect}>
+                        <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect || connectingAccountId != null}>
                             <PlusIcon className="w-4 h-4 me-2" /> {t('addNewAccount')}
                         </Button>
                     ) : undefined
@@ -3350,7 +3376,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                                                 <div className="inline-flex items-center gap-2 flex-nowrap">
                                                                     <div className="w-[150px] min-w-[150px] flex justify-end items-center">
                                                                         {canSubmitToWhatsApp && (
-                                                                            <Button variant="secondary" size="sm" className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem]" disabled={submittingTemplateId === tpl.id} onClick={async () => { setSubmittingTemplateId(tpl.id); try { await submitMessageTemplateToWhatsAppAPI(tpl.id); showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info'); refetchTemplates(); } catch (e: any) { showAlert(resolveLocalizedApiError(e, t, t('failedToSendSms')), 'error'); } finally { setSubmittingTemplateId(null); } }}>
+                                                                            <Button variant="secondary" className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem] h-8 px-3" disabled={submittingTemplateId === tpl.id} onClick={async () => { setSubmittingTemplateId(tpl.id); try { await submitMessageTemplateToWhatsAppAPI(tpl.id); showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info'); refetchTemplates(); } catch (e: any) { showAlert(resolveLocalizedApiError(e, t, t('failedToSendSms')), 'error'); } finally { setSubmittingTemplateId(null); } }}>
                                                                                 {submittingTemplateId === tpl.id ? (
                                                                                     <>
                                                                                         <svg className="w-4 h-4 me-1.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
@@ -3526,7 +3552,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                     <Card>
                         {accounts.length > 0 ? (
                             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {accounts.map((account) => (
+                                {accounts.map((account: Account) => (
                                     <li key={account.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
                                         <div className="flex items-center gap-3 mb-2 sm:mb-0">
                                             <IntegrationPlatformIcon platform="whatsapp" size="md" />
@@ -3550,7 +3576,14 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                                 </Button>
                                             )}
                                             {account.status !== 'Connected' && (
-                                                <Button variant="primary" onClick={() => handleConnect(account.id)}>{t('connect')}</Button>
+                                                <Button
+                                                    variant="primary"
+                                                    onClick={() => handleConnect(account.id)}
+                                                    loading={connectingAccountId === account.id}
+                                                    disabled={connectingAccountId != null || isStartingConnect}
+                                                >
+                                                    {t('connect')}
+                                                </Button>
                                             )}
                                             <Button
                                                 variant="ghost"
@@ -3618,7 +3651,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
     if (loading) {
         return (
             <PageWrapper title={pageTitle}>
-                <PageLoadingState label={t('loadingIntegrations') || 'Loading integrations'} />
+                <PageLoadingState label={t('loadingIntegrations')} />
             </PageWrapper>
         );
     }
@@ -3627,7 +3660,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
         <PageWrapper
             title={pageTitle}
             actions={
-                <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect}>
+                <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect || connectingAccountId != null}>
                     <PlusIcon className="w-4 h-4" /> {t('addNewAccount')}
                 </Button>
             }
@@ -3636,7 +3669,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
             <Card className="overflow-hidden p-0">
                 {accounts.length > 0 ? (
                     <ul className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
-                        {accounts.map(account => (
+                        {accounts.map((account: Account) => (
                             <li
                                 key={account.id}
                                 className="p-5 sm:p-6 flex flex-col gap-4 bg-white dark:bg-gray-800/50 hover:bg-gray-50/80 dark:hover:bg-gray-800/80 transition-colors duration-200 first:rounded-t-lg last:rounded-b-lg"
@@ -3662,7 +3695,13 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 sm:gap-2">
                                     {(account.status !== 'Connected') && (
-                                        <Button variant="primary" onClick={() => handleConnect(account.id)} className="rounded-lg shadow-sm">
+                                        <Button
+                                            variant="primary"
+                                            onClick={() => handleConnect(account.id)}
+                                            loading={connectingAccountId === account.id}
+                                            disabled={connectingAccountId != null || isStartingConnect}
+                                            className="rounded-lg shadow-sm"
+                                        >
                                             {t('connect') || 'Connect'}
                                         </Button>
                                     )}
@@ -3801,7 +3840,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                             )}
                         </div>
                         <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
-                            <div className="font-semibold text-sm mb-2">{t('selection') || 'Selection'}</div>
+                            <div className="font-semibold text-sm mb-2">{t('metaHealthSelection')}</div>
                             <div className="text-sm text-gray-700 dark:text-gray-300">
                                 <div>{t('selectedPage') || 'Selected page'}: {metaHealthData.selection.selected_page_id || '-'}</div>
                                 <div>{t('leadForm') || 'Lead Form'}: {metaHealthData.selection.selected_form_id || '-'}</div>
@@ -3825,7 +3864,7 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                             </div>
                         )}
                         <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
-                            <div className="font-semibold text-sm mb-2">{t('pages') || 'Pages'}</div>
+                            <div className="font-semibold text-sm mb-2">{t('metaHealthPages')}</div>
                             <div className="mb-3">
                                 <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
                                     {t('selectFacebookPage') || 'Facebook Page'}

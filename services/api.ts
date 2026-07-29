@@ -167,7 +167,7 @@ export function getApiErrorDetails(errorData: unknown): unknown {
  */
 export function resolveLocalizedApiError(
   e: { data?: unknown; message?: string; code?: string } | null | undefined,
-  t?: (key: string) => string,
+  t?: (key: any) => string,
   fallback = 'Something went wrong'
 ): string {
   const data = e?.data;
@@ -3282,10 +3282,10 @@ export const getLeadWhatsAppMessagesAPI = async (
  */
 export const getWhatsAppContactByPhoneAPI = async (
   phone: string
-): Promise<{ id: number; name: string; phone_number: string; company_name: string } | null> => {
+): Promise<{ id: number; name: string; phone_number: string; company_name: string; lead_company_name?: string } | null> => {
   const normalized = phone.replace(/\s+/g, '').replace(/^\+/, '');
   if (!normalized) return null;
-  const res = await apiRequest<{ id: number; name: string; phone_number: string; company_name: string } | null>(
+  const res = await apiRequest<{ id: number; name: string; phone_number: string; company_name: string; lead_company_name?: string } | null>(
     `/integrations/whatsapp/contact-by-phone/?phone=${encodeURIComponent(normalized)}`
   );
   return res ?? null;

@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { Stage } from '../../types';
 import { useCreateClientTask, useStages } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -16,7 +17,7 @@ export const AddActionModal = () => {
     // Fetch stages using React Query
     const { data: stagesData } = useStages();
     // Handle both array response and object with results property
-    const stages = Array.isArray(stagesData) 
+    const stages: Stage[] = Array.isArray(stagesData) 
         ? stagesData 
         : (stagesData?.results || []);
 

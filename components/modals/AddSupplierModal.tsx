@@ -6,10 +6,18 @@ import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { useCreateSupplier } from '../../hooks/useQueries';
+import { validateEmailField, validatePhoneField } from '../../utils/formValidation';
+import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-secondary mb-1">{children}</label>
 );
+
+const ADD_SUPPLIER_DOM_ID_MAP: Record<string, string> = {
+    name: 'name',
+    phone: 'phone',
+    email: 'email',
+};
 
 export const AddSupplierModal = () => {
     const { isAddSupplierModalOpen, setIsAddSupplierModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
@@ -35,16 +43,22 @@ export const AddSupplierModal = () => {
             newErrors.name = t('nameRequired') || 'Name is required';
         }
 
-        if (formState.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
-            newErrors.email = t('invalidEmail') || 'Invalid email format';
-        }
+        const emailError = validateEmailField(formState.email, t, { required: false });
+        if (emailError) newErrors.email = emailError;
+
+        const phoneError = validatePhoneField(formState.phone, t, { required: false });
+        if (phoneError) newErrors.phone = phoneError;
 
         if (!currentUser?.company?.id) {
             newErrors._general = t('companyRequired') || 'Company is required';
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        if (Object.keys(newErrors).length > 0) {
+            scrollToFirstFieldError(newErrors, ADD_SUPPLIER_DOM_ID_MAP);
+            return false;
+        }
+        return true;
     };
 
     const clearError = (field: string) => {
@@ -177,7 +191,11 @@ export const AddSupplierModal = () => {
                             clearError('phone');
                         }}
                         defaultCountry="IQ"
+                        error={!!errors.phone}
                     />
+                    {errors.phone && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="email">{t('email')}</Label>

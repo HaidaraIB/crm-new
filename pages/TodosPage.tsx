@@ -1,7 +1,9 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, Loader, PlusIcon, EditIcon, TrashIcon, EditTodoModal, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, Loader, PlusIcon, EditIcon, TrashIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode } from '../components/index';
+import { TodosKanbanView } from '../components/todos/TodosKanbanView';
+import type { TodoKanbanItem } from '../components/todos/TodoKanbanCard';
 import { Todo, TaskStage, Stage } from '../types';
 
 type CallMethodItem = { id: number; name: string; color?: string };
@@ -87,6 +89,8 @@ export const TodosPage = () => {
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
     const [todosPageNumber, setTodosPageNumber] = useState(1);
     const [todosPageSize, setTodosPageSize] = useState(20);
+    const [viewMode, setViewMode] = useEntityViewMode('todos');
+    const isBoardView = viewMode === 'board';
 
     const applyMissionPreset = (preset: MissionBarTodosPreset) => {
         if (preset === 'overdue') {
@@ -185,6 +189,12 @@ export const TodosPage = () => {
                 type: 'client_task',
                 clientId: clientId,
                 clientName: clientName,
+                stageId:
+                    typeof ct.stage === 'number'
+                        ? ct.stage
+                        : ct.stage && typeof ct.stage === 'object'
+                          ? ct.stage.id
+                          : null,
                 stageName: stageName,
                 notes: notes,
                 reminderDate: reminderDate,
@@ -268,6 +278,7 @@ export const TodosPage = () => {
             
             return {
                 ...task,
+                type: 'deal_task',
                 // Store normalized fields for easy access
                 dealId: dealId,
                 reminderDate: task.reminder_date || task.reminderDate || null,
@@ -275,8 +286,15 @@ export const TodosPage = () => {
                 updatedAt: task.updated_at || task.updatedAt || null,
                 // Use API field names directly from serializer (snake_case from TaskSerializer)
                 dealClientName: dealClientName,
+                clientName: dealClientName,
                 dealStage: dealStage,
                 dealEmployeeUsername: dealEmployeeUsername,
+                stageId:
+                    typeof task.stage === 'number'
+                        ? task.stage
+                        : task.stage && typeof task.stage === 'object'
+                          ? task.stage.id
+                          : null,
                 stageName: stageName,
                 // Keep original task for debugging
                 _original: task,
@@ -570,6 +588,71 @@ export const TodosPage = () => {
         return applyDateAndStageFilters(sourceTodos);
     }, [applyDateAndStageFilters, calendarOverdueOnly, currentTodos, overdueFollowUpTasks]);
 
+    /** Board: date/tab filters only — stage chips become columns. Calls have no stage. */
+    const boardTodos = useMemo((): TodoKanbanItem[] => {
+        const sourceTodos = calendarOverdueOnly ? overdueFollowUpTasks : currentTodos;
+        return sourceTodos
+            .filter((todo) => {
+                const taskType = (todo as any).type || 'deal_task';
+                if (taskType === 'client_call') return false;
+
+                const reminderDate = (todo as any).reminderDate || (todo as any).reminder_date || '';
+                if (calendarOverdueOnly) {
+                    return isOverdueFollowUpTask(todo);
+                }
+                if (!selectedDate) return true;
+                if (!reminderDate) return false;
+                try {
+                    return isSameDay(reminderDate, selectedDate);
+                } catch {
+                    return false;
+                }
+            })
+            .map((todo) => {
+                const taskType = ((todo as any).type || 'deal_task') as 'deal_task' | 'client_task';
+                const stageName = String((todo as any).stageName || (todo as any).stage_name || '');
+                let stageId = (todo as any).stageId as number | null;
+                if (stageId == null && stageName) {
+                    stageId = stages.find((s) => s.name === stageName)?.id ?? null;
+                }
+                if (stageId == null) return null;
+
+                const rawId = todo.id;
+                const entityId =
+                    typeof rawId === 'string'
+                        ? parseInt(String(rawId).replace(/^(client-task-|client-call-)/, ''), 10)
+                        : Number(rawId);
+
+                return {
+                    boardId: String(todo.id),
+                    entityType: taskType === 'client_task' ? 'client_task' : 'deal_task',
+                    entityId,
+                    stageId,
+                    stageName,
+                    clientName:
+                        (todo as any).clientName ||
+                        (todo as any).dealClientName ||
+                        (todo as any).deal_client_name ||
+                        '',
+                    notes: (todo as any).notes || '',
+                    reminderDate: (todo as any).reminderDate || (todo as any).reminder_date || null,
+                    dealStage: (todo as any).dealStage ?? (todo as any).deal_stage ?? null,
+                    employeeUsername:
+                        (todo as any).dealEmployeeUsername ||
+                        (todo as any).deal_employee_username ||
+                        (todo as any).createdByUsername ||
+                        null,
+                } as TodoKanbanItem;
+            })
+            .filter((item): item is TodoKanbanItem => item != null);
+    }, [
+        calendarOverdueOnly,
+        overdueFollowUpTasks,
+        currentTodos,
+        selectedDate,
+        stages,
+    ]);
+
     const totalTodoPages = Math.max(1, Math.ceil(filteredTodos.length / todosPageSize));
     const paginationItems = getPaginationItems(todosPageNumber, totalTodoPages);
     const paginatedTodos = useMemo(() => {
@@ -698,8 +781,8 @@ export const TodosPage = () => {
                         )}
                     </div>
 
-                    {/* Stage filters for active and completed todos */}
-                    {!stagesLoading && (
+                    {/* Stage filters for active and completed todos (table only — board columns are stages) */}
+                    {!isBoardView && !stagesLoading && (
                         <div className="flex items-center gap-2 mb-4 flex-wrap">
                             <Button variant={activeFilter === 'all' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('all')}><ListIcon className="w-4 h-4" /> {t('all')}</Button>
                             {availableStages.length > 0 ? (
@@ -721,6 +804,10 @@ export const TodosPage = () => {
                         </div>
                     )}
 
+                    <div className="mb-4 flex justify-end">
+                        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+                    </div>
+
                     {tasksLoading ? (
                         <Card>
                             <div className="flex items-center justify-center py-10">
@@ -738,6 +825,16 @@ export const TodosPage = () => {
                                 </Button>
                             </div>
                         </Card>
+                    ) : isBoardView ? (
+                        <TodosKanbanView
+                            items={boardTodos}
+                            stages={availableStages}
+                            canDrag
+                            isLoading={stagesLoading}
+                            formatDealStage={formatDealStage}
+                            onOpenItem={(item) => handleEditTodo(item.entityId)}
+                            enabled={isBoardView}
+                        />
                     ) : filteredTodos.length > 0 ? (
                         <Card className="p-0 overflow-hidden">
                             <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">

@@ -18,6 +18,7 @@ import {
     type FibPaymentSessionPayload,
 } from '../utils/paymentSession';
 import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
+import { clearFieldError } from '../utils/formFieldErrors';
 
 type FibPaymentData = {
     payment_id: string;
@@ -49,7 +50,19 @@ export const PaymentPage = () => {
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
     const [selectedGateway, setSelectedGateway] = useState<number | null>(null);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+    const error = errors.general || null;
+    const setError = (message: string | null) => {
+        setErrors((prev) => {
+            if (message == null) {
+                if (!prev.general) return prev;
+                const next = { ...prev };
+                delete next.general;
+                return next;
+            }
+            return { ...prev, general: message };
+        });
+    };
     const [showGatewaySelection, setShowGatewaySelection] = useState(true);
     const [fibPaymentData, setFibPaymentData] = useState<FibPaymentData | null>(null);
     const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -151,14 +164,14 @@ export const PaymentPage = () => {
 
     const handleProceedToPayment = async () => {
         if (!selectedGateway || !subscriptionId) {
-            setError(t('paymentGatewayRequired') || 'Please select a payment method');
+            setErrors((prev) => ({ ...prev, gateway: t('paymentGatewayRequired') || 'Please select a payment method' }));
             return;
         }
 
         try {
             setShowGatewaySelection(false);
             setIsLoading(true);
-            setError(null);
+            setErrors({});
             setFibPaymentData(null);
             if (!hydratePaymentAccessToken()) {
                 setError(t('paymentAuthRequired'));
@@ -301,8 +314,14 @@ export const PaymentPage = () => {
                     <div className="mb-6">
                         <PaymentGatewaySelector
                             selectedGateway={selectedGateway}
-                            onSelect={setSelectedGateway}
+                            onSelect={(id) => {
+                                setSelectedGateway(id);
+                                clearFieldError(setErrors, 'gateway', false);
+                            }}
                         />
+                        {errors.gateway && (
+                            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.gateway}</p>
+                        )}
                     </div>
 
                     <div className="flex justify-end gap-4">

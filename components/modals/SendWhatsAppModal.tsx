@@ -4,7 +4,9 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Loader } from '../Loader';
+import { PhoneText } from '../PhoneText';
 import { sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, getMessageTemplatesAPI, resolveLocalizedApiError } from '../../services/api';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -59,7 +61,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
     const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [templateSendId, setTemplateSendId] = useState<number | ''>('');
     const [templateSending, setTemplateSending] = useState(false);
 
@@ -86,7 +88,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
 
     const handleClose = () => {
         setBody('');
-        setError(null);
+        setErrors({});
         setTemplateSendId('');
         onClose();
     };
@@ -96,23 +98,24 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
 
     const handleSend = async () => {
         if (blockFreeText) {
-            setError(
-                t('whatsappOutsideSessionUseTemplate') ||
-                    'Outside the 24-hour window: send an approved template below instead of free text.'
-            );
+            setErrors({
+                body:
+                    t('whatsappOutsideSessionUseTemplate') ||
+                    'Outside the 24-hour window: send an approved template below instead of free text.',
+            });
             return;
         }
         const trimmed = body.trim();
         if (!trimmed) {
-            setError(t('smsMessageRequired') || 'Please enter your message');
+            setErrors({ body: t('smsMessageRequired') || 'Please enter your message' });
             return;
         }
         if (!to) {
-            setError(t('sms_error_invalid_to_number') || 'No phone number');
+            setErrors({ general: t('sms_error_invalid_to_number') || 'No phone number' });
             return;
         }
         const bodyToSend = lead ? replaceTemplatePlaceholders(trimmed, lead) : trimmed;
-        setError(null);
+        setErrors({});
         setSending(true);
         try {
             await sendWhatsAppMessageAPI({ to, message: bodyToSend, client_id: leadId });
@@ -122,7 +125,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
             handleClose();
         } catch (e: any) {
             const fallback = stripAnsi(e?.message || '') || t('failedToSendSms');
-            setError(resolveLocalizedApiError(e, t, fallback));
+            setErrors({ general: resolveLocalizedApiError(e, t, fallback) });
         } finally {
             setSending(false);
         }
@@ -130,14 +133,14 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
 
     const handleSendTemplate = async () => {
         if (templateSendId === '') {
-            setError(t('selectApprovedTemplate') || 'Select an approved template');
+            setErrors({ template: t('selectApprovedTemplate') || 'Select an approved template' });
             return;
         }
         if (!to) {
-            setError(t('sms_error_invalid_to_number') || 'No phone number');
+            setErrors({ general: t('sms_error_invalid_to_number') || 'No phone number' });
             return;
         }
-        setError(null);
+        setErrors({});
         setTemplateSending(true);
         try {
             await sendWhatsAppTemplateAPI({
@@ -148,7 +151,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
             onSent?.();
             handleClose();
         } catch (e: any) {
-            setError(resolveLocalizedApiError(e, t, t('failedToSendSms')));
+            setErrors({ general: resolveLocalizedApiError(e, t, t('failedToSendSms')) });
         } finally {
             setTemplateSending(false);
         }
@@ -164,7 +167,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
         >
             <div className="space-y-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t('whatsappMessage') || 'WhatsApp message'} → <strong>{phoneNumber}</strong>
+                    {t('whatsappMessage') || 'WhatsApp message'} → <PhoneText as="strong">{phoneNumber}</PhoneText>
                 </p>
                 {blockFreeText && (
                     <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">
@@ -187,8 +190,11 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                             <select
                                 id="wa-meta-template"
                                 value={templateSendId === '' ? '' : String(templateSendId)}
-                                onChange={(e) => setTemplateSendId(e.target.value ? Number(e.target.value) : '')}
-                                className="flex-1 min-w-0 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white"
+                                onChange={(e) => {
+                                    setTemplateSendId(e.target.value ? Number(e.target.value) : '');
+                                    clearFieldError(setErrors, 'template');
+                                }}
+                                className={`flex-1 min-w-0 h-10 rounded-md border bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white ${errors.template ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                             >
                                 <option value="">{t('selectApprovedTemplate') || 'Select approved template…'}</option>
                                 {approvedWaTemplates.map((tpl: any) => (
@@ -208,6 +214,9 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                                 {t('sendTemplateMessage') || 'Send'}
                             </Button>
                         </div>
+                        {errors.template && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.template}</p>
+                        )}
                     </div>
                 )}
                 {whatsappTemplates.length > 0 && (
@@ -222,6 +231,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                                         const content = tpl.content || '';
                                         const resolved = lead ? replaceTemplatePlaceholders(content, lead) : content;
                                         setBody((prev) => (prev ? prev + '\n' + resolved : resolved));
+                                        clearFieldError(setErrors, 'body');
                                     }}
                                     className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                                 >
@@ -237,11 +247,17 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                         id="wa-body"
                         rows={4}
                         value={body}
-                        onChange={(e) => setBody(e.target.value)}
+                        onChange={(e) => {
+                            setBody(e.target.value);
+                            clearFieldError(setErrors, 'body');
+                        }}
                         disabled={blockFreeText}
-                        className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm disabled:opacity-60"
+                        className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm disabled:opacity-60 ${errors.body ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                         placeholder={t('smsMessagePlaceholder')}
                     />
+                    {errors.body && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.body}</p>
+                    )}
                 </div>
                 {to && (
                     <div className="flex justify-center">
@@ -257,7 +273,11 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                         </a>
                     </div>
                 )}
-                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+                {errors.general && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                        {errors.general}
+                    </div>
+                )}
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={handleClose} disabled={sending}>{t('cancel')}</Button>
                     <Button

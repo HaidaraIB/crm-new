@@ -3,6 +3,11 @@ import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
 import { resetPasswordAPI } from '../services/api';
+import {
+    validateEmailField,
+    validatePasswordField,
+    validateConfirmPasswordField,
+} from '../utils/formValidation';
 
 export const ResetPasswordPage = () => {
     const { setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -11,18 +16,15 @@ export const ResetPasswordPage = () => {
     const [newPassword, setNewPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
     const [passwordVisible, setPasswordVisible] = useState(false);
-    // Link both password fields visibility together
     const togglePasswordVisibility = () => {
         setPasswordVisible(!passwordVisible);
     };
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [success, setSuccess] = useState(false);
 
     useEffect(() => {
-        // Get token, code, and email from URL query parameters
         const urlParams = new URLSearchParams(window.location.search);
-        const token = urlParams.get('token');
         const codeParam = urlParams.get('code');
         const emailParam = urlParams.get('email');
 
@@ -35,42 +37,45 @@ export const ResetPasswordPage = () => {
         }
     }, []);
 
+    const clearField = (field: string) => {
+        setErrors((prev) => {
+            const next = { ...prev };
+            delete next[field];
+            delete next.general;
+            return next;
+        });
+    };
+
     const handleResetPassword = async () => {
-        setError('');
+        setErrors({});
         setSuccess(false);
-        
-        // Get token from URL if available
+
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
 
-        if (!email.trim()) {
-            setError(t('pleaseEnterEmail') || 'Please enter your email address');
-            return;
-        }
+        const newErrors: Record<string, string> = {};
+        const emailErr = validateEmailField(email, t);
+        if (emailErr) newErrors.email = emailErr;
 
-        // Must have either token (from link) or code (from manual entry)
         if (!token && !code.trim()) {
-            setError(t('pleaseEnterCodeOrToken') || 'Please enter the reset code or use the reset link');
-            return;
+            newErrors.code = t('pleaseEnterCodeOrToken') || 'Please enter the reset code or use the reset link';
         }
 
-        if (!newPassword.trim()) {
-            setError(t('pleaseEnterNewPassword') || 'Please enter a new password');
-            return;
+        const passwordErr = validatePasswordField(newPassword, t);
+        if (passwordErr) {
+            newErrors.newPassword = passwordErr;
         }
 
-        if (newPassword.length < 8) {
-            setError(t('passwordTooShort') || 'Password must be at least 8 characters long');
-            return;
-        }
+        const confirmErr = validateConfirmPasswordField(newPassword, confirmPassword, t);
+        if (confirmErr) newErrors.confirmPassword = confirmErr;
 
-        if (newPassword !== confirmPassword) {
-            setError(t('passwordsDoNotMatch') || 'Passwords do not match');
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
 
         setIsLoading(true);
-        
+
         try {
             await resetPasswordAPI({
                 email,
@@ -80,14 +85,13 @@ export const ResetPasswordPage = () => {
                 confirm_password: confirmPassword,
             });
             setSuccess(true);
-            
-            // Redirect to login after 2 seconds
+
             setTimeout(() => {
                 window.location.href = '/login';
             }, 2000);
         } catch (error: any) {
             const errorMessage = error.message || error.detail || error.error || 'Failed to reset password';
-            setError(errorMessage);
+            setErrors({ general: errorMessage });
         } finally {
             setIsLoading(false);
         }
@@ -95,7 +99,6 @@ export const ResetPasswordPage = () => {
 
     return (
         <div className={`min-h-screen flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
-            {/* Theme and Language Toggle Buttons */}
             <div className={`absolute top-4 end-4 z-10 flex ${language === 'ar' ? 'gap-4' : 'gap-2'}`}>
                 <button
                     onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
@@ -112,10 +115,10 @@ export const ResetPasswordPage = () => {
             <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8">
                 <div className="max-w-md w-full space-y-8">
                     <div className="flex flex-col items-center">
-                        <img 
-                            src="/logo_purple.png" 
-                            alt="LOOP CRM Logo" 
-                            className="h-12 w-auto object-contain mb-4 lg:hidden" 
+                        <img
+                            src="/logo_purple.png"
+                            alt="LOOP CRM Logo"
+                            className="h-12 w-auto object-contain mb-4 lg:hidden"
                         />
                         <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">
                             {t('resetPassword') || 'Reset Password'}
@@ -125,9 +128,14 @@ export const ResetPasswordPage = () => {
                         </p>
                     </div>
                     <div className="space-y-6">
-                        {error && (
+                        {errors.general && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                                {error}
+                                {errors.general}
+                            </div>
+                        )}
+                        {errors.code && (
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                                {errors.code}
                             </div>
                         )}
                         {success && (
@@ -139,28 +147,33 @@ export const ResetPasswordPage = () => {
                             <>
                                 <div>
                                     <label htmlFor="email" className="sr-only">{t('emailAddress') || 'Email'}</label>
-                                    <Input 
-                                        id="email" 
+                                    <Input
+                                        id="email"
                                         type="email"
                                         placeholder={t('emailAddress') || 'Email address'}
                                         value={email}
+                                        className={errors.email ? 'border-red-500' : ''}
                                         onChange={(e) => {
                                             setEmail(e.target.value);
-                                            setError('');
+                                            clearField('email');
                                         }}
                                         disabled={!!new URLSearchParams(window.location.search).get('email')}
                                     />
+                                    {errors.email && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                                    )}
                                 </div>
                                 <div className="relative">
                                     <label htmlFor="newPassword" className="sr-only">{t('newPassword') || 'New Password'}</label>
-                                    <Input 
-                                        id="newPassword" 
+                                    <Input
+                                        id="newPassword"
                                         type={passwordVisible ? 'text' : 'password'}
-                                        placeholder={t('newPassword') || 'New password'} 
+                                        placeholder={t('newPassword') || 'New password'}
                                         value={newPassword}
+                                        className={errors.newPassword ? 'border-red-500' : ''}
                                         onChange={(e) => {
                                             setNewPassword(e.target.value);
-                                            setError('');
+                                            clearField('newPassword');
                                         }}
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') {
@@ -168,24 +181,28 @@ export const ResetPasswordPage = () => {
                                             }
                                         }}
                                     />
-                                    <button 
+                                    <button
                                         type="button"
                                         className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400"
                                         onClick={togglePasswordVisibility}
                                     >
                                         {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
                                     </button>
+                                    {errors.newPassword && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.newPassword}</p>
+                                    )}
                                 </div>
                                 <div className="relative">
                                     <label htmlFor="confirmPassword" className="sr-only">{t('confirmPassword') || 'Confirm Password'}</label>
-                                    <Input 
-                                        id="confirmPassword" 
+                                    <Input
+                                        id="confirmPassword"
                                         type={passwordVisible ? 'text' : 'password'}
-                                        placeholder={t('confirmPassword') || 'Confirm password'} 
+                                        placeholder={t('confirmPassword') || 'Confirm password'}
                                         value={confirmPassword}
+                                        className={errors.confirmPassword ? 'border-red-500' : ''}
                                         onChange={(e) => {
                                             setConfirmPassword(e.target.value);
-                                            setError('');
+                                            clearField('confirmPassword');
                                         }}
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') {
@@ -193,13 +210,16 @@ export const ResetPasswordPage = () => {
                                             }
                                         }}
                                     />
-                                    <button 
+                                    <button
                                         type="button"
                                         className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400"
                                         onClick={togglePasswordVisibility}
                                     >
                                         {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
                                     </button>
+                                    {errors.confirmPassword && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>
+                                    )}
                                 </div>
                                 <div>
                                     <Button onClick={handleResetPassword} className="w-full" loading={isLoading} disabled={isLoading}>
@@ -227,4 +247,3 @@ export const ResetPasswordPage = () => {
         </div>
     );
 };
-

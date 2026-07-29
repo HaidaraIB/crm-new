@@ -6,6 +6,12 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import { changePasswordAPI } from '../../services/api';
+import {
+    validatePasswordField,
+    validateConfirmPasswordField,
+    requiredTrim,
+} from '../../utils/formValidation';
+import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -82,28 +88,50 @@ export const ChangePasswordModal = () => {
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
 
-        if (!formData.currentPassword.trim()) {
-            newErrors.currentPassword = t('currentPasswordRequired') || 'Current password is required';
+        const currentErr = requiredTrim(
+            formData.currentPassword,
+            t,
+            'currentPasswordRequired',
+            'Current password is required'
+        );
+        if (currentErr) newErrors.currentPassword = currentErr;
+
+        const newPassErr = validatePasswordField(formData.newPassword, t);
+        if (newPassErr) {
+            newErrors.newPassword =
+                newPassErr === (t('passwordRequired') || 'Password is required')
+                    ? t('newPasswordRequired') || 'New password is required'
+                    : newPassErr;
         }
 
-        if (!formData.newPassword.trim()) {
-            newErrors.newPassword = t('newPasswordRequired') || 'New password is required';
-        } else if (formData.newPassword.length < 8) {
-            newErrors.newPassword = t('passwordMinLength') || 'Password must be at least 8 characters';
-        }
+        const confirmErr = validateConfirmPasswordField(
+            formData.newPassword,
+            formData.confirmPassword,
+            t
+        );
+        if (confirmErr) newErrors.confirmPassword = confirmErr;
 
-        if (!formData.confirmPassword.trim()) {
-            newErrors.confirmPassword = t('confirmPasswordRequired') || 'Confirm password is required';
-        } else if (formData.newPassword !== formData.confirmPassword) {
-            newErrors.confirmPassword = t('passwordsDoNotMatch') || 'Passwords do not match';
-        }
-
-        if (formData.currentPassword === formData.newPassword) {
-            newErrors.newPassword = t('newPasswordMustBeDifferent') || 'New password must be different from current password';
+        if (
+            formData.currentPassword &&
+            formData.newPassword &&
+            formData.currentPassword === formData.newPassword
+        ) {
+            newErrors.newPassword =
+                t('newPasswordMustBeDifferent') || 'New password must be different from current password';
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        if (Object.keys(newErrors).length > 0) {
+            requestAnimationFrame(() =>
+                scrollToFirstFieldError(newErrors, {
+                    currentPassword: 'currentPassword',
+                    newPassword: 'newPassword',
+                    confirmPassword: 'confirmPassword',
+                })
+            );
+            return false;
+        }
+        return true;
     };
 
     const handleSubmit = async () => {

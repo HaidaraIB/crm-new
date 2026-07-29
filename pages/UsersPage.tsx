@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon } from '../components/index';
+import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText } from '../components/index';
 import { User } from '../types';
 import { useUsers, useReactivateEmployee } from '../hooks/useQueries';
 import { getRoleTranslation, normalizeRole } from '../utils/roles';
@@ -216,12 +216,12 @@ const UserCard = ({ user }: { user: User }) => {
                         {user.is_active === false ? t('deactivated') : t('active')}
                     </span>
                 )}
-                <p className="text-sm mt-1">{user.phone}</p>
+                <PhoneText as="p" className="text-sm mt-1">{user.phone}</PhoneText>
                 {user.phone && (
                     <div className="flex items-center justify-center gap-2 mt-4">
                         <a 
                             href={`tel:${user.phone.replace(/[^0-9+]/g, '')}`}
-                            className="inline-flex items-center justify-center w-8 h-8 text-primary hover:opacity-80 transition-opacity"
+                            className="inline-flex items-center justify-center w-8 h-8 text-primary-600 dark:text-primary-300 hover:opacity-80 transition-opacity"
                             title={t('call') || 'Call'}
                         >
                             <PhoneIcon className="w-5 h-5"/>

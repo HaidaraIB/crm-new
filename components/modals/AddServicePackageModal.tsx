@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
+import { Service } from '../../types';
 import { useCreateServicePackage, useServices } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -25,7 +26,7 @@ export const AddServicePackageModal = () => {
     
     // Fetch services using React Query
     const { data: servicesResponse } = useServices();
-    const services = Array.isArray(servicesResponse) 
+    const services: Service[] = Array.isArray(servicesResponse) 
         ? servicesResponse 
         : (servicesResponse?.results || []);
     

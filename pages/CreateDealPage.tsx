@@ -287,13 +287,15 @@ export const CreateDealPage = () => {
                         }
                     });
                     
-                    setErrors(newErrors);
-                    
-                    // Show first error in alert
-                    const firstError = Object.values(newErrors)[0];
-                    if (firstError) {
-                        errorMessage = firstError;
+                    if (Object.keys(newErrors).length > 0) {
+                        setErrors({
+                            ...newErrors,
+                            general: Object.values(newErrors)[0] || errorMessage,
+                        });
+                    } else {
+                        setErrors({ general: errorMessage });
                     }
+                    return;
                 } catch (e) {
                     // If parsing fails, use the error message as is
                     errorMessage = error.message;
@@ -310,16 +312,16 @@ export const CreateDealPage = () => {
                     }
                 });
                 
-                setErrors(newErrors);
-                
-                // Show first error in alert
-                const firstError = Object.values(newErrors)[0];
-                if (firstError) {
-                    errorMessage = firstError;
+                if (Object.keys(newErrors).length > 0) {
+                    setErrors({
+                        ...newErrors,
+                        general: Object.values(newErrors)[0] || errorMessage,
+                    });
+                    return;
                 }
             }
             
-            alert(errorMessage);
+            setErrors({ general: errorMessage });
         }
     };
 
@@ -356,6 +358,11 @@ export const CreateDealPage = () => {
                 }
             }}>
                 <Card>
+                    {errors.general && (
+                        <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                            {errors.general}
+                        </div>
+                    )}
                     <h3 className="text-lg font-semibold mb-6 border-b pb-3 dark:border-gray-700">{t('dealInformation')}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         {/* Row 1 */}

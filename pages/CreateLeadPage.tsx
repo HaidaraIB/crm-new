@@ -11,6 +11,7 @@ import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole, normalizeRole } fr
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { buildLeadLocationApiBody } from '../utils/leadLocation';
+import { validateLeadForm } from '../utils/leadFormValidation';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -158,47 +159,20 @@ export const CreateLeadPage = () => {
     }, [defaultStatus, defaultChannel]); // Depend on defaults, but check form state before updating
 
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        // Check phone numbers
-        const finalPhoneNumbers = phoneNumbers.length > 0 
-            ? phoneNumbers.filter(pn => pn.phone_number.trim() !== '')
-            : formState.phone 
-            ? [{
-                phone_number: formState.phone,
-                phone_type: 'mobile' as const,
-                is_primary: true,
-                notes: '',
-            }]
-            : [];
-        
-        if (finalPhoneNumbers.length === 0) {
-            newErrors.phone = t('phoneNumberRequired') || 'At least one phone number is required';
-        }
-
-        if (!formState.communicationWay) {
-            newErrors.communicationWay = t('communicationWayRequired') || 'Communication channel is required';
-        }
-
-        if (!formState.status) {
-            newErrors.status = t('statusRequired') || 'Status is required';
-        }
-
-        if (!formState.priority) {
-            newErrors.priority = t('priorityRequired') || 'Priority is required';
-        }
-
-        if (!formState.type) {
-            newErrors.type = t('typeRequired') || 'Type is required';
-        }
-
-        if (!currentUser?.company?.id) {
-            newErrors.company = t('companyRequired') || 'Company is required';
-        }
+        const newErrors = validateLeadForm(
+            {
+                name: formState.name,
+                phone: formState.phone,
+                phoneNumbers,
+                communicationWay: formState.communicationWay,
+                status: formState.status,
+                priority: formState.priority,
+                type: formState.type,
+                companyId: currentUser?.company?.id,
+            },
+            t,
+            { requireCompany: true }
+        );
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;

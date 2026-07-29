@@ -20,6 +20,23 @@ import { navigateToCompanyRoute } from '../utils/routing';
 import { isRedundantPlanDescription } from '../utils/planEntitlements';
 import { withLatinDigits } from '../utils/dateUtils';
 import { setPendingSubscriptionId } from '../utils/paymentSession';
+import {
+    validateEmailField,
+    validateUsernameField,
+    validatePhoneField,
+    validatePasswordField,
+    validateConfirmPasswordField,
+    validateDomainSlugField,
+    requiredTrim,
+} from '../utils/formValidation';
+import {
+    normalizeErrorMessage,
+    unwrapApiFieldErrors,
+    scrollToFirstFieldError as scrollToFirstFieldErrorUtil,
+    buildFieldErrorSummary as buildFieldErrorSummaryUtil,
+    translateBackendError as translateBackendErrorUtil,
+    mapRegisterBackendErrorsToFields,
+} from '../utils/formFieldErrors';
 
 type PublicPlan = {
     id: number;
@@ -134,34 +151,6 @@ export const RegisterPage = () => {
         }
     };
 
-    const normalizeErrorMessage = (value: any): string => {
-        if (!value) return '';
-        if (Array.isArray(value)) {
-            return normalizeErrorMessage(value[0]);
-        }
-        if (typeof value === 'string') {
-            return value;
-        }
-        if (typeof value === 'object') {
-            if (value.detail) return normalizeErrorMessage(value.detail);
-            if (value.message) return normalizeErrorMessage(value.message);
-            if (value.errors) return normalizeErrorMessage(value.errors);
-            const firstKey = Object.keys(value)[0];
-            if (firstKey) return normalizeErrorMessage(value[firstKey]);
-            return '';
-        }
-        return String(value);
-    };
-
-    /** Prefer nested `errors` when API wraps field errors as `{ available, errors }`. */
-    const unwrapApiFieldErrors = (raw: any): Record<string, unknown> => {
-        if (!raw || typeof raw !== 'object') return {};
-        if (raw.errors && typeof raw.errors === 'object' && !Array.isArray(raw.errors)) {
-            return raw.errors as Record<string, unknown>;
-        }
-        return raw as Record<string, unknown>;
-    };
-
     const FIELD_ERROR_DOM_IDS: Record<string, string> = {
         companyName: 'company-name',
         companyDomain: 'company-domain',
@@ -193,196 +182,17 @@ export const RegisterPage = () => {
     };
 
     const scrollToFirstFieldError = (fieldErrors: Record<string, string>) => {
-        const firstKey = Object.keys(fieldErrors).find((k) => k !== 'general' && FIELD_ERROR_DOM_IDS[k]);
-        if (!firstKey) return;
-        const el = document.getElementById(FIELD_ERROR_DOM_IDS[firstKey]);
-        if (el) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            try {
-                el.focus({ preventScroll: true });
-            } catch {
-                // ignore
-            }
-        }
+        scrollToFirstFieldErrorUtil(fieldErrors, FIELD_ERROR_DOM_IDS);
     };
 
-    const buildFieldErrorSummary = (fieldErrors: Record<string, string>): string => {
-        const labels = Object.keys(fieldErrors)
-            .filter((k) => k !== 'general')
-            .map((k) => FIELD_ERROR_LABELS[k] || k);
-        if (labels.length === 0) {
-            return t('pleaseFixHighlightedFields') || 'Please fix the highlighted fields below.';
-        }
-        if (labels.length === 1) {
-            return (
-                t('pleaseFixField')?.replace('{field}', labels[0]) ||
-                `Please fix the ${labels[0]} field below.`
-            );
-        }
-        return (
-            t('pleaseFixHighlightedFields') ||
-            'Please fix the highlighted fields below.'
-        );
-    };
+    const buildFieldErrorSummary = (fieldErrors: Record<string, string>): string =>
+        buildFieldErrorSummaryUtil(fieldErrors, FIELD_ERROR_LABELS, t);
 
-    const translateBackendError = (errorMessage: string, fieldHint?: string): string => {
-        const lowerMessage = (errorMessage || '').toLowerCase();
-        const hint = (fieldHint || '').toLowerCase();
+    const translateBackendError = (errorMessage: string, fieldHint?: string): string =>
+        translateBackendErrorUtil(errorMessage, t, fieldHint);
 
-        const isTaken =
-            lowerMessage.includes('already exists') ||
-            lowerMessage.includes('already exist') ||
-            lowerMessage.includes('already taken') ||
-            lowerMessage.includes('already registered') ||
-            lowerMessage.includes('not available') ||
-            lowerMessage.includes('unavailable');
-
-        if (isTaken || hint) {
-            if (hint.includes('email') || lowerMessage.includes('email')) {
-                return t('emailAlreadyExists') || 'This email is already registered. Please use a different email.';
-            }
-            if (hint.includes('username') || lowerMessage.includes('username')) {
-                return t('usernameAlreadyExists') || 'This username is already taken. Please choose another.';
-            }
-            if (hint.includes('phone') || lowerMessage.includes('phone')) {
-                return t('phoneAlreadyExists') || 'This phone number is already registered. Please use a different number.';
-            }
-            if (
-                hint.includes('domain') ||
-                hint.includes('companydomain') ||
-                hint.includes('company_domain') ||
-                lowerMessage.includes('domain')
-            ) {
-                return t('domainAlreadyExists') || 'This company domain is already taken. Please choose another.';
-            }
-        }
-
-        if (lowerMessage.includes('enter a valid email') || lowerMessage.includes('valid email')) {
-            return t('invalidEmail') || 'Invalid email format';
-        }
-        if (lowerMessage.includes('required')) {
-            if (hint.includes('email')) return t('emailRequired') || 'Email is required';
-            if (hint.includes('username')) return t('usernameRequired') || 'Username is required';
-            if (hint.includes('phone')) return t('phoneRequired') || 'Phone is required';
-            if (hint.includes('password')) return t('passwordRequired') || 'Password is required';
-            if (hint.includes('domain')) return t('companyDomainRequired') || 'Company domain is required';
-            if (hint.includes('name') && hint.includes('company')) return t('companyNameRequired') || 'Company name is required';
-        }
-
-        // Never show vague "Not available." as a standalone message
-        if (lowerMessage === 'not available.' || lowerMessage === 'not available') {
-            return t('pleaseFixHighlightedFields') || 'Please fix the highlighted fields below.';
-        }
-
-        return errorMessage;
-    };
-
-    const mapBackendErrorsToFields = (apiFields: any) => {
-        const fieldErrors: { [key: string]: string } = {};
-        if (!apiFields || typeof apiFields !== 'object') {
-            return fieldErrors;
-        }
-
-        const source = unwrapApiFieldErrors(apiFields);
-
-        const ownerFieldMap: Record<string, string> = {
-            first_name: 'firstName',
-            last_name: 'lastName',
-            email: 'email',
-            username: 'username',
-            password: 'password',
-            phone: 'phone',
-        };
-
-        if (source.company && typeof source.company === 'object') {
-            const companyErrors = source.company as Record<string, unknown>;
-            if (companyErrors.domain) {
-                fieldErrors.companyDomain = translateBackendError(
-                    normalizeErrorMessage(companyErrors.domain),
-                    'company_domain'
-                );
-            }
-            if (companyErrors.name) {
-                fieldErrors.companyName = translateBackendError(
-                    normalizeErrorMessage(companyErrors.name),
-                    'company_name'
-                );
-            }
-            if (!fieldErrors.companyDomain && (Array.isArray(companyErrors) || typeof companyErrors === 'string')) {
-                const message = normalizeErrorMessage(companyErrors);
-                if (!fieldErrors.companyName && message.toLowerCase().includes('name')) {
-                    fieldErrors.companyName = translateBackendError(message, 'company_name');
-                } else {
-                    fieldErrors.companyDomain = translateBackendError(message, 'company_domain');
-                }
-            }
-        }
-
-        if (source.company_domain) {
-            fieldErrors.companyDomain = translateBackendError(
-                normalizeErrorMessage(source.company_domain),
-                'company_domain'
-            );
-        }
-
-        if (source.owner && typeof source.owner === 'object' && !Array.isArray(source.owner)) {
-            Object.entries(ownerFieldMap).forEach(([apiKey, uiKey]) => {
-                if ((source.owner as Record<string, unknown>)[apiKey]) {
-                    fieldErrors[uiKey] = translateBackendError(
-                        normalizeErrorMessage((source.owner as Record<string, unknown>)[apiKey]),
-                        apiKey
-                    );
-                }
-            });
-            const ownerObj = source.owner as Record<string, unknown>;
-            if (ownerObj.non_field_errors && !fieldErrors.password) {
-                fieldErrors.password = translateBackendError(
-                    normalizeErrorMessage(ownerObj.non_field_errors),
-                    'password'
-                );
-            }
-        } else if (source.owner && (Array.isArray(source.owner) || typeof source.owner === 'string')) {
-            const msg = normalizeErrorMessage(source.owner);
-            const lower = msg.toLowerCase();
-            if (lower.includes('email')) {
-                fieldErrors.email = translateBackendError(msg, 'email');
-            } else if (lower.includes('username')) {
-                fieldErrors.username = translateBackendError(msg, 'username');
-            } else if (lower.includes('phone')) {
-                fieldErrors.phone = translateBackendError(msg, 'phone');
-            } else if (lower.includes('password')) {
-                fieldErrors.password = translateBackendError(msg, 'password');
-            } else {
-                fieldErrors.general = translateBackendError(msg);
-            }
-        }
-
-        const directMap: Record<string, string> = {
-            email: 'email',
-            username: 'username',
-            password: 'password',
-            phone: 'phone',
-            first_name: 'firstName',
-            last_name: 'lastName',
-            domain: 'companyDomain',
-            name: 'companyName',
-            plan_id: 'plan',
-            phone_verification_token: 'phoneOtp',
-            email_verification_token: 'emailOtp',
-        };
-
-        Object.entries(directMap).forEach(([apiKey, uiKey]) => {
-            if (source[apiKey] && !fieldErrors[uiKey]) {
-                fieldErrors[uiKey] = translateBackendError(normalizeErrorMessage(source[apiKey]), apiKey);
-            }
-        });
-
-        if (source.non_field_errors) {
-            fieldErrors.general = translateBackendError(normalizeErrorMessage(source.non_field_errors));
-        }
-
-        return fieldErrors;
-    };
+    const mapBackendErrorsToFields = (apiFields: any) =>
+        mapRegisterBackendErrorsToFields(apiFields, t);
 
     const getPlanPriceLabel = (plan: PublicPlan) => {
         // Free/trial plans do not have billing cycles (avoid "per month/year" confusion).
@@ -711,15 +521,16 @@ export const RegisterPage = () => {
     const validateStep1 = (): boolean => {
         const newErrors: { [key: string]: string } = {};
 
-        if (!companyName.trim()) {
-            newErrors.companyName = t('companyNameRequired') || 'Company name is required';
-        }
+        const companyNameErr = requiredTrim(
+            companyName,
+            t,
+            'companyNameRequired',
+            'Company name is required'
+        );
+        if (companyNameErr) newErrors.companyName = companyNameErr;
 
-        if (!companyDomain.trim()) {
-            newErrors.companyDomain = t('companyDomainRequired') || 'Company domain is required';
-        } else if (!/^[a-zA-Z0-9][a-zA-Z0-9-]*[a-zA-Z0-9]*$/.test(companyDomain)) {
-            newErrors.companyDomain = t('invalidDomain') || 'Invalid domain format';
-        }
+        const domainErr = validateDomainSlugField(companyDomain, t);
+        if (domainErr) newErrors.companyDomain = domainErr;
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
@@ -732,54 +543,26 @@ export const RegisterPage = () => {
     const validateStep2 = (): boolean => {
         const newErrors: { [key: string]: string } = {};
 
-        if (!firstName.trim()) {
-            newErrors.firstName = t('firstNameRequired') || 'First name is required';
-        }
+        const firstNameErr = requiredTrim(firstName, t, 'firstNameRequired', 'First name is required');
+        if (firstNameErr) newErrors.firstName = firstNameErr;
 
-        if (!lastName.trim()) {
-            newErrors.lastName = t('lastNameRequired') || 'Last name is required';
-        }
+        const lastNameErr = requiredTrim(lastName, t, 'lastNameRequired', 'Last name is required');
+        if (lastNameErr) newErrors.lastName = lastNameErr;
 
-        if (!email.trim()) {
-            newErrors.email = t('emailRequired') || 'Email is required';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-            newErrors.email = t('invalidEmail') || 'Invalid email format';
-        }
+        const emailErr = validateEmailField(email, t);
+        if (emailErr) newErrors.email = emailErr;
 
-        if (!username.trim()) {
-            newErrors.username = t('usernameRequired') || 'Username is required';
-        } else if (username.length < 3) {
-            newErrors.username = t('usernameMinLength') || 'Username must be at least 3 characters';
-        } else if (!/^[a-zA-Z0-9._-]+$/.test(username)) {
-            newErrors.username =
-                t('invalidUsername') ||
-                'Username can only contain letters, numbers, dots, underscores, and hyphens';
-        }
+        const usernameErr = validateUsernameField(username, t);
+        if (usernameErr) newErrors.username = usernameErr;
 
-        const normalizedPhone = phone.trim();
-        if (!normalizedPhone) {
-            newErrors.phone = t('phoneRequired') || 'Phone is required';
-        } else if (!/^\+[1-9]\d{1,14}$/.test(normalizedPhone)) {
-            newErrors.phone = t('invalidPhone') || 'Invalid phone number format';
-        } else if (normalizedPhone.length < 8) {
-            newErrors.phone = t('phoneTooShort') || 'Phone number is too short';
-        }
+        const phoneErr = validatePhoneField(phone, t);
+        if (phoneErr) newErrors.phone = phoneErr;
 
-        if (!password.trim()) {
-            newErrors.password = t('passwordRequired') || 'Password is required';
-        } else if (password.length < 8) {
-            newErrors.password = t('passwordMinLength') || 'Password must be at least 8 characters';
-        } else if (!/[A-Za-z]/.test(password) || !/\d/.test(password)) {
-            newErrors.password =
-                t('passwordRequirements') ||
-                'Use at least 8 characters with a mix of letters and numbers.';
-        }
+        const passwordErr = validatePasswordField(password, t);
+        if (passwordErr) newErrors.password = passwordErr;
 
-        if (!confirmPassword.trim()) {
-            newErrors.confirmPassword = t('confirmPasswordRequired') || 'Please confirm your password';
-        } else if (password !== confirmPassword) {
-            newErrors.confirmPassword = t('passwordsDoNotMatch') || 'Passwords do not match';
-        }
+        const confirmErr = validateConfirmPasswordField(password, confirmPassword, t);
+        if (confirmErr) newErrors.confirmPassword = confirmErr;
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {

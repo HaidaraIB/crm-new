@@ -6,7 +6,7 @@ import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
-import { Service } from '../../types';
+import { Service, ServiceProvider } from '../../types';
 import { useUpdateService, useServiceProviders } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -29,7 +29,7 @@ export const EditServiceModal = () => {
     
     // Fetch service providers using React Query
     const { data: providersResponse } = useServiceProviders();
-    const serviceProviders = Array.isArray(providersResponse) 
+    const serviceProviders: ServiceProvider[] = Array.isArray(providersResponse) 
         ? providersResponse 
         : (providersResponse?.results || []);
 
@@ -76,11 +76,11 @@ export const EditServiceModal = () => {
     useEffect(() => {
         if (editingService) {
             // Get provider name from serviceProviders if provider is an ID
-            let providerName = editingService.provider || '';
-            if (editingService.provider && typeof editingService.provider === 'number') {
+            let providerName = '';
+            if (typeof editingService.provider === 'number') {
                 const provider = serviceProviders.find(p => p.id === editingService.provider);
                 providerName = provider?.name || '';
-            } else if (editingService.provider && typeof editingService.provider === 'string') {
+            } else if (typeof editingService.provider === 'string') {
                 providerName = editingService.provider;
             }
             

@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Loader } from '../Loader';
+import { PhoneText } from '../PhoneText';
 import { getTwilioSettingsAPI } from '../../services/api';
 import { maskPhoneForDisplay, smsProviderLabel } from '../../utils/smsSendHelpers';
 
@@ -59,7 +60,7 @@ export const SmsSendPreviewModal = ({
                         <dt className="font-medium text-gray-700 dark:text-gray-300">
                             {t('smsSendPreviewRecipient') || 'To'}
                         </dt>
-                        <dd className="mt-0.5 text-gray-900 dark:text-white" dir="ltr">
+                        <PhoneText as="dd" className="mt-0.5 text-gray-900 dark:text-white">
                             {maskedPhone}
                             {extraRecipients > 0 && (
                                 <span className="text-gray-500 dark:text-gray-400">
@@ -70,7 +71,7 @@ export const SmsSendPreviewModal = ({
                                     )}
                                 </span>
                             )}
-                        </dd>
+                        </PhoneText>
                     </div>
                     <div>
                         <dt className="font-medium text-gray-700 dark:text-gray-300">

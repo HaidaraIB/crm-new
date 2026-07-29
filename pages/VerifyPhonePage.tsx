@@ -10,6 +10,7 @@ import {
     preLoginPhoneChangeAPI,
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { validateOtpCodeField } from '../utils/formValidation';
 
 const PRE_LOGIN_PHONE_RESEND_COOLDOWN_KEY = 'preLoginVerifyPhoneResendCooldown';
 const PHONE_RESEND_COOLDOWN_SEC = 60;
@@ -43,6 +44,7 @@ export const VerifyPhonePage = () => {
     const [changePhoneLoading, setChangePhoneLoading] = useState(false);
     const [showChangePhone, setShowChangePhone] = useState(false);
     const [status, setStatus] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [verifiedOk, setVerifiedOk] = useState(false);
     const [resendCountdown, setResendCountdown] = useState(0);
     const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -195,16 +197,27 @@ export const VerifyPhonePage = () => {
         }
     };
 
+    const clearFieldError = (field: string) => {
+        setErrors((prev) => {
+            if (!prev[field]) return prev;
+            const next = { ...prev };
+            delete next[field];
+            return next;
+        });
+    };
+
     const handleVerify = async () => {
         if (!canPreLogin || !preloginUsername || !preloginPassword) {
             setStatus({ type: 'error', message: t('preLoginCredentialsMissingHint') });
             return;
         }
         const trimmed = code.trim().replace(/\s/g, '');
-        if (trimmed.length < 4) {
-            setStatus({ type: 'error', message: t('verificationCodeRequired') });
+        const codeErr = validateOtpCodeField(trimmed, t);
+        if (codeErr) {
+            setErrors({ code: codeErr });
             return;
         }
+        setErrors({});
         setVerifyLoading(true);
         setStatus(null);
         try {
@@ -235,9 +248,10 @@ export const VerifyPhonePage = () => {
         }
         const digits = newPhone.replace(/\D/g, '');
         if (digits.length < 8) {
-            setStatus({ type: 'error', message: t('pleaseEnterCredentials') });
+            setErrors({ newPhone: t('invalidPhone') || 'Invalid phone number format' });
             return;
         }
+        setErrors({});
         setChangePhoneLoading(true);
         setStatus(null);
         try {
@@ -327,12 +341,19 @@ export const VerifyPhonePage = () => {
                                         inputMode="numeric"
                                         autoComplete="one-time-code"
                                         value={code}
-                                        onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 8))}
+                                        onChange={(e) => {
+                                            setCode(e.target.value.replace(/\D/g, '').slice(0, 8));
+                                            clearFieldError('code');
+                                        }}
                                         placeholder="123456"
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') handleVerify();
                                         }}
+                                        className={errors.code ? 'border-red-500' : ''}
                                     />
+                                    {errors.code && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.code}</p>
+                                    )}
                                     <div className="text-start mt-1.5">
                                         <button
                                             type="button"

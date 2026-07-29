@@ -7,12 +7,14 @@ import { useUsers, useAssignLeads } from '../../hooks/useQueries';
 import { getUserDisplayName } from '../../types';
 import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../../utils/roles';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 export const AssignLeadModal = () => {
     const { isAssignLeadModalOpen, setIsAssignLeadModalOpen, checkedLeadIds, setCheckedLeadIds, t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [isUnassign, setIsUnassign] = useState<boolean>(false);
     const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     
     // Fetch users using React Query
     const { data: usersResponse } = useUsers();
@@ -31,14 +33,18 @@ export const AssignLeadModal = () => {
     const isAssigning = assignLeadsMutation.isPending;
 
     const handleAssignClick = () => {
+        const newErrors: Record<string, string> = {};
         if (checkedLeadIds.size === 0) {
-            alert(t('selectLeads') || 'Please select at least one lead');
-            return;
+            newErrors.selectedLeads = t('selectLeads') || 'Please select at least one lead';
         }
         if (!isUnassign && selectedUserId === '') {
-            alert(t('selectEmployee') || 'Please select an employee');
+            newErrors.userId = t('selectEmployee') || 'Please select an employee';
+        }
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
+        setErrors({});
         setShowConfirmDialog(true);
     };
 
@@ -47,6 +53,7 @@ export const AssignLeadModal = () => {
         setIsUnassign(checked);
         if (checked) {
             setSelectedUserId(''); // Clear selected user when unassign is checked
+            clearFieldError(setErrors, 'userId');
         }
     };
 
@@ -55,6 +62,7 @@ export const AssignLeadModal = () => {
         if (e.target.value !== '') {
             setIsUnassign(false); // Clear unassign when user is selected
         }
+        clearFieldError(setErrors, 'userId');
     };
 
     const handleConfirmAssign = async () => {
@@ -72,6 +80,7 @@ export const AssignLeadModal = () => {
             setSelectedUserId('');
             setIsUnassign(false);
             setShowConfirmDialog(false);
+            setErrors({});
             setCheckedLeadIds(new Set()); // Clear selection after success
             const successMessage = isUnassign 
                 ? (t('leadsUnassignedSuccessfully') || 'Leads unassigned successfully!')
@@ -80,10 +89,11 @@ export const AssignLeadModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error assigning leads:', error);
+            setShowConfirmDialog(false);
             if (error?.code === 'employee_weekly_day_off') {
-                alert(t('errorEmployeeWeeklyDayOff') || error?.message);
+                setErrors({ general: t('errorEmployeeWeeklyDayOff') || error?.message || 'Cannot assign to this employee on their weekly day off.' });
             } else {
-                alert(error?.message || t('assignLeadsError') || 'Failed to assign leads. Please try again.');
+                setErrors({ general: error?.message || t('assignLeadsError') || 'Failed to assign leads. Please try again.' });
             }
         }
     };
@@ -93,6 +103,7 @@ export const AssignLeadModal = () => {
         setSelectedUserId('');
         setIsUnassign(false);
         setShowConfirmDialog(false);
+        setErrors({});
     };
 
     const selectedEmployee = selectedUserId && !isUnassign
@@ -103,7 +114,17 @@ export const AssignLeadModal = () => {
         <>
             <Modal isOpen={isAssignLeadModalOpen && !showConfirmDialog} onClose={handleClose} title={t('assignLead')}>
                 <div className="space-y-4">
-                    <p>{t('leadsCount')}: <span className="font-bold">{checkedLeadIds.size}</span></p>
+                    {errors.general && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                            {errors.general}
+                        </div>
+                    )}
+                    <div>
+                        <p>{t('leadsCount')}: <span className="font-bold">{checkedLeadIds.size}</span></p>
+                        {errors.selectedLeads && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.selectedLeads}</p>
+                        )}
+                    </div>
                     <div className="space-y-3">
                         <div>
                             <label htmlFor="assignUser" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('selectEmployee')}</label>
@@ -112,7 +133,7 @@ export const AssignLeadModal = () => {
                                 value={selectedUserId}
                                 onChange={handleUserSelectChange}
                                 disabled={isUnassign}
-                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed"
+                                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary disabled:opacity-50 disabled:cursor-not-allowed ${errors.userId ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                             >
                                 <option value="">{t('selectEmployee') || 'Select Employee'}</option>
                                 {userOptions?.map(user => {
@@ -127,6 +148,9 @@ export const AssignLeadModal = () => {
                                     );
                                 }) || []}
                             </select>
+                            {errors.userId && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.userId}</p>
+                            )}
                         </div>
                         <div className="flex items-center gap-2">
                             <Checkbox

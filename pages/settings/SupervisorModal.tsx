@@ -4,6 +4,14 @@ import { useAppContext } from '../../context/AppContext';
 import { EyeIcon, EyeOffIcon } from '../../components/icons';
 import { Input } from '../../components/Input';
 import { PhoneInput } from '../../components/PhoneInput';
+import {
+  validateEmailField,
+  validateUsernameField,
+  validatePhoneField,
+  validatePasswordField,
+  requiredTrim,
+} from '../../utils/formValidation';
+import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 interface SupervisorModalProps {
   isOpen: boolean;
@@ -61,22 +69,14 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
   </label>
 );
 
-function validatePhone(phone: string, t: (key: any) => string): string | null {
-  if (!phone.trim()) {
-    return t('phoneRequired') || 'Phone is required';
-  }
-  if (!phone.startsWith('+')) {
-    return t('invalidPhoneFormat') || 'Phone number must include country code (e.g., +964...)';
-  }
-  const digitsOnly = phone.replace(/\D/g, '');
-  if (digitsOnly.length < 8) {
-    return t('invalidPhoneLength') || 'Phone number is too short';
-  }
-  if (digitsOnly.length > 15) {
-    return t('invalidPhoneLength') || 'Phone number is too long';
-  }
-  return null;
-}
+const FIELD_DOM_IDS: Record<string, string> = {
+  first_name: 'supervisor-first-name',
+  last_name: 'supervisor-last-name',
+  username: 'supervisor-username',
+  email: 'supervisor-email',
+  phone: 'supervisor-phone',
+  password: 'supervisor-password',
+};
 
 export const SupervisorModal: React.FC<SupervisorModalProps> = ({
   isOpen,
@@ -165,41 +165,36 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
 
   const validate = (): boolean => {
     const newErrors: Record<string, string> = {};
-    const first = formData.first_name.trim();
-    if (!first) {
-      newErrors.first_name = t('firstNameRequired') || 'First name is required';
-    } else if (first.length < 2) {
+    const firstErr = requiredTrim(formData.first_name, t, 'firstNameRequired', 'First name is required');
+    if (firstErr) {
+      newErrors.first_name = firstErr;
+    } else if (formData.first_name.trim().length < 2) {
       newErrors.first_name = t('nameMinLength') || 'Name must be at least 2 characters';
     }
 
     if (!editingSupervisor) {
-      if (!formData.username.trim()) {
-        newErrors.username = t('usernameRequired') || 'Username is required';
-      } else if (formData.username.trim().length < 3) {
-        newErrors.username = t('usernameMinLength') || 'Username must be at least 3 characters';
-      } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username.trim())) {
-        newErrors.username = t('usernameInvalidChars') || 'Username can only contain letters, numbers, and underscores';
-      }
-      if (!formData.email.trim()) {
-        newErrors.email = t('emailRequired') || 'Email is required';
-      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-        newErrors.email = t('invalidEmail') || 'Invalid email format';
-      }
-      const pw = formData.password || '';
-      if (!pw.trim()) {
-        newErrors.password = t('passwordRequired') || 'Password is required';
-      } else if (pw.length < 8) {
-        newErrors.password = t('passwordMinLength') || 'Password must be at least 8 characters';
-      } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(pw)) {
-        newErrors.password = t('passwordComplexity') || 'Password must contain at least one letter and one number';
-      }
+      const usernameErr = validateUsernameField(formData.username, t);
+      if (usernameErr) newErrors.username = usernameErr;
+
+      const emailErr = validateEmailField(formData.email, t);
+      if (emailErr) newErrors.email = emailErr;
+
+      const passwordErr = validatePasswordField(formData.password || '', t);
+      if (passwordErr) newErrors.password = passwordErr;
+    } else if (formData.email.trim()) {
+      const emailErr = validateEmailField(formData.email, t);
+      if (emailErr) newErrors.email = emailErr;
     }
 
-    const phoneErr = validatePhone(formData.phone, t);
+    const phoneErr = validatePhoneField(formData.phone, t);
     if (phoneErr) newErrors.phone = phoneErr;
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    if (Object.keys(newErrors).length > 0) {
+      requestAnimationFrame(() => scrollToFirstFieldError(newErrors, FIELD_DOM_IDS));
+      return false;
+    }
+    return true;
   };
 
   const handleSubmit = (e: React.FormEvent) => {

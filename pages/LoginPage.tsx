@@ -40,7 +40,7 @@ export const LoginPage = () => {
     const [password, setPassword] = useState('');
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
     const [verificationGate, setVerificationGate] = useState<{
         verifyEmailUrl?: string;
@@ -58,19 +58,19 @@ export const LoginPage = () => {
             // Only show error if payment_success is not in URL (to avoid showing error after successful payment)
             if (urlParams.get('payment_success') !== 'true') {
                 if (loginErrorMessage === 'ACCOUNT_TEMPORARILY_INACTIVE') {
-                    setError('ACCOUNT_TEMPORARILY_INACTIVE');
+                    setErrors({ general: 'ACCOUNT_TEMPORARILY_INACTIVE' });
                 } else if (loginErrorMessage === 'SUBSCRIPTION_INACTIVE' && pendingSubId) {
                     setSubscriptionId(pendingSubId);
-                    setError('SUBSCRIPTION_INACTIVE');
+                    setErrors({ general: 'SUBSCRIPTION_INACTIVE' });
                 } else {
-                    setError(t('noActiveSubscription'));
+                    setErrors({ general: t('noActiveSubscription') });
                 }
             }
             // Clear error message after showing
             localStorage.removeItem('loginErrorMessage');
         } else if (pendingSubId && urlParams.get('payment_success') !== 'true') {
             setSubscriptionId(pendingSubId);
-            setError('SUBSCRIPTION_INACTIVE');
+            setErrors({ general: 'SUBSCRIPTION_INACTIVE' });
         }
         
         // Clear stale localStorage backup after reading (URL is source of truth when present)
@@ -130,11 +130,18 @@ export const LoginPage = () => {
     };
 
     const handleLogin = async () => {
-        setError('');
+        setErrors({});
         setVerificationGate(null);
-        
-        if (!username.trim() || !password.trim()) {
-            setError(t('pleaseEnterCredentials') || 'Please enter username and password');
+
+        const newErrors: Record<string, string> = {};
+        if (!username.trim()) {
+            newErrors.username = t('usernameRequired') || 'Username is required';
+        }
+        if (!password.trim()) {
+            newErrors.password = t('passwordRequired') || 'Password is required';
+        }
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
 
@@ -212,7 +219,7 @@ export const LoginPage = () => {
             
             // Check if it's an account temporarily inactive error (for employees)
             if (isAccountTemporarilyInactiveError(errorCode, errorMessage)) {
-                setError('ACCOUNT_TEMPORARILY_INACTIVE');
+                setErrors({ general: 'ACCOUNT_TEMPORARILY_INACTIVE' });
             } 
             // Check if it's a subscription inactive error (for admins)
             else if (isSubscriptionInactiveError(errorCode, errorMessage)) {
@@ -220,9 +227,9 @@ export const LoginPage = () => {
                 if (subId) {
                     setSubscriptionId(String(subId));
                     localStorage.setItem('pendingSubscriptionId', String(subId));
-                    setError('SUBSCRIPTION_INACTIVE');
+                    setErrors({ general: 'SUBSCRIPTION_INACTIVE' });
                 } else {
-                    setError(t('noActiveSubscription'));
+                    setErrors({ general: t('noActiveSubscription') });
                 }
             } else if (
                 ['email_not_verified', 'phone_not_verified', 'email_phone_not_verified'].includes(
@@ -239,11 +246,11 @@ export const LoginPage = () => {
                     verifyEmailUrl: verifyEmailUrl || undefined,
                     verifyPhoneUrl: verifyPhoneUrl || undefined,
                 });
-                setError('');
+                setErrors({});
             } else {
                 const translatedError = translateLoginError(errorMessage);
                 console.error('❌ Translated error:', translatedError);
-                setError(translatedError);
+                setErrors({ general: translatedError });
             }
             setIsLoading(false);
         }
@@ -311,12 +318,12 @@ export const LoginPage = () => {
                                 ) : null}
                             </div>
                         )}
-                        {error && (
+                        {errors.general && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                                 <div>
-                                    {error === 'ACCOUNT_TEMPORARILY_INACTIVE' ? (
+                                    {errors.general === 'ACCOUNT_TEMPORARILY_INACTIVE' ? (
                                         t('accountTemporarilyInactive') || 'Your account is temporarily inactive'
-                                    ) : error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
+                                    ) : errors.general === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
                                         <>
                                             {t('noActiveSubscriptionBeforeLink')}
                                             <a
@@ -335,7 +342,7 @@ export const LoginPage = () => {
                                             {t('noActiveSubscriptionAfterLink')}
                                         </>
                                     ) : (
-                                        error
+                                        errors.general
                                     )}
                                 </div>
                             </div>
@@ -346,9 +353,15 @@ export const LoginPage = () => {
                                 id="username" 
                                 placeholder={t('usernameOrEmail') || 'Username or Email'}
                                 value={username}
+                                className={errors.username ? 'border-red-500' : ''}
                                 onChange={(e) => {
                                     setUsername(e.target.value);
-                                    setError('');
+                                    setErrors((prev) => {
+                                        const next = { ...prev };
+                                        delete next.username;
+                                        delete next.general;
+                                        return next;
+                                    });
                                     setVerificationGate(null);
                                 }}
                                 onKeyPress={(e) => {
@@ -357,6 +370,9 @@ export const LoginPage = () => {
                                     }
                                 }}
                             />
+                            {errors.username && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.username}</p>
+                            )}
                         </div>
                         <div className="relative">
                            <label htmlFor="password" className="sr-only">{t('password')}</label>
@@ -365,9 +381,15 @@ export const LoginPage = () => {
                                 type={passwordVisible ? 'text' : 'password'}
                                 placeholder={t('password')} 
                                 value={password}
+                                className={errors.password ? 'border-red-500' : ''}
                                 onChange={(e) => {
                                     setPassword(e.target.value);
-                                    setError('');
+                                    setErrors((prev) => {
+                                        const next = { ...prev };
+                                        delete next.password;
+                                        delete next.general;
+                                        return next;
+                                    });
                                     setVerificationGate(null);
                                 }}
                                 onKeyPress={(e) => {
@@ -383,6 +405,9 @@ export const LoginPage = () => {
                            >
                             {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
                            </button>
+                           {errors.password && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password}</p>
+                           )}
                         </div>
                         <div>
                             <Button onClick={handleLogin} className="w-full" loading={isLoading} disabled={isLoading}>

@@ -6,7 +6,7 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { useUpdateDeal, useProjects, useUnits, useLeads, useUsers } from '../../hooks/useQueries';
-import { User } from '../../types';
+import { Lead, User } from '../../types';
 import { buildLeadAssigneePickerOptions } from '../../utils/roles';
 
 // Helper function to get user display name
@@ -55,7 +55,7 @@ export const EditDealModal = () => {
         : (unitsResponse?.results || []);
 
     const { data: leadsResponse } = useLeads();
-    const leads = leadsResponse?.results || [];
+    const leads: Lead[] = leadsResponse?.results || [];
 
     const { data: usersResponse } = useUsers();
     const users = Array.isArray(usersResponse) 
@@ -625,7 +625,7 @@ export const EditDealModal = () => {
                     </div>
                     <div>
                         <Label htmlFor="totalValue">{t('totalValue')}</Label>
-                        <Input id="totalValue" type="number" value={calculatedValues.totalValue} readOnly className="font-bold bg-gray-100 dark:bg-gray-800" />
+                        <Input id="totalValue" type="number" value={calculatedValues.totalValue.toFixed(2)} readOnly className="font-bold bg-gray-100 dark:bg-gray-800" />
                     </div>
                     <div>
                         <Label htmlFor="salesCommissionPercentage">{t('salesCommissionPercentage')}</Label>

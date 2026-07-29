@@ -14,6 +14,15 @@ import { normalizeRole } from '../utils/roles';
 import { isFibSessionPayload, routeToFibPaymentPage } from '../utils/paymentSession';
 import { hydratePaymentAccessToken } from '../utils/paymentAuth';
 import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
+import { validateNameField, validatePhoneField } from '../utils/formValidation';
+import { clearFieldError, mapApiFieldsToUiErrors } from '../utils/formFieldErrors';
+
+const PROFILE_API_FIELD_MAP: Record<string, string> = {
+    first_name: 'firstName',
+    last_name: 'lastName',
+    phone: 'phone',
+    profile_photo: 'profilePhoto',
+};
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -66,7 +75,7 @@ export const ProfilePage = () => {
     const [profilePhotoPreview, setProfilePhotoPreview] = useState<string>(currentUser?.profile_photo || currentUser?.avatar || '');
     const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
-    const [saveError, setSaveError] = useState<string>('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [loginTwoFactorEnabled, setLoginTwoFactorEnabled] = useState(true);
     const [isUpdatingTwoFactor, setIsUpdatingTwoFactor] = useState(false);
     const [twoFactorFeedback, setTwoFactorFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -180,7 +189,6 @@ export const ProfilePage = () => {
         const previous = loginTwoFactorEnabled;
         setLoginTwoFactorEnabled(enabled);
         setIsUpdatingTwoFactor(true);
-        setSaveError('');
         setTwoFactorFeedback(null);
 
         try {
@@ -214,12 +222,38 @@ export const ProfilePage = () => {
         }
     };
 
+    const validateProfileForm = (): Record<string, string> => {
+        const validationErrors: Record<string, string> = {};
+        const firstNameErr = validateNameField(firstName, t, {
+            requiredKey: 'firstNameRequired',
+            fallback: 'First name is required',
+        });
+        if (firstNameErr) validationErrors.firstName = firstNameErr;
+
+        const lastNameErr = validateNameField(lastName, t, {
+            requiredKey: 'lastNameRequired',
+            fallback: 'Last name is required',
+        });
+        if (lastNameErr) validationErrors.lastName = lastNameErr;
+
+        const phoneErr = validatePhoneField(phone, t, { required: false });
+        if (phoneErr) validationErrors.phone = phoneErr;
+
+        return validationErrors;
+    };
+
     const handleSave = async () => {
         if (!currentUser?.id) return;
-        
+
+        const validationErrors = validateProfileForm();
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(validationErrors);
+            return;
+        }
+
         setIsSaving(true);
-        setSaveError('');
-        
+        setErrors({});
+
         try {
             // Use FormData for profile photo upload
             const formData = new FormData();
@@ -258,18 +292,14 @@ export const ProfilePage = () => {
             console.error('Error updating profile:', error);
             // Handle field-specific errors
             if (error?.fields) {
-                const fieldErrors: string[] = [];
-                Object.keys(error.fields).forEach(field => {
-                    const fieldError = error.fields[field];
-                    if (Array.isArray(fieldError)) {
-                        fieldErrors.push(`${field}: ${fieldError[0]}`);
-                    } else {
-                        fieldErrors.push(`${field}: ${fieldError}`);
-                    }
-                });
-                setSaveError(fieldErrors.join(', '));
+                const fieldErrors = mapApiFieldsToUiErrors(error.fields, t, PROFILE_API_FIELD_MAP);
+                setErrors(
+                    Object.keys(fieldErrors).length > 0
+                        ? fieldErrors
+                        : { general: error?.message || t('errorUpdatingProfile') || 'Failed to update profile. Please try again.' }
+                );
             } else {
-                setSaveError(error?.message || t('errorUpdatingProfile') || 'Failed to update profile. Please try again.');
+                setErrors({ general: error?.message || t('errorUpdatingProfile') || 'Failed to update profile. Please try again.' });
             }
         } finally {
             setIsSaving(false);
@@ -313,14 +343,15 @@ export const ProfilePage = () => {
 
     const handleRenewSubscription = async () => {
         if (!subscriptionInfo || !subscriptionInfo.id) {
-            alert(t('subscriptionNotFound') || 'Subscription not found');
+            setErrors({ general: t('subscriptionNotFound') || 'Subscription not found' });
             return;
         }
 
         if (!selectedGateway) {
-            alert(t('paymentGatewayRequired') || 'Please select a payment method');
+            setErrors({ gateway: t('paymentGatewayRequired') || 'Please select a payment method' });
             return;
         }
+        setErrors({});
 
         try {
             setIsRenewing(true);
@@ -359,12 +390,12 @@ export const ProfilePage = () => {
                 });
                 routeToFibPaymentPage(subscriptionInfo.id, response);
             } else {
-                alert(t('paymentRedirectError') || 'Failed to get payment URL');
+                setErrors({ general: t('paymentRedirectError') || 'Failed to get payment URL' });
             }
         } catch (error: any) {
             console.error('Error renewing subscription:', error);
             const errorMessage = error?.message || t('errorRenewingSubscription') || 'Error renewing subscription';
-            alert(errorMessage);
+            setErrors({ general: errorMessage });
         } finally {
             setIsRenewing(false);
             setShowRenewalModal(false);
@@ -446,16 +477,30 @@ export const ProfilePage = () => {
                                 <Input 
                                     id="profile-first-name" 
                                     value={firstName}
-                                    onChange={(e) => setFirstName(e.target.value)}
+                                    onChange={(e) => {
+                                        setFirstName(e.target.value);
+                                        clearFieldError(setErrors, 'firstName');
+                                    }}
+                                    className={errors.firstName ? 'border-red-500 dark:border-red-500' : ''}
                                 />
+                                {errors.firstName && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.firstName}</p>
+                                )}
                             </div>
                             <div>
                                 <Label htmlFor="profile-last-name">{t('lastName') || 'Last Name'}</Label>
                                 <Input 
                                     id="profile-last-name" 
                                     value={lastName}
-                                    onChange={(e) => setLastName(e.target.value)}
+                                    onChange={(e) => {
+                                        setLastName(e.target.value);
+                                        clearFieldError(setErrors, 'lastName');
+                                    }}
+                                    className={errors.lastName ? 'border-red-500 dark:border-red-500' : ''}
                                 />
+                                {errors.lastName && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.lastName}</p>
+                                )}
                             </div>
                         </div>
                         <div>
@@ -496,10 +541,16 @@ export const ProfilePage = () => {
                                 id="profile-phone" 
                                 type="tel" 
                                 value={phone}
-                                onChange={(e) => setPhone(e.target.value)}
+                                onChange={(e) => {
+                                    setPhone(e.target.value);
+                                    clearFieldError(setErrors, 'phone');
+                                }}
                                 disabled={true}
-                                className="bg-gray-100 dark:bg-gray-800 cursor-not-allowed"
+                                className={`bg-gray-100 dark:bg-gray-800 cursor-not-allowed ${errors.phone ? 'border-red-500 dark:border-red-500' : ''}`}
                             />
+                            {errors.phone && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                            )}
                         </div>
                     </div>
                 </Card>
@@ -634,9 +685,9 @@ export const ProfilePage = () => {
                     </Card>
                 )}
                 
-                {saveError && (
+                {errors.general && (
                     <Card className="border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20">
-                        <p className="text-sm text-red-600 dark:text-red-400">{saveError}</p>
+                        <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>
                     </Card>
                 )}
                 
@@ -666,24 +717,37 @@ export const ProfilePage = () => {
                 onClose={() => {
                     setShowRenewalModal(false);
                     setSelectedGateway(null);
+                    clearFieldError(setErrors, 'gateway');
                 }}
                 title={t('renewSubscription') || 'Renew Subscription'}
                 maxWidth="lg"
             >
                 <div className="space-y-4">
+                    {errors.general && (
+                        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                            {errors.general}
+                        </div>
+                    )}
                     <p className="text-gray-600 dark:text-gray-400">
                         {t('selectPaymentMethodForRenewal') || 'Select a payment method to renew your subscription'}
                     </p>
                     <PaymentGatewaySelector
                         selectedGateway={selectedGateway}
-                        onSelect={setSelectedGateway}
+                        onSelect={(id) => {
+                            setSelectedGateway(id);
+                            clearFieldError(setErrors, 'gateway');
+                        }}
                     />
+                    {errors.gateway && (
+                        <p className="text-sm text-red-600 dark:text-red-400">{errors.gateway}</p>
+                    )}
                     <div className="flex justify-end gap-4 pt-4">
                         <Button
                             variant="outline"
                             onClick={() => {
                                 setShowRenewalModal(false);
                                 setSelectedGateway(null);
+                                clearFieldError(setErrors, 'gateway');
                             }}
                         >
                             {t('cancel') || 'Cancel'}

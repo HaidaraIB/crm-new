@@ -3,7 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
 import { getMessageLogsAPI, type MessageLogEntry, type MessageLogFilters } from '../../services/api';
 import { IntegrationPlatformIcon } from '../integrations/IntegrationPlatformIcon';
-import { Button, Card, Loader, SectionLoadingState } from '../index';
+import { Button, Card, Loader, SectionLoadingState, PhoneText } from '../index';
 import { SearchIcon, ClockIcon } from '../icons';
 import { getCompanyViewLeadRoute } from '../../utils/routing';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
@@ -126,9 +126,9 @@ function MessageLogTimelineItem({
                         <span className="text-gray-500 dark:text-gray-400">{t('messageLogUnknownLead')}</span>
                     )}
                     {entry.phone_number && (
-                        <span className="text-gray-500 dark:text-gray-400 text-xs" dir="ltr">
+                        <PhoneText className="text-gray-500 dark:text-gray-400 text-xs">
                             {entry.phone_number}
-                        </span>
+                        </PhoneText>
                     )}
                 </div>
 

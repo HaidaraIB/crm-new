@@ -110,6 +110,8 @@ export interface User {
   username?: string;
   password?: string;
   company?: Company;
+  /** Present on some API payloads when company is not nested */
+  company_id?: number;
   emailVerified?: boolean;
   /** Set when role is supervisor (from /users/me/ or login) */
   supervisor_permissions?: SupervisorPermissionPayload | null;
@@ -288,8 +290,10 @@ export interface Deal {
   salesCommissionPercentage?: number;
   salesCommissionAmount?: number;
   description?: string;
-  unit?: number | string; // For real estate deals - can be ID (number) or code (string) from API
-  project?: number | string; // For real estate deals - can be ID (number) or name (string) from API
+  /** Real estate: unit id, code, or nested object from API */
+  unit?: number | string | { id: number; code?: string; name?: string } | null;
+  /** Real estate: project id, name, or nested object from API */
+  project?: number | string | { id: number; name?: string } | null;
   unit_code?: string; // Read-only field from API serializer
   project_name?: string; // Read-only field from API serializer
   createdAt?: string;
@@ -471,7 +475,8 @@ export interface Project {
   id: number;
   code: string;
   name: string;
-  developer: string;
+  /** Developer id, name, or nested object from API */
+  developer: string | number | { id: number; name?: string } | null;
   type: string;
   city: string;
   paymentMethod: string;
@@ -480,7 +485,10 @@ export interface Project {
 export interface Unit {
   id: number;
   code: string;
-  project: string;
+  /** Optional display name when API provides it */
+  name?: string;
+  /** Project id, name, or nested object from API */
+  project: string | number | { id: number; name?: string } | null;
   bedrooms: number;
   price: number;
   bathrooms: number;
@@ -513,7 +521,8 @@ export interface Service {
   price: number;
   duration: string; // e.g., "1 hour", "30 minutes"
   category: string;
-  provider?: string;
+  /** Provider id or name from API */
+  provider?: string | number;
   isActive: boolean;
 }
 
@@ -547,8 +556,10 @@ export interface Product {
   price: number;
   cost: number;
   stock: number;
-  category: string;
-  supplier?: string;
+  /** Category id or name from API */
+  category: string | number;
+  /** Supplier id or name from API */
+  supplier?: string | number;
   sku?: string;
   image?: string;
   isActive: boolean;
@@ -581,6 +592,7 @@ export interface Channel {
     type: string;
     priority: 'High' | 'Medium' | 'Low';
     isDefault?: boolean;
+    is_default?: boolean;
 }
 
 export interface Stage {
@@ -600,6 +612,7 @@ export interface Status {
     category: 'Active' | 'Inactive' | 'Follow Up' | 'Closed';
     color: string;
     isDefault?: boolean;
+    is_default?: boolean;
     isHidden?: boolean;
     /** Hours in this status before scheduled hard-delete; null/undefined = disabled */
     auto_delete_after_hours?: number | null;

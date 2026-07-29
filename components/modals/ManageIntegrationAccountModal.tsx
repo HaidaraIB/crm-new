@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { Page } from '../../types';
 import { useCreateConnectedAccount, useUpdateConnectedAccount, useConnectedAccounts } from '../../hooks/useQueries';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -46,10 +47,18 @@ const getIntegrationPlatformApiParam = (currentPage: Page): string | undefined =
     }
 };
 
-const getIntegrationModalTitleKey = (platformName: string, isEditMode: boolean): string => {
-    const base = platformName === 'Meta' ? 'Meta' : 'WhatsApp';
-    return isEditMode ? `edit${base}Account` : `addNew${base}Account`;
-}
+type IntegrationModalTitleKey =
+    | 'editMetaAccount'
+    | 'addNewMetaAccount'
+    | 'editWhatsAppAccount'
+    | 'addNewWhatsAppAccount';
+
+const getIntegrationModalTitleKey = (platformName: string, isEditMode: boolean): IntegrationModalTitleKey => {
+    if (platformName === 'Meta') {
+        return isEditMode ? 'editMetaAccount' : 'addNewMetaAccount';
+    }
+    return isEditMode ? 'editWhatsAppAccount' : 'addNewWhatsAppAccount';
+};
 
 export const ManageIntegrationAccountModal = () => {
     const { 
@@ -64,6 +73,7 @@ export const ManageIntegrationAccountModal = () => {
     } = useAppContext();
 
     const [accountName, setAccountName] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // React Query mutations
     const createAccountMutation = useCreateConnectedAccount();
@@ -93,11 +103,13 @@ export const ManageIntegrationAccountModal = () => {
         } else {
             setAccountName('');
         }
+        setErrors({});
     }, [editingAccount, isManageIntegrationAccountModalOpen]);
 
     const handleClose = () => {
         setIsManageIntegrationAccountModalOpen(false);
         setEditingAccount(null); // Clear editing state on close
+        setErrors({});
     };
 
     const handleSubmit = async () => {
@@ -105,9 +117,10 @@ export const ManageIntegrationAccountModal = () => {
             return;
         }
         if (!accountName.trim()) {
-            alert(t('accountNameRequired'));
+            setErrors({ accountName: t('accountNameRequired') || 'Account name is required' });
             return;
         }
+        setErrors({});
 
         try {
             if (isEditMode && editingAccount) {
@@ -133,10 +146,15 @@ export const ManageIntegrationAccountModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error saving account:', error);
-            alert(error?.message || t('errorSavingAccount'));
+            setErrors({ general: error?.message || t('errorSavingAccount') || 'Failed to save account. Please try again.' });
         }
     };
-    
+
+    const handleAccountNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        setAccountName(e.target.value);
+        clearFieldError(setErrors, 'accountName');
+    };
+
     const renderPlatformFields = () => {
         switch (platformName) {
             case 'Meta':
@@ -144,7 +162,16 @@ export const ManageIntegrationAccountModal = () => {
                 return (
                     <div>
                         <Label htmlFor="account-name">{t('accountName')}</Label>
-                        <Input id="account-name" placeholder={t('enterAccountName')} value={accountName} onChange={e => setAccountName(e.target.value)} />
+                        <Input
+                            id="account-name"
+                            placeholder={t('enterAccountName')}
+                            value={accountName}
+                            onChange={handleAccountNameChange}
+                            className={errors.accountName ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.accountName && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accountName}</p>
+                        )}
                     </div>
                 );
             case 'WhatsApp':
@@ -152,7 +179,16 @@ export const ManageIntegrationAccountModal = () => {
                 return (
                     <div>
                         <Label htmlFor="account-name">{t('accountName')}</Label>
-                        <Input id="account-name" placeholder={t('egSalesWhatsapp')} value={accountName} onChange={e => setAccountName(e.target.value)} />
+                        <Input
+                            id="account-name"
+                            placeholder={t('egSalesWhatsapp')}
+                            value={accountName}
+                            onChange={handleAccountNameChange}
+                            className={errors.accountName ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.accountName && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accountName}</p>
+                        )}
                     </div>
                 );
             default:
@@ -167,6 +203,11 @@ export const ManageIntegrationAccountModal = () => {
             title={t(modalTitleKey)}
         >
             <div className="space-y-4">
+                {errors.general && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                        {errors.general}
+                    </div>
+                )}
                 {cannotAddSecond && (
                     <p className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">
                         {t('oneIntegrationAccountLimitModal')}

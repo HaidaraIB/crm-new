@@ -18,6 +18,7 @@ import { EditIcon, EyeIcon, EyeOffIcon, TrashIcon } from '../icons';
 import { formatDateTimeToLocal } from '../../utils/dateUtils';
 import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
 import { resolveIntegrationPolicyMessage } from '../../utils/integrationPolicyMessage';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 type IntegrationPolicyEntry = { enabled: boolean; message: string; scope: string };
 
@@ -57,7 +58,7 @@ export function PbxSettingsForm({
   const pbxPolicyDisabled = integrationPolicyMap?.pbx?.enabled === false;
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [success, setSuccess] = useState(false);
   const [settings, setSettings] = useState<PbxSettingsResponse | null>(null);
   const [pbxHost, setPbxHost] = useState('');
@@ -134,15 +135,25 @@ export function PbxSettingsForm({
         setStunServer(data.stun_server || '');
         setTurnServer(data.turn_server || '');
       })
-      .catch(() => { if (!cancelled) setError(t('failedToLoadPbxSettings')); })
+      .catch(() => { if (!cancelled) setErrors({ general: t('failedToLoadPbxSettings') }); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [t]);
 
   const handleSave = () => {
     if (pbxPolicyDisabled) return;
+    const nextErrors: Record<string, string> = {};
+    if (!pbxHost.trim()) nextErrors.pbxHost = t('pbxHostRequired') || 'PBX host is required';
+    if (!amiUsername.trim()) nextErrors.amiUsername = t('amiUsernameRequired') || 'AMI username is required';
+    if (!amiPassword && !settings?.ami_password_masked) {
+      nextErrors.amiPassword = t('amiPasswordRequired') || 'AMI password is required';
+    }
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
     setSaving(true);
-    setError(null);
+    setErrors({});
     setSuccess(false);
     const payload: Parameters<typeof updatePbxSettingsAPI>[0] = {
       pbx_host: pbxHost,
@@ -166,7 +177,7 @@ export function PbxSettingsForm({
         setAmiPassword('');
         refetchHealth();
       })
-      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToSavePbxSettings')))
+      .catch((e: any) => setErrors({ general: getLocalizedApiErrorMessage(e, t, 'failedToSavePbxSettings') }))
       .finally(() => setSaving(false));
   };
 
@@ -175,13 +186,13 @@ export function PbxSettingsForm({
       .then(() => queryClient.invalidateQueries({ queryKey: ['pbxSettings'] }))
       .then(() => getPbxSettingsAPI())
       .then(setSettings)
-      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToRotateConnectorKey')));
+      .catch((e: any) => setErrors({ general: getLocalizedApiErrorMessage(e, t, 'failedToRotateConnectorKey') }));
   };
 
   const handleAddExtension = () => {
     if (!extUserId || !extNumber) return;
     setAddingExtension(true);
-    setError(null);
+    setErrors({});
     savePbxExtensionAPI({
       user_id: parseInt(extUserId, 10),
       extension: extNumber.trim(),
@@ -195,7 +206,7 @@ export function PbxSettingsForm({
         refetchExtensions();
         refetchHealth();
       })
-      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension')))
+      .catch((e: any) => setErrors({ general: getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension') }))
       .finally(() => setAddingExtension(false));
   };
 
@@ -220,13 +231,13 @@ export function PbxSettingsForm({
     setEditSipPassword('');
     setEditSoftphoneEnabled(row.softphone_enabled !== false);
     setShowEditSipPassword(false);
-    setError(null);
+    setErrors({});
   };
 
   const handleSaveExtensionEdit = () => {
     if (editingExtensionId == null || !editUserId || !editNumber.trim()) return;
     setSavingExtensionEdit(true);
-    setError(null);
+    setErrors({});
     updatePbxExtensionAPI(editingExtensionId, {
       user_id: parseInt(editUserId, 10),
       extension: editNumber.trim(),
@@ -238,26 +249,26 @@ export function PbxSettingsForm({
         refetchExtensions();
         refetchHealth();
       })
-      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension')))
+      .catch((e: any) => setErrors({ general: getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension') }))
       .finally(() => setSavingExtensionEdit(false));
   };
 
   const handleDeleteExtension = (id: number) => {
     if (editingExtensionId === id) cancelEditExtension();
     setExtensionBusyId(id);
-    setError(null);
+    setErrors({});
     deletePbxExtensionAPI(id)
       .then(() => {
         refetchExtensions();
         refetchHealth();
       })
-      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension')))
+      .catch((e: any) => setErrors({ general: getLocalizedApiErrorMessage(e, t, 'failedToSavePbxExtension') }))
       .finally(() => setExtensionBusyId(null));
   };
 
   const handleRefreshHealth = async () => {
     setHealthRefreshNotice(null);
-    setError(null);
+    setErrors({});
     try {
       await Promise.all([
         refetchHealth(),
@@ -268,7 +279,7 @@ export function PbxSettingsForm({
       window.setTimeout(() => setHealthRefreshNotice(null), 3500);
     } catch {
       setHealthRefreshNotice('error');
-      setError(t('failedToLoadPbxSettings'));
+      setErrors({ general: t('failedToLoadPbxSettings') });
     }
   };
 
@@ -276,9 +287,9 @@ export function PbxSettingsForm({
 
   const handleDownloadConnector = () => {
     setDownloading(true);
-    setError(null);
+    setErrors({});
     downloadPbxConnectorPackageAPI()
-      .catch((e: any) => setError(getLocalizedApiErrorMessage(e, t, 'failedToLoadPbxSettings')))
+      .catch((e: any) => setErrors({ general: getLocalizedApiErrorMessage(e, t, 'failedToLoadPbxSettings') }))
       .finally(() => setDownloading(false));
   };
 
@@ -328,9 +339,14 @@ export function PbxSettingsForm({
           <FieldLabel>{t('pbxHost')}</FieldLabel>
           <Input
             value={pbxHost}
-            onChange={(e) => setPbxHost(e.target.value)}
+            onChange={(e) => {
+              setPbxHost(e.target.value);
+              clearFieldError(setErrors, 'pbxHost');
+            }}
             placeholder={t('pbxHostPlaceholder')}
+            className={errors.pbxHost ? 'border-red-500 dark:border-red-500' : ''}
           />
+          {errors.pbxHost && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.pbxHost}</p>}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -340,7 +356,16 @@ export function PbxSettingsForm({
           </div>
           <div>
             <FieldLabel>{t('amiUsername')}</FieldLabel>
-            <Input value={amiUsername} onChange={(e) => setAmiUsername(e.target.value)} autoComplete="off" />
+            <Input
+              value={amiUsername}
+              onChange={(e) => {
+                setAmiUsername(e.target.value);
+                clearFieldError(setErrors, 'amiUsername');
+              }}
+              autoComplete="off"
+              className={errors.amiUsername ? 'border-red-500 dark:border-red-500' : ''}
+            />
+            {errors.amiUsername && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.amiUsername}</p>}
           </div>
         </div>
 
@@ -350,10 +375,13 @@ export function PbxSettingsForm({
             <input
               type={showAmiPassword ? 'text' : 'password'}
               value={amiPassword}
-              onChange={(e) => setAmiPassword(e.target.value)}
+              onChange={(e) => {
+                setAmiPassword(e.target.value);
+                clearFieldError(setErrors, 'amiPassword');
+              }}
               placeholder={settings?.ami_password_masked ? '••••••••' : t('amiPasswordPlaceholder')}
               autoComplete="new-password"
-              className={`flex-1 ${inputClass}`}
+              className={`flex-1 ${inputClass} ${errors.amiPassword ? 'border-red-500 dark:border-red-500' : ''}`}
             />
             <button
               type="button"
@@ -364,6 +392,7 @@ export function PbxSettingsForm({
               {showAmiPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
             </button>
           </div>
+          {errors.amiPassword && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.amiPassword}</p>}
         </div>
 
         <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
@@ -409,7 +438,7 @@ export function PbxSettingsForm({
           </div>
         ) : null}
 
-        {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+        {errors.general ? <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p> : null}
         {success ? <p className="text-sm text-green-600 dark:text-green-400">{t('savedSuccessfully')}</p> : null}
         <Button onClick={handleSave} disabled={saving || pbxPolicyDisabled}>
           {saving ? t('saving') : t('save')}

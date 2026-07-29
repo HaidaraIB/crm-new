@@ -8,6 +8,7 @@ import { useCurrentUser, queryKeys } from '../../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { IANA_TIMEZONE_GROUPS, allListedIanaZones, type TimezoneGroup } from '../../utils/ianaTimezones';
 import type { AutoAssignAlgorithm } from '../../types';
+import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -28,7 +29,7 @@ export const LeadAssignmentSettings = () => {
     const [reAssignHours, setReAssignHours] = useState(24);
     const [businessTimezone, setBusinessTimezone] = useState('UTC');
     const [isSaving, setIsSaving] = useState(false);
-    const [saveError, setSaveError] = useState<string>('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Load settings from company data
     useEffect(() => {
@@ -54,14 +55,35 @@ export const LeadAssignmentSettings = () => {
         return [...extra, ...IANA_TIMEZONE_GROUPS];
     }, [businessTimezone, t]);
 
+    const validateForm = (): boolean => {
+        const newErrors: Record<string, string> = {};
+
+        if (reAssignEnabled && (!Number.isFinite(reAssignHours) || reAssignHours < 1)) {
+            newErrors.reAssignHours = t('invalidReminderDelayTime') || 'Please enter a valid number of hours (1 or more)';
+        }
+
+        setErrors(newErrors);
+        if (Object.keys(newErrors).length > 0) {
+            requestAnimationFrame(() =>
+                scrollToFirstFieldError(newErrors, { reAssignHours: 're-assign-hours' })
+            );
+            return false;
+        }
+        return true;
+    };
+
     const handleSave = async () => {
         if (!company?.id) {
-            setSaveError(t('companyNotFound') || 'Company not found');
+            setErrors({ general: t('companyNotFound') || 'Company not found' });
+            return;
+        }
+
+        if (!validateForm()) {
             return;
         }
 
         setIsSaving(true);
-        setSaveError('');
+        setErrors({});
 
         try {
             await updateCompanyAssignmentSettingsAPI(company.id, {
@@ -80,7 +102,7 @@ export const LeadAssignmentSettings = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating assignment settings:', error);
-            setSaveError(error?.message || t('errorSavingSettings') || 'Failed to save settings. Please try again.');
+            setErrors({ general: error?.message || t('errorSavingSettings') || 'Failed to save settings. Please try again.' });
         } finally {
             setIsSaving(false);
         }
@@ -199,13 +221,23 @@ export const LeadAssignmentSettings = () => {
                                             } else if (e.target.value === '') {
                                                 setReAssignHours(1);
                                             }
+                                            if (errors.reAssignHours) {
+                                                setErrors((prev) => {
+                                                    const next = { ...prev };
+                                                    delete next.reAssignHours;
+                                                    return next;
+                                                });
+                                            }
                                         }}
-                                        className="w-32"
+                                        className={`w-32 ${errors.reAssignHours ? 'border-red-500' : ''}`}
                                     />
                                     <span className="text-sm text-gray-500 dark:text-gray-400">
                                         {t('hours') || 'ساعة'}
                                     </span>
                                 </div>
+                                {errors.reAssignHours && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.reAssignHours}</p>
+                                )}
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {t('reminderDelayTimeDesc')}
                                 </p>
@@ -237,9 +269,9 @@ export const LeadAssignmentSettings = () => {
                         </p>
                     </div>
 
-                    {saveError && (
+                    {errors.general && (
                         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                            {saveError}
+                            {errors.general}
                         </div>
                     )}
 

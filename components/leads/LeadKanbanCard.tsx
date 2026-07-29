@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { MarqueeText } from '../MarqueeText';
 import { FacebookIcon, PhoneIcon, SmsIcon, TikTokIcon, WhatsappIcon } from '../icons';
+import { PhoneText } from '../PhoneText';
 import type { Lead } from '../../types';
 import { resolvePrimaryPhone } from '../../utils/resolvePrimaryPhone';
 
@@ -152,14 +153,13 @@ export const LeadKanbanCard = ({
             {phone ? (
                 <div
                     className="mt-2 flex items-center gap-1.5 min-w-0"
-                    dir="ltr"
                     onClick={stopCardGesture}
                     onPointerDown={stopCardGesture}
                     onKeyDown={stopCardGesture}
                 >
-                    <p className="min-w-0 flex-1 truncate text-xs text-gray-700 dark:text-gray-300 tabular-nums">
+                    <PhoneText as="p" className="min-w-0 flex-1 truncate text-xs text-gray-700 dark:text-gray-300">
                         {phone}
-                    </p>
+                    </PhoneText>
                     {showPhoneActions ? (
                         <div
                             className="inline-flex shrink-0 items-center gap-0.5"

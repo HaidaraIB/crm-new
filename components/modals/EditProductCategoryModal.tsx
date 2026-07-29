@@ -32,7 +32,7 @@ export const EditProductCategoryModal = () => {
     
     // Fetch product categories using React Query
     const { data: categoriesResponse } = useProductCategories();
-    const productCategories = Array.isArray(categoriesResponse) 
+    const productCategories: ProductCategory[] = Array.isArray(categoriesResponse) 
         ? categoriesResponse 
         : (categoriesResponse?.results || []);
     

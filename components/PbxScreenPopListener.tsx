@@ -5,6 +5,7 @@ import { getNotificationsAPI, getPbxSettingsAPI, markNotificationReadAPI, type A
 import { getNotificationDisplay } from '../utils/notificationDisplay';
 import { Button } from './Button';
 import { PhoneIcon } from './icons';
+import { PhoneText } from './PhoneText';
 
 const AUTO_DISMISS_MS = 45_000;
 const PBX_POP_TYPES = new Set(['pbx_incoming_call', 'pbx_call_missed']);
@@ -220,9 +221,9 @@ export const PbxScreenPopListener = () => {
               <p className="mt-0.5 text-sm text-gray-600 dark:text-gray-300">{body}</p>
             ) : null}
             {(phone || display.title !== title) ? (
-              <p className="mt-1 font-mono text-base text-gray-900 dark:text-gray-100" dir="ltr">
+              <PhoneText as="p" className="mt-1 font-mono text-base text-gray-900 dark:text-gray-100">
                 {phone || display.title}
-              </p>
+              </PhoneText>
             ) : null}
             <div className="mt-3 flex flex-wrap gap-2">
               <Button variant="secondary" className="h-8 px-3 text-xs" onClick={dismiss}>

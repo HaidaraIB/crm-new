@@ -7,7 +7,7 @@ import { useDeleteUser } from '../../hooks/useQueries';
 import { normalizeRole } from '../../utils/roles';
 
 // Helper function to get user display name
-const getUserDisplayName = (user: any, t?: (key: string) => string): string => {
+const getUserDisplayName = (user: any, t?: (key: any) => string): string => {
     if (user.name) return user.name;
     if (user.first_name || user.last_name) {
         return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();

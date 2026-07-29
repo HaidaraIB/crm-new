@@ -9,6 +9,16 @@ import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import { useUpdateUser } from '../../hooks/useQueries';
 import { normalizeRoleForApi } from '../../utils/roles';
+import { validateEmailField, validatePhoneField, validatePasswordField, validateNameField } from '../../utils/formValidation';
+import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+
+const EDIT_USER_DOM_ID_MAP: Record<string, string> = {
+    name: 'edit-user-name',
+    phone: 'edit-user-phone',
+    email: 'edit-user-email',
+    password: 'edit-user-password',
+    role: 'edit-user-role',
+};
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -96,63 +106,28 @@ export const EditUserModal = () => {
         }
     }, [selectedUser, isEditUserModalOpen, isMedicalCompany]);
 
-    const validatePhone = (phone: string): string | null => {
-        if (!phone.trim()) {
-            return t('phoneRequired') || 'Phone is required';
-        }
-        
-        // Phone should start with + (dial code)
-        if (!phone.startsWith('+')) {
-            return t('invalidPhoneFormat') || 'Phone number must include country code (e.g., +964...)';
-        }
-        
-        // Remove + and check if remaining digits are valid (at least 7 digits for phone number)
-        const digitsOnly = phone.replace(/\D/g, '');
-        if (digitsOnly.length < 8) {
-            return t('invalidPhoneLength') || 'Phone number is too short';
-        }
-        
-        if (digitsOnly.length > 15) {
-            return t('invalidPhoneLength') || 'Phone number is too long';
-        }
-        
-        return null;
-    };
-
     const validateForm = (): boolean => {
         const newErrors: Record<string, string> = {};
-        
-        // Name validation
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        } else if (formState.name.trim().length < 2) {
-            newErrors.name = t('nameMinLength') || 'Name must be at least 2 characters';
-        }
-        
-        // Email validation
-        if (!formState.email.trim()) {
-            newErrors.email = t('emailRequired') || 'Email is required';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email.trim())) {
-            newErrors.email = t('invalidEmail') || 'Invalid email format';
-        }
-        
-        // Phone validation
-        const phoneError = validatePhone(formState.phone);
-        if (phoneError) {
-            newErrors.phone = phoneError;
-        }
-        
-        // Password validation (only if provided)
-        if (formState.password.trim()) {
-            if (formState.password.length < 8) {
-                newErrors.password = t('passwordMinLength') || 'Password must be at least 8 characters';
-            } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(formState.password)) {
-                newErrors.password = t('passwordComplexity') || 'Password must contain at least one letter and one number';
-            }
-        }
-        
+
+        const nameError = validateNameField(formState.name, t, { minLength: 2 });
+        if (nameError) newErrors.name = nameError;
+
+        const emailError = validateEmailField(formState.email, t);
+        if (emailError) newErrors.email = emailError;
+
+        const phoneError = validatePhoneField(formState.phone, t);
+        if (phoneError) newErrors.phone = phoneError;
+
+        // Password is optional on edit - only validate if provided
+        const passwordError = validatePasswordField(formState.password, t, { required: false });
+        if (passwordError) newErrors.password = passwordError;
+
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        if (Object.keys(newErrors).length > 0) {
+            scrollToFirstFieldError(newErrors, EDIT_USER_DOM_ID_MAP);
+            return false;
+        }
+        return true;
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppContext } from '../../context/AppContext';
-import { Modal, Button, TableHorizontalScroll } from '../index';
+import { Modal, Button, TableHorizontalScroll, PhoneText } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUsers, useStatuses, useChannels, useCampaigns, useDevelopers, useProjects, useUnits } from '../../hooks/useQueries';
 import { createLeadAPI } from '../../services/api';
@@ -9,9 +9,11 @@ import { getUserDisplayName } from '../../types';
 import { buildLeadAssigneePickerOptions } from '../../utils/roles';
 import { formatLeadBudget } from '../../utils/budgetRange';
 import { ChevronDownIcon } from '../icons';
+import { translations } from '../../constants';
 import ExcelJS from 'exceljs';
 
 type ImportStep = 'upload' | 'match' | 'preview' | 'importing' | 'done';
+type TranslationKey = keyof typeof translations.en;
 
 export type LeadImportFieldKey =
   | 'name'
@@ -32,7 +34,7 @@ export type LeadImportFieldKey =
   | 'interestedUnit'
   | '';
 
-const SYSTEM_FIELDS: { value: LeadImportFieldKey; labelKey: string }[] = [
+const SYSTEM_FIELDS: { value: LeadImportFieldKey; labelKey: TranslationKey }[] = [
   { value: '', labelKey: 'importLeadsChooseField' },
   { value: 'name', labelKey: 'name' },
   { value: 'phone', labelKey: 'phone' },
@@ -1192,7 +1194,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
                       <td className="px-2 py-1.5 text-gray-500">{idx + 1}</td>
                       <td className="px-2 py-1.5">{row.name}</td>
-                      <td className="px-2 py-1.5">{row.phone}</td>
+                      <td className="px-2 py-1.5"><PhoneText>{row.phone}</PhoneText></td>
                       <td className="px-2 py-1.5">{formatLeadBudget(row as any) || '-'}</td>
                       <td className="px-2 py-1.5">{row.type}</td>
                       <td className="px-2 py-1.5">{row.priority}</td>

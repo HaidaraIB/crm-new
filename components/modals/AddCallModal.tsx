@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { CallMethod } from '../../pages/settings/CallMethodsSettings';
 import { useCreateClientCall, useCallMethods } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -16,7 +17,7 @@ export const AddCallModal = () => {
     // Fetch call methods using React Query
     const { data: callMethodsData } = useCallMethods();
     // Handle both array response and object with results property
-    const callMethods = Array.isArray(callMethodsData) 
+    const callMethods: CallMethod[] = Array.isArray(callMethodsData) 
         ? callMethodsData 
         : (callMethodsData?.results || []);
 
@@ -27,7 +28,7 @@ export const AddCallModal = () => {
     // Get default call method (current default from settings, or first)
     const getDefaultCallMethod = () => {
         if (callMethods.length === 0) return '';
-        const defaultCm = callMethods.find((c: { isDefault?: boolean; is_default?: boolean }) => c.isDefault ?? c.is_default) ?? callMethods[0];
+        const defaultCm = callMethods.find(c => c.isDefault ?? c.is_default) ?? callMethods[0];
         return defaultCm.name;
     };
     

@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
+import { ServiceProvider } from '../../types';
 import { useAddService, useServiceProviders } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -26,7 +27,7 @@ export const AddServiceModal = () => {
     
     // Fetch service providers using React Query
     const { data: providersResponse } = useServiceProviders();
-    const serviceProviders = Array.isArray(providersResponse) 
+    const serviceProviders: ServiceProvider[] = Array.isArray(providersResponse) 
         ? providersResponse 
         : (providersResponse?.results || []);
 

@@ -56,6 +56,7 @@ export const BillingPage = () => {
     const [selectedGateway, setSelectedGateway] = useState<number | null>(null);
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
     const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
+    const [formErrors, setFormErrors] = useState<Record<string, string>>({});
     const [availablePlans, setAvailablePlans] = useState<any[]>([]);
     const [plansLoading, setPlansLoading] = useState(false);
     const [freeTrialConsumed, setFreeTrialConsumed] = useState(false);
@@ -273,8 +274,9 @@ export const BillingPage = () => {
     };
 
     const handleRenewSubscription = async () => {
+        setFormErrors({});
         if (!subscriptionInfo || !subscriptionInfo.id) {
-            alert(t('subscriptionNotFound') || 'Subscription not found');
+            setFormErrors({ general: t('subscriptionNotFound') || 'Subscription not found' });
             return;
         }
 
@@ -283,12 +285,12 @@ export const BillingPage = () => {
         const currentPy = Number(subscriptionInfo.plan?.price_yearly ?? 0);
         const isCurrentFreeOrTrial = currentPm <= 0 && currentPy <= 0;
         if (isCurrentFreeOrTrial) {
-            alert(t('freeTrialNoRenewal') || 'Free/trial plans do not require renewal.');
+            setFormErrors({ general: t('freeTrialNoRenewal') || 'Free/trial plans do not require renewal.' });
             return;
         }
 
         if (!selectedGateway) {
-            alert(t('paymentGatewayRequired') || 'Please select a payment method');
+            setFormErrors({ gateway: t('paymentGatewayRequired') || 'Please select a payment method' });
             return;
         }
 
@@ -319,36 +321,40 @@ export const BillingPage = () => {
                 });
                 routeToFibPaymentPage(subscriptionInfo.id, response);
             } else {
-                alert(t('paymentRedirectError') || 'Failed to get payment URL');
+                setFormErrors({ general: t('paymentRedirectError') || 'Failed to get payment URL' });
             }
         } catch (error: any) {
             console.error('Error renewing subscription:', error);
-            alert(error?.message || t('errorRenewingSubscription') || 'Error renewing subscription');
+            setFormErrors({
+                general: error?.message || t('errorRenewingSubscription') || 'Error renewing subscription',
+            });
         } finally {
             setIsRenewing(false);
-            setShowRenewalModal(false);
         }
     };
 
     const handleChangePlan = async () => {
+        setFormErrors({});
         if (!subscriptionInfo || !subscriptionInfo.id) {
-            alert(t('subscriptionNotFound') || 'Subscription not found');
+            setFormErrors({ general: t('subscriptionNotFound') || 'Subscription not found' });
             return;
         }
 
         if (!selectedPlan) {
-            alert(t('planRequired') || 'Please select a plan to continue');
+            setFormErrors({ plan: t('planRequired') || 'Please select a plan to continue' });
             return;
         }
 
         if (currentPlanId != null && selectedPlan === currentPlanId) {
-            alert(t('alreadyOnCurrentPlan') || 'This is already your current plan. Choose a different plan.');
+            setFormErrors({
+                plan: t('alreadyOnCurrentPlan') || 'This is already your current plan. Choose a different plan.',
+            });
             return;
         }
 
         const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
         if (freeTrialConsumed && selectedPlanObj && isFreeTrialPlan(selectedPlanObj)) {
-            alert(t('trialUnavailable') || 'Trial already used');
+            setFormErrors({ plan: t('trialUnavailable') || 'Trial already used' });
             return;
         }
 
@@ -383,13 +389,15 @@ export const BillingPage = () => {
                             .replace('{date}', endLabel),
                         'info',
                     );
+                    setShowChangePlanModal(false);
                 } else {
                     setSuccessMessage(t('planChangeSuccess') || 'Your plan has been updated.');
                     setIsSuccessModalOpen(true);
+                    setShowChangePlanModal(false);
                 }
             } else {
                 if (!selectedGateway) {
-                    alert(t('paymentGatewayRequired') || 'Please select a payment method');
+                    setFormErrors({ gateway: t('paymentGatewayRequired') || 'Please select a payment method' });
                     return;
                 }
                 hydratePaymentAccessToken();
@@ -414,15 +422,18 @@ export const BillingPage = () => {
                     });
                     routeToFibPaymentPage(subscriptionInfo.id, response);
                 } else {
-                    alert(t('paymentRedirectError') || 'Failed to get payment URL');
+                    setFormErrors({ general: t('paymentRedirectError') || 'Failed to get payment URL' });
+                    return;
                 }
             }
         } catch (error: any) {
             console.error('Error changing plan:', error);
-            alert(error?.message || t('errorLoadingPaymentLink') || 'Error loading payment link');
+            setFormErrors({
+                general: error?.message || t('errorLoadingPaymentLink') || 'Error loading payment link',
+            });
+            return;
         } finally {
             setIsRenewing(false);
-            setShowChangePlanModal(false);
         }
     };
 
@@ -856,24 +867,42 @@ export const BillingPage = () => {
                 onClose={() => {
                     setShowRenewalModal(false);
                     setSelectedGateway(null);
+                    setFormErrors({});
                 }}
                 title={t('renewSubscription') || 'Renew Subscription'}
                 maxWidth="lg"
             >
                 <div className="space-y-4">
+                    {formErrors.general && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                            {formErrors.general}
+                        </div>
+                    )}
                     <p className="text-gray-600 dark:text-gray-400">
                         {t('selectPaymentMethodForRenewal') || 'Select a payment method to renew your subscription'}
                     </p>
                     <PaymentGatewaySelector
                         selectedGateway={selectedGateway}
-                        onSelect={setSelectedGateway}
+                        onSelect={(id) => {
+                            setSelectedGateway(id);
+                            setFormErrors((prev) => {
+                                const next = { ...prev };
+                                delete next.gateway;
+                                delete next.general;
+                                return next;
+                            });
+                        }}
                     />
+                    {formErrors.gateway && (
+                        <p className="text-sm text-red-600 dark:text-red-400">{formErrors.gateway}</p>
+                    )}
                     <div className="flex justify-end gap-4 pt-4">
                         <Button
                             variant="outline"
                             onClick={() => {
                                 setShowRenewalModal(false);
                                 setSelectedGateway(null);
+                                setFormErrors({});
                             }}
                         >
                             {t('cancel') || 'Cancel'}
@@ -892,11 +921,22 @@ export const BillingPage = () => {
             {/* Change Plan Modal */}
             <Modal
                 isOpen={showChangePlanModal}
-                onClose={() => setShowChangePlanModal(false)}
+                onClose={() => {
+                    setShowChangePlanModal(false);
+                    setFormErrors({});
+                }}
                 title={t('changePlan') || 'Change Plan'}
                 maxWidth="2xl"
             >
                 <div className="space-y-6">
+                    {formErrors.general && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                            {formErrors.general}
+                        </div>
+                    )}
+                    {formErrors.plan && (
+                        <p className="text-sm text-red-600 dark:text-red-400">{formErrors.plan}</p>
+                    )}
                     {(() => {
                         const selectedPlanObj = availablePlans.find((p: any) => p.id === selectedPlan);
                         const isSelectedFreeOrTrial = Number(selectedPlanObj?.price_monthly ?? 0) <= 0 && Number(selectedPlanObj?.price_yearly ?? 0) <= 0;
@@ -956,12 +996,24 @@ export const BillingPage = () => {
                                         onClick={() => {
                                             if (isLocked) return;
                                             setSelectedPlan(plan.id);
+                                            setFormErrors((prev) => {
+                                                const next = { ...prev };
+                                                delete next.plan;
+                                                delete next.general;
+                                                return next;
+                                            });
                                         }}
                                         onKeyDown={(e) => {
                                             if (isLocked) return;
                                             if (e.key === 'Enter' || e.key === ' ') {
                                                 e.preventDefault();
                                                 setSelectedPlan(plan.id);
+                                                setFormErrors((prev) => {
+                                                    const next = { ...prev };
+                                                    delete next.plan;
+                                                    delete next.general;
+                                                    return next;
+                                                });
                                             }
                                         }}
                                         className={`p-4 border-2 rounded-lg transition-all ${
@@ -1045,10 +1097,23 @@ export const BillingPage = () => {
                         return (
                             <>
                                 {!isSelectedFreeOrTrial ? (
+                                    <>
                                     <PaymentGatewaySelector
                                         selectedGateway={selectedGateway}
-                                        onSelect={setSelectedGateway}
+                                        onSelect={(id) => {
+                                            setSelectedGateway(id);
+                                            setFormErrors((prev) => {
+                                                const next = { ...prev };
+                                                delete next.gateway;
+                                                delete next.general;
+                                                return next;
+                                            });
+                                        }}
                                     />
+                                    {formErrors.gateway && (
+                                        <p className="mt-2 text-sm text-red-600 dark:text-red-400">{formErrors.gateway}</p>
+                                    )}
+                                    </>
                                 ) : null}
                                 {isSelectedFreeOrTrial && isCurrentPaid && selectedPlan != null && (
                                     <p className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-950/40 border border-amber-500/30 rounded-lg px-3 py-2">

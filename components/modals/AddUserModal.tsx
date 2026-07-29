@@ -8,6 +8,23 @@ import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import { useCreateUser } from '../../hooks/useQueries';
+import {
+    validateEmailField,
+    validatePhoneField,
+    validatePasswordField,
+    validateUsernameField,
+    validateNameField,
+} from '../../utils/formValidation';
+import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+
+const ADD_USER_DOM_ID_MAP: Record<string, string> = {
+    name: 'add-user-name',
+    username: 'add-user-username',
+    email: 'add-user-email',
+    password: 'add-user-password',
+    phone: 'add-user-phone',
+    role: 'add-user-role',
+};
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -50,77 +67,35 @@ export const AddUserModal = () => {
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    const validatePhone = (phone: string): string | null => {
-        if (!phone.trim()) {
-            return t('phoneRequired') || 'Phone is required';
-        }
-        
-        // Phone should start with + (dial code)
-        if (!phone.startsWith('+')) {
-            return t('invalidPhoneFormat') || 'Phone number must include country code (e.g., +964...)';
-        }
-        
-        // Remove + and check if remaining digits are valid (at least 7 digits for phone number)
-        const digitsOnly = phone.replace(/\D/g, '');
-        if (digitsOnly.length < 8) {
-            return t('invalidPhoneLength') || 'Phone number is too short';
-        }
-        
-        if (digitsOnly.length > 15) {
-            return t('invalidPhoneLength') || 'Phone number is too long';
-        }
-        
-        return null;
-    };
-
     const validateForm = () => {
         const newErrors: Record<string, string> = {};
-        
-        // Name validation
-        if (!formData.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        } else if (formData.name.trim().length < 2) {
-            newErrors.name = t('nameMinLength') || 'Name must be at least 2 characters';
-        }
-        
-        // Username validation
-        if (!formData.username.trim()) {
-            newErrors.username = t('usernameRequired') || 'Username is required';
-        } else if (formData.username.trim().length < 3) {
-            newErrors.username = t('usernameMinLength') || 'Username must be at least 3 characters';
-        } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username.trim())) {
-            newErrors.username = t('usernameInvalidChars') || 'Username can only contain letters, numbers, and underscores';
-        }
-        
-        // Email validation
-        if (!formData.email.trim()) {
-            newErrors.email = t('emailRequired') || 'Email is required';
-        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
-            newErrors.email = t('invalidEmail') || 'Invalid email format';
-        }
-        
-        // Password validation
-        if (!formData.password.trim()) {
-            newErrors.password = t('passwordRequired') || 'Password is required';
-        } else if (formData.password.length < 8) {
-            newErrors.password = t('passwordMinLength') || 'Password must be at least 8 characters';
-        } else if (!/(?=.*[a-zA-Z])(?=.*\d)/.test(formData.password)) {
-            newErrors.password = t('passwordComplexity') || 'Password must contain at least one letter and one number';
-        }
-        
-        // Phone validation
-        const phoneError = validatePhone(formData.phone);
-        if (phoneError) {
-            newErrors.phone = phoneError;
-        }
-        
+
+        const nameError = validateNameField(formData.name, t, { minLength: 2 });
+        if (nameError) newErrors.name = nameError;
+
+        const usernameError = validateUsernameField(formData.username, t);
+        if (usernameError) newErrors.username = usernameError;
+
+        const emailError = validateEmailField(formData.email, t);
+        if (emailError) newErrors.email = emailError;
+
+        const passwordError = validatePasswordField(formData.password, t);
+        if (passwordError) newErrors.password = passwordError;
+
+        const phoneError = validatePhoneField(formData.phone, t);
+        if (phoneError) newErrors.phone = phoneError;
+
         // Role validation
         if (!formData.role) {
             newErrors.role = t('roleRequired') || 'Role is required';
         }
 
         setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        if (Object.keys(newErrors).length > 0) {
+            scrollToFirstFieldError(newErrors, ADD_USER_DOM_ID_MAP);
+            return false;
+        }
+        return true;
     };
 
     const handleSubmit = async () => {
@@ -423,4 +398,3 @@ export const AddUserModal = () => {
         </Modal>
     );
 };
-

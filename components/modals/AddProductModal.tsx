@@ -6,6 +6,7 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
+import { ProductCategory, Supplier } from '../../types';
 import { useAddProduct, useProductCategories, useSuppliers } from '../../hooks/useQueries';
 import { normalizeRole } from '../../utils/roles';
 
@@ -30,12 +31,12 @@ export const AddProductModal = () => {
     
     // Fetch data using React Query
     const { data: categoriesResponse } = useProductCategories();
-    const productCategories = Array.isArray(categoriesResponse) 
+    const productCategories: ProductCategory[] = Array.isArray(categoriesResponse) 
         ? categoriesResponse 
         : (categoriesResponse?.results || []);
 
     const { data: suppliersResponse } = useSuppliers();
-    const suppliers = Array.isArray(suppliersResponse) 
+    const suppliers: Supplier[] = Array.isArray(suppliersResponse) 
         ? suppliersResponse 
         : (suppliersResponse?.results || []);
 

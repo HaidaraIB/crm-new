@@ -2,8 +2,9 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll, hasActiveFilters, ViewModeToggle, useEntityViewMode } from '../components/index';
 import { DEFAULT_DEAL_FILTERS } from '../components/drawers/DealsFilterDrawer';
+import { DealsKanbanView } from '../components/deals/DealsKanbanView';
 import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
@@ -243,11 +244,13 @@ export const DealsPage = () => {
     } = useAppContext();
     const [dealsPageNumber, setDealsPageNumber] = useState(1);
     const [dealsPageSize, setDealsPageSize] = useState(20);
+    const [viewMode, setViewMode] = useEntityViewMode('deals');
+    const isBoardView = viewMode === 'board';
 
     // Fetch deals using React Query (search is server-side)
     const { data: dealsResponse, isLoading: dealsLoading, error: dealsError } = useDeals(
         dealsPageNumber,
-        undefined,
+        { enabled: !isBoardView },
         dealsPageSize,
         dealFilters.search || undefined,
     );
@@ -448,6 +451,22 @@ export const DealsPage = () => {
         }
     };
 
+    const handleOpenDealFromBoard = (deal: Deal) => {
+        setViewingDeal(deal);
+        setIsViewDealModalOpen(true);
+    };
+
+    const getStageLabel = (stage: string): string => {
+        const stageMap: Record<string, string> = {
+            in_progress: t('inProgress') || 'In Progress',
+            on_hold: t('onHold') || 'On Hold',
+            won: t('won') || 'Won',
+            lost: t('lost') || 'Lost',
+            cancelled: t('cancelled') || 'Cancelled',
+        };
+        return stageMap[stage] || stage;
+    };
+
     const handleExportDeals = () => {
         const rows = filteredDeals.map((deal: any) => ({
             id: deal.id,
@@ -476,7 +495,7 @@ export const DealsPage = () => {
         exportToExcel(rows, columns, `deals-export-${new Date().toISOString().slice(0, 10)}`, t('deals') || 'Deals');
     };
 
-    if (dealsLoading) {
+    if (!isBoardView && dealsLoading) {
         return (
             <PageWrapper title={t('deals')}>
                 <PageLoadingState label={t('loading')} />
@@ -484,7 +503,7 @@ export const DealsPage = () => {
         );
     }
 
-    if (dealsError) {
+    if (!isBoardView && dealsError) {
         return (
             <PageWrapper title={t('deals')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
@@ -511,7 +530,7 @@ export const DealsPage = () => {
                         className="w-full sm:w-auto"
                         hasActiveFilters={hasActiveFilters(dealFilters, DEFAULT_DEAL_FILTERS)}
                     />
-                    <Button variant="secondary" onClick={handleExportDeals} className="w-full sm:w-auto" type="button" disabled={filteredDeals.length === 0}>
+                    <Button variant="secondary" onClick={handleExportDeals} className="w-full sm:w-auto" type="button" disabled={filteredDeals.length === 0 && !isBoardView}>
                         <span className="hidden sm:inline">{t('exportDeals') || 'Export to Excel'}</span>
                     </Button>
                     <Button 
@@ -527,6 +546,20 @@ export const DealsPage = () => {
                 </>
             }
         >
+            <div className="mb-4 flex justify-end">
+                <ViewModeToggle value={viewMode} onChange={setViewMode} />
+            </div>
+            {isBoardView ? (
+                <DealsKanbanView
+                    search={dealFilters.search || undefined}
+                    dealFilters={dealFilters}
+                    isRealEstate={isRealEstate}
+                    canDrag
+                    onOpenDeal={handleOpenDealFromBoard}
+                    getStageLabel={getStageLabel}
+                    enabled={isBoardView}
+                />
+            ) : (
             <Card>
                 <DealsTable deals={filteredDeals} onDelete={handleDelete} onEdit={handleEdit} onView={handleView} isRealEstate={isRealEstate} projects={projects} units={units} />
                 <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
@@ -590,6 +623,7 @@ export const DealsPage = () => {
                     </div>
                 </div>
             </Card>
+            )}
         </PageWrapper>
     );
 };

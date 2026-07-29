@@ -11,6 +11,7 @@ import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '..
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { buildLeadLocationApiBody, parseLeadCoordinate } from '../utils/leadLocation';
 import { mapApiLeadToDisplayLead, normalizeLead } from '../utils/normalizeLead';
+import { validateLeadForm } from '../utils/leadFormValidation';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -106,44 +107,18 @@ export const EditLeadPage = () => {
     }, []);
 
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        // Check phone numbers
-        const finalPhoneNumbers = phoneNumbers.length > 0 
-            ? phoneNumbers.filter(pn => pn.phone_number.trim() !== '')
-            : formState.phone 
-            ? [{
-                phone_number: formState.phone,
-                phone_type: 'mobile' as const,
-                is_primary: true,
-                notes: '',
-            }]
-            : [];
-        
-        if (finalPhoneNumbers.length === 0) {
-            newErrors.phone = t('phoneNumberRequired') || 'At least one phone number is required';
-        }
-
-        // Validate required fields for API
-        if (!formState.communicationWay) {
-            newErrors.communicationWay = t('communicationWayRequired') || 'Communication way is required';
-        }
-
-        if (!formState.status) {
-            newErrors.status = t('statusRequired') || 'Status is required';
-        }
-
-        if (!formState.priority) {
-            newErrors.priority = t('priorityRequired') || 'Priority is required';
-        }
-
-        if (!formState.type) {
-            newErrors.type = t('typeRequired') || 'Type is required';
-        }
+        const newErrors = validateLeadForm(
+            {
+                name: formState.name,
+                phone: formState.phone,
+                phoneNumbers,
+                communicationWay: formState.communicationWay,
+                status: formState.status,
+                priority: formState.priority,
+                type: formState.type,
+            },
+            t
+        );
 
         setErrors(newErrors);
         return Object.keys(newErrors).length === 0;

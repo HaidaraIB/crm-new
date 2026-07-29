@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
 import { Product, ProductCategory, Supplier } from '../types';
 import { AddProductModal } from '../components/modals/AddProductModal';
 import { EditProductModal } from '../components/modals/EditProductModal';
@@ -149,7 +149,9 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers:
                                     <td className="px-3 sm:px-6 py-4"><img src={supplier.logo} alt={supplier.name} className="w-8 h-8 rounded-full object-cover" /></td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{supplier.name}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{supplier.specialization}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{supplier.phone}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">
+                                        <PhoneText>{supplier.phone}</PhoneText>
+                                    </td>
                                     <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{supplier.email}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{supplier.contactPerson}</td>
                                     <td className="px-3 sm:px-6 py-4">

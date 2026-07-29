@@ -225,14 +225,15 @@
             scrollbar-color: hsl(var(--color-primary-400)) #1f2937;
         }
 
-        /* Wide tables: one visible horizontal scrollbar (top), synced with hidden main bar */
+        /* Wide tables: one visible horizontal scrollbar (top), synced with hidden main bar.
+           Keep z-index below header (20) and overlays (40+) so sticky bars never paint over modals. */
         .table-horizontal-scroll-top {
             overflow-y: hidden;
             height: 14px;
             margin-bottom: 2px;
             position: sticky;
             top: 0;
-            z-index: 20;
+            z-index: 10;
             background-color: #ffffff;
         }
         .dark .table-horizontal-scroll-top {

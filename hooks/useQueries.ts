@@ -21,7 +21,7 @@ import {
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
-  createDealAPI, updateDealAPI, deleteDealAPI,
+  createDealAPI, updateDealAPI, patchDealAPI, deleteDealAPI,
   createTaskAPI, updateTaskAPI, deleteTaskAPI,
   createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI,
   createClientCallAPI, updateClientCallAPI, deleteClientCallAPI,
@@ -70,8 +70,8 @@ export const queryKeys = {
   teamsReport: (params?: ReportQueryParams) => ['teamsReport', params] as const,
   marketingReport: (params?: ReportQueryParams) => ['marketingReport', params] as const,
   callReport: (params?: ReportQueryParams) => ['callReport', params] as const,
-  deals: (page?: number, pageSize?: number, search?: string) =>
-    ['deals', page ?? 'all', pageSize ?? 'default', search ?? ''] as const,
+  deals: (page?: number, pageSize?: number, search?: string, stage?: string) =>
+    ['deals', page ?? 'all', pageSize ?? 'default', search ?? '', stage ?? ''] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (filters?: any) => ['activities', filters] as const,
   clientTasks: ['clientTasks'] as const,
@@ -197,13 +197,19 @@ export const useDeals = (
   options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
   pageSize?: number,
   search?: string,
+  stage?: string,
 ) => {
   const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
   const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   const searchKey = search?.trim() || '';
+  const stageKey = stage?.trim() || '';
   return useQuery({
-    queryKey: queryKeys.deals(page, pageSize, searchKey),
-    queryFn: () => getDealsAPI(page, pageSize, searchKey ? { search: searchKey } : undefined),
+    queryKey: queryKeys.deals(page, pageSize, searchKey, stageKey),
+    queryFn: () =>
+      getDealsAPI(page, pageSize, {
+        ...(searchKey ? { search: searchKey } : {}),
+        ...(stageKey ? { stage: stageKey } : {}),
+      }),
     staleTime: 1 * 60 * 1000, // 1 minute
     ...resolvedOptions,
   });
@@ -839,6 +845,21 @@ export const useUpdateDeal = (options?: UseMutationOptions<any, Error, { id: num
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateDealAPI(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['deals'] });
+    },
+    ...options,
+  });
+};
+
+/** Partial deal update (e.g. Kanban stage move) — uses PATCH. */
+export const usePatchDeal = (
+  options?: UseMutationOptions<any, Error, { id: number; data: Record<string, unknown> }>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
+      patchDealAPI(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['deals'] });
     },

@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_OWNER_FILTERS } from '../components/drawers/OwnersFilterDrawer';
 import { Owner } from '../types';
 import { useOwners, useDeleteOwner } from '../hooks/useQueries';
@@ -31,7 +31,9 @@ const OwnersTable = ({ owners, onEdit, onDelete, isAdmin }: { owners: Owner[], o
                             <td className="px-6 py-4 whitespace-nowrap text-center">{owner.city}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">{owner.district}</td>
                             <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap text-center">{owner.name}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-center">{owner.phone}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                <PhoneText>{owner.phone}</PhoneText>
+                            </td>
                             <td className="px-6 py-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
                                     {isAdmin && (

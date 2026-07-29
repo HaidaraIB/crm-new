@@ -7,7 +7,7 @@ import type { LeadApiFilters } from '../../types';
 import { getUserDisplayName, User } from '../../types';
 import { usersForOperationalEmployeeLists } from '../../utils/roles';
 import { leadHasPhone, resolveLeadPhoneRaw } from '../../utils/smsSendHelpers';
-import { Button, Loader } from '../index';
+import { Button, Loader, PhoneText } from '../index';
 import { SearchIcon } from '../icons';
 
 const LEAD_TYPES = ['fresh', 'hot', 'cold'] as const;
@@ -827,9 +827,9 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
                                         <div className="min-w-0 flex-1">
                                             <p className="font-medium text-gray-900 dark:text-white truncate">{displayTitle}</p>
                                             {resolveLeadPhoneRaw(lead) && (
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 truncate" dir="ltr">
+                                                <PhoneText as="p" className="text-xs text-gray-500 dark:text-gray-400 truncate">
                                                     {resolveLeadPhoneRaw(lead)}
-                                                </p>
+                                                </PhoneText>
                                             )}
                                             <div className="flex flex-wrap gap-1.5 mt-1">
                                                 {statusName && (

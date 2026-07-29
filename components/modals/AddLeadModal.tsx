@@ -7,7 +7,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { PhoneInput } from '../PhoneInput';
 import { Checkbox } from '../Checkbox';
-import { Lead, PhoneNumber } from '../../types';
+import { Channel, Lead, PhoneNumber, Status, User } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
 import { useCreateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
 import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
@@ -15,6 +15,20 @@ import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole } from '../../utils
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../LeadLocationMapPicker';
 import { buildLeadLocationApiBody } from '../../utils/leadLocation';
+import { validateLeadForm } from '../../utils/leadFormValidation';
+import { clearFieldError, mapApiFieldsToUiErrors } from '../../utils/formFieldErrors';
+
+const LEAD_API_FIELD_MAP: Record<string, string> = {
+    phone_number: 'phone',
+    phone_numbers: 'phone',
+    communication_way: 'communicationWay',
+    assigned_to: 'assignedTo',
+    lead_company_name: 'leadCompanyName',
+    budget_max: 'budgetMax',
+    interested_developer: 'interestedDeveloper',
+    interested_project: 'interestedProject',
+    interested_unit: 'interestedUnit',
+};
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -38,7 +52,7 @@ export const AddLeadModal = () => {
     
     // Fetch data using React Query
     const { data: usersResponse } = useUsers();
-    const users = usersResponse?.results || [];
+    const users: User[] = usersResponse?.results || [];
 
     // Ensure admin (current user) is included in the options even if not in the users list
     const userOptions = React.useMemo(
@@ -47,12 +61,12 @@ export const AddLeadModal = () => {
     );
 
     const { data: statusesData } = useStatuses();
-    const statuses = Array.isArray(statusesData)
+    const statuses: Status[] = Array.isArray(statusesData)
         ? statusesData
         : (statusesData?.results || []);
 
     const { data: channelsData } = useChannels();
-    const channels = Array.isArray(channelsData)
+    const channels: Channel[] = Array.isArray(channelsData)
         ? channelsData
         : (channelsData?.results || []);
     const companyTz = currentUser?.company?.timezone ?? 'UTC';
@@ -64,8 +78,8 @@ export const AddLeadModal = () => {
     // Get default status from settings (first non-hidden status or first status)
     const getDefaultStatus = () => {
         if (!Array.isArray(statuses) || statuses.length === 0) return undefined;
-        const defaultStatus = statuses.find((s: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (s.isDefault ?? s.is_default) && !s.isHidden) || 
-                             statuses.find((s: { isHidden?: boolean }) => !s.isHidden) || 
+        const defaultStatus = statuses.find(s => (s.isDefault ?? s.is_default) && !s.isHidden) || 
+                             statuses.find(s => !s.isHidden) || 
                              statuses[0];
         return defaultStatus ? defaultStatus.name as Lead['status'] : undefined;
     };
@@ -73,7 +87,7 @@ export const AddLeadModal = () => {
     // Get default channel from settings (first default or first channel)
     const getDefaultChannel = () => {
         if (!Array.isArray(channels) || channels.length === 0) return undefined;
-        const defaultChannel = channels.find((c: { isDefault?: boolean; is_default?: boolean }) => c.isDefault ?? c.is_default) || channels[0];
+        const defaultChannel = channels.find(c => c.isDefault ?? c.is_default) || channels[0];
         return defaultChannel ? defaultChannel.name : undefined;
     };
     
@@ -99,6 +113,7 @@ export const AddLeadModal = () => {
     });
     
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'>>>([]);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     // Set default assignedTo to current user when modal opens or users load
     useEffect(() => {
@@ -122,15 +137,23 @@ export const AddLeadModal = () => {
         if (isAddLeadModalOpen) {
             setFormState(prev => ({
                 ...prev,
-                status: getDefaultStatus(),
-                communicationWay: getDefaultChannel(),
+                status: getDefaultStatus() ?? '',
+                communicationWay: getDefaultChannel() ?? '',
             }));
         }
     }, [isAddLeadModalOpen, statuses, channels]);
 
+    // Clear stale errors whenever the modal is (re)opened
+    useEffect(() => {
+        if (isAddLeadModalOpen) {
+            setErrors({});
+        }
+    }, [isAddLeadModalOpen]);
+
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearFieldError(setErrors, id);
     };
 
     const handleAddPhoneNumber = () => {
@@ -166,14 +189,30 @@ export const AddLeadModal = () => {
             }
             return newPhones;
         });
+        clearFieldError(setErrors, 'phone');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!formState.name) {
+
+        const validationErrors = validateLeadForm(
+            {
+                name: formState.name,
+                phone: formState.phone,
+                phoneNumbers,
+                communicationWay: formState.communicationWay,
+                status: formState.status,
+                priority: formState.priority,
+                type: formState.type,
+            },
+            t
+        );
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(validationErrors);
             return;
         }
-        
+        setErrors({});
+
         // Use phone numbers if provided, otherwise use single phone field
         const finalPhoneNumbers = phoneNumbers.length > 0 
             ? phoneNumbers.filter(pn => pn.phone_number.trim() !== '')
@@ -185,12 +224,7 @@ export const AddLeadModal = () => {
                 notes: '',
             }]
             : [];
-        
-        if (finalPhoneNumbers.length === 0) {
-            // At least one phone number is required
-            return;
-        }
-        
+
         try {
             const channelId = formState.communicationWay
                 ? (channels.find((c: { id?: number; name?: string }) =>
@@ -215,7 +249,7 @@ export const AddLeadModal = () => {
 
             const companyId = currentUser?.company?.id;
             if (!companyId) {
-                alert(t('companyRequired') || 'Company is required. Please log in again.');
+                setErrors({ general: t('companyRequired') || 'Company is required. Please log in again.' });
                 return;
             }
 
@@ -253,11 +287,12 @@ export const AddLeadModal = () => {
             const defaultUserId = isDataEntryUser ? '' : (currentUser?.id || users[0]?.id || '');
             setFormState({
                 name: '', phone: '', budget: '', budgetMax: '', assignedTo: defaultUserId.toString(),
-                type: '', communicationWay: getDefaultChannel() ?? '', priority: '', status: getDefaultStatus() ?? '', leadCompanyName: '', profession: '', residence: '', locationLatitude: '', locationLongitude: '', notes: '',
+                type: '' as Lead['type'], communicationWay: getDefaultChannel() ?? '', priority: '' as Lead['priority'], status: getDefaultStatus() ?? '', leadCompanyName: '', profession: '', residence: '', locationLatitude: '', locationLongitude: '', notes: '',
                 interestedDeveloper: '', interestedProject: '', interestedUnit: '',
             });
             setPhoneNumbers([]);
-            
+            setErrors({});
+
             // Close modal immediately and show success modal
             setIsAddLeadModalOpen(false);
             setSuccessMessage(t('leadCreatedSuccessfully') || 'Lead created successfully!');
@@ -266,19 +301,24 @@ export const AddLeadModal = () => {
             console.error('Error creating lead:', error);
             const code = error?.code || error?.error_key;
             if (code === 'employee_weekly_day_off') {
-                alert(
-                    t('employeeWeeklyDayOffAssignError')
-                    || error?.message
-                    || 'Cannot assign to this employee on their weekly day off.'
+                setErrors({
+                    assignedTo:
+                        t('employeeWeeklyDayOffAssignError')
+                        || error?.message
+                        || 'Cannot assign to this employee on their weekly day off.',
+                });
+                return;
+            }
+            if (error?.fields) {
+                const fieldErrors = mapApiFieldsToUiErrors(error.fields, t, LEAD_API_FIELD_MAP);
+                setErrors(
+                    Object.keys(fieldErrors).length > 0
+                        ? fieldErrors
+                        : { general: error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.' }
                 );
                 return;
             }
-            if (error?.fields?.assigned_to) {
-                const fe = error.fields.assigned_to;
-                alert(Array.isArray(fe) ? fe[0] : String(fe));
-                return;
-            }
-            alert(error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.');
+            setErrors({ general: error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.' });
         }
     };
 
@@ -287,10 +327,24 @@ export const AddLeadModal = () => {
             setIsAddLeadModalOpen(false);
         }} title={t('addNewLead')}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors.general && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                        {errors.general}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="name">{t('clientName')}</Label>
-                        <Input id="name" placeholder={t('enterClientName')} value={formState.name} onChange={handleChange} />
+                        <Input
+                            id="name"
+                            placeholder={t('enterClientName')}
+                            value={formState.name}
+                            onChange={handleChange}
+                            className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.name && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
@@ -348,9 +402,16 @@ export const AddLeadModal = () => {
                                     id="phone" 
                                     placeholder={t('enterPhoneNumber')} 
                                     value={formState.phone} 
-                                    onChange={(value) => setFormState(prev => ({ ...prev, phone: value }))}
+                                    onChange={(value) => {
+                                        setFormState(prev => ({ ...prev, phone: value }));
+                                        clearFieldError(setErrors, 'phone');
+                                    }}
                                     defaultCountry="IQ"
+                                    error={!!errors.phone}
                                 />
+                                {errors.phone && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                                )}
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {t('orAddMultiplePhones') || 'Or add multiple phone numbers below'}
                                 </p>
@@ -402,11 +463,19 @@ export const AddLeadModal = () => {
                                 ))}
                             </div>
                         )}
+                        {phoneNumbers.length > 0 && errors.phone && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                        )}
                     </div>
                      {!isDataEntryUser && (
                      <div>
                         <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
-                        <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
+                        <Select
+                            id="assignedTo"
+                            value={formState.assignedTo}
+                            onChange={handleChange}
+                            className={errors.assignedTo ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="">{t('selectEmployee') || 'Select Employee'}</option>
                             {userOptions.map(user => {
                                 const off = isUserOnWeeklyDayOff(user, companyTz);
@@ -418,19 +487,35 @@ export const AddLeadModal = () => {
                                 );
                             })}
                         </Select>
+                        {errors.assignedTo && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.assignedTo}</p>
+                        )}
                     </div>
                      )}
                     <div>
                         <Label htmlFor="type">{t('type')}</Label>
-                        <Select id="type" value={formState.type} onChange={handleChange}>
+                        <Select
+                            id="type"
+                            value={formState.type}
+                            onChange={handleChange}
+                            className={errors.type ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="Fresh">{t('fresh')}</option>
                             <option value="Hot">{t('hot')}</option>
                             <option value="Cold">{t('cold')}</option>
                         </Select>
+                        {errors.type && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.type}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="communicationWay">{t('communicationWay')}</Label>
-                        <Select id="communicationWay" value={formState.communicationWay} onChange={handleChange}>
+                        <Select
+                            id="communicationWay"
+                            value={formState.communicationWay}
+                            onChange={handleChange}
+                            className={errors.communicationWay ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             {(channels || []).length > 0 ? (
                                 (channels || []).map(channel => (
                                     <option key={channel.id} value={channel.name}>
@@ -441,18 +526,34 @@ export const AddLeadModal = () => {
                                 <option value="">{t('noChannelsAvailable') || 'No channels available'}</option>
                             )}
                         </Select>
+                        {errors.communicationWay && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.communicationWay}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="priority">{t('priority')}</Label>
-                        <Select id="priority" value={formState.priority} onChange={handleChange}>
+                        <Select
+                            id="priority"
+                            value={formState.priority}
+                            onChange={handleChange}
+                            className={errors.priority ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="High">{t('high')}</option>
                             <option value="Medium">{t('medium')}</option>
                             <option value="Low">{t('low')}</option>
                         </Select>
+                        {errors.priority && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="status">{t('status')}</Label>
-                        <Select id="status" value={formState.status} onChange={handleChange}>
+                        <Select
+                            id="status"
+                            value={formState.status}
+                            onChange={handleChange}
+                            className={errors.status ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             {(statuses || []).length > 0 ? (
                                 (statuses || [])
                                     .filter(s => !s.isHidden) // Only show non-hidden statuses
@@ -465,6 +566,9 @@ export const AddLeadModal = () => {
                                 <option value="">{t('noStatusesAvailable') || 'No statuses available'}</option>
                             )}
                         </Select>
+                        {errors.status && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.status}</p>
+                        )}
                     </div>
                 </div>
                 <div className="md:col-span-2">

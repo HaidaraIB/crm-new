@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { ProductCategory } from '../../types';
 import { useCreateProductCategory, useProductCategories } from '../../hooks/useQueries';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -29,7 +30,7 @@ export const AddProductCategoryModal = () => {
     
     // Fetch product categories using React Query
     const { data: categoriesResponse } = useProductCategories();
-    const productCategories = Array.isArray(categoriesResponse) 
+    const productCategories: ProductCategory[] = Array.isArray(categoriesResponse) 
         ? categoriesResponse 
         : (categoriesResponse?.results || []);
     

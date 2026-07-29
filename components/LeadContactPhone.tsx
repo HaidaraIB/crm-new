@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PhoneIcon, PbxDialIcon, SmsIcon, WhatsappIcon } from './icons';
 import { MarqueeText } from './MarqueeText';
+import { PHONE_BIDI_CLASS } from './PhoneText';
 import type { PhoneNumber } from '../types';
 
 export type LeadContactPhoneVariant = 'table' | 'details';
@@ -160,7 +161,7 @@ export function LeadContactPhone({
     variant === 'details'
       ? 'text-base font-semibold text-gray-900 dark:text-gray-100'
       : 'text-sm font-medium text-gray-900 dark:text-gray-100';
-  const phoneTextClass = `tabular-nums tracking-tight [unicode-bidi:isolate] ${phoneClass}`;
+  const phoneTextClass = `${PHONE_BIDI_CLASS} ${phoneClass}`;
   const compact = variant === 'table';
   const metaTextClass = compact ? 'text-[10px] leading-tight' : 'text-xs';
 

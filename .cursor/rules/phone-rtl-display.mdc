@@ -1,0 +1,45 @@
+---
+description: Display phone numbers as LTR BiDi islands so leading + stays correct under Arabic RTL
+alwaysApply: true
+---
+
+# Phone number RTL / BiDi display
+
+Under document RTL (Arabic), strings that start with `+` (E.164) are reordered by the Unicode BiDi algorithm unless isolated as LTR. That turns `+1 555-939-3585` into `555-939-3585 1+`.
+
+## Required pattern
+
+For any **displayed** phone / E.164 string in the UI, use `PhoneText` from `components/PhoneText.tsx` (also re-exported from `components/index`):
+
+```tsx
+import { PhoneText, isPhoneLike } from '../components/PhoneText';
+
+<PhoneText>{lead.phone}</PhoneText>
+{t('connected')} · <PhoneText>{phone}</PhoneText>
+```
+
+`PhoneText` sets `dir="ltr"` and `[unicode-bidi:isolate]` (same idea as Billing money islands).
+
+## Ambiguous titles
+
+When a label might be either a name or a phone (e.g. WhatsApp `account.name`, Messaging Center contact title), wrap only when phone-like:
+
+```tsx
+{isPhoneLike(title) ? (
+  <PhoneText as="p" className="font-semibold ...">{title}</PhoneText>
+) : (
+  <p className="font-semibold ...">{title}</p>
+)}
+```
+
+## Anti-patterns
+
+- Do **not** render raw `{phone}`, `{phone_number}`, or phone-like `{account.name}` inside an RTL parent without `PhoneText`.
+- `dir="ltr"` alone is weaker than isolate — prefer `PhoneText` for display text.
+- Do **not** change `tel:` / `wa.me` / API payloads — only visible text needs isolation.
+- Inputs: keep using `PhoneInput` (already `dir="ltr"`); do not wrap inputs in `PhoneText`.
+
+## Related
+
+- Lead phone rows: `LeadContactPhone` / `LeadContactPhoneList` (already BiDi-safe).
+- Shared class tokens: `PHONE_TEXT_CLASS`, `PHONE_BIDI_CLASS` in `components/PhoneText.tsx`.

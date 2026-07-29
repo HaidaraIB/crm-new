@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { PhoneText } from '../PhoneText';
 import { getRoleTranslation } from '../../utils/roles';
 
 const WEEKLY_DAY_OFF_LABEL_KEYS = [
@@ -15,7 +16,7 @@ const WEEKLY_DAY_OFF_LABEL_KEYS = [
     'dayOffSunday',
 ] as const;
 
-function weeklyDayOffLabel(user: { weekly_day_off?: number | null }, t: (key: string) => string): string {
+function weeklyDayOffLabel(user: { weekly_day_off?: number | null }, t: (key: any) => string): string {
     if (user.weekly_day_off === undefined || user.weekly_day_off === null) {
         return t('dayOffNone');
     }
@@ -26,7 +27,7 @@ function weeklyDayOffLabel(user: { weekly_day_off?: number | null }, t: (key: st
 }
 
 // Helper function to get user display name
-const getUserDisplayName = (user: any, t?: (key: string) => string): string => {
+const getUserDisplayName = (user: any, t?: (key: any) => string): string => {
     if (user.name) return user.name;
     if (user.first_name || user.last_name) {
         return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
@@ -110,7 +111,7 @@ export const ViewUserModal = () => {
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('phone')}</label>
                         <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
-                            {selectedUser.phone}
+                            <PhoneText>{selectedUser.phone}</PhoneText>
                         </div>
                     </div>
                     

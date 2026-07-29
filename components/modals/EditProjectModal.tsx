@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
-import { Project } from '../../types';
+import { Developer } from '../../types';
 import { useUpdateProject, useDevelopers } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -26,7 +26,7 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 
 export const EditProjectModal = () => {
     const { isEditProjectModalOpen, setIsEditProjectModalOpen, t, editingProject, setEditingProject, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
-    const [formState, setFormState] = useState<Omit<Project, 'id' | 'code'>>({
+    const [formState, setFormState] = useState({
         name: '',
         developer: '',
         type: '',
@@ -37,7 +37,7 @@ export const EditProjectModal = () => {
     
     // Fetch developers using React Query
     const { data: developersResponse } = useDevelopers();
-    const developers = developersResponse?.results || [];
+    const developers: Developer[] = developersResponse?.results || [];
     
     // Update project mutation
     const updateProjectMutation = useUpdateProject();

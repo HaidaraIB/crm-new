@@ -8,13 +8,14 @@ import {
     getCurrentUserAPI,
     type RequestTwoFactorAuthResponse,
 } from '../services/api';
+import { validateOtpCodeField } from '../utils/formValidation';
 
 export const TwoFactorAuthPage = () => {
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRequesting, setIsRequesting] = useState(false);
-    const [error, setError] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [success, setSuccess] = useState('');
     const [countdown, setCountdown] = useState(() => {
         // Load cooldown from localStorage on mount
@@ -111,12 +112,21 @@ export const TwoFactorAuthPage = () => {
         }
     }, [countdown]);
 
+    const clearFieldError = (field: string) => {
+        setErrors((prev) => {
+            if (!prev[field]) return prev;
+            const next = { ...prev };
+            delete next[field];
+            return next;
+        });
+    };
+
     const handleRequestCode = async () => {
-        setError('');
+        setErrors({});
         setSuccess('');
         
         if (!username.trim()) {
-            setError(t('pleaseEnterCredentials') || 'Please enter username');
+            setErrors({ general: t('pleaseEnterCredentials') || 'Please enter username' });
             return;
         }
 
@@ -132,9 +142,11 @@ export const TwoFactorAuthPage = () => {
                     if (remaining > 0) {
                         // Cooldown is still active, update state and return
                         setCountdown(remaining);
-                        setError(language === 'ar' 
-                            ? `يرجى الانتظار ${remaining} ثانية قبل إعادة الإرسال`
-                            : `Please wait ${remaining} seconds before resending`);
+                        setErrors({
+                            general: language === 'ar'
+                                ? `يرجى الانتظار ${remaining} ثانية قبل إعادة الإرسال`
+                                : `Please wait ${remaining} seconds before resending`,
+                        });
                         return;
                     }
                 }
@@ -155,7 +167,7 @@ export const TwoFactorAuthPage = () => {
             // Get password from sessionStorage if not in state
             const passwordToUse = password || sessionStorage.getItem('2fa_password') || '';
             if (!passwordToUse) {
-                setError(t('passwordRequired') || 'Password is required to resend code');
+                setErrors({ general: t('passwordRequired') || 'Password is required to resend code' });
                 setIsRequesting(false);
                 return;
             }
@@ -171,18 +183,19 @@ export const TwoFactorAuthPage = () => {
                 username: username.trim()
             }));
         } catch (error: any) {
-            setError(error.message || t('twoFactorAuthRequestFailed') || 'Failed to request two-factor authentication code');
+            setErrors({ general: error.message || t('twoFactorAuthRequestFailed') || 'Failed to request two-factor authentication code' });
         } finally {
             setIsRequesting(false);
         }
     };
 
     const handleVerify = async () => {
-        setError('');
+        setErrors({});
         setSuccess('');
         
-        if (!code.trim() || code.length !== 6) {
-            setError(t('pleaseEnter2FACode') || 'Please enter the 6-digit two-factor authentication code');
+        const codeError = validateOtpCodeField(code, t, { exactLength: 6 });
+        if (codeError) {
+            setErrors({ code: codeError });
             return;
         }
 
@@ -287,23 +300,23 @@ export const TwoFactorAuthPage = () => {
             const errorMessage = error.message || '';
             // Check if it's an account temporarily inactive error (for employees)
             if (error.code === 'ACCOUNT_TEMPORARILY_INACTIVE' || errorMessage === 'ACCOUNT_TEMPORARILY_INACTIVE') {
-                setError('ACCOUNT_TEMPORARILY_INACTIVE');
+                setErrors({ general: 'ACCOUNT_TEMPORARILY_INACTIVE' });
             } 
             // Check if it's a subscription inactive error (for admins)
             else if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
                 const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
                 if (subId) {
                     setSubscriptionId(parseInt(subId));
-                    setError('SUBSCRIPTION_INACTIVE');
+                    setErrors({ general: 'SUBSCRIPTION_INACTIVE' });
                 } else {
-                    setError(t('noActiveSubscription'));
+                    setErrors({ general: t('noActiveSubscription') });
                 }
             } else if (errorMessage.includes('expired')) {
-                setError(t('twoFactorCodeExpired') || 'Two-factor authentication code has expired. Please request a new one');
+                setErrors({ code: t('twoFactorCodeExpired') || 'Two-factor authentication code has expired. Please request a new one' });
             } else if (errorMessage.includes('Invalid') || errorMessage.includes('invalid')) {
-                setError(t('twoFactorCodeInvalid') || 'Invalid two-factor authentication code');
+                setErrors({ code: t('twoFactorCodeInvalid') || 'Invalid two-factor authentication code' });
             } else {
-                setError(errorMessage || t('twoFactorAuthFailed') || 'Failed to verify two-factor authentication code');
+                setErrors({ general: errorMessage || t('twoFactorAuthFailed') || 'Failed to verify two-factor authentication code' });
             }
             setIsLoading(false);
         }
@@ -312,7 +325,7 @@ export const TwoFactorAuthPage = () => {
     const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value.replace(/\D/g, '').slice(0, 6);
         setCode(value);
-        setError('');
+        clearFieldError('code');
     };
 
     const handleDigitChange = (index: number, value: string) => {
@@ -321,7 +334,7 @@ export const TwoFactorAuthPage = () => {
         newCode[index] = digit;
         const updatedCode = newCode.join('').slice(0, 6);
         setCode(updatedCode);
-        setError('');
+        clearFieldError('code');
 
         // Auto-focus next input
         if (digit && index < 5) {
@@ -348,7 +361,7 @@ export const TwoFactorAuthPage = () => {
         const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
         if (pastedData) {
             setCode(pastedData);
-            setError('');
+            clearFieldError('code');
             // Focus the next empty input or the last one
             const nextIndex = Math.min(pastedData.length, 5);
             const nextInput = document.getElementById(`code-input-${nextIndex}`);
@@ -386,12 +399,12 @@ export const TwoFactorAuthPage = () => {
                         </p>
                     </div>
                     <div className="space-y-6">
-                        {error && (
+                        {errors.general && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
                                 <div>
-                                    {error === 'ACCOUNT_TEMPORARILY_INACTIVE' ? (
+                                    {errors.general === 'ACCOUNT_TEMPORARILY_INACTIVE' ? (
                                         t('accountTemporarilyInactive') || 'Your account is temporarily inactive'
-                                    ) : error === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
+                                    ) : errors.general === 'SUBSCRIPTION_INACTIVE' && subscriptionId ? (
                                         <>
                                             {t('noActiveSubscriptionBeforeLink')}
                                             <a
@@ -410,7 +423,7 @@ export const TwoFactorAuthPage = () => {
                                             {t('noActiveSubscriptionAfterLink')}
                                         </>
                                     ) : (
-                                        error
+                                        errors.general
                                     )}
                                 </div>
                             </div>
@@ -445,13 +458,18 @@ export const TwoFactorAuthPage = () => {
                                                 handleVerify();
                                             }
                                         }}
-                                        className="w-14 h-14 text-center text-2xl font-bold font-mono bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors"
+                                        className={`w-14 h-14 text-center text-2xl font-bold font-mono bg-white dark:bg-gray-800 border-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-primary-500 transition-colors ${
+                                            errors.code ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'
+                                        }`}
                                         dir="ltr"
                                         autoFocus={index === 0 && !code}
                                         onFocus={(e) => e.target.setSelectionRange(0, 0)}
                                     />
                                 ))}
                             </div>
+                            {errors.code && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400 text-center">{errors.code}</p>
+                            )}
                         </div>
                         <div>
                             <label className="flex items-center gap-2 text-sm text-secondary cursor-pointer">

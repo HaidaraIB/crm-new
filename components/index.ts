@@ -7,6 +7,7 @@ export * from './TableHorizontalScroll';
 export * from './Input';
 export * from './NumberInput';
 export * from './PhoneInput';
+export * from './PhoneText';
 export * from './Checkbox';
 export * from './Modal';
 export * from './PageWrapper';

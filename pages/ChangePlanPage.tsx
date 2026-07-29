@@ -15,6 +15,7 @@ import { withLatinDigits } from '../utils/dateUtils';
 import { isFibSessionPayload, routeToFibPaymentPage, getPendingSubscriptionId } from '../utils/paymentSession';
 import { hydratePaymentAccessToken } from '../utils/paymentAuth';
 import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
+import { clearFieldError } from '../utils/formFieldErrors';
 
 type PublicPlan = {
     id: number;
@@ -34,8 +35,9 @@ type PublicPlan = {
 };
 
 export const ChangePlanPage = () => {
-    const { t, language, theme, currentUser } = useAppContext();
+    const { t, language, theme, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [plans, setPlans] = useState<PublicPlan[]>([]);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [plansLoading, setPlansLoading] = useState<boolean>(true);
     const [plansError, setPlansError] = useState<string | null>(null);
     const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
@@ -208,50 +210,52 @@ export const ChangePlanPage = () => {
     };
 
     const handleChangePlan = async () => {
+        const newErrors: Record<string, string> = {};
+
         if (!selectedPlan) {
-            alert(t('planRequired') || 'Please select a plan to continue');
-            return;
-        }
-
-        if (currentPlanId != null && selectedPlan === currentPlanId) {
-            alert(t('alreadyOnCurrentPlan') || 'This is already your current plan. Choose a different plan.');
-            return;
-        }
-
-        const selectedPlanObj = plans.find((p) => p.id === selectedPlan);
-        if (selectedPlanObj && freeTrialConsumed && isFreeTrialPlan(selectedPlanObj)) {
-            alert(t('trialUnavailable') || 'Trial already used');
-            return;
+            newErrors.plan = t('planRequired') || 'Please select a plan to continue';
+        } else if (currentPlanId != null && selectedPlan === currentPlanId) {
+            newErrors.plan = t('alreadyOnCurrentPlan') || 'This is already your current plan. Choose a different plan.';
+        } else {
+            const selectedPlanObj = plans.find((p) => p.id === selectedPlan);
+            if (selectedPlanObj && freeTrialConsumed && isFreeTrialPlan(selectedPlanObj)) {
+                newErrors.plan = t('trialUnavailable') || 'Trial already used';
+            }
         }
 
         if (!subscriptionId) {
-            alert(t('paymentSubscriptionIdRequired') || 'Subscription ID is required');
+            newErrors.general = t('paymentSubscriptionIdRequired') || 'Subscription ID is required';
+        }
+
+        if (!newErrors.plan && !newErrors.general && !selectedGateway) {
+            newErrors.gateway = t('paymentGatewayRequired') || 'Please select a payment method';
+        }
+
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
             return;
         }
+        setErrors({});
 
         if (preview?.error) {
             const errLow = preview.error.toLowerCase();
             if (errLow.includes('downgrade') || errLow.includes('schedule')) {
                 try {
                     setIsProcessing(true);
-                    await scheduleSubscriptionDowngradeAPI(selectedPlan, billingCycle);
-                    alert(
+                    await scheduleSubscriptionDowngradeAPI(selectedPlan!, billingCycle);
+                    setSuccessMessage(
                         t('downgradeScheduledSuccess') ||
                             'Downgrade scheduled for the end of your current billing period.',
                     );
+                    setIsSuccessModalOpen(true);
                 } catch (e: any) {
-                    alert(e?.message || 'Error');
+                    setErrors({ general: e?.message || 'Error' });
                 } finally {
                     setIsProcessing(false);
                 }
                 return;
             }
-            alert(preview.error);
-            return;
-        }
-
-        if (!selectedGateway) {
-            alert(t('paymentGatewayRequired') || 'Please select a payment method');
+            setErrors({ general: preview.error });
             return;
         }
 
@@ -259,9 +263,9 @@ export const ChangePlanPage = () => {
             setIsProcessing(true);
             hydratePaymentAccessToken();
             const response: CreatePaymentSessionResult = await createPaymentSessionAPI(
-                parseInt(subscriptionId),
-                selectedGateway,
-                selectedPlan,
+                parseInt(subscriptionId!),
+                selectedGateway!,
+                selectedPlan!,
                 billingCycle
             );
             if (response.redirect_url) {
@@ -277,20 +281,20 @@ export const ChangePlanPage = () => {
                     messageKey: 'planChangeSuccess',
                     titleKey: 'paymentSuccess',
                 });
-                routeToFibPaymentPage(subscriptionId, response);
+                routeToFibPaymentPage(subscriptionId!, response);
             } else {
-                alert(t('paymentRedirectError') || 'Failed to get payment URL');
+                setErrors({ general: t('paymentRedirectError') || 'Failed to get payment URL' });
             }
         } catch (error: any) {
             console.error('Error changing plan:', error);
             // Show user-friendly error message
             const errorMessage = error?.message || t('errorLoadingPaymentLink') || 'Error loading payment link';
-            
+
             // If error mentions "already active", explain that plan change is still possible
             if (errorMessage.toLowerCase().includes('already active')) {
-                alert(t('subscriptionActiveButCanUpgrade') || 'Your subscription is active. You can still upgrade or downgrade your plan. Please try again or contact support.');
+                setErrors({ general: t('subscriptionActiveButCanUpgrade') || 'Your subscription is active. You can still upgrade or downgrade your plan. Please try again or contact support.' });
             } else {
-                alert(errorMessage);
+                setErrors({ general: errorMessage });
             }
         } finally {
             setIsProcessing(false);
@@ -310,6 +314,12 @@ export const ChangePlanPage = () => {
                     <p className="text-gray-600 dark:text-gray-400 mb-6">
                         {t('changePlanDescription') || 'Select a new plan for your subscription'}
                     </p>
+
+                    {errors.general && (
+                        <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                            {errors.general}
+                        </div>
+                    )}
 
                     {/* Billing Cycle Toggle */}
                     <div className="flex justify-center mb-6">
@@ -383,6 +393,10 @@ export const ChangePlanPage = () => {
                         </div>
                     )}
 
+                    {errors.plan && (
+                        <p className="mb-4 text-sm text-red-600 dark:text-red-400">{errors.plan}</p>
+                    )}
+
                     {!plansLoading && !plansError && plans.length > 0 && (
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                             {plans.map((plan) => {
@@ -409,12 +423,14 @@ export const ChangePlanPage = () => {
                                     onClick={() => {
                                         if (isLocked) return;
                                         setSelectedPlan(plan.id);
+                                        clearFieldError(setErrors, 'plan');
                                     }}
                                     onKeyDown={(e) => {
                                         if (isLocked) return;
                                         if (e.key === 'Enter' || e.key === ' ') {
                                             e.preventDefault();
                                             setSelectedPlan(plan.id);
+                                            clearFieldError(setErrors, 'plan');
                                         }
                                     }}
                                     className={`p-6 border-2 rounded-lg transition-all ${
@@ -479,8 +495,14 @@ export const ChangePlanPage = () => {
                     <div className="mb-6">
                         <PaymentGatewaySelector
                             selectedGateway={selectedGateway}
-                            onSelect={setSelectedGateway}
+                            onSelect={(id) => {
+                                setSelectedGateway(id);
+                                clearFieldError(setErrors, 'gateway');
+                            }}
                         />
+                        {errors.gateway && (
+                            <p className="mt-2 text-sm text-red-600 dark:text-red-400">{errors.gateway}</p>
+                        )}
                     </div>
 
                     {/* Action Button */}

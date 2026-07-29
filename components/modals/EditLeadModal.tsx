@@ -7,7 +7,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { PhoneInput } from '../PhoneInput';
 import { Checkbox } from '../Checkbox';
-import { Lead, PhoneNumber } from '../../types';
+import { Channel, Lead, PhoneNumber, Status, User } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
 import { useUpdateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
 import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
@@ -15,6 +15,20 @@ import { buildLeadAssigneePickerOptions, showInLeadAssigneePicker } from '../../
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../LeadLocationMapPicker';
 import { buildLeadLocationApiBody, parseLeadCoordinate } from '../../utils/leadLocation';
+import { validateLeadForm } from '../../utils/leadFormValidation';
+import { clearFieldError, mapApiFieldsToUiErrors } from '../../utils/formFieldErrors';
+
+const LEAD_API_FIELD_MAP: Record<string, string> = {
+    phone_number: 'phone',
+    phone_numbers: 'phone',
+    communication_way: 'communicationWay',
+    assigned_to: 'assignedTo',
+    lead_company_name: 'leadCompanyName',
+    budget_max: 'budgetMax',
+    interested_developer: 'interestedDeveloper',
+    interested_project: 'interestedProject',
+    interested_unit: 'interestedUnit',
+};
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -38,28 +52,28 @@ export const EditLeadModal = () => {
     
     // Fetch data using React Query
     const { data: usersResponse } = useUsers();
-    const users = usersResponse?.results || [];
+    const users: User[] = usersResponse?.results || [];
 
     const { data: statusesData } = useStatuses();
-    const statuses = Array.isArray(statusesData)
+    const statuses: Status[] = Array.isArray(statusesData)
         ? statusesData
         : (statusesData?.results || []);
 
     const { data: channelsData } = useChannels();
-    const channels = Array.isArray(channelsData)
+    const channels: Channel[] = Array.isArray(channelsData)
         ? channelsData
         : (channelsData?.results || []);
     const chList = channels;
     const stList = statuses;
     const defaultChannelName = React.useMemo(() => {
         if (!chList.length) return '';
-        const c = chList.find((x: { isDefault?: boolean; is_default?: boolean }) => x.isDefault ?? x.is_default) || chList[0];
+        const c = chList.find(x => x.isDefault ?? x.is_default) || chList[0];
         return c?.name ?? '';
     }, [chList]);
     const defaultStatusName = React.useMemo(() => {
         if (!stList.length) return '';
-        const s = stList.find((x: { isDefault?: boolean; is_default?: boolean; isHidden?: boolean }) => (x.isDefault ?? x.is_default) && !x.isHidden)
-            || stList.find((x: { isHidden?: boolean }) => !x.isHidden) || stList[0];
+        const s = stList.find(x => (x.isDefault ?? x.is_default) && !x.isHidden)
+            || stList.find(x => !x.isHidden) || stList[0];
         return s?.name ?? '';
     }, [stList]);
 
@@ -88,6 +102,7 @@ export const EditLeadModal = () => {
         interestedUnit: '',
     });
     const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const userOptions = React.useMemo(
         () => buildLeadAssigneePickerOptions(users, currentUser),
@@ -116,9 +131,9 @@ export const EditLeadModal = () => {
                           ? String((editingLead as any).budget_max)
                           : '',
                 assignedTo: assignedToField,
-                type: editingLead.type || '',
+                type: (editingLead.type || '') as Lead['type'],
                 communicationWay: editingLead.communicationWay || defaultChannelName,
-                priority: editingLead.priority || '',
+                priority: (editingLead.priority || '') as Lead['priority'],
                 status: editingLead.status || defaultStatusName,
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
                 profession: editingLead.profession ?? (editingLead as any).profession ?? '',
@@ -174,12 +189,14 @@ export const EditLeadModal = () => {
             } else {
                 setPhoneNumbers([]);
             }
+            setErrors({});
         }
     }, [editingLead, defaultChannelName, defaultStatusName, users]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
         setFormState(prev => ({ ...prev, [id]: value }));
+        clearFieldError(setErrors, id);
     };
 
     const handleClose = () => {
@@ -219,16 +236,30 @@ export const EditLeadModal = () => {
             }
             return newPhones;
         });
+        clearFieldError(setErrors, 'phone');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!editingLead) return;
-        
-        if (!formState.name) {
-            alert('Please fill in required fields');
+
+        const validationErrors = validateLeadForm(
+            {
+                name: formState.name,
+                phone: formState.phone,
+                phoneNumbers,
+                communicationWay: formState.communicationWay,
+                status: formState.status,
+                priority: formState.priority,
+                type: formState.type,
+            },
+            t
+        );
+        if (Object.keys(validationErrors).length > 0) {
+            setErrors(validationErrors);
             return;
         }
+        setErrors({});
 
         // Use phone numbers if provided, otherwise use single phone field
         const finalPhoneNumbers = phoneNumbers.length > 0 
@@ -241,11 +272,6 @@ export const EditLeadModal = () => {
                 notes: '',
             }]
             : [];
-        
-        if (finalPhoneNumbers.length === 0) {
-            alert('At least one phone number is required');
-            return;
-        }
 
         try {
             const channelId = formState.communicationWay
@@ -271,7 +297,7 @@ export const EditLeadModal = () => {
 
             const companyId = currentUser?.company?.id;
             if (!companyId) {
-                alert(t('companyRequired') || 'Company is required. Please log in again.');
+                setErrors({ general: t('companyRequired') || 'Company is required. Please log in again.' });
                 return;
             }
 
@@ -311,19 +337,24 @@ export const EditLeadModal = () => {
             console.error('Error updating lead:', error);
             const code = error?.code || error?.error_key;
             if (code === 'employee_weekly_day_off') {
-                alert(
-                    t('employeeWeeklyDayOffAssignError')
-                    || error?.message
-                    || 'Cannot assign to this employee on their weekly day off.'
+                setErrors({
+                    assignedTo:
+                        t('employeeWeeklyDayOffAssignError')
+                        || error?.message
+                        || 'Cannot assign to this employee on their weekly day off.',
+                });
+                return;
+            }
+            if (error?.fields) {
+                const fieldErrors = mapApiFieldsToUiErrors(error.fields, t, LEAD_API_FIELD_MAP);
+                setErrors(
+                    Object.keys(fieldErrors).length > 0
+                        ? fieldErrors
+                        : { general: error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.' }
                 );
                 return;
             }
-            if (error?.fields?.assigned_to) {
-                const fe = error.fields.assigned_to;
-                alert(Array.isArray(fe) ? fe[0] : String(fe));
-                return;
-            }
-            alert(error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
+            setErrors({ general: error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.' });
         }
     };
 
@@ -332,10 +363,24 @@ export const EditLeadModal = () => {
     return (
         <Modal isOpen={isEditLeadModalOpen} onClose={handleClose} title={t('editClient') || 'Edit Client'}>
             <form onSubmit={handleSubmit} className="space-y-4">
+                {errors.general && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                        {errors.general}
+                    </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
                         <Label htmlFor="name">{t('clientName')}</Label>
-                        <Input id="name" placeholder={t('enterClientName')} value={formState.name} onChange={handleChange} />
+                        <Input
+                            id="name"
+                            placeholder={t('enterClientName')}
+                            value={formState.name}
+                            onChange={handleChange}
+                            className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
+                        />
+                        {errors.name && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
@@ -404,9 +449,16 @@ export const EditLeadModal = () => {
                                     id="phone" 
                                     placeholder={t('enterPhoneNumber')} 
                                     value={formState.phone} 
-                                    onChange={(value) => setFormState(prev => ({ ...prev, phone: value }))}
+                                    onChange={(value) => {
+                                        setFormState(prev => ({ ...prev, phone: value }));
+                                        clearFieldError(setErrors, 'phone');
+                                    }}
                                     defaultCountry="IQ"
+                                    error={!!errors.phone}
                                 />
+                                {errors.phone && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                                )}
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {t('orAddMultiplePhones') || 'Or add multiple phone numbers below'}
                                 </p>
@@ -458,10 +510,18 @@ export const EditLeadModal = () => {
                                 ))}
                             </div>
                         )}
+                        {phoneNumbers.length > 0 && errors.phone && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                        )}
                     </div>
                      <div>
                         <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
-                        <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
+                        <Select
+                            id="assignedTo"
+                            value={formState.assignedTo}
+                            onChange={handleChange}
+                            className={errors.assignedTo ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="">{t('selectEmployee') || 'Select Employee'}</option>
                             {userOptions.map(user => {
                                 const off = isUserOnWeeklyDayOff(user, companyTz);
@@ -473,18 +533,34 @@ export const EditLeadModal = () => {
                                 );
                             })}
                         </Select>
+                        {errors.assignedTo && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.assignedTo}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="type">{t('type')}</Label>
-                        <Select id="type" value={formState.type} onChange={handleChange}>
+                        <Select
+                            id="type"
+                            value={formState.type}
+                            onChange={handleChange}
+                            className={errors.type ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="Fresh">{t('fresh')}</option>
                             <option value="Hot">{t('hot')}</option>
                             <option value="Cold">{t('cold')}</option>
                         </Select>
+                        {errors.type && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.type}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="communicationWay">{t('communicationWay')}</Label>
-                        <Select id="communicationWay" value={formState.communicationWay || ''} onChange={handleChange}>
+                        <Select
+                            id="communicationWay"
+                            value={formState.communicationWay || ''}
+                            onChange={handleChange}
+                            className={errors.communicationWay ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="">{t('selectChannel') || 'Select Channel'}</option>
                             {(channels || []).length > 0 ? (
                                 (channels || []).map(channel => (
@@ -496,18 +572,34 @@ export const EditLeadModal = () => {
                                 <option value="" disabled>{t('noChannelsAvailable') || 'No channels available'}</option>
                             )}
                         </Select>
+                        {errors.communicationWay && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.communicationWay}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="priority">{t('priority')}</Label>
-                        <Select id="priority" value={formState.priority} onChange={handleChange}>
+                        <Select
+                            id="priority"
+                            value={formState.priority}
+                            onChange={handleChange}
+                            className={errors.priority ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="High">{t('high')}</option>
                             <option value="Medium">{t('medium')}</option>
                             <option value="Low">{t('low')}</option>
                         </Select>
+                        {errors.priority && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>
+                        )}
                     </div>
                     <div>
                         <Label htmlFor="status">{t('status')}</Label>
-                        <Select id="status" value={formState.status || ''} onChange={handleChange}>
+                        <Select
+                            id="status"
+                            value={formState.status || ''}
+                            onChange={handleChange}
+                            className={errors.status ? 'border-red-500 dark:border-red-500' : ''}
+                        >
                             <option value="">{t('selectStatus') || 'Select Status'}</option>
                             {(statuses || []).length > 0 ? (
                                 (statuses || [])
@@ -521,6 +613,9 @@ export const EditLeadModal = () => {
                                 <option value="" disabled>{t('noStatusesAvailable') || 'No statuses available'}</option>
                             )}
                         </Select>
+                        {errors.status && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.status}</p>
+                        )}
                     </div>
                 </div>
                 <div className="flex justify-end gap-2">

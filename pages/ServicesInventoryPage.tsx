@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
 import { Service, ServicePackage, ServiceProvider } from '../types';
 import { AddServiceModal } from '../components/modals/AddServiceModal';
 import { EditServiceModal } from '../components/modals/EditServiceModal';
@@ -151,7 +151,9 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{provider.code}</td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{provider.name}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.specialization}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{provider.phone}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">
+                                        <PhoneText>{provider.phone}</PhoneText>
+                                    </td>
                                     <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{provider.email}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.rating ? `⭐ ${provider.rating}` : '-'}</td>
                                     <td className="px-3 sm:px-6 py-4">

@@ -10,12 +10,14 @@ export const DeleteDeveloperModal = () => {
     const deleteDeveloperMutation = useDeleteDeveloper();
     const [isLoading, setIsLoading] = useState(false);
     const [successMessage, setSuccessMessage] = useState('');
+    const [error, setError] = useState('');
 
     const handleDelete = async () => {
         if (!deletingDeveloper) return;
 
         setIsLoading(true);
         setSuccessMessage('');
+        setError('');
         try {
             await deleteDeveloperMutation.mutateAsync(deletingDeveloper.id);
             
@@ -27,10 +29,15 @@ export const DeleteDeveloperModal = () => {
                 setIsDeleteDeveloperModalOpen(false);
                 setDeletingDeveloper(null);
                 setSuccessMessage('');
+                setError('');
             }, 1500);
         } catch (error: any) {
             console.error('Error deleting developer:', error);
-            alert(error?.message || t('errorDeletingDeveloper') || 'Failed to delete developer. Please try again.');
+            setError(
+                error?.message ||
+                    t('errorDeletingDeveloper') ||
+                    'Failed to delete developer. Please try again.'
+            );
         } finally {
             setIsLoading(false);
         }
@@ -43,11 +50,17 @@ export const DeleteDeveloperModal = () => {
             setIsDeleteDeveloperModalOpen(false);
             setDeletingDeveloper(null);
             setSuccessMessage('');
+            setError('');
         }} title={t('deleteDeveloper') || 'Delete Developer'}>
             <div className="space-y-4">
                 {successMessage && (
                     <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
                         {successMessage}
+                    </div>
+                )}
+                {error && (
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
+                        {error}
                     </div>
                 )}
                 {!successMessage && (
@@ -62,6 +75,7 @@ export const DeleteDeveloperModal = () => {
                                 setIsDeleteDeveloperModalOpen(false);
                                 setDeletingDeveloper(null);
                                 setSuccessMessage('');
+                                setError('');
                             }} disabled={isLoading}>
                                 {t('cancel')}
                             </Button>

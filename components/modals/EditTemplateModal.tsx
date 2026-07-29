@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
-import type { MessageTemplateType } from '../../services/api';
+import type { MessageTemplateType, TemplateButtonPayload } from '../../services/api';
 import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTemplateAPI, resolveLocalizedApiError } from '../../services/api';
 import { SelectMediaModal } from './SelectMediaModal';
 import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 const NAME_MAX = 200;
 const BODY_MAX = 1000;
@@ -112,7 +113,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const [buttons, setButtons] = useState<TemplateButton[]>([]);
   const [saving, setSaving] = useState(false);
   const [sendingToReview, setSendingToReview] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [showValidationConfirm, setShowValidationConfirm] = useState(false);
   const [showSelectMedia, setShowSelectMedia] = useState(false);
   const [headerMediaName, setHeaderMediaName] = useState<string | null>(null);
@@ -158,11 +159,12 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       setFooter('');
       setButtons([]);
     }
-    setError(null);
+    setErrors({});
   }, [template, isOpen]);
 
   const insertPlaceholder = (insert: string) => {
     setContent((prev) => prev + insert);
+    clearFieldError(setErrors, 'content');
   };
 
   const addButton = (type: TemplateButton['type']) => {
@@ -184,19 +186,20 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   };
 
   const handleSubmit = async () => {
+    const newErrors: Record<string, string> = {};
     if (!name.trim()) {
-      setError(t('templateName') + ' ' + (t('required') || 'required'));
-      return;
-    }
-    if (isWhatsApp && !TEMPLATE_NAME_ENGLISH_REGEX.test(name.trim())) {
-      setError(t('templateNameEnglishOnly'));
-      return;
+      newErrors.name = t('templateName') + ' ' + (t('required') || 'required');
+    } else if (isWhatsApp && !TEMPLATE_NAME_ENGLISH_REGEX.test(name.trim())) {
+      newErrors.name = t('templateNameEnglishOnly');
     }
     if (!content.trim()) {
-      setError((t('messageContent') || 'Message content') + ' ' + (t('required') || 'required'));
+      newErrors.content = (t('messageContent') || 'Message content') + ' ' + (t('required') || 'required');
+    }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
-    setError(null);
+    setErrors({});
     setSaving(true);
     try {
       const categoryForBackend = isWhatsApp ? (CATEGORY_OPTIONS.find((c) => c.value === category)?.backendValue ?? category) : 'utility';
@@ -211,9 +214,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
           ...(headerType === 'text' && headerText.trim() && { header_text: headerText.trim() }),
           ...(footer.trim() && { footer: footer.trim() }),
           ...(buttons.length > 0 && {
-            buttons: buttons.map((b) => {
-              const item: { type: string; button_text: string; phone?: string; url?: string } = {
-                type: b.type,
+            buttons: buttons.map((b): TemplateButtonPayload => {
+              const item: TemplateButtonPayload = {
+                type: b.type as TemplateButtonPayload['type'],
                 button_text: b.buttonText.trim(),
               };
               if (b.type === 'phone' && b.phone) item.phone = b.phone.trim();
@@ -231,7 +234,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       onSuccess();
       onClose();
     } catch (e: any) {
-      setError(e?.message || (t('save') || 'Save') + ' failed');
+      setErrors({ general: e?.message || (t('save') || 'Save') + ' failed' });
     } finally {
       setSaving(false);
     }
@@ -240,7 +243,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const runWhatsAppBodyValidation = (): boolean => {
     const result = validateWhatsAppTemplateBody(content);
     if (!result.ok && result.key) {
-      setError(t(result.key));
+      setErrors({ content: t(result.key) });
       return false;
     }
     return true;
@@ -249,7 +252,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const handleSendToReview = async () => {
     if (!template?.id || !onSendToReview) return;
     if (!runWhatsAppBodyValidation()) return;
-    setError(null);
+    setErrors({});
     setSendingToReview(true);
     try {
       await onSendToReview(template.id, templateLanguage);
@@ -257,7 +260,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       onSuccess();
       onClose();
     } catch (e: any) {
-      setError(resolveLocalizedApiError(e, t, 'Failed to send to review'));
+      setErrors({ general: resolveLocalizedApiError(e, t, 'Failed to send to review') });
     } finally {
       setSendingToReview(false);
     }
@@ -294,10 +297,16 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
             <input
               type="text"
               value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+              onChange={(e) => {
+                setName(e.target.value);
+                clearFieldError(setErrors, 'name');
+              }}
+              className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.name ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
               placeholder={t('templateName')}
             />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('messageContent')}</label>
@@ -318,11 +327,17 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
             </div>
             <textarea
               value={content}
-              onChange={(e) => setContent(e.target.value)}
+              onChange={(e) => {
+                setContent(e.target.value);
+                clearFieldError(setErrors, 'content');
+              }}
               rows={5}
-              className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+              className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.content ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
               placeholder={t('messageContent')}
             />
+            {errors.content && (
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.content}</p>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('category')}</label>
@@ -349,12 +364,18 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
               <input
                 type="text"
                 value={name}
-                onChange={(e) => setName(e.target.value.slice(0, NAME_MAX))}
+                onChange={(e) => {
+                  setName(e.target.value.slice(0, NAME_MAX));
+                  clearFieldError(setErrors, 'name');
+                }}
                 maxLength={NAME_MAX}
-                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.name ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                 placeholder={t('templateNamePlaceholderEn') || 'Enter message template name in English'}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">{name.length}/{NAME_MAX}</p>
+              {errors.name && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
+              )}
             </div>
 
             {/* Category / Type and Language in one row */}
@@ -448,13 +469,19 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
               </div>
               <textarea
                 value={content}
-                onChange={(e) => setContent(e.target.value.slice(0, BODY_MAX))}
+                onChange={(e) => {
+                  setContent(e.target.value.slice(0, BODY_MAX));
+                  clearFieldError(setErrors, 'content');
+                }}
                 maxLength={BODY_MAX}
                 rows={5}
-                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.content ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                 placeholder={t('messageContent')}
               />
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 text-right">{content.length}/{BODY_MAX}</p>
+              {errors.content && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.content}</p>
+              )}
             </div>
 
             {/* Footer */}
@@ -582,7 +609,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
         </div>
       )}
 
-      {error && <p className="text-sm text-red-600 dark:text-red-400 mt-4">{error}</p>}
+      {errors.general && <p className="text-sm text-red-600 dark:text-red-400 mt-4">{errors.general}</p>}
 
       <div className="flex flex-wrap items-center justify-between gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
         <div>

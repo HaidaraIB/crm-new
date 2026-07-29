@@ -5,7 +5,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
-import { Unit } from '../../types';
+import { Project, Unit } from '../../types';
 import { useUpdateUnit, useProjects } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -29,7 +29,7 @@ export const EditUnitModal = () => {
     
     // Fetch projects using React Query
     const { data: projectsResponse } = useProjects();
-    const projects = projectsResponse?.results || [];
+    const projects: Project[] = projectsResponse?.results || [];
     
     // Update unit mutation
     const updateUnitMutation = useUpdateUnit();

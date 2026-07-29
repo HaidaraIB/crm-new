@@ -50,7 +50,7 @@ export const normalizeRole = (role?: string): AppRole => {
  */
 export const getRoleTranslation = (
   role: string,
-  t: (key: string) => string,
+  t: (key: any) => string,
   companySpecialization?: string | null,
 ): string => {
   let normalizedRole = normalizeRole(role);

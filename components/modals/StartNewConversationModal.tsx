@@ -7,13 +7,17 @@ import {
   getWhatsAppContactSubtitle,
   getWhatsAppContactTitle,
 } from '../../utils/whatsappContactDisplay';
+import { PhoneText, isPhoneLike } from '../PhoneText';
+import { validatePhoneField } from '../../utils/formValidation';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 type Client = {
-  id: number;
+  id: number | string;
   name?: string;
   lead_company_name?: string;
   company_name?: string;
   phone_number?: string;
+  is_manual?: boolean;
   [k: string]: any;
 };
 
@@ -29,6 +33,7 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [manualPhone, setManualPhone] = useState('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isOpen) return;
@@ -47,14 +52,21 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
     onClose();
   };
   const handleStartWithNumber = () => {
-    const normalized = manualPhone.replace(/\s+/g, '').replace(/^\+/, '');
-    if (!normalized || !/^\d+$/.test(normalized)) return;
+    const compact = manualPhone.replace(/\s+/g, '');
+    const withPlus = compact.startsWith('+') ? compact : `+${compact}`;
+    const phoneErr = validatePhoneField(withPlus, t);
+    if (phoneErr) {
+      setErrors({ phone: phoneErr });
+      return;
+    }
+    setErrors({});
+    const normalized = compact.replace(/^\+/, '');
     onSelectClient({
       id: `manual:${normalized}`,
       name: normalized,
       phone_number: normalized,
       is_manual: true,
-    } as Client);
+    });
     setManualPhone('');
     onClose();
   };
@@ -70,23 +82,31 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
     >
       <div className="space-y-4">
         <p className="text-sm text-gray-600 dark:text-gray-400">{t('chooseClientFromDb')}</p>
-        <div className="flex gap-2">
-          <input
-            type="tel"
-            value={manualPhone}
-            onChange={(e) => setManualPhone(e.target.value.replace(/[^\d+\s]/g, ''))}
-            placeholder={t('enterPhoneNumber') || 'Type phone number (e.g. +971501234567)'}
-            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
-            dir="ltr"
-          />
-          <button
-            type="button"
-            onClick={handleStartWithNumber}
-            disabled={!manualPhone.trim()}
-            className="px-3 py-2 rounded bg-primary text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {t('start') || 'Start'}
-          </button>
+        <div>
+          <div className="flex gap-2">
+            <input
+              type="tel"
+              value={manualPhone}
+              onChange={(e) => {
+                setManualPhone(e.target.value.replace(/[^\d+\s]/g, ''));
+                clearFieldError(setErrors, 'phone');
+              }}
+              placeholder={t('enterPhoneNumber') || 'Type phone number (e.g. +971501234567)'}
+              className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.phone ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+              dir="ltr"
+            />
+            <button
+              type="button"
+              onClick={handleStartWithNumber}
+              disabled={!manualPhone.trim()}
+              className="px-3 py-2 rounded bg-primary text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {t('start') || 'Start'}
+            </button>
+          </div>
+          {errors.phone && (
+            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+          )}
         </div>
         <input
           type="text"
@@ -116,11 +136,17 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
                         {getWhatsAppContactAvatarLabel(client)}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-gray-900 dark:text-white truncate">{title}</p>
+                        {isPhoneLike(title) ? (
+                          <PhoneText as="p" className="font-medium text-gray-900 dark:text-white truncate">{title}</PhoneText>
+                        ) : (
+                          <p className="font-medium text-gray-900 dark:text-white truncate">{title}</p>
+                        )}
                         {subtitle && (
-                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate" dir={subtitle === (client.phone_number || '') ? 'ltr' : 'auto'}>
-                            {subtitle}
-                          </p>
+                          isPhoneLike(subtitle) ? (
+                            <PhoneText as="p" className="text-sm text-gray-500 dark:text-gray-400 truncate">{subtitle}</PhoneText>
+                          ) : (
+                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{subtitle}</p>
+                          )
                         )}
                       </div>
                     </button>

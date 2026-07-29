@@ -3,7 +3,7 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input, PhoneText, isPhoneLike } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { CheckIcon, EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
@@ -50,6 +50,7 @@ import {
     type ManualChatMessage,
 } from '../utils/whatsappManualChatsStorage';
 import { normalizeRole } from '../utils/roles';
+import { clearFieldError } from '../utils/formFieldErrors';
 
 type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown> };
 
@@ -116,11 +117,13 @@ function TwilioSMSForm({
     const [isEnabled, setIsEnabled] = useState(false);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [success, setSuccess] = useState(false);
     const [showAccountSid, setShowAccountSid] = useState(false);
     const [showAuthToken, setShowAuthToken] = useState(false);
     const [showOtpiqApiKey, setShowOtpiqApiKey] = useState(false);
+    const [authTokenMasked, setAuthTokenMasked] = useState<string | null>(null);
+    const [otpiqApiKeyMasked, setOtpiqApiKeyMasked] = useState<string | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -132,11 +135,13 @@ function TwilioSMSForm({
                     setTwilioNumber(data.twilio_number || '');
                     setAuthToken('');
                     setOtpiqApiKey('');
+                    setAuthTokenMasked(data.auth_token_masked ?? null);
+                    setOtpiqApiKeyMasked(data.otpiq_api_key_masked ?? null);
                     setSenderId(data.sender_id || '');
                     setIsEnabled(!!data.is_enabled);
                 }
             })
-            .catch(() => { if (!cancelled) setError(t('failedToLoadTwilioSettings')); })
+            .catch(() => { if (!cancelled) setErrors({ general: t('failedToLoadTwilioSettings') }); })
             .finally(() => { if (!cancelled) setLoading(false); });
         return () => { cancelled = true; };
     }, []);
@@ -152,14 +157,29 @@ function TwilioSMSForm({
 
     const handleSave = () => {
         if (selectedProviderPolicyDisabled) {
-            setError(
-                selectedProviderPolicyMessage ||
+            setErrors({
+                general:
+                    selectedProviderPolicyMessage ||
                     t('integrationDisabledDefaultMessage') ||
                     'This integration is currently disabled by your administrator.',
-            );
+            });
             return;
         }
-        setError(null);
+
+        const newErrors: Record<string, string> = {};
+        if (provider === 'twilio') {
+            if (!accountSid.trim()) newErrors.accountSid = t('accountSidRequired') || 'Account SID is required';
+            if (!twilioNumber.trim()) newErrors.twilioNumber = t('twilioNumberRequired') || 'Twilio number is required';
+            if (!authToken.trim() && !authTokenMasked) newErrors.authToken = t('authTokenRequired') || 'Auth token is required';
+        } else if (!otpiqApiKey.trim() && !otpiqApiKeyMasked) {
+            newErrors.otpiqApiKey = t('otpiqApiKeyRequired') || 'OTPIQ API key is required';
+        }
+        if (Object.keys(newErrors).length > 0) {
+            setErrors(newErrors);
+            return;
+        }
+
+        setErrors({});
         setSuccess(false);
         setSaving(true);
         const payload: Parameters<typeof updateTwilioSettingsAPI>[0] = {
@@ -176,8 +196,14 @@ function TwilioSMSForm({
             if (otpiqApiKey) payload.otpiq_api_key = otpiqApiKey;
         }
         updateTwilioSettingsAPI(payload)
-            .then(() => { setSuccess(true); setAuthToken(''); setOtpiqApiKey(''); })
-            .catch((e: any) => setError(e?.message || t('failedToSaveTwilioSettings')))
+            .then((data) => {
+                setSuccess(true);
+                setAuthToken('');
+                setOtpiqApiKey('');
+                setAuthTokenMasked(data.auth_token_masked ?? authTokenMasked);
+                setOtpiqApiKeyMasked(data.otpiq_api_key_masked ?? otpiqApiKeyMasked);
+            })
+            .catch((e: any) => setErrors({ general: e?.message || t('failedToSaveTwilioSettings') }))
             .finally(() => setSaving(false));
     };
 
@@ -242,7 +268,13 @@ function TwilioSMSForm({
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('smsProvider') || 'SMS provider'}</label>
                         <select
                             value={provider}
-                            onChange={(e) => setProvider(e.target.value as SmsProviderChoice)}
+                            onChange={(e) => {
+                                setProvider(e.target.value as SmsProviderChoice);
+                                clearFieldError(setErrors, 'accountSid');
+                                clearFieldError(setErrors, 'twilioNumber');
+                                clearFieldError(setErrors, 'authToken');
+                                clearFieldError(setErrors, 'otpiqApiKey');
+                            }}
                             className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
                         >
                             <option value="twilio" disabled={twilioPolicyDisabled}>
@@ -268,11 +300,14 @@ function TwilioSMSForm({
                             <input
                                 type={showAccountSid ? 'text' : 'password'}
                                 value={accountSid}
-                                onChange={(e) => setAccountSid(e.target.value)}
+                                onChange={(e) => {
+                                    setAccountSid(e.target.value);
+                                    clearFieldError(setErrors, 'accountSid');
+                                }}
                                 autoComplete="off"
                                 data-form-type="other"
                                 data-lpignore="true"
-                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm ${errors.accountSid ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                 placeholder={t('accountSidPlaceholder')}
                             />
                             <button
@@ -284,19 +319,28 @@ function TwilioSMSForm({
                                 {showAccountSid ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                             </button>
                         </div>
+                        {errors.accountSid && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.accountSid}</p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('twilioNumber')}</label>
                         <input
                             type="text"
                             value={twilioNumber}
-                            onChange={(e) => setTwilioNumber(e.target.value)}
+                            onChange={(e) => {
+                                setTwilioNumber(e.target.value);
+                                clearFieldError(setErrors, 'twilioNumber');
+                            }}
                             autoComplete="off"
                             data-form-type="other"
                             data-lpignore="true"
-                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                            className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.twilioNumber ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                             placeholder={t('twilioNumberPlaceholder')}
                         />
+                        {errors.twilioNumber && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.twilioNumber}</p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('authToken')}</label>
@@ -304,11 +348,14 @@ function TwilioSMSForm({
                             <input
                                 type={showAuthToken ? 'text' : 'password'}
                                 value={authToken}
-                                onChange={(e) => setAuthToken(e.target.value)}
+                                onChange={(e) => {
+                                    setAuthToken(e.target.value);
+                                    clearFieldError(setErrors, 'authToken');
+                                }}
                                 autoComplete="new-password"
                                 data-form-type="other"
                                 data-lpignore="true"
-                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm ${errors.authToken ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                 placeholder={t('leaveBlankToKeepCurrent')}
                             />
                             <button
@@ -320,6 +367,9 @@ function TwilioSMSForm({
                                 {showAuthToken ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                             </button>
                         </div>
+                        {errors.authToken && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.authToken}</p>
+                        )}
                     </div>
                     </>
                     ) : (
@@ -329,11 +379,14 @@ function TwilioSMSForm({
                             <input
                                 type={showOtpiqApiKey ? 'text' : 'password'}
                                 value={otpiqApiKey}
-                                onChange={(e) => setOtpiqApiKey(e.target.value)}
+                                onChange={(e) => {
+                                    setOtpiqApiKey(e.target.value);
+                                    clearFieldError(setErrors, 'otpiqApiKey');
+                                }}
                                 autoComplete="new-password"
                                 data-form-type="other"
                                 data-lpignore="true"
-                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm ${errors.otpiqApiKey ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                 placeholder={t('leaveBlankToKeepCurrent')}
                             />
                             <button
@@ -345,6 +398,9 @@ function TwilioSMSForm({
                                 {showOtpiqApiKey ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
                             </button>
                         </div>
+                        {errors.otpiqApiKey && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.otpiqApiKey}</p>
+                        )}
                         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('otpiqApiKeyHelp') || 'From your OTPIQ project dashboard.'}</p>
                     </div>
                     )}
@@ -373,7 +429,7 @@ function TwilioSMSForm({
                     </div>
                 </div>
 
-                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+                {errors.general && <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p>}
                 {success && <p className="text-sm text-green-600 dark:text-green-400">{t('saveSucceeded')}</p>}
 
                 <Button onClick={handleSave} disabled={saving || selectedProviderPolicyDisabled}>
@@ -415,7 +471,7 @@ function OpenAISettingsForm({
     const [saving, setSaving] = useState(false);
     const [testing, setTesting] = useState(false);
     const [running, setRunning] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [successMessage, setSuccessMessage] = useState<string | null>(null);
     const [testStatus, setTestStatus] = useState<'idle' | 'success' | 'error'>('idle');
     const [testMessage, setTestMessage] = useState<string | null>(null);
@@ -442,7 +498,7 @@ function OpenAISettingsForm({
                 }
             })
             .catch(() => {
-                if (!cancelled) setError(t('failedToLoadOpenAISettings'));
+                if (!cancelled) setErrors({ general: t('failedToLoadOpenAISettings') });
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -454,10 +510,14 @@ function OpenAISettingsForm({
 
     const handleSave = () => {
         if (openaiPolicyDisabled) {
-            setError(openaiPolicyMessage || t('integrationDisabledDefaultMessage'));
+            setErrors({ general: openaiPolicyMessage || t('integrationDisabledDefaultMessage') });
             return;
         }
-        setError(null);
+        if (!apiKey.trim() && !apiKeyMasked) {
+            setErrors({ apiKey: t('openaiApiKeyRequired') || 'API key is required' });
+            return;
+        }
+        setErrors({});
         setSuccessMessage(null);
         setTestStatus('idle');
         setTestMessage(null);
@@ -476,20 +536,20 @@ function OpenAISettingsForm({
                 setApiKeyMasked(data.api_key_masked ?? null);
                 setLastError(data.last_error ?? null);
             })
-            .catch((e: any) => setError(e?.message || t('failedToSaveOpenAISettings')))
+            .catch((e: any) => setErrors({ general: e?.message || t('failedToSaveOpenAISettings') }))
             .finally(() => setSaving(false));
     };
 
     const handleTest = () => {
         if (openaiPolicyDisabled) {
-            setError(openaiPolicyMessage || t('integrationDisabledDefaultMessage'));
+            setErrors({ general: openaiPolicyMessage || t('integrationDisabledDefaultMessage') });
             return;
         }
         setTesting(true);
         setTestStatus('idle');
         setTestMessage(null);
         setSuccessMessage(null);
-        setError(null);
+        setErrors({});
         const draftKey = apiKey.trim();
         const payload = draftKey ? { api_key: draftKey, model } : undefined;
         testOpenAISettingsAPI(payload)
@@ -506,16 +566,16 @@ function OpenAISettingsForm({
 
     const handleAnalyze = () => {
         setRunning(true);
-        setError(null);
+        setErrors({});
         setSuccessMessage(null);
         setTestStatus('idle');
         setTestMessage(null);
         runAIAnalysisAPI(false)
             .then(() => {
                 setSuccessMessage(t('openaiAnalyzeSuccess'));
-                setError(null);
+                setErrors({});
             })
-            .catch((e: any) => setError(e?.message || t('openaiConnectionFailed')))
+            .catch((e: any) => setErrors({ general: e?.message || t('openaiConnectionFailed') }))
             .finally(() => setRunning(false));
     };
 
@@ -572,11 +632,14 @@ function OpenAISettingsForm({
                                 name="openai_api_key"
                                 type={showApiKey ? 'text' : 'password'}
                                 value={apiKey}
-                                onChange={(e) => setApiKey(e.target.value)}
+                                onChange={(e) => {
+                                    setApiKey(e.target.value);
+                                    clearFieldError(setErrors, 'apiKey');
+                                }}
                                 autoComplete="new-password"
                                 data-form-type="other"
                                 data-lpignore="true"
-                                className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm"
+                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm ${errors.apiKey ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                 placeholder={t('openaiApiKeyPlaceholder')}
                             />
                             <button
@@ -589,6 +652,9 @@ function OpenAISettingsForm({
                                 {showApiKey ? <EyeOffIcon className="w-5 h-5" /> : <EyeIcon className="w-5 h-5" />}
                             </button>
                         </div>
+                        {errors.apiKey && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.apiKey}</p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('openaiModel')}</label>
@@ -636,9 +702,9 @@ function OpenAISettingsForm({
                     </label>
                 </div>
 
-                {error && (
+                {errors.general && (
                     <div className="rounded-lg border px-4 py-3 text-sm bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
-                        {error}
+                        {errors.general}
                     </div>
                 )}
                 {testStatus === 'success' && testMessage ? (
@@ -792,6 +858,7 @@ export const IntegrationsPage = () => {
     const [leadApiKeyName, setLeadApiKeyName] = useState('');
     const [leadApiSecretModal, setLeadApiSecretModal] = useState<string | null>(null);
     const [leadApiKeyBusy, setLeadApiKeyBusy] = useState(false);
+    const [leadApiKeyError, setLeadApiKeyError] = useState<string | null>(null);
     const [showLeadApiSecret, setShowLeadApiSecret] = useState(false);
     const [leadApiTab, setLeadApiTab] = useState<'setup' | 'docs'>('setup');
 
@@ -1142,9 +1209,10 @@ export const IntegrationsPage = () => {
             }
             const name = leadApiKeyName.trim();
             if (!name) {
-                showAlert(t('leadApiKeyName') || 'Key name', 'warning');
+                setLeadApiKeyError(t('leadApiKeyNameRequired') || t('leadApiKeyName') || 'Key name is required');
                 return;
             }
+            setLeadApiKeyError(null);
             setLeadApiKeyBusy(true);
             try {
                 const data = await createLeadApiKeyAPI(name);
@@ -1153,7 +1221,7 @@ export const IntegrationsPage = () => {
                 setShowLeadApiSecret(true);
                 refetchMujebConfig();
             } catch (e: any) {
-                showAlert(e?.message || t('leadApiKeyCreateFailed'), 'error');
+                setLeadApiKeyError(e?.message || t('leadApiKeyCreateFailed'));
             } finally {
                 setLeadApiKeyBusy(false);
             }
@@ -1277,10 +1345,17 @@ export const IntegrationsPage = () => {
                                                     </label>
                                                     <Input
                                                         value={leadApiKeyName}
-                                                        onChange={(e) => setLeadApiKeyName(e.target.value)}
+                                                        onChange={(e) => {
+                                                            setLeadApiKeyName(e.target.value);
+                                                            setLeadApiKeyError(null);
+                                                        }}
                                                         placeholder={t('leadApiKeyNamePlaceholder')}
                                                         disabled={mujebDisabled}
+                                                        className={leadApiKeyError ? 'border-red-500 dark:border-red-500' : ''}
                                                     />
+                                                    {leadApiKeyError && (
+                                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{leadApiKeyError}</p>
+                                                    )}
                                                 </div>
                                                 <Button
                                                     variant="primary"
@@ -1460,9 +1535,10 @@ export const IntegrationsPage = () => {
         const handleGenerateKey = async () => {
             const name = leadApiKeyName.trim();
             if (!name) {
-                showAlert(t('leadApiKeyName') || 'Key name', 'warning');
+                setLeadApiKeyError(t('leadApiKeyNameRequired') || t('leadApiKeyName') || 'Key name is required');
                 return;
             }
+            setLeadApiKeyError(null);
             setLeadApiKeyBusy(true);
             try {
                 const data = await createLeadApiKeyAPI(name);
@@ -1471,7 +1547,7 @@ export const IntegrationsPage = () => {
                 setShowLeadApiSecret(true);
                 refetchLeadApiConfig();
             } catch (e: any) {
-                showAlert(e?.message || t('leadApiKeyCreateFailed'), 'error');
+                setLeadApiKeyError(e?.message || t('leadApiKeyCreateFailed'));
             } finally {
                 setLeadApiKeyBusy(false);
             }
@@ -1627,9 +1703,16 @@ export const IntegrationsPage = () => {
                                                     </label>
                                                     <Input
                                                         value={leadApiKeyName}
-                                                        onChange={(e) => setLeadApiKeyName(e.target.value)}
+                                                        onChange={(e) => {
+                                                            setLeadApiKeyName(e.target.value);
+                                                            setLeadApiKeyError(null);
+                                                        }}
                                                         placeholder={t('leadApiKeyNamePlaceholder')}
+                                                        className={leadApiKeyError ? 'border-red-500 dark:border-red-500' : ''}
                                                     />
+                                                    {leadApiKeyError && (
+                                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{leadApiKeyError}</p>
+                                                    )}
                                                 </div>
                                                 <Button
                                                     variant="primary"
@@ -2973,13 +3056,24 @@ export const IntegrationsPage = () => {
                                                     {getChatAvatarLabel(client)}
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{getWhatsAppContactTitle(client)}</p>
+                                                    {(() => {
+                                                        const title = getWhatsAppContactTitle(client);
+                                                        return isPhoneLike(title) ? (
+                                                            <PhoneText as="p" className="font-medium text-gray-900 dark:text-white truncate">{title}</PhoneText>
+                                                        ) : (
+                                                            <p className="font-medium text-gray-900 dark:text-white truncate">{title}</p>
+                                                        );
+                                                    })()}
                                                     <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                        {getWhatsAppContactSubtitle(client) ? (
-                                                            <span dir={getWhatsAppContactSubtitle(client) === (client.phone_number || '') ? 'ltr' : 'auto'}>
-                                                                {getWhatsAppContactSubtitle(client)}
-                                                            </span>
-                                                        ) : null}
+                                                        {(() => {
+                                                            const subtitle = getWhatsAppContactSubtitle(client);
+                                                            if (!subtitle) return null;
+                                                            return isPhoneLike(subtitle) ? (
+                                                                <PhoneText className="truncate">{subtitle}</PhoneText>
+                                                            ) : (
+                                                                <span>{subtitle}</span>
+                                                            );
+                                                        })()}
                                                     </p>
                                                 </div>
                                             </button>
@@ -3009,12 +3103,19 @@ export const IntegrationsPage = () => {
                                                 {getChatAvatarLabel(selectedChatClient)}
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="font-medium text-gray-900 dark:text-white">{getWhatsAppContactTitle(selectedChatClient)}</p>
+                                                {(() => {
+                                                    const title = getWhatsAppContactTitle(selectedChatClient);
+                                                    return isPhoneLike(title) ? (
+                                                        <PhoneText as="p" className="font-medium text-gray-900 dark:text-white">{title}</PhoneText>
+                                                    ) : (
+                                                        <p className="font-medium text-gray-900 dark:text-white">{title}</p>
+                                                    );
+                                                })()}
                                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                                     {selectedChatClient.phone_number && (
                                                         <>
                                                             {t('connectedWhatsAppApi')} ·{' '}
-                                                            <span dir="ltr">{selectedChatClient.phone_number}</span>
+                                                            <PhoneText>{selectedChatClient.phone_number}</PhoneText>
                                                         </>
                                                     )}
                                                 </p>
@@ -3568,7 +3669,11 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                         <div className="flex items-center gap-3 mb-2 sm:mb-0">
                                             <IntegrationPlatformIcon platform="whatsapp" size="md" />
                                             <div>
-                                                <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
+                                                {isPhoneLike(account.name) ? (
+                                                    <PhoneText as="p" className="font-semibold text-gray-900 dark:text-white">{account.name}</PhoneText>
+                                                ) : (
+                                                    <p className="font-semibold text-gray-900 dark:text-white">{account.name}</p>
+                                                )}
                                                 <span className={`flex items-center text-xs ${account.status === 'Connected' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                     <span className={`h-2 w-2 me-1.5 rounded-full ${account.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                                                     {account.status === 'Connected' ? t('connected') : t('disconnected')}
@@ -3691,7 +3796,11 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                         <IntegrationPlatformIcon platform={integrationPlatform} size="md" />
                                     )}
                                     <div className="min-w-0">
-                                        <p className="font-semibold text-gray-900 dark:text-white truncate">{account.name}</p>
+                                        {isPhoneLike(account.name) ? (
+                                            <PhoneText as="p" className="font-semibold text-gray-900 dark:text-white truncate">{account.name}</PhoneText>
+                                        ) : (
+                                            <p className="font-semibold text-gray-900 dark:text-white truncate">{account.name}</p>
+                                        )}
                                         <span
                                             className={`inline-flex items-center gap-1.5 mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
                                                 account.status === 'Connected'

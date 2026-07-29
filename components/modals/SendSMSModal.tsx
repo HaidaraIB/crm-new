@@ -4,9 +4,11 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Loader } from '../Loader';
+import { PhoneText } from '../PhoneText';
 import { sendLeadSMSAPI, getMessageTemplatesAPI } from '../../services/api';
 import { replaceSmsTemplatePlaceholders } from '../../utils/smsSendHelpers';
 import { SmsSendPreviewModal } from './SmsSendPreviewModal';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -31,7 +33,7 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
     const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [showPreview, setShowPreview] = useState(false);
     const [resolvedBody, setResolvedBody] = useState('');
 
@@ -44,26 +46,31 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
 
     const handleClose = () => {
         setBody('');
-        setError(null);
+        setErrors({});
         setShowPreview(false);
         setResolvedBody('');
         onClose();
     };
 
+    const handleBodyChange = (value: string) => {
+        setBody(value);
+        clearFieldError(setErrors, 'body');
+    };
+
     const handleOpenPreview = () => {
         const trimmed = body.trim();
         if (!trimmed) {
-            setError(t('smsMessageRequired') || 'Please enter your message');
+            setErrors({ body: t('smsMessageRequired') || 'Please enter your message' });
             return;
         }
         const bodyToSend = lead ? replaceSmsTemplatePlaceholders(trimmed, lead) : trimmed;
         setResolvedBody(bodyToSend);
-        setError(null);
+        setErrors({});
         setShowPreview(true);
     };
 
     const handleConfirmSend = async () => {
-        setError(null);
+        setErrors({});
         setSending(true);
         try {
             await sendLeadSMSAPI({ lead_id: leadId, phone_number: phoneNumber, body: resolvedBody });
@@ -75,7 +82,7 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
             const errorKey = e?.data?.error_key;
             const localized = errorKey && t(errorKey) ? t(errorKey) : null;
             const fallback = stripAnsi(e?.message || '') || t('failedToSendSms');
-            setError(localized || fallback);
+            setErrors({ general: localized || fallback });
             setShowPreview(false);
         } finally {
             setSending(false);
@@ -107,7 +114,7 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
         >
             <div className="space-y-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t('smsMessage')} → <strong>{phoneNumber}</strong>
+                    {t('smsMessage')} → <PhoneText as="strong">{phoneNumber}</PhoneText>
                 </p>
                 <div>
                     {smsTemplates.length > 0 && (
@@ -122,6 +129,7 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
                                             const content = tpl.content || '';
                                             const resolved = lead ? replaceSmsTemplatePlaceholders(content, lead) : content;
                                             setBody((prev) => (prev ? prev + '\n' + resolved : resolved));
+                                            clearFieldError(setErrors, 'body');
                                         }}
                                         className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
                                     >
@@ -136,12 +144,19 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
                         id="sms-body"
                         rows={4}
                         value={body}
-                        onChange={(e) => setBody(e.target.value)}
-                        className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                        onChange={(e) => handleBodyChange(e.target.value)}
+                        className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.body ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                         placeholder={t('smsMessagePlaceholder')}
                     />
+                    {errors.body && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.body}</p>
+                    )}
                 </div>
-                {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+                {errors.general && (
+                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+                        {errors.general}
+                    </div>
+                )}
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={handleClose} disabled={sending}>{t('cancel')}</Button>
                     <Button

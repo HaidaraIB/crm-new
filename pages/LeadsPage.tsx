@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
@@ -857,11 +857,11 @@ export const LeadsPage = () => {
                                                 )}
                                                 <td className="px-4 sm:px-6 py-4 text-center min-w-[220px]">
                                                     {isDataEntryUser ? (
-                                                        <span className="text-sm text-gray-900 dark:text-gray-100" dir="ltr">
+                                                        <PhoneText className="text-sm text-gray-900 dark:text-gray-100">
                                                             {lead.phoneNumbers && lead.phoneNumbers.length > 0
                                                                 ? lead.phoneNumbers.map((pn: { phone_number: string }) => pn.phone_number).join(', ')
                                                                 : (lead.phone || '-')}
-                                                        </span>
+                                                        </PhoneText>
                                                     ) : (
                                                     <div className="mx-auto w-full min-w-[200px] max-w-full">
                                                         <LeadContactPhoneList

@@ -1,6 +1,6 @@
 ---
-description: Reusable Kanban board pattern for table/board entity views (leads, deals, etc.)
-globs: "**/components/kanban/**,**/components/leads/**,**/pages/LeadsPage.tsx,**/pages/DealsPage.tsx"
+description: Reusable Kanban board pattern for table/board entity views (leads, deals, todos)
+globs: "**/components/kanban/**,**/components/leads/**,**/components/deals/**,**/components/todos/**,**/pages/LeadsPage.tsx,**/pages/DealsPage.tsx,**/pages/TodosPage.tsx"
 alwaysApply: false
 ---
 
@@ -17,20 +17,18 @@ Import from `components/kanban` (also re-exported from `components/index`):
 - `KanbanBoard` — generic DnD board (`@dnd-kit/core`)
 - Types: `EntityViewMode`, `KanbanColumnDef`, `KanbanMoveEvent`
 
-## How to adopt (e.g. Deals)
+## How to adopt
 
-1. `const [viewMode, setViewMode] = useEntityViewMode('deals')`
+1. `const [viewMode, setViewMode] = useEntityViewMode('leads' | 'deals' | 'todos')`
 2. Render `<ViewModeToggle value={viewMode} onChange={setViewMode} />` next to list toolbar controls
 3. When `viewMode === 'board'`:
-   - Columns = pipeline axis: for **Deals use `Deal.stage`** (`won` | `lost` | `on_hold` | `in_progress` | `cancelled`), not reservation/contract status
-   - For **Leads use company `Status` rows** (`settings/statuses`), column id = status id
+   - **Leads:** columns = company `Status` rows (`settings/statuses`), move → `PATCH { status: id }`
+   - **Deals:** columns = `Deal.stage` enum, move → `PATCH { stage }`
+   - **Todos:** columns = company `LeadStage` rows (`settings/stages`); deal tasks + client tasks only (calls have no stage); move → `PATCH { stage: id }` on `/tasks/` or `/client-tasks/`
 4. Pass domain cards via `renderCard`; keep DnD in `KanbanBoard` / `KanbanCardShell`
-5. On `onMove`, **PATCH only the moved field** (leads: `{ status: id }` via `patchLeadAPI` / `usePatchLead`; deals: `{ stage }` via existing deal update). Prefer PATCH over full PUT payloads
-6. **Optimistic UI** + rollback on failure; invalidate the entity list + related count queries
-7. **Per-column pagination** (page size ~30 + Load more) — do not fetch the entire entity set into the board
-8. Disable table list query when board is active (`enabled: viewMode === 'table'`) and vice versa for board column queries
-9. Hide status/stage filter tabs in board mode (columns already represent that axis)
-10. Respect role permissions (e.g. DataEntry: no drag / no open), RTL, and **localize every string** in `constants.ts` (`en` + `ar`) with `t()`
+5. Prefer PATCH for field moves; optimistic UI + rollback; invalidate related queries
+6. Hide status/stage filter chips in board mode (columns already represent that axis)
+7. Respect role permissions, RTL, and localize every string in `constants.ts` (`en` + `ar`) with `t()`
 
 ## Do not
 

@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { forgotPasswordAPI } from '../services/api';
+import { validateEmailField, validateOtpCodeField } from '../utils/formValidation';
 
 export const ForgotPasswordPage = () => {
     const { setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -10,42 +11,47 @@ export const ForgotPasswordPage = () => {
     const [code, setCode] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isCodeLoading, setIsCodeLoading] = useState(false);
-    const [error, setError] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [success, setSuccess] = useState(false);
-    const [useCode, setUseCode] = useState(false);
 
     const handleForgotPassword = async () => {
-        setError('');
+        setErrors({});
         setSuccess(false);
-        
-        if (!email.trim()) {
-            setError(t('pleaseEnterEmail') || 'Please enter your email address');
-            return;
-        }
 
-        // Basic email validation
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            setError(t('invalidEmailFormat') || 'Please enter a valid email address');
+        const emailErr = validateEmailField(email, t);
+        if (emailErr) {
+            setErrors({ email: emailErr });
             return;
         }
 
         setIsLoading(true);
-        
+
         try {
             await forgotPasswordAPI(email, language);
             setSuccess(true);
         } catch (error: any) {
             const errorMessage = error.message || 'Failed to send password reset email';
-            setError(errorMessage);
+            setErrors({ general: errorMessage });
         } finally {
             setIsLoading(false);
         }
     };
 
+    const handleContinueWithCode = () => {
+        const codeErr = validateOtpCodeField(code, t, { exactLength: 6 });
+        if (codeErr) {
+            setErrors({ code: codeErr === (t('invalidVerificationCode') || 'Invalid verification code')
+                ? (t('codeMustBe6Digits') || 'Code must be 6 digits')
+                : (code.trim() ? codeErr : (t('pleaseEnterCode') || 'Please enter the reset code'))
+            });
+            return;
+        }
+        setIsCodeLoading(true);
+        window.location.href = `/reset-password?email=${encodeURIComponent(email)}&code=${code.trim()}`;
+    };
+
     return (
         <div className={`min-h-screen flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
-            {/* Theme and Language Toggle Buttons */}
             <div className={`absolute top-4 end-4 z-10 flex ${language === 'ar' ? 'gap-4' : 'gap-2'}`}>
                 <button
                     onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
@@ -62,10 +68,10 @@ export const ForgotPasswordPage = () => {
             <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8">
                 <div className="max-w-md w-full space-y-8">
                     <div className="flex flex-col items-center">
-                        <img 
-                            src="/logo_purple.png" 
-                            alt="LOOP CRM Logo" 
-                            className="h-12 w-auto object-contain mb-4 lg:hidden" 
+                        <img
+                            src="/logo_purple.png"
+                            alt="LOOP CRM Logo"
+                            className="h-12 w-auto object-contain mb-4 lg:hidden"
                         />
                         <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">
                             {t('forgotPassword') || 'Forgot Password?'}
@@ -75,9 +81,9 @@ export const ForgotPasswordPage = () => {
                         </p>
                     </div>
                     <div className="space-y-6">
-                        {error && (
+                        {errors.general && (
                             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                                {error}
+                                {errors.general}
                             </div>
                         )}
                         {success ? (
@@ -93,39 +99,37 @@ export const ForgotPasswordPage = () => {
                                     </div>
                                     <div>
                                         <label htmlFor="code" className="sr-only">{t('resetCode') || 'Reset Code'}</label>
-                                        <Input 
-                                            id="code" 
+                                        <Input
+                                            id="code"
                                             placeholder={t('resetCode') || 'Enter reset code from email'}
                                             value={code}
+                                            className={errors.code ? 'border-red-500' : ''}
                                             onChange={(e) => {
                                                 setCode(e.target.value);
-                                                setError('');
+                                                setErrors((prev) => {
+                                                    const next = { ...prev };
+                                                    delete next.code;
+                                                    delete next.general;
+                                                    return next;
+                                                });
                                             }}
                                             onKeyPress={(e) => {
                                                 if (e.key === 'Enter' && code.trim().length === 6) {
-                                                    window.location.href = `/reset-password?email=${encodeURIComponent(email)}&code=${code.trim()}`;
+                                                    handleContinueWithCode();
                                                 }
                                             }}
                                             maxLength={6}
                                         />
+                                        {errors.code && (
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.code}</p>
+                                        )}
                                         <p className="mt-2 text-xs text-secondary text-center">
                                             {t('enterCodeFromEmail') || 'Enter the 6-digit code sent to your email'}
                                         </p>
                                     </div>
                                     <div>
-                                        <Button 
-                                            onClick={() => {
-                                                if (!code.trim()) {
-                                                    setError(t('pleaseEnterCode') || 'Please enter the reset code');
-                                                    return;
-                                                }
-                                                if (code.trim().length !== 6) {
-                                                    setError(t('codeMustBe6Digits') || 'Code must be 6 digits');
-                                                    return;
-                                                }
-                                                setIsCodeLoading(true);
-                                                window.location.href = `/reset-password?email=${encodeURIComponent(email)}&code=${code.trim()}`;
-                                            }}
+                                        <Button
+                                            onClick={handleContinueWithCode}
                                             className="w-full"
                                             loading={isCodeLoading}
                                             disabled={!code.trim() || code.trim().length !== 6 || isCodeLoading}
@@ -144,14 +148,20 @@ export const ForgotPasswordPage = () => {
                             <>
                                 <div>
                                     <label htmlFor="email" className="sr-only">{t('emailAddress') || 'Email'}</label>
-                                    <Input 
-                                        id="email" 
+                                    <Input
+                                        id="email"
                                         type="email"
                                         placeholder={t('emailAddress') || 'Email address'}
                                         value={email}
+                                        className={errors.email ? 'border-red-500' : ''}
                                         onChange={(e) => {
                                             setEmail(e.target.value);
-                                            setError('');
+                                            setErrors((prev) => {
+                                                const next = { ...prev };
+                                                delete next.email;
+                                                delete next.general;
+                                                return next;
+                                            });
                                         }}
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') {
@@ -159,6 +169,9 @@ export const ForgotPasswordPage = () => {
                                             }
                                         }}
                                     />
+                                    {errors.email && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                                    )}
                                 </div>
                                 <div>
                                     <Button onClick={handleForgotPassword} className="w-full" loading={isLoading} disabled={isLoading}>
@@ -186,4 +199,3 @@ export const ForgotPasswordPage = () => {
         </div>
     );
 };
-

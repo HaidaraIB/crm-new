@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
+import { Developer } from '../../types';
 import { useAddProject, useDevelopers } from '../../hooks/useQueries';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -27,7 +28,7 @@ export const AddProjectModal = () => {
     
     // Fetch developers using React Query
     const { data: developersResponse } = useDevelopers();
-    const developers = developersResponse?.results || [];
+    const developers: Developer[] = developersResponse?.results || [];
 
     // Create project mutation
     const addProjectMutation = useAddProject();

@@ -4,6 +4,7 @@ import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { useAppContext } from '../../context/AppContext';
 import { getTwilioSettingsAPI, updateTwilioSettingsAPI } from '../../services/api';
 import { navigateToCompanyRoute } from '../../utils/routing';
+import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 const DEFAULT_TEMPLATE = "Hello [first_name], we'll contact you soon!";
 
@@ -13,7 +14,7 @@ export const NewLeadSmsSettings = () => {
     const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
-    const [error, setError] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     useEffect(() => {
         let cancelled = false;
@@ -26,7 +27,7 @@ export const NewLeadSmsSettings = () => {
                 setTemplate(tpl != null && tpl !== '' ? tpl : DEFAULT_TEMPLATE);
             })
             .catch(() => {
-                if (!cancelled) setError(t('failedToLoadTwilioSettings') || 'Failed to load settings');
+                if (!cancelled) setErrors({ general: t('failedToLoadTwilioSettings') || 'Failed to load settings' });
             })
             .finally(() => {
                 if (!cancelled) setLoading(false);
@@ -36,9 +37,27 @@ export const NewLeadSmsSettings = () => {
         };
     }, [t]);
 
+    const validateForm = (): boolean => {
+        const newErrors: Record<string, string> = {};
+        if (enabled && !template.trim()) {
+            newErrors.template = t('newLeadSmsTemplateRequired') || 'Template is required when this is enabled';
+        }
+        setErrors(newErrors);
+        if (Object.keys(newErrors).length > 0) {
+            requestAnimationFrame(() =>
+                scrollToFirstFieldError(newErrors, { template: 'lead-sms-template' })
+            );
+            return false;
+        }
+        return true;
+    };
+
     const handleSave = async () => {
+        if (!validateForm()) {
+            return;
+        }
         setSaving(true);
-        setError('');
+        setErrors({});
         try {
             await updateTwilioSettingsAPI({
                 lead_created_sms_enabled: enabled,
@@ -48,9 +67,20 @@ export const NewLeadSmsSettings = () => {
             setIsSuccessModalOpen(true);
         } catch (e: unknown) {
             const msg = e instanceof Error ? e.message : String(e);
-            setError(msg || t('failedToSaveTwilioSettings') || 'Failed to save');
+            setErrors({ general: msg || t('failedToSaveTwilioSettings') || 'Failed to save' });
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleTemplateChange = (value: string) => {
+        setTemplate(value);
+        if (errors.template) {
+            setErrors((prev) => {
+                const next = { ...prev };
+                delete next.template;
+                return next;
+            });
         }
     };
 
@@ -107,15 +137,18 @@ export const NewLeadSmsSettings = () => {
                         id="lead-sms-template"
                         rows={4}
                         value={template}
-                        onChange={(e) => setTemplate(e.target.value)}
-                        className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                        onChange={(e) => handleTemplateChange(e.target.value)}
+                        className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.template ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                     />
+                    {errors.template && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.template}</p>
+                    )}
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 whitespace-pre-line">
                         {t('newLeadSmsPlaceholders')}
                     </p>
                 </div>
 
-                {error ? <p className="text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+                {errors.general ? <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p> : null}
 
                 <Button type="button" onClick={handleSave} disabled={saving}>
                     {saving ? t('loading') || 'Saving…' : t('saveSettings')}

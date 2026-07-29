@@ -4,6 +4,7 @@ import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Loader } from '../Loader';
 import { useLeadForms, useSelectLeadForm, useCampaigns } from '../../hooks/useQueries';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 interface SelectLeadFormModalProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
   const [selectedPageId, setSelectedPageId] = useState('');
   const [selectedFormId, setSelectedFormId] = useState<string>('');
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (!isOpen || !pages.length) return;
@@ -75,6 +77,7 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
       setSelectedFormId('');
       setSelectedCampaignId('');
     }
+    setErrors({});
   }, [isOpen, pages, linkedPageId, initialFormId, initialCampaignId]);
 
   const { data: leadFormsData, isLoading: loadingForms, isError: leadFormsError, error: leadFormsErrorObj } =
@@ -91,9 +94,10 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
 
   const handleSubmit = async () => {
     if (!selectedFormId) {
-      alert(t('pleaseSelectLeadForm') || 'Please select a lead form');
+      setErrors({ formId: t('pleaseSelectLeadForm') || 'Please select a lead form' });
       return;
     }
+    setErrors({});
 
     try {
       await selectFormMutation.mutateAsync({
@@ -111,7 +115,7 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
       onClose();
     } catch (error: any) {
       console.error('Error linking lead form:', error);
-      alert(error?.message || t('errorLinkingLeadForm') || 'Failed to link lead form. Please try again.');
+      setErrors({ general: error?.message || t('errorLinkingLeadForm') || 'Failed to link lead form. Please try again.' });
     }
   };
 
@@ -125,6 +129,7 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
       setSelectedFormId('');
       setSelectedCampaignId('');
     }
+    clearFieldError(setErrors, 'formId');
   };
 
   if (!pages.length) {
@@ -134,6 +139,11 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={t('selectLeadForm') || 'Select Lead Form'}>
       <div className="space-y-4">
+        {errors.general && (
+          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
+            {errors.general}
+          </div>
+        )}
         {pages.length > 1 && (
           <div>
             <Label htmlFor="meta-page">{t('selectFacebookPage') || 'Facebook Page'}</Label>
@@ -176,7 +186,10 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
               <Select
                 id="lead-form"
                 value={selectedFormId}
-                onChange={(e) => setSelectedFormId(e.target.value)}
+                onChange={(e) => {
+                  setSelectedFormId(e.target.value);
+                  clearFieldError(setErrors, 'formId');
+                }}
                 disabled={selectFormMutation.isPending}
               >
                 <option value="">{t('selectLeadForm') || 'Select a lead form'}</option>
@@ -186,6 +199,9 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
                   </option>
                 ))}
               </Select>
+              {errors.formId && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.formId}</p>
+              )}
             </div>
 
             <div>

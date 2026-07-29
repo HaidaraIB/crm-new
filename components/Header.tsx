@@ -1,6 +1,7 @@
 
 
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './Button';
@@ -148,44 +149,57 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                     </DropdownItem>
                 </Dropdown>
             </div>
-            {/* Logout Confirmation Dialog */}
-            {isLogoutConfirmOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={() => setIsLogoutConfirmOpen(false)}>
-                    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md transform transition-all" onClick={e => e.stopPropagation()}>
-                        <div className="p-6">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-                                {t('logoutConfirmTitle')}
-                            </h3>
-                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
-                                {t('logoutConfirmMessage')}
-                            </p>
-                            <div className={`flex gap-3 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                                <button
-                                    onClick={() => setIsLogoutConfirmOpen(false)}
-                                    className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 font-medium transition-colors"
+            {isLogoutConfirmOpen &&
+                createPortal(
+                    <div
+                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+                        role="presentation"
+                        onClick={() => setIsLogoutConfirmOpen(false)}
+                    >
+                        <div
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="logout-confirm-title"
+                            className="w-full max-w-md transform rounded-lg bg-white shadow-xl transition-all dark:bg-gray-800"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="p-6">
+                                <h3
+                                    id="logout-confirm-title"
+                                    className="mb-4 text-lg font-semibold text-gray-900 dark:text-white"
                                 >
-                                    {t('cancel')}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        // Clear all data first
-                                        localStorage.removeItem('accessToken');
-                                        localStorage.removeItem('refreshToken');
-                                        localStorage.removeItem('isLoggedIn');
-                                        localStorage.removeItem('currentUser');
-                                        
-                                        // Then set logged in to false (this will handle redirect)
-                                        setIsLoggedIn(false);
-                                    }}
-                                    className="flex-1 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 font-medium transition-colors"
-                                >
-                                    {t('logout')}
-                                </button>
+                                    {t('logoutConfirmTitle')}
+                                </h3>
+                                <p className="mb-6 text-sm text-gray-500 dark:text-gray-400">
+                                    {t('logoutConfirmMessage')}
+                                </p>
+                                <div className={`flex gap-3 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsLogoutConfirmOpen(false)}
+                                        className="flex-1 rounded-md bg-gray-200 px-4 py-2 font-medium text-gray-800 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                                    >
+                                        {t('cancel')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            localStorage.removeItem('accessToken');
+                                            localStorage.removeItem('refreshToken');
+                                            localStorage.removeItem('isLoggedIn');
+                                            localStorage.removeItem('currentUser');
+                                            setIsLoggedIn(false);
+                                        }}
+                                        className="flex-1 rounded-md bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700"
+                                    >
+                                        {t('logout')}
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
-                </div>
-            )}
+                    </div>,
+                    document.body
+                )}
         </header>
     );
 };

@@ -18,7 +18,7 @@ export const FieldVisitSettings = () => {
 
     const [fieldVisitEnabled, setFieldVisitEnabled] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
-    const [saveError, setSaveError] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     const adminAllowsFieldVisits = company?.field_visit_admin_allowed !== false;
     const adminBlockMessage = company?.field_visit_admin_message || '';
@@ -31,12 +31,12 @@ export const FieldVisitSettings = () => {
 
     const handleSave = async () => {
         if (!company?.id) {
-            setSaveError(t('companyNotFound') || 'Company not found');
+            setErrors({ general: t('companyNotFound') || 'Company not found' });
             return;
         }
 
         setIsSaving(true);
-        setSaveError('');
+        setErrors({});
         try {
             await updateCompanyFieldVisitSettingsAPI(company.id, {
                 field_visit_enabled: fieldVisitEnabled,
@@ -51,7 +51,7 @@ export const FieldVisitSettings = () => {
             setIsSuccessModalOpen(true);
         } catch (error: unknown) {
             const err = error as Error;
-            setSaveError(err?.message || t('errorSavingSettings') || 'Failed to save settings.');
+            setErrors({ general: err?.message || t('errorSavingSettings') || 'Failed to save settings.' });
         } finally {
             setIsSaving(false);
         }
@@ -99,8 +99,8 @@ export const FieldVisitSettings = () => {
                                 setEnabled={setFieldVisitEnabled}
                             />
                         </div>
-                        {saveError && (
-                            <p className="mt-4 text-sm text-red-600 dark:text-red-400">{saveError}</p>
+                        {errors.general && (
+                            <p className="mt-4 text-sm text-red-600 dark:text-red-400">{errors.general}</p>
                         )}
                         <div className="mt-4 flex justify-end">
                             <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>

@@ -2341,12 +2341,13 @@ export const bulkAssignLeadsAPI = async (clientIds: number[], userId: number | n
 export const getDealsAPI = async (
   page?: number,
   pageSize?: number,
-  filters?: { search?: string },
+  filters?: { search?: string; stage?: string },
 ) => {
   const queryParams = new URLSearchParams();
   if (page) queryParams.append('page', String(page));
   if (pageSize) queryParams.append('page_size', String(pageSize));
   if (filters?.search?.trim()) queryParams.append('search', filters.search.trim());
+  if (filters?.stage?.trim()) queryParams.append('stage', filters.stage.trim());
   const endpoint = `/deals/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   return page
     ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint)
@@ -2375,6 +2376,17 @@ export const createDealAPI = async (dealData: any) => {
 export const updateDealAPI = async (dealId: number, dealData: any) => {
   return apiRequest<any>(`/deals/${dealId}/`, {
     method: 'PUT',
+    body: JSON.stringify(dealData),
+  });
+};
+
+/**
+ * Partial update Deal — e.g. stage-only moves on the Kanban board.
+ * PATCH /api/deals/:id/
+ */
+export const patchDealAPI = async (dealId: number, dealData: Record<string, unknown>) => {
+  return apiRequest<any>(`/deals/${dealId}/`, {
+    method: 'PATCH',
     body: JSON.stringify(dealData),
   });
 };
@@ -2908,6 +2920,17 @@ export const createTaskAPI = async (taskData: any) => {
 export const updateTaskAPI = async (taskId: number, taskData: any) => {
   return apiRequest<any>(`/tasks/${taskId}/`, {
     method: 'PUT',
+    body: JSON.stringify(taskData),
+  });
+};
+
+/**
+ * Partial update Task — e.g. stage-only moves on the Todos Kanban board.
+ * PATCH /api/tasks/:id/
+ */
+export const patchTaskAPI = async (taskId: number, taskData: Record<string, unknown>) => {
+  return apiRequest<any>(`/tasks/${taskId}/`, {
+    method: 'PATCH',
     body: JSON.stringify(taskData),
   });
 };
@@ -4496,6 +4519,20 @@ export const createClientTaskAPI = async (clientTaskData: any) => {
 export const updateClientTaskAPI = async (clientTaskId: number, clientTaskData: any) => {
   return apiRequest<any>(`/client-tasks/${clientTaskId}/`, {
     method: 'PUT',
+    body: JSON.stringify(clientTaskData),
+  });
+};
+
+/**
+ * Partial update Client Task — e.g. stage-only moves on the Kanban board.
+ * PATCH /api/client-tasks/:id/
+ */
+export const patchClientTaskAPI = async (
+  clientTaskId: number,
+  clientTaskData: Record<string, unknown>,
+) => {
+  return apiRequest<any>(`/client-tasks/${clientTaskId}/`, {
+    method: 'PATCH',
     body: JSON.stringify(clientTaskData),
   });
 };

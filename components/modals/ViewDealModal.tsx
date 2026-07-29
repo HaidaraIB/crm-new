@@ -8,9 +8,10 @@ import { MarqueeText } from '../MarqueeText';
 import { withLatinDigits } from '../../utils/dateUtils';
 import { useUsers, useLeads, useProjects, useUnits } from '../../hooks/useQueries';
 import { User } from '../../types';
+import { isMedicalSpecialization } from '../../utils/medicalTranslationOverrides';
 
 // Helper function to get user display name
-const getUserDisplayName = (user: User, t?: (key: string) => string): string => {
+const getUserDisplayName = (user: User, t?: (key: any) => string): string => {
     if (user.name) return user.name;
     if (user.first_name || user.last_name) {
         return [user.first_name, user.last_name].filter(Boolean).join(' ').trim();
@@ -45,11 +46,21 @@ export const ViewDealModal = () => {
         : (unitsResponse?.results || []);
     
     const isRealEstate = currentUser?.company?.specialization === 'real_estate';
+    const isMedical = isMedicalSpecialization(currentUser?.company?.specialization);
     
     if (!viewingDeal) return null;
 
     // Find related data
     const lead = leads.find((l: any) => l.id === viewingDeal.leadId || l.id === viewingDeal.client);
+    // Medical: clientName and lead both map to "Patient" — hide the duplicate Lead field.
+    // Other specs: still hide Lead when it shows the same name as Client Name.
+    const leadDisplayName = (lead?.name || '').trim();
+    const clientDisplayName = (viewingDeal.clientName || '').trim();
+    const showLeadField =
+        !isMedical &&
+        !!leadDisplayName &&
+        leadDisplayName.toLowerCase() !== clientDisplayName.toLowerCase();
+
     
     // Handle startedBy and closedBy - API might return started_by/closed_by or startedBy/closedBy
     const startedById = (viewingDeal as any).started_by || viewingDeal.startedBy;
@@ -62,20 +73,22 @@ export const ViewDealModal = () => {
     const closedDate = (viewingDeal as any).closed_date || viewingDeal.closedDate;
     const reminderDate = (viewingDeal as any).reminder_date || (viewingDeal as any).reminderDate;
     // Handle project - API might return project_name, project (ID), or project object
-    const project = isRealEstate && viewingDeal.project 
-        ? ((viewingDeal as any).project_name 
+    const projectRef = viewingDeal.project;
+    const project = isRealEstate && projectRef
+        ? ((viewingDeal as any).project_name
             ? projects.find((p: any) => p.name === (viewingDeal as any).project_name)
-            : typeof viewingDeal.project === 'object' 
-                ? projects.find((p: any) => p.id === viewingDeal.project?.id || p.id === viewingDeal.project)
-                : projects.find((p: any) => p.id === viewingDeal.project || p.name === viewingDeal.project))
+            : typeof projectRef === 'object' && projectRef !== null
+                ? projects.find((p: any) => p.id === projectRef.id || p.id === projectRef)
+                : projects.find((p: any) => p.id === projectRef || p.name === projectRef))
         : null;
     // Handle unit - API might return unit_code, unit (ID), or unit object
-    const unit = isRealEstate && viewingDeal.unit 
+    const unitRef = viewingDeal.unit;
+    const unit = isRealEstate && unitRef
         ? ((viewingDeal as any).unit_code
             ? units.find((u: any) => u.code === (viewingDeal as any).unit_code)
-            : typeof viewingDeal.unit === 'object'
-                ? units.find((u: any) => u.id === viewingDeal.unit?.id || u.id === viewingDeal.unit)
-                : units.find((u: any) => u.id === viewingDeal.unit || u.code === viewingDeal.unit))
+            : typeof unitRef === 'object' && unitRef !== null
+                ? units.find((u: any) => u.id === unitRef.id || u.id === unitRef)
+                : units.find((u: any) => u.id === unitRef || u.code === unitRef))
         : null;
 
     // Format dates
@@ -227,14 +240,17 @@ export const ViewDealModal = () => {
                                 contentClassName="text-base font-semibold text-gray-900 dark:text-white"
                             />
                         </div>
-                        <div className="min-w-0 text-center">
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('lead') || 'Lead'}</p>
-                            <MarqueeText
-                                text={lead?.name || '-'}
-                                className="w-full"
-                                contentClassName="text-base font-medium text-gray-900 dark:text-white"
-                            />
-                        </div>
+                        {showLeadField && (
+                            <div className="min-w-0 text-center">
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('lead') || 'Lead'}</p>
+                                <MarqueeText
+                                    text={leadDisplayName || '-'}
+                                    className="w-full"
+                                    contentClassName="text-base font-medium text-gray-900 dark:text-white"
+                                />
+                            </div>
+                        )}
+
                         <div className="text-center">
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{t('stage') || 'Stage'}</p>
                             <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full whitespace-nowrap ${getStageColor(viewingDeal.stage)}`}>

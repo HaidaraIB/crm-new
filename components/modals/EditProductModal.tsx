@@ -6,7 +6,7 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
-import { Product } from '../../types';
+import { Product, ProductCategory, Supplier } from '../../types';
 import { useUpdateProduct, useProductCategories, useSuppliers } from '../../hooks/useQueries';
 import { normalizeRole } from '../../utils/roles';
 
@@ -31,12 +31,12 @@ export const EditProductModal = () => {
     
     // Fetch data using React Query
     const { data: categoriesResponse } = useProductCategories();
-    const productCategories = Array.isArray(categoriesResponse) 
+    const productCategories: ProductCategory[] = Array.isArray(categoriesResponse) 
         ? categoriesResponse 
         : (categoriesResponse?.results || []);
 
     const { data: suppliersResponse } = useSuppliers();
-    const suppliers = Array.isArray(suppliersResponse) 
+    const suppliers: Supplier[] = Array.isArray(suppliersResponse) 
         ? suppliersResponse 
         : (suppliersResponse?.results || []);
 
@@ -89,18 +89,20 @@ export const EditProductModal = () => {
     useEffect(() => {
         if (editingProduct) {
             // Get category name from productCategories if category is an ID
-            let categoryName = editingProduct.category || '';
-            if (editingProduct.category && typeof editingProduct.category === 'number') {
+            let categoryName = '';
+            if (typeof editingProduct.category === 'number') {
                 const category = productCategories.find(cat => cat.id === editingProduct.category);
                 categoryName = category?.name || '';
+            } else {
+                categoryName = editingProduct.category || '';
             }
             
             // Get supplier name from suppliers if supplier is an ID
-            let supplierName = editingProduct.supplier || '';
-            if (editingProduct.supplier && typeof editingProduct.supplier === 'number') {
+            let supplierName = '';
+            if (typeof editingProduct.supplier === 'number') {
                 const supplier = suppliers.find(sup => sup.id === editingProduct.supplier);
                 supplierName = supplier?.name || '';
-            } else if (editingProduct.supplier && typeof editingProduct.supplier === 'string') {
+            } else if (typeof editingProduct.supplier === 'string') {
                 supplierName = editingProduct.supplier;
             }
             

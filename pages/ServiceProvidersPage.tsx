@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_SERVICE_PROVIDER_FILTERS } from '../components/drawers/ServiceProvidersFilterDrawer';
 import { ServiceProvider } from '../types';
 import { useServiceProviders, useDeleteServiceProvider } from '../hooks/useQueries';
@@ -54,7 +54,9 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
                                             <span className="text-sm text-gray-900 dark:text-gray-100">{provider.specialization || '-'}</span>
                                         </td>
                                         <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
-                                            <span className="text-sm text-gray-900 dark:text-gray-100">{provider.phone || '-'}</span>
+                                            <span className="text-sm text-gray-900 dark:text-gray-100">
+                                                {provider.phone ? <PhoneText>{provider.phone}</PhoneText> : '-'}
+                                            </span>
                                         </td>
                                         <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
                                             <span className="text-sm text-gray-900 dark:text-gray-100">{provider.email || '-'}</span>

@@ -10,6 +10,7 @@ import {
     preLoginEmailChangeAPI,
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { validateEmailField, validateOtpCodeField } from '../utils/formValidation';
 
 const PRE_LOGIN_EMAIL_RESEND_COOLDOWN_KEY = 'preLoginVerifyEmailResendCooldown';
 const RESEND_COOLDOWN_SEC = 60;
@@ -40,6 +41,7 @@ export const VerifyEmailPage = () => {
     const [manualEmail, setManualEmail] = useState<string | null>(null);
     const [manualCode, setManualCode] = useState('');
     const [newEmail, setNewEmail] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
     const [resendLoading, setResendLoading] = useState(false);
     const [changeEmailLoading, setChangeEmailLoading] = useState(false);
     const [showChangeEmail, setShowChangeEmail] = useState(false);
@@ -213,15 +215,23 @@ export const VerifyEmailPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- URL-driven, run once on mount
     }, []);
 
+    const clearFieldError = (field: string) => {
+        setErrors((prev) => {
+            if (!prev[field]) return prev;
+            const next = { ...prev };
+            delete next[field];
+            return next;
+        });
+    };
+
     const handleManualVerify = async () => {
         if (!manualEmail) return;
-        if (manualCode.trim().length < 4) {
-            setStatus({
-                type: 'error',
-                message: t('verificationCodeRequired') || 'Please enter the verification code from your email.',
-            });
+        const codeErr = validateOtpCodeField(manualCode, t);
+        if (codeErr) {
+            setErrors({ manualCode: codeErr });
             return;
         }
+        setErrors({});
         setIsVerifying(true);
         setStatus(null);
         try {
@@ -291,10 +301,12 @@ export const VerifyEmailPage = () => {
             return;
         }
         const trimmed = newEmail.trim().toLowerCase();
-        if (!trimmed || !trimmed.includes('@')) {
-            setStatus({ type: 'error', message: t('pleaseEnterCredentials') });
+        const emailErr = validateEmailField(newEmail, t);
+        if (emailErr) {
+            setErrors({ newEmail: emailErr });
             return;
         }
+        setErrors({});
         setChangeEmailLoading(true);
         setStatus(null);
         try {
@@ -373,7 +385,10 @@ export const VerifyEmailPage = () => {
                                     type="button"
                                     variant="ghost"
                                     className="w-full"
-                                    onClick={() => setShowChangeEmail((v) => !v)}
+                                    onClick={() => {
+                                        setShowChangeEmail((v) => !v);
+                                        clearFieldError('newEmail');
+                                    }}
                                 >
                                     {t('preLoginChangeEmailTitle')}
                                 </Button>
@@ -381,11 +396,18 @@ export const VerifyEmailPage = () => {
                                     <div className="space-y-2">
                                         <Input
                                             value={newEmail}
-                                            onChange={(e) => setNewEmail(e.target.value)}
+                                            onChange={(e) => {
+                                                setNewEmail(e.target.value);
+                                                clearFieldError('newEmail');
+                                            }}
                                             placeholder={t('preLoginNewEmailPlaceholder')}
                                             type="email"
                                             autoComplete="email"
+                                            className={errors.newEmail ? 'border-red-500' : ''}
                                         />
+                                        {errors.newEmail && (
+                                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.newEmail}</p>
+                                        )}
                                         <Button
                                             type="button"
                                             className="w-full"
@@ -408,6 +430,7 @@ export const VerifyEmailPage = () => {
                                     onChange={(e) => {
                                         setManualCode(e.target.value);
                                         setStatus(null);
+                                        clearFieldError('manualCode');
                                     }}
                                     placeholder={t('verificationCodePlaceholder') || '6-digit code'}
                                     onKeyPress={(e) => {
@@ -415,7 +438,11 @@ export const VerifyEmailPage = () => {
                                             handleManualVerify();
                                         }
                                     }}
+                                    className={errors.manualCode ? 'border-red-500' : ''}
                                 />
+                                {errors.manualCode && (
+                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.manualCode}</p>
+                                )}
                                 {canPreLogin ? (
                                     <div className="text-start mt-1.5">
                                         <button

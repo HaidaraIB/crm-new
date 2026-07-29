@@ -16,7 +16,7 @@ import {
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI, getVisitTypesAPI,
   getCurrentUserAPI, getActivitiesAPI,
-  getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, testConnectionAPI,
+  getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
@@ -625,13 +625,20 @@ export const useWhatsAppChatMessages = (
 };
 
 export const useWhatsAppConversations = (
-  options?: Omit<UseQueryOptions<any[], Error>, 'queryKey' | 'queryFn'>
+  options?: Omit<UseQueryOptions<any[], Error>, 'queryKey' | 'queryFn'> & {
+    refetchInterval?: number | false;
+    enabled?: boolean;
+  }
 ) => {
+  const { refetchInterval = false, enabled = true, ...rest } = options || {};
   return useQuery({
     queryKey: queryKeys.whatsAppConversations,
     queryFn: getWhatsAppConversationsAPI,
-    staleTime: 1 * 60 * 1000, // 1 minute
-    ...options,
+    staleTime: 3 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
+    enabled,
+    ...rest,
   });
 };
 
@@ -1587,6 +1594,20 @@ export const useDeleteConnectedAccount = (options?: UseMutationOptions<void, Err
     onSuccess: () => {
       // Invalidate all connected accounts queries
       queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+    },
+    ...options,
+  });
+};
+
+/** Soft-disconnect: clears tokens and marks WhatsApp phone rows disconnected (does not delete the row). */
+export const useDisconnectConnectedAccount = (options?: UseMutationOptions<void, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => disconnectIntegrationAccountAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
+      queryClient.invalidateQueries({ queryKey: ['whatsappChatMessages'] });
     },
     ...options,
   });

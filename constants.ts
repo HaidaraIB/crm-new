@@ -1879,6 +1879,7 @@ export const translations = {
     editWhatsAppAccount: "Edit WhatsApp Account",
     connected: "Connected",
     disconnected: "Disconnected",
+    whatsappReconnectRequired: "WhatsApp is disconnected. Reconnect an account to send messages.",
     // SelectLeadFormModal (Meta integration)
     selectLeadForm: "Select Lead Form",
     pleaseSelectLeadForm: "Please select a lead form",
@@ -4185,6 +4186,7 @@ export const translations = {
     editWhatsAppAccount: "تعديل حساب واتساب",
     connected: "متصل",
     disconnected: "غير متصل",
+    whatsappReconnectRequired: "واتساب غير متصل. أعد ربط الحساب لإرسال الرسائل.",
     // SelectLeadFormModal (Meta integration)
     selectLeadForm: "اختر نموذج الليد",
     pleaseSelectLeadForm: "يرجى اختيار نموذج ليد",

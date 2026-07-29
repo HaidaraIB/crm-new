@@ -2,8 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { Loader } from '../Loader';
 import { getLeadsAPI } from '../../services/api';
+import {
+  getWhatsAppContactAvatarLabel,
+  getWhatsAppContactSubtitle,
+  getWhatsAppContactTitle,
+} from '../../utils/whatsappContactDisplay';
 
-type Client = { id: number; name?: string; company_name?: string; phone_number?: string; [k: string]: any };
+type Client = {
+  id: number;
+  name?: string;
+  lead_company_name?: string;
+  company_name?: string;
+  phone_number?: string;
+  [k: string]: any;
+};
 
 type StartNewConversationModalProps = {
   isOpen: boolean;
@@ -40,16 +52,12 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
     onSelectClient({
       id: `manual:${normalized}`,
       name: normalized,
-      company_name: normalized,
       phone_number: normalized,
       is_manual: true,
     } as Client);
     setManualPhone('');
     onClose();
   };
-
-  const displayName = (c: Client) => c.company_name || c.name || `#${c.id}`;
-  const displaySub = (c: Client) => (c.name && c.company_name ? c.name : c.phone_number || '');
 
   if (!isOpen) return null;
 
@@ -94,27 +102,31 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
             <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">{t('noAccountsConnected') || 'No clients'}</p>
           ) : (
             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-              {clients.map((client) => (
-                <li key={client.id}>
-                  <button
-                    type="button"
-                    onClick={() => handleSelect(client)}
-                    className="w-full flex items-center gap-3 p-3 text-start hover:bg-gray-50 dark:hover:bg-gray-700/50"
-                  >
-                    <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center text-primary-800 dark:text-primary-50 font-bold text-sm ring-2 ring-primary-200/80 dark:ring-primary-600">
-                      {(displayName(client).replace(/\D/g, '') === displayName(client).replace(/\s/g, '')
-                        ? displayName(client).replace(/\D/g, '').slice(-2) || '?'
-                        : displayName(client).charAt(0).toUpperCase())}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-gray-900 dark:text-white truncate">{displayName(client)}</p>
-                      {displaySub(client) && (
-                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{displaySub(client)}</p>
-                      )}
-                    </div>
-                  </button>
-                </li>
-              ))}
+              {clients.map((client) => {
+                const title = getWhatsAppContactTitle(client);
+                const subtitle = getWhatsAppContactSubtitle(client);
+                return (
+                  <li key={client.id}>
+                    <button
+                      type="button"
+                      onClick={() => handleSelect(client)}
+                      className="w-full flex items-center gap-3 p-3 text-start hover:bg-gray-50 dark:hover:bg-gray-700/50"
+                    >
+                      <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center text-primary-800 dark:text-primary-50 font-bold text-sm ring-2 ring-primary-200/80 dark:ring-primary-600">
+                        {getWhatsAppContactAvatarLabel(client)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-medium text-gray-900 dark:text-white truncate">{title}</p>
+                        {subtitle && (
+                          <p className="text-sm text-gray-500 dark:text-gray-400 truncate" dir={subtitle === (client.phone_number || '') ? 'ltr' : 'auto'}>
+                            {subtitle}
+                          </p>
+                        )}
+                      </div>
+                    </button>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>

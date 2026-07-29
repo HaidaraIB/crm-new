@@ -11,14 +11,19 @@ import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWh
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
-import { useConnectedAccounts, useCreateConnectedAccount, useDeleteConnectedAccount, useTestConnection } from '../hooks/useQueries';
+import { useConnectedAccounts, useCreateConnectedAccount, useDisconnectConnectedAccount, useTestConnection } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { SmsSendPreviewModal } from '../components/modals/SmsSendPreviewModal';
 import { replaceSmsTemplatePlaceholders, leadHasPhone, resolveLeadPhoneRaw } from '../utils/smsSendHelpers';
-import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon, ClockIcon } from '../components/icons';
+import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon, ClockIcon, RefreshIcon } from '../components/icons';
+import {
+    getWhatsAppContactAvatarLabel,
+    getWhatsAppContactSubtitle,
+    getWhatsAppContactTitle,
+} from '../utils/whatsappContactDisplay';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { MessageLogsPanel } from '../components/messaging/MessageLogsPanel';
 import { navigateToCompanyRoute } from '../utils/routing';
@@ -827,15 +832,23 @@ export const IntegrationsPage = () => {
         }
     }, [isEmployee, whatsAppTab]);
 
-    const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations();
     const isWhatsAppOrMessagingCenter = currentPage === 'WhatsApp' || currentPage === 'Messaging Center';
+    const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
+        enabled: isWhatsAppOrMessagingCenter,
+        refetchInterval: isWhatsAppOrMessagingCenter ? 8000 : false,
+    });
     const selectedChatLeadId =
         selectedChatClient && typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined;
     const selectedChatPhone = selectedChatClient ? normalizeChatPhone(selectedChatClient) : '';
-    const { data: leadWhatsAppMessages = [], refetch: refetchLeadWhatsApp } = useWhatsAppChatMessages({
+    const {
+        data: leadWhatsAppMessages = [],
+        refetch: refetchLeadWhatsApp,
+        isFetching: isFetchingChatMessages,
+    } = useWhatsAppChatMessages({
         clientId: selectedChatLeadId,
         phone: selectedChatPhone || undefined,
         enabled: isWhatsAppOrMessagingCenter && !!selectedChatClient,
+        refetchInterval: isWhatsAppOrMessagingCenter && !!selectedChatClient ? 5000 : false,
     });
 
     // Link manual-number chat to CRM lead once Meta/webhook created or matched a client
@@ -849,7 +862,7 @@ export const IntegrationsPage = () => {
                 id: contact.id,
                 name: contact.name,
                 phone_number: contact.phone_number || selectedChatPhone,
-                company_name: contact.company_name || contact.name,
+                lead_company_name: contact.lead_company_name || '',
             });
             saveSelectedManualPhone(companyId, null);
             refetchConversations();
@@ -884,7 +897,7 @@ export const IntegrationsPage = () => {
                 id: c.id,
                 name: c.name,
                 phone_number: c.phone_number || '',
-                company_name: c.company_name || c.name,
+                lead_company_name: c.lead_company_name || '',
             },
         }));
         const extra = extraConversations.filter((e) => {
@@ -1877,7 +1890,7 @@ export const IntegrationsPage = () => {
     const pageTitle = `${name} ${t('integration')}`;
 
     // Handlers for Connect / Edit / Disconnect (must be defined before any early return so WhatsApp "accounts" tab can use them)
-    const deleteAccountMutation = useDeleteConnectedAccount();
+    const disconnectAccountMutation = useDisconnectConnectedAccount();
     const createAccountMutation = useCreateConnectedAccount();
     const testConnectionMutation = useTestConnection();
     const queryClient = useQueryClient();
@@ -2027,10 +2040,10 @@ export const IntegrationsPage = () => {
                 itemName: account.name,
                 onConfirm: async () => {
                     try {
-                        await deleteAccountMutation.mutateAsync(accountId);
+                        await disconnectAccountMutation.mutateAsync(accountId);
                     } catch (error: any) {
-                        console.error('Error deleting account:', error);
-                        showAlert(error?.message || t('errorDeletingAccount') || 'Failed to delete account', 'error');
+                        console.error('Error disconnecting account:', error);
+                        showAlert(error?.message || t('errorDeletingAccount') || 'Failed to disconnect account', 'error');
                     }
                 },
             });
@@ -2271,7 +2284,7 @@ export const IntegrationsPage = () => {
                             id: contact.id,
                             name: contact.name,
                             phone_number: contact.phone_number || phone,
-                            company_name: contact.company_name || contact.name,
+                            lead_company_name: contact.lead_company_name || '',
                         });
                         saveSelectedManualPhone(companyId, null);
                         await refetchLeadWhatsApp();
@@ -2369,7 +2382,7 @@ export const IntegrationsPage = () => {
         const handleDeleteConversation = (client: any) => {
             const phone = normalizeChatPhone(client);
             const clientId = typeof client.id === 'number' ? client.id : undefined;
-            const label = String(client.company_name || client.name || phone || '');
+            const label = getWhatsAppContactTitle(client) || String(phone || '');
             setConfirmDeleteConfig({
                 title: t('delete'),
                 message: t('deleteConversationConfirm'),
@@ -2444,17 +2457,7 @@ export const IntegrationsPage = () => {
         const CHAT_AVATAR_CLASS =
             'w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-800 flex items-center justify-center text-primary-800 dark:text-primary-50 font-bold text-sm shrink-0 ring-2 ring-primary-200/80 dark:ring-primary-600';
 
-        const getChatAvatarLabel = (client: any): string => {
-            const name = String(client?.company_name || client?.name || '').trim();
-            const nameOnlyDigits = name.replace(/\s/g, '').replace(/\D/g, '') === name.replace(/\s/g, '');
-            if (name && !nameOnlyDigits) {
-                return name.charAt(0).toUpperCase();
-            }
-            const phone = String(client?.phone_number || client?.phone || (nameOnlyDigits ? name : '') || '').replace(/\D/g, '');
-            if (phone.length >= 2) return phone.slice(-2);
-            if (phone.length === 1) return phone;
-            return '?';
-        };
+        const getChatAvatarLabel = (client: any): string => getWhatsAppContactAvatarLabel(client);
 
         const formatChatTime = () =>
             new Date().toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' }));
@@ -2463,7 +2466,7 @@ export const IntegrationsPage = () => {
         const replaceTemplatePlaceholders = (text: string, client: any): string => {
             if (!client) return text;
             const customerName = (client.name || client.contact_name || (client.first_name && client.last_name ? `${client.first_name} ${client.last_name}`.trim() : '') || '').trim();
-            const leadCompany = (typeof client.company_name === 'string' ? client.company_name : (client.company && (typeof client.company === 'string' ? client.company : client.company.name)) || '').trim();
+            const leadCompany = String(client.lead_company_name || '').trim();
             const tenantCompany = (currentUser?.company?.name || '').trim();
             const company = tenantCompany || leadCompany;
             const amount = client.amount ?? client.last_invoice_amount ?? '';
@@ -2507,8 +2510,18 @@ export const IntegrationsPage = () => {
             waSession != null &&
             !waSession.in_session;
 
+        const hasConnectedWhatsApp = accounts.some(
+            (a: { status?: string; platform?: string }) =>
+                a.platform === 'whatsapp' && a.status === 'Connected'
+        );
+        const whatsappSendBlocked = !hasConnectedWhatsApp;
+
         const handleSendMessage = async () => {
             if (!selectedChatClient || !messageInput.trim()) return;
+            if (whatsappSendBlocked) {
+                showAlert(t('whatsappReconnectRequired') || 'WhatsApp is disconnected. Reconnect an account to send messages.', 'warning');
+                return;
+            }
             const to = getClientPhone(selectedChatClient);
             if (!to) {
                 showAlert(t('sms_error_invalid_to_number') || 'No phone number for this client', 'warning');
@@ -2535,6 +2548,10 @@ export const IntegrationsPage = () => {
         const handleSendMetaTemplate = async () => {
             if (!selectedChatClient || chatTemplateSendId === '') {
                 showAlert(t('selectApprovedTemplate') || 'Select an approved template', 'warning');
+                return;
+            }
+            if (whatsappSendBlocked) {
+                showAlert(t('whatsappReconnectRequired') || 'WhatsApp is disconnected. Reconnect an account to send messages.', 'warning');
                 return;
             }
             const to = getClientPhone(selectedChatClient);
@@ -2930,8 +2947,14 @@ export const IntegrationsPage = () => {
                                                     {getChatAvatarLabel(client)}
                                                 </div>
                                                 <div className="min-w-0 flex-1">
-                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{client.company_name || client.name}</p>
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{client.name ? client.name : <span dir="ltr">{client.phone_number}</span>}</p>
+                                                    <p className="font-medium text-gray-900 dark:text-white truncate">{getWhatsAppContactTitle(client)}</p>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                                                        {getWhatsAppContactSubtitle(client) ? (
+                                                            <span dir={getWhatsAppContactSubtitle(client) === (client.phone_number || '') ? 'ltr' : 'auto'}>
+                                                                {getWhatsAppContactSubtitle(client)}
+                                                            </span>
+                                                        ) : null}
+                                                    </p>
                                                 </div>
                                             </button>
                                             <button
@@ -2960,9 +2983,28 @@ export const IntegrationsPage = () => {
                                                 {getChatAvatarLabel(selectedChatClient)}
                                             </div>
                                             <div className="min-w-0 flex-1">
-                                                <p className="font-medium text-gray-900 dark:text-white">{selectedChatClient.company_name || selectedChatClient.name}</p>
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">{selectedChatClient.phone_number && <>{t('connectedWhatsAppApi')} · <span dir="ltr">{selectedChatClient.phone_number}</span></>}</p>
+                                                <p className="font-medium text-gray-900 dark:text-white">{getWhatsAppContactTitle(selectedChatClient)}</p>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400">
+                                                    {selectedChatClient.phone_number && (
+                                                        <>
+                                                            {t('connectedWhatsAppApi')} ·{' '}
+                                                            <span dir="ltr">{selectedChatClient.phone_number}</span>
+                                                        </>
+                                                    )}
+                                                </p>
                                             </div>
+                                            <button
+                                                type="button"
+                                                title={t('refresh') || 'Refresh'}
+                                                disabled={isFetchingChatMessages}
+                                                onClick={() => {
+                                                    void refetchLeadWhatsApp();
+                                                    void refetchConversations();
+                                                }}
+                                                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 disabled:opacity-50"
+                                            >
+                                                <RefreshIcon className={`w-4 h-4 ${isFetchingChatMessages ? 'animate-spin' : ''}`} />
+                                            </button>
                                             <button
                                                 type="button"
                                                 title={t('delete')}
@@ -3094,6 +3136,12 @@ export const IntegrationsPage = () => {
                                                     />
                                                 </div>
                                             )}
+                                            {whatsappSendBlocked && (
+                                                <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5 mb-2">
+                                                    {t('whatsappReconnectRequired') ||
+                                                        'WhatsApp is disconnected. Reconnect an account to send messages.'}
+                                                </p>
+                                            )}
                                             {typeof selectedChatClient.id === 'number' && waSession && !waSession.in_session && (
                                                 <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5 mb-2">
                                                     {t('whatsappSessionClosedHint') ||
@@ -3119,7 +3167,8 @@ export const IntegrationsPage = () => {
                                                             onChange={(e) =>
                                                                 setChatTemplateSendId(e.target.value ? Number(e.target.value) : '')
                                                             }
-                                                            className="flex-1 min-w-0 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white"
+                                                            disabled={whatsappSendBlocked}
+                                                            className="flex-1 min-w-0 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white disabled:opacity-60"
                                                         >
                                                             <option value="">{t('selectApprovedTemplate') || 'Select approved template…'}</option>
                                                             {approvedWaTemplates.map((tpl) => (
@@ -3131,7 +3180,7 @@ export const IntegrationsPage = () => {
                                                         <Button
                                                             variant="secondary"
                                                             onClick={handleSendMetaTemplate}
-                                                            disabled={chatTemplateSendId === ''}
+                                                            disabled={whatsappSendBlocked || chatTemplateSendId === ''}
                                                             loading={chatTemplateSending}
                                                             className="shrink-0 h-10 py-0 px-4"
                                                         >
@@ -3148,7 +3197,8 @@ export const IntegrationsPage = () => {
                                                             key={tpl.id}
                                                             type="button"
                                                             onClick={() => handleApplyQuickTemplate(tpl.content)}
-                                                            className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-700"
+                                                            disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
+                                                            className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
                                                         >
                                                             {tpl.name}
                                                         </button>
@@ -3160,12 +3210,21 @@ export const IntegrationsPage = () => {
                                                     type="text"
                                                     value={messageInput}
                                                     onChange={(e) => setMessageInput(e.target.value)}
-                                                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && !blockFreeTextWhatsApp && handleSendMessage()}
+                                                    onKeyDown={(e) =>
+                                                        e.key === 'Enter' &&
+                                                        !e.shiftKey &&
+                                                        !blockFreeTextWhatsApp &&
+                                                        !whatsappSendBlocked &&
+                                                        handleSendMessage()
+                                                    }
                                                     placeholder={t('typeMessageWhatsApp')}
-                                                    disabled={blockFreeTextWhatsApp}
+                                                    disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
                                                     className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-60"
                                                 />
-                                                <Button onClick={handleSendMessage} disabled={blockFreeTextWhatsApp}>
+                                                <Button
+                                                    onClick={handleSendMessage}
+                                                    disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
+                                                >
                                                     {t('sendSms')}
                                                 </Button>
                                             </div>
@@ -3500,7 +3559,9 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                             >
                                                 <SettingsIcon className="w-4 h-4" /> <span className="sm:inline">{t('edit')}</span>
                                             </Button>
-                                            <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
+                                            {account.status === 'Connected' && (
+                                                <Button variant="danger" onClick={() => handleDelete(account.id)}><TrashIcon className="w-4 h-4 me-2" /> {t('disconnect')}</Button>
+                                            )}
                                         </div>
                                     </li>
                                 ))}
@@ -3640,13 +3701,15 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                                     >
                                         <SettingsIcon className="w-4 h-4" /> <span className="sm:inline">{t('edit')}</span>
                                     </Button>
-                                    <Button
-                                        variant="danger"
-                                        onClick={() => handleDelete(account.id)}
-                                        className="rounded-lg ml-auto sm:ml-0 border border-transparent hover:border-red-500/30"
-                                    >
-                                        <TrashIcon className="w-4 h-4" /> <span className="sm:inline">{t('disconnect')}</span>
-                                    </Button>
+                                    {account.status === 'Connected' && (
+                                        <Button
+                                            variant="danger"
+                                            onClick={() => handleDelete(account.id)}
+                                            className="rounded-lg ml-auto sm:ml-0 border border-transparent hover:border-red-500/30"
+                                        >
+                                            <TrashIcon className="w-4 h-4" /> <span className="sm:inline">{t('disconnect')}</span>
+                                        </Button>
+                                    )}
                                 </div>
                                 </div>
                                 {account.status === 'Connected' && account.platform === 'meta' && (

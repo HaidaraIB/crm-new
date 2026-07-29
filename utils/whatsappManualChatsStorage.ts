@@ -45,7 +45,6 @@ export function buildManualClientForPhone(phone: string): Record<string, unknown
   return {
     id: `manual:${phone}`,
     name: phone,
-    company_name: phone,
     phone_number: phone,
     is_manual: true,
   };

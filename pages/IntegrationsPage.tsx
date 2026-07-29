@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
-import { EyeIcon, EyeOffIcon } from '../components/icons';
+import { CheckIcon, EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
 import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, getMujebConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
@@ -3098,20 +3098,31 @@ export const IntegrationsPage = () => {
                                                         )}
                                                         {msg.direction === 'out' && msg.status === 'sent' && (
                                                             <span
-                                                                className="text-xs opacity-70 leading-none"
+                                                                className="inline-flex shrink-0 items-center opacity-70"
                                                                 title={t('whatsappDeliveryPending') || 'Sent to Meta — waiting for delivery'}
-                                                                aria-hidden="true"
+                                                                aria-label={t('whatsappDeliveryPending') || 'Sent'}
                                                             >
-                                                                ✓
+                                                                <CheckIcon className="size-3.5" aria-hidden />
                                                             </span>
                                                         )}
-                                                        {msg.direction === 'out' && (msg.status === 'delivered' || msg.status === 'read') && (
+                                                        {msg.direction === 'out' && msg.status === 'delivered' && (
                                                             <span
-                                                                className={`text-xs leading-none ${msg.status === 'read' ? 'opacity-95' : 'opacity-70'}`}
-                                                                title={msg.status === 'read' ? (t('whatsappRead') || 'Read') : (t('whatsappDelivered') || 'Delivered')}
-                                                                aria-hidden="true"
+                                                                className="inline-flex shrink-0 items-center opacity-70"
+                                                                title={t('whatsappDelivered') || 'Delivered'}
+                                                                aria-label={t('whatsappDelivered') || 'Delivered'}
                                                             >
-                                                                ✓✓
+                                                                <CheckIcon className="size-3.5" aria-hidden />
+                                                                <CheckIcon className="size-3.5 -ms-2" aria-hidden />
+                                                            </span>
+                                                        )}
+                                                        {msg.direction === 'out' && msg.status === 'read' && (
+                                                            <span
+                                                                className="inline-flex shrink-0 items-center text-[#53bdeb]"
+                                                                title={t('whatsappRead') || 'Read'}
+                                                                aria-label={t('whatsappRead') || 'Read'}
+                                                            >
+                                                                <CheckIcon className="size-3.5" aria-hidden />
+                                                                <CheckIcon className="size-3.5 -ms-2" aria-hidden />
                                                             </span>
                                                         )}
                                                         {msg.direction === 'out' && msg.status === 'failed' && (

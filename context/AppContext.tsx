@@ -835,14 +835,23 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         const userData = await getCurrentUserAPI();
         
         // Check subscription for all users (employees and admins)
-        const isEmployee =
-          normalizeRole(userData.role) === 'Employee' ||
-          normalizeRole(userData.role) === 'Doctor';
+        const appRole = normalizeRole(userData.role);
+        const isStaffWithoutBilling =
+          appRole === 'Employee' ||
+          appRole === 'Doctor' ||
+          appRole === 'DataEntry' ||
+          appRole === 'Reception';
         const subscriptionId = userData.company?.subscription?.id;
         
         // Check subscription status with end_date validation
         let hasActiveSubscription = false;
         let subscriptionStatus = null;
+
+        const subscriptionFromMe = userData.company?.subscription;
+        const meLooksActive =
+          subscriptionFromMe?.is_active === true &&
+          (!subscriptionFromMe?.end_date ||
+            new Date(subscriptionFromMe.end_date) > new Date());
         
         if (subscriptionId) {
           try {
@@ -868,11 +877,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             }
           } catch (error) {
             console.error('Error checking subscription status:', error);
-            // Fallback to basic check
-            hasActiveSubscription = userData.company?.subscription?.is_active === true;
+            // Fallback to /users/me/ subscription shape (do not treat permission errors as inactive)
+            hasActiveSubscription = meLooksActive;
           }
         } else {
-          hasActiveSubscription = userData.company?.subscription?.is_active === true;
+          hasActiveSubscription = meLooksActive;
         }
         
         // Support impersonation must stay in for expired tenants (banner shows warning).
@@ -883,6 +892,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           localStorage.removeItem('currentUser');
           localStorage.removeItem('isLoggedIn');
           localStorage.removeItem('subscriptionExpiringWarning');
+          if (subscriptionId) {
+            localStorage.setItem('pendingSubscriptionId', String(subscriptionId));
+          }
+          localStorage.setItem(
+            'loginErrorMessage',
+            isStaffWithoutBilling ? 'ACCOUNT_TEMPORARILY_INACTIVE' : 'SUBSCRIPTION_INACTIVE'
+          );
           window.location.href = '/login';
           return;
         }
@@ -1018,6 +1034,20 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
           localStorage.removeItem('currentUser');
+          localStorage.removeItem('isLoggedIn');
+          if (subscriptionId) {
+            localStorage.setItem('pendingSubscriptionId', String(subscriptionId));
+          }
+          const role = normalizeRole(latestUser?.role);
+          const isStaff =
+            role === 'Employee' ||
+            role === 'Doctor' ||
+            role === 'DataEntry' ||
+            role === 'Reception';
+          localStorage.setItem(
+            'loginErrorMessage',
+            isStaff ? 'ACCOUNT_TEMPORARILY_INACTIVE' : 'SUBSCRIPTION_INACTIVE'
+          );
           window.location.href = '/login';
           return;
         }

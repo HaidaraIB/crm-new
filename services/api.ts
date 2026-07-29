@@ -301,6 +301,25 @@ async function parseSuccessJsonResponse<T>(response: Response): Promise<T> {
  * Helper function to make API requests
  * يستخدم JWT Bearer token للـ authentication
  */
+function isInactiveSubscriptionForbidden(errorCode: string, errorMessage: string): boolean {
+  const code = (errorCode || '').toLowerCase();
+  if (
+    code === 'subscription_inactive' ||
+    code === 'account_temporarily_inactive'
+  ) {
+    return true;
+  }
+  const lower = (errorMessage || '').toLowerCase();
+  // Match explicit inactive/expired subscription messages only — never bare "subscription"/"active"
+  // (those false-match owner-only payment-status 403s and log staff out after login).
+  return (
+    lower.includes('subscription is not active') ||
+    lower.includes('subscription is not active or has expired') ||
+    lower.includes('اشتراكك غير نشط') ||
+    lower.includes('account is temporarily inactive')
+  );
+}
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
@@ -387,17 +406,14 @@ async function apiRequest<T>(
     }
   }
 
-  // إذا كان الخطأ 403 (Forbidden)، قد يكون بسبب عدم وجود اشتراك نشط
-  // لكن لا نتحقق من ذلك في endpoint /users/me/ لأنه يستخدم للتحقق من حالة الاشتراك
+  // 403 may mean inactive subscription — but only for explicit inactive/expired codes/messages.
+  // Do NOT match generic text like "permission to pay for this subscription" (staff payment-status).
   if (response.status === 403 && !endpoint.includes('/users/me/')) {
     const errorData = await readJsonResponse(response);
     const errorMessage = getApiErrorMessage(errorData, '');
-    
-    // إذا كان الخطأ متعلق بعدم وجود اشتراك نشط، قم بتسجيل الخروج تلقائياً
-    if (errorMessage.toLowerCase().includes('subscription') || 
-        errorMessage.toLowerCase().includes('اشتراك') ||
-        errorMessage.toLowerCase().includes('active') ||
-        errorMessage.toLowerCase().includes('not active')) {
+    const errorCode = (getErrorCodeFromBody(errorData) || '').toLowerCase();
+
+    if (isInactiveSubscriptionForbidden(errorCode, errorMessage)) {
       // Support impersonation must not wipe the session on inactive subscription 403s.
       if (isImpersonating()) {
         const subscriptionError: any = new Error('SUBSCRIPTION_INACTIVE');
@@ -406,37 +422,27 @@ async function apiRequest<T>(
         throw subscriptionError;
       }
 
-      // احفظ subscription ID من localStorage إذا كان موجوداً
-      const currentUserStr = localStorage.getItem('currentUser');
-      if (currentUserStr) {
+      const pendingSubscriptionId = localStorage.getItem('pendingSubscriptionId');
+      if (!pendingSubscriptionId) {
         try {
-          const currentUser = JSON.parse(currentUserStr);
-          // محاولة الحصول على subscription ID من بيانات المستخدم المحفوظة
-          // أو من localStorage إذا كان موجوداً
-          const pendingSubscriptionId = localStorage.getItem('pendingSubscriptionId');
-          if (!pendingSubscriptionId) {
-            // محاولة الحصول على subscription ID من API (إذا كان متاحاً)
-            try {
-              const userData = await getCurrentUserAPI().catch(() => null);
-              if (userData?.company?.subscription?.id) {
-                localStorage.setItem('pendingSubscriptionId', userData.company.subscription.id.toString());
-              }
-            } catch (e) {
-              // تجاهل الأخطاء في محاولة الحصول على بيانات المستخدم
-            }
+          const userData = await getCurrentUserAPI().catch(() => null);
+          if (userData?.company?.subscription?.id) {
+            localStorage.setItem(
+              'pendingSubscriptionId',
+              userData.company.subscription.id.toString()
+            );
           }
-        } catch (e) {
-          // تجاهل الأخطاء في parsing
+        } catch {
+          // ignore
         }
       }
-      
-      // قم بتسجيل الخروج
+
+      localStorage.setItem('loginErrorMessage', 'SUBSCRIPTION_INACTIVE');
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUser');
-      
-      // رمي خطأ خاص يمكن التعرف عليه
+
       const subscriptionError: any = new Error('SUBSCRIPTION_INACTIVE');
       subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
       subscriptionError.subscriptionId = localStorage.getItem('pendingSubscriptionId');

@@ -301,23 +301,36 @@ async function parseSuccessJsonResponse<T>(response: Response): Promise<T> {
  * Helper function to make API requests
  * يستخدم JWT Bearer token للـ authentication
  */
+function normalizeBusinessErrorCode(code: unknown): string {
+  return String(code || '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '_');
+}
+
+/** Owner/billing inactive subscription (explicit code or message only). */
 function isInactiveSubscriptionForbidden(errorCode: string, errorMessage: string): boolean {
-  const code = (errorCode || '').toLowerCase();
-  if (
-    code === 'subscription_inactive' ||
-    code === 'account_temporarily_inactive'
-  ) {
+  if (normalizeBusinessErrorCode(errorCode) === 'subscription_inactive') {
     return true;
   }
   const lower = (errorMessage || '').toLowerCase();
-  // Match explicit inactive/expired subscription messages only — never bare "subscription"/"active"
-  // (those false-match owner-only payment-status 403s and log staff out after login).
+  // Never match bare "subscription"/"active" — those false-match permission 403s.
   return (
     lower.includes('subscription is not active') ||
     lower.includes('subscription is not active or has expired') ||
-    lower.includes('اشتراكك غير نشط') ||
-    lower.includes('account is temporarily inactive')
+    lower.includes('اشتراكك غير نشط')
   );
+}
+
+/** Staff roles when company subscription is inactive. */
+function isAccountTemporarilyInactiveForbidden(
+  errorCode: string,
+  errorMessage: string
+): boolean {
+  if (normalizeBusinessErrorCode(errorCode) === 'account_temporarily_inactive') {
+    return true;
+  }
+  return (errorMessage || '').toLowerCase().includes('account is temporarily inactive');
 }
 
 async function apiRequest<T>(
@@ -411,19 +424,32 @@ async function apiRequest<T>(
   if (response.status === 403 && !endpoint.includes('/users/me/')) {
     const errorData = await readJsonResponse(response);
     const errorMessage = getApiErrorMessage(errorData, '');
-    const errorCode = (getErrorCodeFromBody(errorData) || '').toLowerCase();
+    const errorCode = getErrorCodeFromBody(errorData) || '';
 
-    if (isInactiveSubscriptionForbidden(errorCode, errorMessage)) {
+    const accountTempInactive = isAccountTemporarilyInactiveForbidden(
+      errorCode,
+      errorMessage
+    );
+    const subscriptionInactive = isInactiveSubscriptionForbidden(
+      errorCode,
+      errorMessage
+    );
+
+    if (accountTempInactive || subscriptionInactive) {
       // Support impersonation must not wipe the session on inactive subscription 403s.
       if (isImpersonating()) {
-        const subscriptionError: any = new Error('SUBSCRIPTION_INACTIVE');
-        subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
+        const subscriptionError: any = new Error(
+          accountTempInactive ? 'ACCOUNT_TEMPORARILY_INACTIVE' : 'SUBSCRIPTION_INACTIVE'
+        );
+        subscriptionError.code = accountTempInactive
+          ? 'ACCOUNT_TEMPORARILY_INACTIVE'
+          : 'SUBSCRIPTION_INACTIVE';
         subscriptionError.impersonation = true;
         throw subscriptionError;
       }
 
       const pendingSubscriptionId = localStorage.getItem('pendingSubscriptionId');
-      if (!pendingSubscriptionId) {
+      if (!pendingSubscriptionId && subscriptionInactive) {
         try {
           const userData = await getCurrentUserAPI().catch(() => null);
           if (userData?.company?.subscription?.id) {
@@ -437,14 +463,21 @@ async function apiRequest<T>(
         }
       }
 
-      localStorage.setItem('loginErrorMessage', 'SUBSCRIPTION_INACTIVE');
+      localStorage.setItem(
+        'loginErrorMessage',
+        accountTempInactive ? 'ACCOUNT_TEMPORARILY_INACTIVE' : 'SUBSCRIPTION_INACTIVE'
+      );
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
       localStorage.removeItem('isLoggedIn');
       localStorage.removeItem('currentUser');
 
-      const subscriptionError: any = new Error('SUBSCRIPTION_INACTIVE');
-      subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
+      const subscriptionError: any = new Error(
+        accountTempInactive ? 'ACCOUNT_TEMPORARILY_INACTIVE' : 'SUBSCRIPTION_INACTIVE'
+      );
+      subscriptionError.code = accountTempInactive
+        ? 'ACCOUNT_TEMPORARILY_INACTIVE'
+        : 'SUBSCRIPTION_INACTIVE';
       subscriptionError.subscriptionId = localStorage.getItem('pendingSubscriptionId');
       throw subscriptionError;
     }
@@ -561,7 +594,7 @@ async function fetchAllPaginatedPages<T>(initialEndpoint: string): Promise<Pagin
 
   while (endpoint && safetyCounter < 200) {
     safetyCounter += 1;
-    const pageData = await apiRequest<unknown>(endpoint);
+    const pageData: unknown = await apiRequest<unknown>(endpoint);
     if (!isPaginatedResponse<T>(pageData)) {
       break;
     }
@@ -1610,7 +1643,11 @@ export const requestTwoFactorAuthAPI = async (
     const nestedMsg = (raw?.error && typeof raw.error === 'object' ? (raw.error as any).message : '') || '';
 
     if (!response.ok) {
-      if (response.status === 403 && apiCode === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+      const msg = getApiErrorMessage(raw, '') || nestedMsg;
+      if (
+        response.status === 403 &&
+        isAccountTemporarilyInactiveForbidden(String(apiCode || ''), msg)
+      ) {
         const accountError: any = new Error(getApiErrorMessage(raw, 'ACCOUNT_TEMPORARILY_INACTIVE'));
         accountError.code = 'ACCOUNT_TEMPORARILY_INACTIVE';
         accountError.status = response.status;
@@ -1619,9 +1656,7 @@ export const requestTwoFactorAuthAPI = async (
 
       if (
         response.status === 403 &&
-        (apiCode === 'SUBSCRIPTION_INACTIVE' ||
-          nestedMsg.toLowerCase().includes('subscription') ||
-          (typeof raw?.error === 'string' && raw.error.toLowerCase().includes('subscription')))
+        isInactiveSubscriptionForbidden(String(apiCode || ''), msg)
       ) {
         const subscriptionError: any = new Error(getApiErrorMessage(raw, 'SUBSCRIPTION_INACTIVE'));
         subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
@@ -1710,7 +1745,11 @@ export const verifyTwoFactorAuthAPI = async (payload: {
     : '');
 
   if (!response.ok) {
-    if (response.status === 403 && apiCode === 'ACCOUNT_TEMPORARILY_INACTIVE') {
+    const msg = getApiErrorMessage(raw, '') || nestedMsg;
+    if (
+      response.status === 403 &&
+      isAccountTemporarilyInactiveForbidden(String(apiCode || ''), msg)
+    ) {
       const accountError: any = new Error(getApiErrorMessage(raw, 'ACCOUNT_TEMPORARILY_INACTIVE'));
       accountError.code = 'ACCOUNT_TEMPORARILY_INACTIVE';
       throw accountError;
@@ -1718,9 +1757,7 @@ export const verifyTwoFactorAuthAPI = async (payload: {
 
     if (
       response.status === 403 &&
-      (apiCode === 'SUBSCRIPTION_INACTIVE' ||
-        nestedMsg.toLowerCase().includes('subscription') ||
-        (typeof (raw as any)?.error === 'string' && (raw as any).error.toLowerCase().includes('subscription')))
+      isInactiveSubscriptionForbidden(String(apiCode || ''), msg)
     ) {
       const subscriptionError: any = new Error(getApiErrorMessage(raw, 'SUBSCRIPTION_INACTIVE'));
       subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
@@ -4309,7 +4346,7 @@ export const updateClientCallAPI = async (clientCallId: number, clientCallData: 
  * حذف Client Call
  * DELETE /api/client-calls/{id}/
  */
-export const deleteClientCallAPI = async (clientCallId: number) => {
+export const deleteClientCallAPI = async (clientCallId: number): Promise<void> => {
   const token = localStorage.getItem('accessToken');
   const response = await fetch(`${BASE_URL}/client-calls/${clientCallId}/`, {
     method: 'DELETE',
@@ -4399,7 +4436,7 @@ export const createClientFieldVisitAPI = async (data: Record<string, unknown>) =
 };
 
 /** DELETE /client-visits/{id}/ */
-export const deleteClientVisitAPI = async (clientVisitId: number) => {
+export const deleteClientVisitAPI = async (clientVisitId: number): Promise<void> => {
   const token = localStorage.getItem('accessToken');
   const response = await fetch(`${BASE_URL}/client-visits/${clientVisitId}/`, {
     method: 'DELETE',
@@ -4467,7 +4504,7 @@ export const updateClientTaskAPI = async (clientTaskId: number, clientTaskData: 
  * حذف Client Task
  * DELETE /api/client-tasks/{id}/
  */
-export const deleteClientTaskAPI = async (clientTaskId: number) => {
+export const deleteClientTaskAPI = async (clientTaskId: number): Promise<void> => {
   const token = localStorage.getItem('accessToken');
   const response = await fetch(`${BASE_URL}/client-tasks/${clientTaskId}/`, {
     method: 'DELETE',

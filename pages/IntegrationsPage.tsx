@@ -9,7 +9,13 @@ import { CheckIcon, EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
 import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, getMujebConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
-import { WhatsAppFormattedText } from '../utils/whatsappFormatting';
+import {
+    WhatsAppFormattedText,
+    WhatsAppFormatToolbar,
+    applyWhatsAppFormatToInput,
+    textLooksWhatsAppFormatted,
+    type WhatsAppFormatKind,
+} from '../utils/whatsappFormatting';
 import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useCreateConnectedAccount, useDisconnectConnectedAccount, useTestConnection } from '../hooks/useQueries';
@@ -1002,6 +1008,7 @@ export const IntegrationsPage = () => {
         saveManualConversations(companyId, extraConversations);
     }, [companyId, extraConversations]);
     const [messageInput, setMessageInput] = useState('');
+    const messageInputRef = useRef<HTMLTextAreaElement | null>(null);
     const [chatTemplateSendId, setChatTemplateSendId] = useState<number | ''>('');
     const [chatTemplateSending, setChatTemplateSending] = useState(false);
     const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
@@ -3340,28 +3347,62 @@ export const IntegrationsPage = () => {
                                                     ))}
                                                 </div>
                                             )}
-                                            <div className="flex gap-2">
-                                                <input
-                                                    type="text"
-                                                    value={messageInput}
-                                                    onChange={(e) => setMessageInput(e.target.value)}
-                                                    onKeyDown={(e) =>
-                                                        e.key === 'Enter' &&
-                                                        !e.shiftKey &&
-                                                        !blockFreeTextWhatsApp &&
-                                                        !whatsappSendBlocked &&
-                                                        handleSendMessage()
+                                            <div className="space-y-1.5">
+                                                <WhatsAppFormatToolbar
+                                                    disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
+                                                    onFormat={(kind: WhatsAppFormatKind) =>
+                                                        applyWhatsAppFormatToInput(
+                                                            messageInputRef.current,
+                                                            messageInput,
+                                                            kind,
+                                                            setMessageInput
+                                                        )
                                                     }
-                                                    placeholder={t('typeMessageWhatsApp')}
-                                                    disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
-                                                    className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-60"
                                                 />
-                                                <Button
-                                                    onClick={handleSendMessage}
-                                                    disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
-                                                >
-                                                    {t('sendSms')}
-                                                </Button>
+                                                <div className="flex gap-2 items-end">
+                                                    <textarea
+                                                        ref={messageInputRef}
+                                                        rows={2}
+                                                        value={messageInput}
+                                                        onChange={(e) => setMessageInput(e.target.value)}
+                                                        onKeyDown={(e) => {
+                                                            if (
+                                                                e.key === 'Enter' &&
+                                                                !e.shiftKey &&
+                                                                !blockFreeTextWhatsApp &&
+                                                                !whatsappSendBlocked
+                                                            ) {
+                                                                e.preventDefault();
+                                                                handleSendMessage();
+                                                            }
+                                                        }}
+                                                        placeholder={t('typeMessageWhatsApp')}
+                                                        disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
+                                                        className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-60 resize-y min-h-[40px] max-h-32"
+                                                    />
+                                                    <Button
+                                                        onClick={handleSendMessage}
+                                                        disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
+                                                    >
+                                                        {t('sendSms')}
+                                                    </Button>
+                                                </div>
+                                                {textLooksWhatsAppFormatted(messageInput) && (
+                                                    <div className="rounded border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 px-2.5 py-1.5">
+                                                        <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">
+                                                            {t('preview') || 'Preview'}
+                                                        </p>
+                                                        <WhatsAppFormattedText
+                                                            text={messageInput}
+                                                            as="div"
+                                                            className="text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100"
+                                                        />
+                                                    </div>
+                                                )}
+                                                <p className="text-[11px] text-gray-400 dark:text-gray-500">
+                                                    {t('whatsappFormatHint') ||
+                                                        'Format: *bold* _italic_ ~strike~ ```code``` · Enter to send · Shift+Enter for new line'}
+                                                </p>
                                             </div>
                                         </div>
                                     </>

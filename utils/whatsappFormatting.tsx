@@ -143,3 +143,97 @@ export function WhatsAppFormattedText({
 }) {
   return <Tag className={className}>{parseWhatsAppFormatting(text || '')}</Tag>;
 }
+
+export type WhatsAppFormatKind = 'bold' | 'italic' | 'strike' | 'code';
+
+const FORMAT_MARKERS: Record<WhatsAppFormatKind, { open: string; close: string; placeholder: string }> = {
+  bold: { open: '*', close: '*', placeholder: 'bold' },
+  italic: { open: '_', close: '_', placeholder: 'italic' },
+  strike: { open: '~', close: '~', placeholder: 'strike' },
+  code: { open: '```', close: '```', placeholder: 'code' },
+};
+
+/** Wrap a selection (or insert placeholders) with WhatsApp markers for Cloud API send. */
+export function wrapWhatsAppSelection(
+  value: string,
+  start: number,
+  end: number,
+  kind: WhatsAppFormatKind
+): { value: string; selectionStart: number; selectionEnd: number } {
+  const safeStart = Math.max(0, Math.min(start, value.length));
+  const safeEnd = Math.max(safeStart, Math.min(end, value.length));
+  const { open, close, placeholder } = FORMAT_MARKERS[kind];
+  const selected = value.slice(safeStart, safeEnd);
+  const inner = selected || placeholder;
+  const next = value.slice(0, safeStart) + open + inner + close + value.slice(safeEnd);
+  const innerStart = safeStart + open.length;
+  return {
+    value: next,
+    selectionStart: innerStart,
+    selectionEnd: innerStart + inner.length,
+  };
+}
+
+export function textLooksWhatsAppFormatted(text: string): boolean {
+  const s = text || '';
+  return (
+    (s.includes('*') && /\*[^*\n]+\*/.test(s)) ||
+    (s.includes('_') && /_[^_\n]+_/.test(s)) ||
+    (s.includes('~') && /~[^~\n]+~/.test(s)) ||
+    s.includes('```')
+  );
+}
+
+type InputLike = HTMLInputElement | HTMLTextAreaElement;
+
+/** Apply formatting around the current selection of an input/textarea and restore focus. */
+export function applyWhatsAppFormatToInput(
+  el: InputLike | null,
+  value: string,
+  kind: WhatsAppFormatKind,
+  setValue: (next: string) => void
+): void {
+  const start = el?.selectionStart ?? value.length;
+  const end = el?.selectionEnd ?? value.length;
+  const result = wrapWhatsAppSelection(value, start, end, kind);
+  setValue(result.value);
+  requestAnimationFrame(() => {
+    if (!el) return;
+    el.focus();
+    try {
+      el.setSelectionRange(result.selectionStart, result.selectionEnd);
+    } catch {
+      /* ignore */
+    }
+  });
+}
+
+const TOOLBAR_BTN =
+  'inline-flex h-7 min-w-7 items-center justify-center rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-1.5 text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed';
+
+export function WhatsAppFormatToolbar({
+  disabled,
+  onFormat,
+  className = '',
+}: {
+  disabled?: boolean;
+  onFormat: (kind: WhatsAppFormatKind) => void;
+  className?: string;
+}) {
+  return (
+    <div className={`flex flex-wrap items-center gap-1 ${className}`.trim()} role="toolbar" aria-label="WhatsApp text formatting">
+      <button type="button" className={TOOLBAR_BTN} disabled={disabled} title="Bold (*text*)" aria-label="Bold" onClick={() => onFormat('bold')}>
+        <span className="font-bold">B</span>
+      </button>
+      <button type="button" className={TOOLBAR_BTN} disabled={disabled} title="Italic (_text_)" aria-label="Italic" onClick={() => onFormat('italic')}>
+        <span className="italic">I</span>
+      </button>
+      <button type="button" className={TOOLBAR_BTN} disabled={disabled} title="Strikethrough (~text~)" aria-label="Strikethrough" onClick={() => onFormat('strike')}>
+        <span className="line-through">S</span>
+      </button>
+      <button type="button" className={TOOLBAR_BTN} disabled={disabled} title="Monospace (```text```)" aria-label="Monospace" onClick={() => onFormat('code')}>
+        <span className="font-mono text-[10px]">{'</>'}</span>
+      </button>
+    </div>
+  );
+}

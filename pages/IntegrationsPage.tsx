@@ -9,6 +9,7 @@ import { CheckIcon, EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
 import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, getMujebConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
+import { WhatsAppFormattedText } from '../utils/whatsappFormatting';
 import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useCreateConnectedAccount, useDisconnectConnectedAccount, useTestConnection } from '../hooks/useQueries';
@@ -3181,7 +3182,10 @@ export const IntegrationsPage = () => {
                                                             <TrashIcon className="w-3 h-3" />
                                                         </button>
                                                     )}
-                                                    <p className="text-sm whitespace-pre-wrap break-words">{msg.body}</p>
+                                                    <WhatsAppFormattedText
+                                                        text={msg.body}
+                                                        className="text-sm whitespace-pre-wrap break-words"
+                                                    />
                                                     <div className="flex items-center justify-end gap-1.5 mt-1">
                                                         <span className="text-xs opacity-80">{msg.time}</span>
                                                         {msg.direction === 'out' && msg.status === 'sending' && (

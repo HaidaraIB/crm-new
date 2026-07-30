@@ -2758,26 +2758,20 @@ export const IntegrationsPage = () => {
                                 campaign_batch_id: batchId,
                             });
                         } else {
-                            const session = await getWhatsAppSessionWindowAPI({ clientId: lead.id, phone });
-                            if (!session.in_session) {
-                                throw {
-                                    code: 'whatsapp_outside_session_use_template',
-                                    message: t('whatsapp_outside_session_use_template'),
-                                };
-                            }
-                            await sendWhatsAppMessageAPI({
-                                to: phone,
-                                message: body,
-                                client_id: lead.id,
-                                send_source: 'campaign',
-                                campaign_batch_id: batchId,
-                            });
+                            throw {
+                                code: 'whatsapp_campaign_template_required',
+                                message: t('campaignWhatsAppTemplateRequired'),
+                            };
                         }
                         sent++;
                     } catch (err) {
                         await recordFailure(lead, phone, err);
                     }
                     setCampaignProgress({ sent, failed });
+                    // Light pacing to reduce Meta rate-limit / quality hits on large batches.
+                    if (!isSmsCampaign) {
+                        await new Promise((r) => setTimeout(r, 250));
+                    }
                 }
 
                 if (batchId) {
@@ -2838,14 +2832,13 @@ export const IntegrationsPage = () => {
                 return;
             }
 
-            if (!campaignWhatsAppTemplateId && !message) {
-                showAlert(t('campaignWhatsAppTemplateOrMessageRequired'), 'warning');
+            if (!campaignWhatsAppTemplateId) {
+                showAlert(t('campaignWhatsAppTemplateRequired'), 'warning');
                 return;
             }
-            if (!campaignWhatsAppTemplateId && approvedWaTemplates.length > 0) {
-                showAlert(t('campaignWhatsAppSessionOnlyHint'), 'info');
-            }
-            await runCampaignSend(withPhone, message || approvedWaTemplates.find((tpl) => tpl.id === campaignWhatsAppTemplateId)?.content || '', false);
+            const tplContent =
+                approvedWaTemplates.find((tpl) => tpl.id === campaignWhatsAppTemplateId)?.content || message || '';
+            await runCampaignSend(withPhone, tplContent, false);
         };
 
         const handleConfirmSmsCampaign = async () => {

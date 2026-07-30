@@ -134,9 +134,10 @@ export async function obtainWhatsAppEmbeddedSignupCode(
 
     // WA_EMBEDDED_SIGNUP postMessage often arrives after the FB.login callback.
     // Coexistence FINISH may return waba_id without phone_number_id.
-    const deadline = Date.now() + 8000;
+    // Wait longer so signup_event is not missed (missed event skips coexistence SMB sync).
+    const deadline = Date.now() + 15000;
     while (Date.now() < deadline) {
-      if (session.phone_number_id && session.waba_id) break;
+      if (session.phone_number_id && session.waba_id && session.signup_event) break;
       if (
         session.waba_id &&
         session.signup_event === 'FINISH_WHATSAPP_BUSINESS_APP_ONBOARDING'

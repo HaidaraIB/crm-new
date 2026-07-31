@@ -33,7 +33,8 @@ globs:
 - Meta `131037` / `whatsapp_display_name_not_approved` → show the dedicated composer/account guidance. Approval happens in Meta Business Manager; CRM cannot “fix” it.
 
 ## Lead phones
-- Company-wide duplicate phones are rejected on lead create/update (`duplicate_lead_phone`). Do not silently overwrite.
+- Company-wide uniqueness is enforced in the API on normalized E.164 digits (`ClientPhoneNumber.phone_normalized` + `uniq_company_phone_normalized`). Serializer also returns `duplicate_lead_phone`. Do not silently overwrite.
+- WhatsApp / inbound lead create paths must reuse `find_client_by_phone` (or treat IntegrityError as an existing lead), not create a second client for the same number.
 
 ## Sender attribution
 - Outbound bubbles show `created_by_username` initials (Mujeb-style). Fallback label when null: WhatsApp / system.

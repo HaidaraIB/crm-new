@@ -59,7 +59,7 @@ import {
 import { normalizeRole } from '../utils/roles';
 import { clearFieldError } from '../utils/formFieldErrors';
 
-type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown> };
+type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown>; is_active?: boolean };
 
 type PlatformDetails = {
     name: string;
@@ -763,7 +763,8 @@ export const IntegrationsPage = () => {
     const { 
         t, 
         language,
-        currentPage, 
+        currentPage,
+        setCurrentPage,
         currentUser,
         setIsManageIntegrationAccountModalOpen, 
         setEditingAccount, 
@@ -800,7 +801,7 @@ export const IntegrationsPage = () => {
             return 'meta';
         } else if (currentPage === 'TikTok') {
             return 'tiktok';
-        } else if (currentPage === 'WhatsApp' || currentPage === 'Messaging Center') {
+        } else if (currentPage === 'WhatsApp' || currentPage === 'Chats' || currentPage === 'Messaging Center') {
             return 'whatsapp';
         } else if (currentPage === 'Twilio') {
             return 'twilio';
@@ -831,6 +832,7 @@ export const IntegrationsPage = () => {
                 platformKey = 'Meta';
                 break;
             case 'WhatsApp':
+            case 'Chats':
             case 'Messaging Center':
                 platformKey = 'WhatsApp';
                 break;
@@ -906,10 +908,19 @@ export const IntegrationsPage = () => {
         }
     }, [isEmployee, whatsAppTab]);
 
-    const isWhatsAppOrMessagingCenter = currentPage === 'WhatsApp' || currentPage === 'Messaging Center';
+    // Staff no longer use Integrations → WhatsApp for chats; send them to Chats.
+    useEffect(() => {
+        if (isEmployee && currentPage === 'WhatsApp') {
+            setCurrentPage('Chats');
+            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Chats');
+        }
+    }, [isEmployee, currentPage, currentUser?.company?.name, currentUser?.company?.domain, setCurrentPage]);
+
+    const isChatsPage = currentPage === 'Chats';
+    const isChatPollingPage = isChatsPage;
     const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
-        enabled: isWhatsAppOrMessagingCenter,
-        refetchInterval: isWhatsAppOrMessagingCenter ? 8000 : false,
+        enabled: isChatPollingPage,
+        refetchInterval: isChatPollingPage ? 8000 : false,
     });
     const selectedChatLeadId =
         selectedChatClient && typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined;
@@ -921,13 +932,13 @@ export const IntegrationsPage = () => {
     } = useWhatsAppChatMessages({
         clientId: selectedChatLeadId,
         phone: selectedChatPhone || undefined,
-        enabled: isWhatsAppOrMessagingCenter && !!selectedChatClient,
-        refetchInterval: isWhatsAppOrMessagingCenter && !!selectedChatClient ? 5000 : false,
+        enabled: isChatPollingPage && !!selectedChatClient,
+        refetchInterval: isChatPollingPage && !!selectedChatClient ? 5000 : false,
     });
 
     // Link manual-number chat to CRM lead once Meta/webhook created or matched a client
     useEffect(() => {
-        if (!isWhatsAppOrMessagingCenter || !selectedChatPhone || !selectedChatClient) return;
+        if (!isChatPollingPage || !selectedChatPhone || !selectedChatClient) return;
         if (!isManualChatClient(selectedChatClient)) return;
         let cancelled = false;
         getWhatsAppContactByPhoneAPI(selectedChatPhone).then((contact) => {
@@ -945,7 +956,7 @@ export const IntegrationsPage = () => {
         return () => {
             cancelled = true;
         };
-    }, [isWhatsAppOrMessagingCenter, selectedChatPhone, selectedChatClient?.id, companyId]);
+    }, [isChatPollingPage, selectedChatPhone, selectedChatClient?.id, companyId]);
 
     // Drop optimistic "sent" rows once the server thread has them; keep sending/failed
     useEffect(() => {
@@ -960,7 +971,7 @@ export const IntegrationsPage = () => {
                 ? getWhatsAppSessionWindowAPI({ clientId: selectedChatLeadId })
                 : getWhatsAppSessionWindowAPI({ phone: selectedChatPhone }),
         enabled:
-            isWhatsAppOrMessagingCenter &&
+            isChatPollingPage &&
             (typeof selectedChatLeadId === 'number' ||
                 (!!selectedChatPhone && selectedChatPhone.replace(/\D/g, '').length >= 7)),
     });
@@ -985,7 +996,7 @@ export const IntegrationsPage = () => {
     }, [conversationsList, extraConversations]);
 
     useEffect(() => {
-        if (!companyId || !isWhatsAppOrMessagingCenter) return;
+        if (!companyId || !isChatPollingPage) return;
         const merged = mergeManualConversations(companyId);
         setExtraConversations(merged);
         manualChatsHydratedRef.current = true;
@@ -1001,7 +1012,7 @@ export const IntegrationsPage = () => {
         }
         setSelectedChatClient(client);
         setOptimisticMessages(loadManualMessages(companyId, phone));
-    }, [companyId, isWhatsAppOrMessagingCenter]);
+    }, [companyId, isChatPollingPage]);
 
     useEffect(() => {
         if (!companyId || !manualChatsHydratedRef.current) return;
@@ -1058,7 +1069,7 @@ export const IntegrationsPage = () => {
     const { data: templates = [], refetch: refetchTemplates } = useQuery({
         queryKey: ['messageTemplates'],
         queryFn: getMessageTemplatesAPI,
-        enabled: isWhatsAppOrMessagingCenter,
+        enabled: isChatsPage || currentPage === 'Messaging Center',
     });
 
     const approvedWaTemplates = useMemo(
@@ -1074,14 +1085,14 @@ export const IntegrationsPage = () => {
     const { data: whatsAppLimits } = useQuery({
         queryKey: ['whatsAppLimits'],
         queryFn: getWhatsAppLimitsAPI,
-        enabled: ((currentPage === 'WhatsApp' && whatsAppTab === 'campaigns') || currentPage === 'Messaging Center') && campaignChannel === 'whatsapp',
+        enabled: (currentPage === 'Messaging Center') && campaignChannel === 'whatsapp',
     });
 
     const { data: smsSettings } = useQuery({
         queryKey: ['twilioSettings'],
         queryFn: getTwilioSettingsAPI,
         enabled:
-            (currentPage === 'Messaging Center' || currentPage === 'WhatsApp') &&
+            currentPage === 'Messaging Center' &&
             campaignChannel === 'sms',
     });
 
@@ -1099,6 +1110,7 @@ export const IntegrationsPage = () => {
             status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
             platform: acc.platform,
             metadata: acc.metadata,
+            is_active: acc.is_active !== false,
         }));
     }, [accountsResponse]);
 
@@ -2319,7 +2331,7 @@ export const IntegrationsPage = () => {
         setIsManageIntegrationAccountModalOpen(true);
     };
 
-    // WhatsApp (Integrations) or Messaging Center (Marketing): Chats | Template Management (WhatsApp only) | Message Campaign | Accounts (WhatsApp only)
+    // WhatsApp settings or Messaging Center (Marketing) — Chats live in ChatsPage
     const isMessagingCenterPage = currentPage === 'Messaging Center';
     if (currentPage === 'WhatsApp' || isMessagingCenterPage) {
         const ensureManualConversationListed = (client: any) => {
@@ -2624,8 +2636,8 @@ export const IntegrationsPage = () => {
             !waSession.in_session;
 
         const hasConnectedWhatsApp = accounts.some(
-            (a: { status?: string; platform?: string }) =>
-                a.platform === 'whatsapp' && a.status === 'Connected'
+            (a: { status?: string; platform?: string; is_active?: boolean }) =>
+                a.platform === 'whatsapp' && a.status === 'Connected' && a.is_active !== false
         );
         const whatsappSendBlocked = !hasConnectedWhatsApp;
 
@@ -2979,26 +2991,20 @@ export const IntegrationsPage = () => {
             );
         }
 
-        // WhatsApp (Integrations): only Chats and Accounts tabs
-        const effectiveTab = (
-            (whatsAppTab === 'templates' || whatsAppTab === 'campaigns')
-                ? 'chats'
-                : (isEmployee && whatsAppTab === 'accounts' ? 'chats' : whatsAppTab)
-        ) as 'chats' | 'templates' | 'accounts' | 'campaigns';
-
+        // Integrations → WhatsApp: account settings only (chats are on ChatsPage)
         return (
             <PageWrapper
                 title={
                     <div>
                         <div className="flex items-center gap-2">
                             <IntegrationPlatformIcon platform="whatsapp" size="md" variant="inline" />
-                            <span>{t('messagingCenter')}</span>
+                            <span>{t('whatsApp')}</span>
                         </div>
-                        <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('messagingCenterDesc')}</p>
+                        <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppIntegrationDesc')}</p>
                     </div>
                 }
                 actions={
-                    !isEmployee && effectiveTab === 'accounts' ? (
+                    !isEmployee ? (
                         <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect || connectingAccountId != null}>
                             <PlusIcon className="w-4 h-4 me-2" /> {t('addNewAccount')}
                         </Button>
@@ -3006,700 +3012,8 @@ export const IntegrationsPage = () => {
                 }
             >
                 {renderPolicyBanner()}
-                <div className="flex border-b border-gray-200 dark:border-gray-700 gap-1 mb-4">
-                    <button
-                        type="button"
-                        onClick={() => setWhatsAppTabPersisted('chats')}
-                        className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'chats' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-                    >
-                        <WhatsappIcon className={`w-4 h-4 ${effectiveTab === 'chats' ? 'text-white' : integrationIconInAccentButtonClass}`} /> {t('chats')}
-                    </button>
-                    {!isEmployee && (
-                        <button
-                            type="button"
-                            onClick={() => setWhatsAppTabPersisted('accounts')}
-                            className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${effectiveTab === 'accounts' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-                        >
-                            <SettingsIcon className="w-4 h-4" /> {t('whatsAppAccounts')}
-                        </button>
-                    )}
-                </div>
 
-                {effectiveTab === 'chats' && (
-                    <Card className="overflow-hidden">
-                        <div className="flex flex-col md:flex-row min-h-[500px]">
-                            <div className="w-full md:w-80 border-e border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 flex flex-col">
-                                <div className="p-3 border-b border-gray-200 dark:border-gray-700">
-                                    <Button className="w-full" onClick={() => setIsStartNewConversationOpen(true)}>
-                                        <PlusIcon className="w-4 h-4 me-2" /> {t('startNewConversation')}
-                                    </Button>
-                                </div>
-                                <div className="p-2">
-                                    <div className="relative">
-                                        <SearchIcon className="absolute top-1/2 -translate-y-1/2 start-2 w-4 h-4 text-gray-400 pointer-events-none" />
-                                        <input
-                                            type="text"
-                                            placeholder={t('searchConversations')}
-                                            dir="auto"
-                                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-8 pe-3 py-2 text-sm"
-                                        />
-                                    </div>
-                                </div>
-                                <ul className="flex-1 overflow-y-auto custom-scrollbar">
-                                    {conversations.map(({ client }) => (
-                                        <li key={String(client.id)} className="group relative">
-                                            <button
-                                                type="button"
-                                                onClick={() => selectChatClient(client)}
-                                                className={`w-full flex items-center gap-3 p-3 pe-10 text-start ${selectedChatClient?.id === client.id ? 'bg-primary/10 dark:bg-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700/50'}`}
-                                            >
-                                                <div className={CHAT_AVATAR_CLASS}>
-                                                    {getChatAvatarLabel(client)}
-                                                </div>
-                                                <div className="min-w-0 flex-1">
-                                                    {(() => {
-                                                        const title = getWhatsAppContactTitle(client);
-                                                        return isPhoneLike(title) ? (
-                                                            <PhoneText as="p" className="font-medium text-gray-900 dark:text-white truncate">{title}</PhoneText>
-                                                        ) : (
-                                                            <p className="font-medium text-gray-900 dark:text-white truncate">{title}</p>
-                                                        );
-                                                    })()}
-                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                                                        {(() => {
-                                                            const subtitle = getWhatsAppContactSubtitle(client);
-                                                            if (!subtitle) return null;
-                                                            return isPhoneLike(subtitle) ? (
-                                                                <PhoneText className="truncate">{subtitle}</PhoneText>
-                                                            ) : (
-                                                                <span>{subtitle}</span>
-                                                            );
-                                                        })()}
-                                                    </p>
-                                                </div>
-                                            </button>
-                                            <button
-                                                type="button"
-                                                title={t('delete')}
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    handleDeleteConversation(client);
-                                                }}
-                                                className="absolute end-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-gray-400 opacity-0 transition-opacity hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        </li>
-                                    ))}
-                                    {conversations.length === 0 && (
-                                        <li className="p-4 text-center text-sm text-gray-500 dark:text-gray-400">{t('chooseClientFromDb')}</li>
-                                    )}
-                                </ul>
-                            </div>
-                            <div className="flex-1 flex flex-col bg-white dark:bg-gray-800">
-                                {selectedChatClient ? (
-                                    <>
-                                        <div className="p-3 border-b border-gray-200 dark:border-gray-700 flex items-center gap-3">
-                                            <div className={CHAT_AVATAR_CLASS}>
-                                                {getChatAvatarLabel(selectedChatClient)}
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                {(() => {
-                                                    const title = getWhatsAppContactTitle(selectedChatClient);
-                                                    return isPhoneLike(title) ? (
-                                                        <PhoneText as="p" className="font-medium text-gray-900 dark:text-white">{title}</PhoneText>
-                                                    ) : (
-                                                        <p className="font-medium text-gray-900 dark:text-white">{title}</p>
-                                                    );
-                                                })()}
-                                                <p className="text-xs text-gray-500 dark:text-gray-400">
-                                                    {selectedChatClient.phone_number && (
-                                                        <>
-                                                            {t('connectedWhatsAppApi')} ·{' '}
-                                                            <PhoneText>{selectedChatClient.phone_number}</PhoneText>
-                                                        </>
-                                                    )}
-                                                </p>
-                                            </div>
-                                            <button
-                                                type="button"
-                                                title={t('refresh') || 'Refresh'}
-                                                disabled={isFetchingChatMessages}
-                                                onClick={() => {
-                                                    void refetchLeadWhatsApp();
-                                                    void refetchConversations();
-                                                }}
-                                                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:hover:bg-gray-700 dark:hover:text-gray-200 disabled:opacity-50"
-                                            >
-                                                <RefreshIcon className={`w-4 h-4 ${isFetchingChatMessages ? 'animate-spin' : ''}`} />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                title={t('delete')}
-                                                onClick={() => handleDeleteConversation(selectedChatClient)}
-                                                className="shrink-0 rounded-lg p-2 text-gray-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400"
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-2">
-                                            <p className="text-center text-xs text-gray-400 py-2">{t('today')}</p>
-                                            {[
-                                                ...(leadWhatsAppMessages as any[])
-                                                    .map((wa: any) => {
-                                                        const delivery = String(wa.delivery_status || 'sent').toLowerCase();
-                                                        let status: 'sent' | 'delivered' | 'read' | 'failed' = 'sent';
-                                                        if (delivery === 'failed') status = 'failed';
-                                                        else if (delivery === 'delivered') status = 'delivered';
-                                                        else if (delivery === 'read') status = 'read';
-                                                        return {
-                                                            id: `api-${wa.id}`,
-                                                            body: wa.body,
-                                                            direction: (wa.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
-                                                            time: new Date(wa.created_at).toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' })),
-                                                            status,
-                                                            deliveryError: wa.delivery_error || undefined,
-                                                        };
-                                                    })
-                                                    .reverse(),
-                                                ...optimisticMessages,
-                                            ].map((msg) => (
-                                                <div
-                                                    key={msg.id ?? `${msg.time}-${msg.body.slice(0, 24)}`}
-                                                    className={`group relative max-w-[85%] rounded-lg px-3 py-2 ${
-                                                        msg.direction === 'out'
-                                                            ? msg.status === 'failed'
-                                                                ? 'ms-auto bg-red-600/90 text-white'
-                                                                : 'ms-auto bg-primary text-white'
-                                                            : 'me-auto bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                                                    } ${msg.status === 'sending' ? 'opacity-80' : ''}`}
-                                                >
-                                                    {msg.status !== 'sending' && msg.id && (
-                                                        <button
-                                                            type="button"
-                                                            title={t('delete')}
-                                                            disabled={deletingMessageId === msg.id}
-                                                            onClick={() => handleDeleteChatMessage(msg)}
-                                                            className={`absolute -top-2 ${msg.direction === 'out' ? '-start-2' : '-end-2'} rounded-full p-1 opacity-0 transition-opacity group-hover:opacity-100 ${
-                                                                msg.direction === 'out'
-                                                                    ? 'bg-red-900/80 text-white hover:bg-red-900'
-                                                                    : 'bg-gray-200 text-gray-600 hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-100 dark:hover:bg-gray-500'
-                                                            } disabled:opacity-40`}
-                                                        >
-                                                            <TrashIcon className="w-3 h-3" />
-                                                        </button>
-                                                    )}
-                                                    <WhatsAppFormattedText
-                                                        text={msg.body}
-                                                        className="text-sm whitespace-pre-wrap break-words"
-                                                    />
-                                                    <div className="flex items-center justify-end gap-1.5 mt-1">
-                                                        <span className="text-xs opacity-80">{msg.time}</span>
-                                                        {msg.direction === 'out' && msg.status === 'sending' && (
-                                                            <svg className="w-3.5 h-3.5 animate-spin opacity-70 shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                            </svg>
-                                                        )}
-                                                        {msg.direction === 'out' && msg.status === 'sent' && (
-                                                            <span
-                                                                className="inline-flex shrink-0 items-center opacity-70"
-                                                                title={t('whatsappDeliveryPending') || 'Sent to Meta — waiting for delivery'}
-                                                                aria-label={t('whatsappDeliveryPending') || 'Sent'}
-                                                            >
-                                                                <CheckIcon className="size-3.5" aria-hidden />
-                                                            </span>
-                                                        )}
-                                                        {msg.direction === 'out' && msg.status === 'delivered' && (
-                                                            <span
-                                                                className="inline-flex shrink-0 items-center opacity-70"
-                                                                title={t('whatsappDelivered') || 'Delivered'}
-                                                                aria-label={t('whatsappDelivered') || 'Delivered'}
-                                                            >
-                                                                <CheckIcon className="size-3.5" aria-hidden />
-                                                                <CheckIcon className="size-3.5 -ms-2" aria-hidden />
-                                                            </span>
-                                                        )}
-                                                        {msg.direction === 'out' && msg.status === 'read' && (
-                                                            <span
-                                                                className="inline-flex shrink-0 items-center text-[#53bdeb]"
-                                                                title={t('whatsappRead') || 'Read'}
-                                                                aria-label={t('whatsappRead') || 'Read'}
-                                                            >
-                                                                <CheckIcon className="size-3.5" aria-hidden />
-                                                                <CheckIcon className="size-3.5 -ms-2" aria-hidden />
-                                                            </span>
-                                                        )}
-                                                        {msg.direction === 'out' && msg.status === 'failed' && (
-                                                            <span
-                                                                className="text-xs font-semibold text-red-100"
-                                                                title={
-                                                                    (msg as { deliveryError?: string }).deliveryError
-                                                                        ? (t('whatsappDeliveryFailed') || 'Meta did not deliver: {error}').replace(
-                                                                              '{error}',
-                                                                              (msg as { deliveryError?: string }).deliveryError || ''
-                                                                          )
-                                                                        : t('chatMessageFailed')
-                                                                }
-                                                            >
-                                                                !
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {msg.direction === 'out' && msg.status === 'failed' && msg.id && !String(msg.id).startsWith('api-') && (
-                                                        <div className="flex items-center justify-end gap-2 mt-2 pt-2 border-t border-red-300/30">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleDeleteFailedMessage(msg.id!)}
-                                                                className="text-xs text-red-100/90 hover:text-white underline-offset-2 hover:underline"
-                                                            >
-                                                                {t('delete')}
-                                                            </button>
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleResendFailedMessage(msg)}
-                                                                disabled={resendingMessageId === msg.id}
-                                                                className="text-xs font-semibold text-white bg-red-800/50 hover:bg-red-800/70 disabled:opacity-60 rounded px-2 py-0.5"
-                                                            >
-                                                                {resendingMessageId === msg.id ? t('sending') : t('chatMessageResend')}
-                                                            </button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ))}
-                                        </div>
-                                        <div className="p-3 border-t border-gray-200 dark:border-gray-700 relative">
-                                            {chatToast && (
-                                                <div className="absolute bottom-full left-3 right-3 mb-2 z-20 pointer-events-none">
-                                                    <ChatToast
-                                                        message={chatToast.message}
-                                                        variant={chatToast.variant}
-                                                        onDismiss={() => setChatToast(null)}
-                                                    />
-                                                </div>
-                                            )}
-                                            {whatsappSendBlocked && (
-                                                <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5 mb-2">
-                                                    {t('whatsappReconnectRequired') ||
-                                                        'WhatsApp is disconnected. Reconnect an account to send messages.'}
-                                                </p>
-                                            )}
-                                            {typeof selectedChatClient.id === 'number' && waSession && !waSession.in_session && (
-                                                <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5 mb-2">
-                                                    {t('whatsappSessionClosedHint') ||
-                                                        'No reply in the last 24 hours. Use an approved template below to message this contact.'}
-                                                </p>
-                                            )}
-                                            {typeof selectedChatClient.id === 'number' && waSession?.in_session && waSession.hours_remaining != null && (
-                                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
-                                                    {(t('whatsappSessionOpenHint') || 'Free-form messages allowed (~{h}h left in session)').replace(
-                                                        '{h}',
-                                                        String(Math.max(0, Math.round(waSession.hours_remaining)))
-                                                    )}
-                                                </p>
-                                            )}
-                                            {approvedWaTemplates.length > 0 && (
-                                                <div className="mb-2">
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">
-                                                        {t('sendMetaTemplate') || 'Send Meta template'}
-                                                    </span>
-                                                    <div className="flex items-stretch gap-2">
-                                                        <select
-                                                            value={chatTemplateSendId === '' ? '' : String(chatTemplateSendId)}
-                                                            onChange={(e) =>
-                                                                setChatTemplateSendId(e.target.value ? Number(e.target.value) : '')
-                                                            }
-                                                            disabled={whatsappSendBlocked}
-                                                            className="flex-1 min-w-0 h-10 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 text-sm text-gray-900 dark:text-white disabled:opacity-60"
-                                                        >
-                                                            <option value="">{t('selectApprovedTemplate') || 'Select approved template…'}</option>
-                                                            {approvedWaTemplates.map((tpl) => (
-                                                                <option key={tpl.id} value={tpl.id}>
-                                                                    {tpl.name}
-                                                                </option>
-                                                            ))}
-                                                        </select>
-                                                        <Button
-                                                            variant="secondary"
-                                                            onClick={handleSendMetaTemplate}
-                                                            disabled={whatsappSendBlocked || chatTemplateSendId === ''}
-                                                            loading={chatTemplateSending}
-                                                            className="shrink-0 h-10 py-0 px-4"
-                                                        >
-                                                            {t('sendTemplateMessage') || 'Send template'}
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            )}
-                                            {templates.length > 0 && (
-                                                <div className="flex flex-wrap gap-2 mb-2">
-                                                    <span className="text-xs text-gray-500 dark:text-gray-400 w-full">{t('quickTemplates')}</span>
-                                                    {templates.slice(0, 4).map((tpl) => (
-                                                        <button
-                                                            key={tpl.id}
-                                                            type="button"
-                                                            onClick={() => handleApplyQuickTemplate(tpl.content)}
-                                                            disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
-                                                            className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-60"
-                                                        >
-                                                            {tpl.name}
-                                                        </button>
-                                                    ))}
-                                                </div>
-                                            )}
-                                            <div className="space-y-1.5">
-                                                <WhatsAppFormatToolbar
-                                                    disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
-                                                    onFormat={(kind: WhatsAppFormatKind) =>
-                                                        applyWhatsAppFormatToInput(
-                                                            messageInputRef.current,
-                                                            messageInput,
-                                                            kind,
-                                                            setMessageInput
-                                                        )
-                                                    }
-                                                />
-                                                <div className="flex gap-2 items-end">
-                                                    <textarea
-                                                        ref={messageInputRef}
-                                                        rows={2}
-                                                        value={messageInput}
-                                                        onChange={(e) => setMessageInput(e.target.value)}
-                                                        onKeyDown={(e) => {
-                                                            if (
-                                                                e.key === 'Enter' &&
-                                                                !e.shiftKey &&
-                                                                !blockFreeTextWhatsApp &&
-                                                                !whatsappSendBlocked
-                                                            ) {
-                                                                e.preventDefault();
-                                                                handleSendMessage();
-                                                            }
-                                                        }}
-                                                        placeholder={t('typeMessageWhatsApp')}
-                                                        disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
-                                                        className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm disabled:opacity-60 resize-y min-h-[40px] max-h-32"
-                                                    />
-                                                    <Button
-                                                        onClick={handleSendMessage}
-                                                        disabled={whatsappSendBlocked || blockFreeTextWhatsApp}
-                                                    >
-                                                        {t('sendSms')}
-                                                    </Button>
-                                                </div>
-                                                {textLooksWhatsAppFormatted(messageInput) && (
-                                                    <div className="rounded border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-900/40 px-2.5 py-1.5">
-                                                        <p className="text-[10px] uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-0.5">
-                                                            {t('preview') || 'Preview'}
-                                                        </p>
-                                                        <WhatsAppFormattedText
-                                                            text={messageInput}
-                                                            as="div"
-                                                            className="text-sm whitespace-pre-wrap break-words text-gray-900 dark:text-gray-100"
-                                                        />
-                                                    </div>
-                                                )}
-                                                <p className="text-[11px] text-gray-400 dark:text-gray-500">
-                                                    {t('whatsappFormatHint') ||
-                                                        'Format: *bold* _italic_ ~strike~ ```code``` · Enter to send · Shift+Enter for new line'}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </>
-                                ) : (
-                                    <div className="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
-                                        {t('startNewConversation')} {t('chooseClientFromDb')}
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </Card>
-                )}
-
-                {effectiveTab === 'templates' && (
-                    <div className="space-y-4">
-                        <div className="flex items-center justify-end flex-wrap gap-3">
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="secondary"
-                                    disabled={syncingTemplates}
-                                    onClick={async () => {
-                                        setSyncingTemplates(true);
-                                        try {
-                                            const res = await syncWhatsAppTemplatesAPI();
-                                            await refetchTemplates();
-                                            const summary = (t('templatesSyncedSummary') || 'Synced with Meta: {imported} imported, {updated} status updates.')
-                                                .replace('{imported}', String(res.imported ?? 0))
-                                                .replace('{updated}', String(res.updated ?? 0));
-                                            showAlert(
-                                                (res.imported ?? 0) > 0 || (res.updated ?? 0) > 0 ? summary : (t('templatesSynced') || 'Templates synced.'),
-                                                'info'
-                                            );
-                                        } catch (e: any) {
-                                            showAlert(resolveLocalizedApiError(e, t, 'Sync failed'), 'error');
-                                        } finally {
-                                            setSyncingTemplates(false);
-                                        }
-                                    }}
-                                    className="min-w-[5rem]"
-                                >
-                                    {syncingTemplates ? (
-                                        <>
-                                            <svg className="w-4 h-4 me-2 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                            </svg>
-                                            {t('syncing')}
-                                        </>
-                                    ) : (
-                                        t('sync') || 'Sync'
-                                    )}
-                                </Button>
-                                <Button
-                                    onClick={() => {
-                                        setEditingTemplate(null);
-                                        setIsEditTemplateOpen(true);
-                                    }}
-                                >
-                                    <PlusIcon className="w-4 h-4 me-2" /> {t('addTemplate') || '+ Template'}
-                                </Button>
-                            </div>
-                        </div>
-                        <div className="relative">
-                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 pointer-events-none" />
-                            <input
-                                type="text"
-                                value={templateSearch}
-                                onChange={(e) => setTemplateSearch(e.target.value)}
-                                placeholder={t('search') || 'Search'}
-                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 pl-9 pr-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
-                            />
-                        </div>
-                        <Card className="overflow-hidden">
-                            <TableHorizontalScroll>
-                                <table className="w-full min-w-[700px]">
-                                    <thead>
-                                        <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('templateLanguage') || 'Language'}</th>
-                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('name') || 'Name'}</th>
-                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('category')}</th>
-                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300">{t('status')}</th>
-                                            <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 w-[180px]">{t('actions') || 'Actions'}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
-                                        {(() => {
-                                            const filtered = templateSearch.trim()
-                                                ? templates.filter((t) => (t.name || '').toLowerCase().includes(templateSearch.trim().toLowerCase()) || ((t as any).language || '').toLowerCase().includes(templateSearch.trim().toLowerCase()))
-                                                : templates;
-                                            if (filtered.length === 0) {
-                                                return (
-                                                    <tr>
-                                                        <td colSpan={5} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                                                            {templates.length === 0
-                                                                ? (t('noTemplates') || 'No templates yet. Create one with + Template.')
-                                                                : (t('search') || 'Search') + ' — ' + (t('noResultsFound') || 'No results found')}
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            }
-                                            return filtered.map((tpl) => {
-                                                const isWa = (tpl.channel_type || '').toLowerCase() === 'whatsapp' || (tpl.channel_type || '').toLowerCase() === 'whatsapp_api';
-                                                const rawMeta = (tpl as MessageTemplateType).meta_status;
-                                                const metaStatus = rawMeta ? String(rawMeta).toUpperCase() : '';
-                                                const canSubmitToWhatsApp = isWa && (!metaStatus || metaStatus === 'REJECTED');
-                                                const cat = (tpl.category || '').toLowerCase();
-const categoryLabelKey = cat === 'marketing' ? 'categoryMarketingLabel' : cat === 'auth' ? 'categoryAuthLabel' : cat === 'utility' ? 'categoryUtilityLabel' : cat === 'carousel' ? 'categoryCarouselLabel' : cat === 'single_product' ? 'categorySingleProductLabel' : cat === 'multi_product' ? 'categoryMultiProductLabel' : cat === 'product_card_carousel' ? 'categoryProductCardCarouselLabel' : cat === 'limited_time_offer' ? 'categoryLimitedTimeOfferLabel' : null;
-const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_display || tpl.category || '').toUpperCase();
-                                                return (
-                                                    <tr key={tpl.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 even:bg-gray-50/50 dark:even:bg-gray-800/20">
-                                                        <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{(tpl as any).language || 'AR'}</td>
-                                                        <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white font-medium">{tpl.name}</td>
-                                                        <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{categoryDisplay || '—'}</td>
-                                                        <td className="py-3 px-4 text-center">
-                                                            <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : metaStatus === 'PENDING' ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>
-                                                                {metaStatus === 'APPROVED' ? (t('templateApproved') || 'APPROVED') : metaStatus === 'REJECTED' ? (t('templateRejected') || 'REJECTED') : metaStatus === 'PENDING' ? (t('templatePending') || 'PENDING') : (t('templateDraft') || 'Not submitted')}
-                                                            </span>
-                                                        </td>
-                                                        <td className="py-3 px-4">
-                                                            <div className="flex justify-center items-center">
-                                                                <div className="inline-flex items-center gap-2 flex-nowrap">
-                                                                    <div className="w-[150px] min-w-[150px] flex justify-end items-center">
-                                                                        {canSubmitToWhatsApp && (
-                                                                            <Button variant="secondary" className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem] h-8 px-3" disabled={submittingTemplateId === tpl.id} onClick={async () => { setSubmittingTemplateId(tpl.id); try { await submitMessageTemplateToWhatsAppAPI(tpl.id); showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info'); refetchTemplates(); } catch (e: any) { showAlert(resolveLocalizedApiError(e, t, t('failedToSendSms')), 'error'); } finally { setSubmittingTemplateId(null); } }}>
-                                                                                {submittingTemplateId === tpl.id ? (
-                                                                                    <>
-                                                                                        <svg className="w-4 h-4 me-1.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                                                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                                                        </svg>
-                                                                                        {t('submittingToWhatsApp')}
-                                                                                    </>
-                                                                                ) : (
-                                                                                    t('submitToWhatsApp') || 'Submit to WhatsApp'
-                                                                                )}
-                                                                            </Button>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="inline-flex items-center gap-0.5 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shrink-0">
-                                                                        <button type="button" onClick={() => { setConfirmDeleteConfig({ title: t('deleteTemplate'), message: t('deleteTemplateConfirm'), itemName: tpl.name, confirmButtonText: t('delete'), confirmButtonVariant: 'danger', onConfirm: async () => { await deleteMessageTemplateAPI(tpl.id); refetchTemplates(); } }); setIsConfirmDeleteModalOpen(true); }} className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-red-600" title={t('deleteTemplate')}><TrashIcon className="w-4 h-4" /></button>
-                                                                        <button type="button" onClick={() => handleCopyTemplate(tpl.content)} className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary-700 dark:hover:text-primary-200" title={t('copyTemplate')}><FileTextIcon className="w-4 h-4" /></button>
-                                                                        <button type="button" onClick={() => { setEditingTemplate(tpl); setIsEditTemplateOpen(true); }} className="p-2.5 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-600 hover:text-primary-700 dark:hover:text-primary-200" title={t('edit')}><EditIcon className="w-4 h-4" /></button>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                );
-                                            });
-                                        })()}
-                                    </tbody>
-                                </table>
-                            </TableHorizontalScroll>
-                        </Card>
-                    </div>
-                )}
-
-                {effectiveTab === 'campaigns' && (
-                    <div className="space-y-4">
-                        <div>
-                            <h2 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center gap-2">
-                                <MegaphoneIcon className={`w-5 h-5 shrink-0 ${marketingAccentIconClass}`} /> {t('messageCampaign')}
-                            </h2>
-                            <p className="text-sm text-gray-500 dark:text-gray-400">{t('messageCampaignDesc')}</p>
-                        </div>
-                        <Card className="overflow-hidden">
-                            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 p-4">
-                                <CampaignLeadPicker
-                                    enabled={effectiveTab === 'campaigns'}
-                                    selectedIds={campaignSelectedIds}
-                                    onSelectedIdsChange={setCampaignSelectedIds}
-                                />
-                                <div className="flex flex-col">
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignSendVia')}</label>
-                                    <div className="flex gap-2 mb-3">
-                                        <button
-                                            type="button"
-                                            onClick={() => setCampaignChannel('whatsapp')}
-                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'whatsapp' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-200' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-                                        >
-                                            <IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" />
-                                            {t('campaignViaWhatsApp')}
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => setCampaignChannel('sms')}
-                                            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded border text-sm font-medium ${campaignChannel === 'sms' ? 'border-primary bg-primary/10 text-primary dark:bg-primary/20' : 'border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300'}`}
-                                        >
-                                            <IntegrationPlatformIcon platform="sms" size="sm" variant="inline" />
-                                            {t('campaignViaSms')}
-                                        </button>
-                                    </div>
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('quickTemplates')}</label>
-                                    {(() => {
-                                        const isSms = campaignChannel === 'sms';
-                                        const campaignTemplates = (templates as any[]).filter((tpl: any) => {
-                                            const ch = (tpl.channel_type || '').toLowerCase();
-                                            return isSms ? ch === 'sms' : (ch === 'whatsapp' || ch === 'whatsapp_api');
-                                        });
-                                        if (campaignTemplates.length === 0) {
-                                            return (
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3">
-                                                    {isSms ? t('noSmsTemplatesYet') : t('noWhatsAppTemplatesYet')}
-                                                </p>
-                                            );
-                                        }
-                                        return (
-                                            <div className="flex flex-wrap gap-2 mb-3">
-                                                {campaignTemplates.map((tpl: any) => (
-                                                    <button
-                                                        key={tpl.id}
-                                                        type="button"
-                                                        onClick={() => {
-                                                            const content = tpl.content || '';
-                                                            setCampaignMessage((prev) => (prev ? prev + '\n' + content : content));
-                                                            if (!isSms && (tpl.meta_status || '').toUpperCase() === 'APPROVED') {
-                                                                setCampaignWhatsAppTemplateId(tpl.id);
-                                                            }
-                                                        }}
-                                                        className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 text-sm whitespace-nowrap hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-                                                    >
-                                                        {tpl.name}
-                                                    </button>
-                                                ))}
-                                            </div>
-                                        );
-                                    })()}
-                                    {campaignChannel === 'whatsapp' && (
-                                        <div className="mb-3">
-                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('campaignWhatsAppTemplateLabel')}</label>
-                                            <select
-                                                value={campaignWhatsAppTemplateId ?? ''}
-                                                onChange={(e) => {
-                                                    const id = e.target.value ? Number(e.target.value) : null;
-                                                    setCampaignWhatsAppTemplateId(id);
-                                                    if (id) {
-                                                        const tpl = approvedWaTemplates.find((tplItem) => tplItem.id === id);
-                                                        if (tpl?.content) setCampaignMessage(tpl.content);
-                                                    }
-                                                }}
-                                                className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-2.5 py-2 text-sm text-gray-900 dark:text-white"
-                                            >
-                                                <option value="">{t('campaignWhatsAppSessionMessage')}</option>
-                                                {approvedWaTemplates.map((tpl) => (
-                                                    <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
-                                                ))}
-                                            </select>
-                                            <p className="text-xs mt-1 text-gray-500 dark:text-gray-400">
-                                                {campaignWhatsAppTemplateId
-                                                    ? t('campaignWhatsAppTemplateHint')
-                                                    : t('campaignWhatsAppSessionOnlyHint')}
-                                            </p>
-                                        </div>
-                                    )}
-                                    {campaignChannel === 'sms' && smsSettings && !smsSettings.is_enabled && (
-                                        <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">{t('sms_error_not_configured')}</p>
-                                    )}
-                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 mt-1">{t('messageContent')}</label>
-                                    <textarea
-                                        value={campaignMessage}
-                                        onChange={(e) => setCampaignMessage(e.target.value)}
-                                        rows={6}
-                                        placeholder={t('messageContent')}
-                                        className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y"
-                                    />
-                                    {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && (
-                                        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                                            {t('whatsAppMessagingLimit') || 'WhatsApp limit'}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier}
-                                            {t('conversationsPerDay') || ' conversations/day'}
-                                            {whatsAppLimits.quality_rating && ` · ${t('quality') || 'Quality'}: ${whatsAppLimits.quality_rating}`}
-                                        </p>
-                                    )}
-                                    {campaignProgress !== null && (
-                                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                                            {t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}
-                                        </p>
-                                    )}
-                                    <Button
-                                        className="mt-3"
-                                        onClick={handleCampaignSend}
-                                        disabled={campaignSending}
-                                    >
-                                        {campaignSending ? (
-                                            <><Loader variant="primary" className="w-4 h-4 me-2" /> {t('campaignSending')}</>
-                                        ) : (
-                                            <>{t('sendToSelected')} ({campaignSelectedIds.size})</>
-                                        )}
-                                    </Button>
-                                </div>
-                            </div>
-                        </Card>
-                    </div>
-                )}
-                {smsCampaignPreviewModal}
-
-                {effectiveTab === 'accounts' && (
-                    <Card>
+                <Card>
                         {accounts.length > 0 ? (
                             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                                 {accounts.map((account: Account) => (
@@ -3761,43 +3075,6 @@ const categoryDisplay = categoryLabelKey ? t(categoryLabelKey) : (tpl.category_d
                             </div>
                         )}
                     </Card>
-                )}
-
-                <EditTemplateModal
-                    isOpen={isEditTemplateOpen}
-                    onClose={() => { setIsEditTemplateOpen(false); setEditingTemplate(null); }}
-                    template={editingTemplate}
-                    t={t}
-                    language={language}
-                    onSuccess={() => { refetchTemplates(); }}
-                    onSendToReview={editingTemplate ? async (templateId, lang) => {
-                        await submitMessageTemplateToWhatsAppAPI(templateId, { language: lang });
-                        showAlert(t('templateSubmittedToWhatsApp') || 'Template submitted to WhatsApp for review.', 'info');
-                        refetchTemplates();
-                    } : undefined}
-                    onRequestDelete={(tpl) => {
-                        setConfirmDeleteConfig({
-                            title: t('deleteTemplate'),
-                            message: t('deleteTemplateConfirm'),
-                            itemName: tpl.name,
-                            confirmButtonText: t('delete'),
-                            confirmButtonVariant: 'danger',
-                            onConfirm: async () => {
-                                await deleteMessageTemplateAPI(tpl.id);
-                                refetchTemplates();
-                                setIsEditTemplateOpen(false);
-                                setEditingTemplate(null);
-                            },
-                        });
-                        setIsConfirmDeleteModalOpen(true);
-                    }}
-                />
-                <StartNewConversationModal
-                    isOpen={isStartNewConversationOpen}
-                    onClose={() => setIsStartNewConversationOpen(false)}
-                    t={t}
-                    onSelectClient={addConversation}
-                />
             </PageWrapper>
         );
     }

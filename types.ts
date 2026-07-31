@@ -12,6 +12,7 @@ export type Page =
   | 'Products' | 'Product Categories' | 'Suppliers'
   | 'Campaigns'
   | 'Messaging Center'
+  | 'Chats'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
   | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'Mujeb' | 'PBX'
   | 'Call Reports'

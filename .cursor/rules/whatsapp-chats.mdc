@@ -1,0 +1,39 @@
+---
+description: WhatsApp Chats page architecture, ACL, session window, and phone uniqueness
+globs:
+  - pages/ChatsPage.tsx
+  - components/whatsapp/**
+  - components/modals/StartNewConversationModal.tsx
+  - utils/whatsapp*.ts
+  - utils/whatsapp*.tsx
+---
+
+# WhatsApp Chats
+
+## Layout
+- **Chats** route (`/chats`, page `Chats`) → [`pages/ChatsPage.tsx`](pages/ChatsPage.tsx) + [`components/whatsapp/*`](components/whatsapp/).
+- **Integrations → WhatsApp** is account settings only (connect/disconnect). Do not put conversation UI back in `IntegrationsPage`.
+- Chats page fills the main viewport (`h-full` shell, no page-level scroll). Keep title compact; composer templates collapse behind a toggle so the thread stays visible without scrolling the page.
+- Theme tokens live in `components/whatsapp/whatsappChatTheme.ts`. Use CRM `primary` + gray surfaces so the chat chrome matches the sidebar.
+
+## Phone display
+- Any **displayed** phone / E.164 string → `PhoneText` / `isPhoneLike` (see `phone-rtl-display` rule).
+
+## Access control (never client-only)
+- Employee/Doctor: only leads `assigned_to` themselves. Backend enforces this on conversations, messages, contact-by-phone, session, and send.
+- Manual phone for staff: if the number is missing or belongs to another assignee → treat as **not found** (`whatsapp_contact_not_found`). Do not reveal ownership.
+- Owners/admins (and other company-wide lead viewers) see all threads; owners may open unknown numbers as manual chats.
+
+## 24h session
+- CRM session is derived from last **inbound** `LeadWhatsAppMessage.created_at` (+ Meta timestamp when available).
+- When the messages poll shows a newer inbound, **invalidate** `['whatsappSession', …]` and refetch. Also derive open session from loaded inbound messages so the UI does not lag.
+- Meta code `131047` = outside session → template hint. **Do not** treat `131037` (display name) as session-closed.
+
+## Display name
+- Meta `131037` / `whatsapp_display_name_not_approved` → show the dedicated composer/account guidance. Approval happens in Meta Business Manager; CRM cannot “fix” it.
+
+## Lead phones
+- Company-wide duplicate phones are rejected on lead create/update (`duplicate_lead_phone`). Do not silently overwrite.
+
+## Sender attribution
+- Outbound bubbles show `created_by_username` initials (Mujeb-style). Fallback label when null: WhatsApp / system.

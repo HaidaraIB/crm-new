@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Modal } from '../Modal';
 import { Loader } from '../Loader';
-import { getLeadsAPI } from '../../services/api';
+import { getLeadsAPI, getWhatsAppContactByPhoneAPI } from '../../services/api';
 import {
   getWhatsAppContactAvatarLabel,
   getWhatsAppContactSubtitle,
@@ -33,6 +33,7 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [manualPhone, setManualPhone] = useState('');
+  const [startingPhone, setStartingPhone] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -51,7 +52,8 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
     onSelectClient(client);
     onClose();
   };
-  const handleStartWithNumber = () => {
+
+  const handleStartWithNumber = async () => {
     const compact = manualPhone.replace(/\s+/g, '');
     const withPlus = compact.startsWith('+') ? compact : `+${compact}`;
     const phoneErr = validatePhoneField(withPlus, t);
@@ -61,14 +63,38 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
     }
     setErrors({});
     const normalized = compact.replace(/^\+/, '');
-    onSelectClient({
-      id: `manual:${normalized}`,
-      name: normalized,
-      phone_number: normalized,
-      is_manual: true,
-    });
-    setManualPhone('');
-    onClose();
+    setStartingPhone(true);
+    try {
+      const contact = await getWhatsAppContactByPhoneAPI(normalized);
+      if (contact?.id) {
+        onSelectClient({
+          id: contact.id,
+          name: contact.name,
+          phone_number: contact.phone_number || normalized,
+          lead_company_name: contact.lead_company_name || contact.company_name || '',
+        });
+        setManualPhone('');
+        onClose();
+        return;
+      }
+      onSelectClient({
+        id: `manual:${normalized}`,
+        name: normalized,
+        phone_number: normalized,
+        is_manual: true,
+      });
+      setManualPhone('');
+      onClose();
+    } catch (e: any) {
+      const key = e?.error_key || e?.code;
+      if (key === 'whatsapp_contact_not_found' || e?.status === 404) {
+        setErrors({ phone: t('whatsappContactNotFound') || 'Contact not found' });
+        return;
+      }
+      setErrors({ phone: t('whatsappContactNotFound') || 'Contact not found' });
+    } finally {
+      setStartingPhone(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -97,11 +123,11 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
             />
             <button
               type="button"
-              onClick={handleStartWithNumber}
-              disabled={!manualPhone.trim()}
+              onClick={() => void handleStartWithNumber()}
+              disabled={!manualPhone.trim() || startingPhone}
               className="px-3 py-2 rounded bg-primary text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {t('start') || 'Start'}
+              {startingPhone ? '…' : t('start') || 'Start'}
             </button>
           </div>
           {errors.phone && (

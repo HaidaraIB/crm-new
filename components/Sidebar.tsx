@@ -98,6 +98,7 @@ export const Sidebar = () => {
         Meta: 'meta',
         TikTok: 'tiktok',
         WhatsApp: 'whatsapp',
+        Chats: 'whatsapp',
         'Messaging Center': 'whatsapp',
         Twilio: 'twilio',
         AI: 'openai',
@@ -258,6 +259,10 @@ export const Sidebar = () => {
                     if (item.name === 'Employees' && (normalizedCurrentRole === 'Employee' || normalizedCurrentRole === 'Doctor')) {
                         return false;
                     }
+                    // Staff use Chats (not Integrations settings) for WhatsApp messaging
+                    if (item.name === 'Integrations' && (normalizedCurrentRole === 'Employee' || normalizedCurrentRole === 'Doctor')) {
+                        return false;
+                    }
                     return true;
                 }).map((item) => {
                     const isOpen = openSubMenus[item.name] ?? false;
@@ -269,10 +274,6 @@ export const Sidebar = () => {
                     }
                     if (isReceptionUser && item.name === 'Leads') {
                         subItems = ['All Leads', 'CreateLead'];
-                    }
-                    // Employees only see WhatsApp under Integrations (Chats + Template Management)
-                    if (item.name === 'Integrations' && (normalizedCurrentRole === 'Employee' || normalizedCurrentRole === 'Doctor')) {
-                        subItems = ['WhatsApp'];
                     }
                     // Supervisor: filter sub-items by permission
                     if (normalizedCurrentRole === 'Supervisor' && subItems) {

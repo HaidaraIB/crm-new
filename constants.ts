@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Page, Lead, User, Deal, Todo, Campaign, TimelineEntry, Activity, Developer, Project, Unit, Owner, Channel, Stage, Status, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier } from './types';
-import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon } from './components/index';
+import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon, WhatsappIcon } from './components/index';
 
 export const SIDEBAR_ITEMS: {
   name: Page;
@@ -16,6 +16,7 @@ export const SIDEBAR_ITEMS: {
     { name: 'Deals', icon: HandshakeIcon },
     { name: 'Employees', icon: UsersIcon },
     { name: 'Marketing', icon: MegaphoneIcon, subItems: ['Campaigns', 'Messaging Center'] },
+    { name: 'Chats', icon: WhatsappIcon },
     { name: 'Todos', icon: CheckSquareIcon },
     { name: 'Reports', icon: FileTextIcon, subItems: ['Teams Report', 'Employees Report', 'Marketing Report', 'Call Reports'] },
     { name: 'Integrations', icon: ChevronsUpDownIcon, subItems: ['Meta', 'TikTok', 'WhatsApp', 'Twilio', 'AI', 'Lead API', 'Mujeb', 'PBX'] },
@@ -1381,6 +1382,10 @@ export const translations = {
     categoryMarketing: "Marketing",
     categoryUtility: "Utility",
     whatsAppAccounts: "WhatsApp Accounts",
+    whatsAppIntegrationDesc: "Connect and manage WhatsApp Business API accounts",
+    whatsappContactNotFound: "Contact not found",
+    noConversations: "No conversations yet",
+    duplicate_lead_phone: "A lead with this phone number already exists in your company.",
     invoiceReminder: "Invoice Reminder",
     welcomeNewClient: "Welcome New Client",
     projectDeliveryNotification: "Project Delivery Notification",
@@ -3710,6 +3715,10 @@ export const translations = {
     categoryMarketing: "تسويق",
     categoryUtility: "أدوات",
     whatsAppAccounts: "حسابات واتساب",
+    whatsAppIntegrationDesc: "ربط وإدارة حسابات واتساب للأعمال",
+    whatsappContactNotFound: "لم يتم العثور على جهة الاتصال",
+    noConversations: "لا توجد محادثات بعد",
+    duplicate_lead_phone: "يوجد عميل محتمل بنفس رقم الهاتف في شركتك.",
     invoiceReminder: "تذكير بالفاتورة",
     welcomeNewClient: "ترحيب بعميل جديد",
     projectDeliveryNotification: "إشعار تسليم مشروع",

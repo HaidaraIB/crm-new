@@ -505,6 +505,7 @@ async function apiRequest<T>(
     console.error('API Error:', response.status, errorData);
 
     const error: any = new Error(errorMessage);
+    error.status = response.status;
     if (errorData && typeof errorData === 'object') {
       error.data = errorData;
       if (code) error.code = code;

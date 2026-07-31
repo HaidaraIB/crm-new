@@ -28,6 +28,7 @@ export * from './TeamsReportPage';
 export * from './EmployeesReportPage';
 export * from './MarketingReportPage';
 export * from './IntegrationsPage';
+export * from './ChatsPage';
 export * from './CallReportsPage';
 export * from './SettingsPage';
 export * from './SupportCenterPage';

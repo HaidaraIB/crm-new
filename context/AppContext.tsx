@@ -1292,6 +1292,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'Meta':
       case 'TikTok':
       case 'WhatsApp':
+      case 'Chats':
       case 'Twilio':
       case 'AI':
       case 'Lead API':

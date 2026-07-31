@@ -146,7 +146,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
       leadId
     ) {
       if (leadId) setSelectedLead({ id: leadId } as any);
-      openPage('WhatsApp');
+      openPage('Chats');
       return;
     }
     if (

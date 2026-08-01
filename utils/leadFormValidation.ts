@@ -2,6 +2,7 @@
 
 import type { TranslateFn } from './formValidation';
 import { validatePhoneField } from './formValidation';
+import { mapApiFieldsToUiErrors } from './formFieldErrors';
 
 export interface LeadFormPhoneNumberInput {
     phone_number?: string;
@@ -91,4 +92,67 @@ export const validateLeadForm = (
     }
 
     return errors;
+};
+
+/** Map API field keys → lead form UI error keys. */
+export const LEAD_API_FIELD_MAP: Record<string, string> = {
+    phone_number: 'phone',
+    phone_numbers: 'phone',
+    communication_way: 'communicationWay',
+    assigned_to: 'assignedTo',
+    lead_company_name: 'leadCompanyName',
+    budget_max: 'budgetMax',
+    interested_developer: 'interestedDeveloper',
+    interested_project: 'interestedProject',
+    interested_unit: 'interestedUnit',
+};
+
+/**
+ * Map create/update lead API errors onto inline form field keys (localized).
+ * Prefer `error.code` business keys (e.g. duplicate_lead_phone) over raw English details.
+ */
+export const mapLeadApiErrorToFieldErrors = (
+    error: {
+        code?: string;
+        error_key?: string;
+        message?: string;
+        fields?: Record<string, unknown>;
+    } | null | undefined,
+    t: TranslateFn,
+    fallbackGeneralKey: 'errorCreatingLead' | 'errorUpdatingLead' = 'errorCreatingLead'
+): Record<string, string> => {
+    const code = error?.code || error?.error_key;
+
+    if (code === 'employee_weekly_day_off') {
+        return {
+            assignedTo:
+                t('employeeWeeklyDayOffAssignError') ||
+                error?.message ||
+                'Cannot assign to this employee on their weekly day off.',
+        };
+    }
+
+    if (code === 'duplicate_lead_phone') {
+        return {
+            phone:
+                t('duplicate_lead_phone') ||
+                'A lead with this phone number already exists in your company.',
+        };
+    }
+
+    if (error?.fields) {
+        const fieldErrors = mapApiFieldsToUiErrors(error.fields, t, LEAD_API_FIELD_MAP);
+        if (Object.keys(fieldErrors).length > 0) {
+            return fieldErrors;
+        }
+    }
+
+    return {
+        general:
+            error?.message ||
+            t(fallbackGeneralKey) ||
+            (fallbackGeneralKey === 'errorUpdatingLead'
+                ? 'Failed to update lead. Please try again.'
+                : 'Failed to create lead. Please try again.'),
+    };
 };

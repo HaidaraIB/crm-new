@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -9,26 +9,15 @@ import { PhoneInput } from '../PhoneInput';
 import { Checkbox } from '../Checkbox';
 import { Channel, Lead, PhoneNumber, Status, User } from '../../types';
 import { PlusIcon, TrashIcon } from '../icons';
-import { useUpdateLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
+import { usePatchLead, useUsers, useStatuses, useChannels } from '../../hooks/useQueries';
 import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
-import { buildLeadAssigneePickerOptions, showInLeadAssigneePicker } from '../../utils/roles';
-import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
+import { buildLeadAssigneePickerOptions } from '../../utils/roles';
+import { LeadInterestInventoryFields } from '../LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../LeadLocationMapPicker';
-import { buildLeadLocationApiBody, parseLeadCoordinate } from '../../utils/leadLocation';
-import { validateLeadForm } from '../../utils/leadFormValidation';
-import { clearFieldError, mapApiFieldsToUiErrors } from '../../utils/formFieldErrors';
-
-const LEAD_API_FIELD_MAP: Record<string, string> = {
-    phone_number: 'phone',
-    phone_numbers: 'phone',
-    communication_way: 'communicationWay',
-    assigned_to: 'assignedTo',
-    lead_company_name: 'leadCompanyName',
-    budget_max: 'budgetMax',
-    interested_developer: 'interestedDeveloper',
-    interested_project: 'interestedProject',
-    interested_unit: 'interestedUnit',
-};
+import { parseLeadCoordinate } from '../../utils/leadLocation';
+import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../../utils/leadFormValidation';
+import { clearFieldError } from '../../utils/formFieldErrors';
+import { buildLeadUpdateDiff, buildLeadUpdatePayload } from '../../utils/leadUpdatePayload';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -63,23 +52,9 @@ export const EditLeadModal = () => {
     const channels: Channel[] = Array.isArray(channelsData)
         ? channelsData
         : (channelsData?.results || []);
-    const chList = channels;
-    const stList = statuses;
-    const defaultChannelName = React.useMemo(() => {
-        if (!chList.length) return '';
-        const c = chList.find(x => x.isDefault ?? x.is_default) || chList[0];
-        return c?.name ?? '';
-    }, [chList]);
-    const defaultStatusName = React.useMemo(() => {
-        if (!stList.length) return '';
-        const s = stList.find(x => (x.isDefault ?? x.is_default) && !x.isHidden)
-            || stList.find(x => !x.isHidden) || stList[0];
-        return s?.name ?? '';
-    }, [stList]);
-
-    // Update lead mutation
-    const updateLeadMutation = useUpdateLead();
+    const updateLeadMutation = usePatchLead();
     const loading = updateLeadMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
 
     const [formState, setFormState] = useState({
         name: '',
@@ -112,15 +87,24 @@ export const EditLeadModal = () => {
     // Initialize form state when editingLead changes
     useEffect(() => {
         if (editingLead) {
-            const aid = editingLead.assignedTo;
-            let assignedToField = '';
-            if (aid) {
-                const assignee = users.find((u) => u.id === aid);
-                if (assignee && showInLeadAssigneePicker(assignee.role)) {
-                    assignedToField = String(aid);
-                }
+            const typeValue = editingLead.type ? editingLead.type.toLowerCase() as Lead['type'] : '' as Lead['type'];
+            const priorityValue = editingLead.priority ? editingLead.priority.toLowerCase() as Lead['priority'] : '' as Lead['priority'];
+
+            let channelId = '';
+            if (editingLead.communicationWay) {
+                const channel = channels.find(c => c.name === editingLead.communicationWay);
+                channelId = channel ? channel.id.toString() : editingLead.communicationWay;
             }
-            setFormState({
+
+            let statusId = '';
+            if (editingLead.status) {
+                const status = statuses.find(s => s.name === editingLead.status);
+                statusId = status ? status.id.toString() : editingLead.status;
+            }
+
+            const assignedToField = editingLead.assignedTo ? String(editingLead.assignedTo) : '';
+
+            const nextForm = {
                 name: editingLead.name || '',
                 phone: editingLead.phone || '',
                 budget: editingLead.budget != null ? String(editingLead.budget) : '',
@@ -131,10 +115,10 @@ export const EditLeadModal = () => {
                           ? String((editingLead as any).budget_max)
                           : '',
                 assignedTo: assignedToField,
-                type: (editingLead.type || '') as Lead['type'],
-                communicationWay: editingLead.communicationWay || defaultChannelName,
-                priority: (editingLead.priority || '') as Lead['priority'],
-                status: editingLead.status || defaultStatusName,
+                type: typeValue,
+                communicationWay: channelId,
+                priority: priorityValue,
+                status: statusId,
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
                 profession: editingLead.profession ?? (editingLead as any).profession ?? '',
                 residence: (editingLead as Lead).residence ?? (editingLead as any).residence ?? '',
@@ -171,27 +155,41 @@ export const EditLeadModal = () => {
                         : (editingLead as any).interested_unit != null
                           ? String((editingLead as any).interested_unit)
                           : '',
-            });
-            // Initialize phone numbers from editingLead
+            };
+            setFormState(nextForm);
+
+            let nextPhones: Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber> = [];
             if (editingLead.phoneNumbers && editingLead.phoneNumbers.length > 0) {
-                setPhoneNumbers(editingLead.phoneNumbers.map(pn => ({
+                nextPhones = editingLead.phoneNumbers.map(pn => ({
                     ...pn,
                     phone_number: pn.phone_number,
-                })));
+                }));
             } else if (editingLead.phone) {
-                // If no phone numbers but has phone, create one
-                setPhoneNumbers([{
+                nextPhones = [{
                     phone_number: editingLead.phone,
                     phone_type: 'mobile',
                     is_primary: true,
                     notes: '',
-                }]);
+                }];
+            }
+            setPhoneNumbers(nextPhones);
+
+            const companyId = currentUser?.company?.id;
+            if (companyId) {
+                initialPayloadRef.current = buildLeadUpdatePayload({
+                    formState: nextForm,
+                    phoneNumbers: nextPhones,
+                    channels,
+                    statuses,
+                    companyId,
+                    specialization: currentUser?.company?.specialization,
+                });
             } else {
-                setPhoneNumbers([]);
+                initialPayloadRef.current = null;
             }
             setErrors({});
         }
-    }, [editingLead, defaultChannelName, defaultStatusName, users]);
+    }, [editingLead, channels, statuses, currentUser]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -274,87 +272,48 @@ export const EditLeadModal = () => {
             : [];
 
         try {
-            const channelId = formState.communicationWay
-                ? (chList.find((c: { id?: number; name?: string }) =>
-                    c.id?.toString() === formState.communicationWay || c.name === formState.communicationWay)?.id ?? null)
-                : null;
-            const statusId = formState.status
-                ? (stList.find((s: { id?: number; name?: string }) =>
-                    s.id?.toString() === formState.status || s.name === formState.status)?.id ?? null)
-                : null;
-
-            const priorityValue = formState.priority
-                ? (formState.priority.toLowerCase() as 'low' | 'medium' | 'high')
-                : null;
-            const typeValue = formState.type
-                ? (formState.type.toLowerCase() as 'fresh' | 'hot' | 'cold')
-                : null;
-
-            const primaryPhone =
-                finalPhoneNumbers.find(pn => pn.is_primary)?.phone_number
-                || finalPhoneNumbers[0]?.phone_number
-                || '';
-
             const companyId = currentUser?.company?.id;
             if (!companyId) {
                 setErrors({ general: t('companyRequired') || 'Company is required. Please log in again.' });
                 return;
             }
 
-            const updateData: Record<string, unknown> = {
-                name: formState.name,
-                phone_numbers: finalPhoneNumbers,
-                budget: formState.budget ? Number(formState.budget) : null,
-                budget_max: formState.budgetMax?.trim() ? Number(formState.budgetMax) : null,
-                assigned_to: formState.assignedTo ? Number(formState.assignedTo) : null,
-                type: typeValue,
-                communication_way: channelId,
-                priority: priorityValue,
-                status: statusId,
-                company: companyId,
-                lead_company_name: formState.leadCompanyName?.trim() || null,
-                profession: formState.profession?.trim() || null,
-                residence: formState.residence?.trim() || null,
-                notes: formState.notes?.trim() ? formState.notes.trim() : null,
-                ...buildLeadLocationApiBody(formState.locationLatitude, formState.locationLongitude),
-                ...buildInterestedInventoryApiBody(currentUser?.company?.specialization, {
-                    interestedDeveloper: formState.interestedDeveloper,
-                    interestedProject: formState.interestedProject,
-                    interestedUnit: formState.interestedUnit,
-                }),
-            };
-            if (primaryPhone) {
-                updateData.phone_number = primaryPhone;
+            const updateData = buildLeadUpdatePayload({
+                formState,
+                phoneNumbers: finalPhoneNumbers,
+                channels,
+                statuses,
+                companyId,
+                specialization: currentUser?.company?.specialization,
+            });
+
+            const initial = initialPayloadRef.current;
+            const patchData = initial
+                ? buildLeadUpdateDiff(initial, updateData)
+                : updateData;
+
+            if (Object.keys(patchData).length === 0) {
+                handleClose();
+                return;
             }
 
-            await updateLeadMutation.mutateAsync({ id: editingLead.id, data: updateData });
+            await updateLeadMutation.mutateAsync({ id: editingLead.id, data: patchData });
 
-            // Close modal immediately and show success modal
+            initialPayloadRef.current = buildLeadUpdatePayload({
+                formState,
+                phoneNumbers: finalPhoneNumbers,
+                channels,
+                statuses,
+                companyId,
+                specialization: currentUser?.company?.specialization,
+            });
+
             handleClose();
             setSuccessMessage(t('leadUpdatedSuccessfully') || 'Lead updated successfully!');
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating lead:', error);
-            const code = error?.code || error?.error_key;
-            if (code === 'employee_weekly_day_off') {
-                setErrors({
-                    assignedTo:
-                        t('employeeWeeklyDayOffAssignError')
-                        || error?.message
-                        || 'Cannot assign to this employee on their weekly day off.',
-                });
-                return;
-            }
-            if (error?.fields) {
-                const fieldErrors = mapApiFieldsToUiErrors(error.fields, t, LEAD_API_FIELD_MAP);
-                setErrors(
-                    Object.keys(fieldErrors).length > 0
-                        ? fieldErrors
-                        : { general: error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.' }
-                );
-                return;
-            }
-            setErrors({ general: error?.message || t('errorUpdatingLead') || 'Failed to update lead. Please try again.' });
+            setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorUpdatingLead'));
         }
     };
 
@@ -473,6 +432,7 @@ export const EditLeadModal = () => {
                                                 value={pn.phone_number}
                                                 onChange={(value) => handlePhoneNumberChange(index, 'phone_number', value)}
                                                 defaultCountry="IQ"
+                                                error={!!errors.phone}
                                             />
                                         </div>
                                         <div className="col-span-6 sm:col-span-2">
@@ -510,7 +470,7 @@ export const EditLeadModal = () => {
                                 ))}
                             </div>
                         )}
-                        {phoneNumbers.length > 0 && errors.phone && (
+                        {errors.phone && phoneNumbers.length > 0 && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
                         )}
                     </div>
@@ -564,7 +524,7 @@ export const EditLeadModal = () => {
                             <option value="">{t('selectChannel') || 'Select Channel'}</option>
                             {(channels || []).length > 0 ? (
                                 (channels || []).map(channel => (
-                                    <option key={channel.id} value={channel.name}>
+                                    <option key={channel.id} value={channel.id.toString()}>
                                         {channel.name}
                                     </option>
                                 ))
@@ -605,7 +565,7 @@ export const EditLeadModal = () => {
                                 (statuses || [])
                                     .filter(s => !s.isHidden) // Only show non-hidden statuses
                                     .map(status => (
-                                        <option key={status.id} value={status.name}>
+                                        <option key={status.id} value={status.id.toString()}>
                                             {status.name}
                                         </option>
                                     ))

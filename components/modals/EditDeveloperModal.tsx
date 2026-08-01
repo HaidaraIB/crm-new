@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Developer } from '../../types';
 import { useUpdateDeveloper } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -22,6 +23,12 @@ export const EditDeveloperModal = () => {
     // Update developer mutation
     const updateDeveloperMutation = useUpdateDeveloper();
     const isLoading = updateDeveloperMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: { name: string }): Record<string, unknown> => ({
+        name: state.name,
+        company: currentUser?.company?.id,
+    });
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -46,11 +53,15 @@ export const EditDeveloperModal = () => {
 
     useEffect(() => {
         if (editingDeveloper) {
-            setFormState({
+            const initState = {
                 name: editingDeveloper.name,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingDeveloper]);
+    }, [editingDeveloper, currentUser?.company?.id]);
 
     const handleClose = () => {
         setIsEditDeveloperModalOpen(false);
@@ -72,19 +83,21 @@ export const EditDeveloperModal = () => {
         }
         
         try {
-            // Include company ID in the request
-            const developerData = {
-                ...formState,
-                company: currentUser?.company?.id,
-            };
+            const developerData = buildPayload(formState);
             
             if (!developerData.company) {
                 throw new Error(t('companyRequired') || 'Company information is required');
             }
+
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, developerData);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
             
             await updateDeveloperMutation.mutateAsync({
                 id: editingDeveloper.id,
-                data: developerData,
+                data: patch,
             });
 
             // Close modal immediately and show success modal

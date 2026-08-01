@@ -19,6 +19,7 @@ export * from './PropertiesPage';
 export * from './OwnersPage';
 export * from './DealsPage';
 export * from './CreateDealPage';
+export * from './EditDealPage';
 export * from './CreateLeadPage';
 export * from './EditLeadPage';
 export * from './UsersPage';

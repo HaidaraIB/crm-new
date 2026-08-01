@@ -346,8 +346,6 @@ export interface AppContextType {
   setTodosPagePreset: React.Dispatch<React.SetStateAction<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>>;
   dealFilters: DealFilters;
   setDealFilters: React.Dispatch<React.SetStateAction<DealFilters>>;
-  isEditDealModalOpen: boolean;
-  setIsEditDealModalOpen: (isOpen: boolean) => void;
   editingDeal: Deal | null;
   setEditingDeal: React.Dispatch<React.SetStateAction<Deal | null>>;
   campaignFilters: CampaignFilters;
@@ -719,7 +717,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   
   // Deals state
   const [isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen] = useState(false);
-  const [isEditDealModalOpen, setIsEditDealModalOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
   const [isViewDealModalOpen, setIsViewDealModalOpen] = useState(false);
   const [viewingDeal, setViewingDeal] = useState<Deal | null>(null);
@@ -1259,6 +1256,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         return p('can_manage_leads');
       case 'Deals':
       case 'CreateDeal':
+      case 'EditDeal':
         return p('can_manage_deals');
       case 'Users':
       case 'Employees':
@@ -1514,7 +1512,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isEditSupplierModalOpen, setIsEditSupplierModalOpen,
     editingSupplier, setEditingSupplier,
     isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen,
-    isEditDealModalOpen, setIsEditDealModalOpen,
     editingDeal, setEditingDeal,
     isViewDealModalOpen, setIsViewDealModalOpen,
     viewingDeal, setViewingDeal,

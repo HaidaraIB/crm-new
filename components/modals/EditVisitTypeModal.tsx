@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { useUpdateVisitType } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -25,6 +26,15 @@ export const EditVisitTypeModal = () => {
 
     const updateVisitTypeMutation = useUpdateVisitType();
     const loading = updateVisitTypeMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name,
+        description: state.description,
+        color: state.color,
+        company: currentUser?.company?.id,
+        is_default: state.isDefault,
+    });
 
     const [formState, setFormState] = useState({
         name: '',
@@ -56,15 +66,19 @@ export const EditVisitTypeModal = () => {
     useEffect(() => {
         if (editingVisitType) {
             const vt = editingVisitType as { isDefault?: boolean; is_default?: boolean };
-            setFormState({
+            const initState = {
                 name: editingVisitType.name,
                 description: editingVisitType.description || '',
                 color: editingVisitType.color || '#808080',
                 isDefault: vt.isDefault ?? vt.is_default ?? false,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingVisitType]);
+    }, [editingVisitType, currentUser?.company?.id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;
@@ -87,15 +101,16 @@ export const EditVisitTypeModal = () => {
             return;
         }
         try {
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
+
             await updateVisitTypeMutation.mutateAsync({
                 id: editingVisitType.id,
-                data: {
-                    name: formState.name,
-                    description: formState.description,
-                    color: formState.color,
-                    company: currentUser.company.id,
-                    is_default: formState.isDefault,
-                },
+                data: patch,
             });
             handleClose();
             setSuccessMessage(t('visitTypeUpdatedSuccessfully') || 'Visit type updated.');

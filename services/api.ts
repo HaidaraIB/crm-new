@@ -2284,6 +2284,15 @@ export const createLeadAPI = async (leadData: any) => {
 };
 
 /**
+ * الحصول على Client واحد (Lead) بالمعرّف
+ * GET /api/clients/:id/
+ * Response: Client object
+ */
+export const getLeadAPI = async (leadId: number) => {
+  return apiRequest<any>(`/clients/${leadId}/`);
+};
+
+/**
  * تحديث Client (Lead)
  * PUT /api/clients/:id/
  * Body: Client data
@@ -2433,7 +2442,7 @@ export const createDeveloperAPI = async (developerData: any) => {
  */
 export const updateDeveloperAPI = async (developerId: number, developerData: any) => {
   return apiRequest<any>(`/developers/${developerId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(developerData),
   });
 };
@@ -2494,7 +2503,7 @@ export const createProjectAPI = async (projectData: any) => {
  */
 export const updateProjectAPI = async (projectId: number, projectData: any) => {
   return apiRequest<any>(`/projects/${projectId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(projectData),
   });
 };
@@ -2556,7 +2565,7 @@ export const createUnitAPI = async (unitData: any) => {
  */
 export const updateUnitAPI = async (unitId: number, unitData: any) => {
   return apiRequest<any>(`/units/${unitId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(unitData),
   });
 };
@@ -2596,7 +2605,7 @@ export const createOwnerAPI = async (ownerData: any) => {
  */
 export const updateOwnerAPI = async (ownerId: number, ownerData: any) => {
   return apiRequest<any>(`/owners/${ownerId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(ownerData),
   });
 };
@@ -2638,7 +2647,7 @@ export const createServiceAPI = async (serviceData: any) => {
  */
 export const updateServiceAPI = async (serviceId: number, serviceData: any) => {
   return apiRequest<any>(`/services/${serviceId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(serviceData),
   });
 };
@@ -2678,7 +2687,7 @@ export const createServicePackageAPI = async (packageData: any) => {
  */
 export const updateServicePackageAPI = async (packageId: number, packageData: any) => {
   return apiRequest<any>(`/service-packages/${packageId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(packageData),
   });
 };
@@ -2718,7 +2727,7 @@ export const createServiceProviderAPI = async (providerData: any) => {
  */
 export const updateServiceProviderAPI = async (providerId: number, providerData: any) => {
   return apiRequest<any>(`/service-providers/${providerId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(providerData),
   });
 };
@@ -2760,7 +2769,7 @@ export const createProductAPI = async (productData: any) => {
  */
 export const updateProductAPI = async (productId: number, productData: any) => {
   return apiRequest<any>(`/products/${productId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(productData),
   });
 };
@@ -2800,7 +2809,7 @@ export const createProductCategoryAPI = async (categoryData: any) => {
  */
 export const updateProductCategoryAPI = async (categoryId: number, categoryData: any) => {
   return apiRequest<any>(`/product-categories/${categoryId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(categoryData),
   });
 };
@@ -2840,7 +2849,7 @@ export const createSupplierAPI = async (supplierData: any) => {
  */
 export const updateSupplierAPI = async (supplierId: number, supplierData: any) => {
   return apiRequest<any>(`/suppliers/${supplierId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(supplierData),
   });
 };
@@ -2943,6 +2952,16 @@ export const patchTaskAPI = async (taskId: number, taskData: Record<string, unkn
 export const deleteTaskAPI = async (taskId: number) => {
   return apiRequest<void>(`/tasks/${taskId}/`, {
     method: 'DELETE',
+  });
+};
+
+/**
+ * Mark deal task as completed
+ * POST /api/tasks/:id/complete/
+ */
+export const completeTaskAPI = async (taskId: number) => {
+  return apiRequest<any>(`/tasks/${taskId}/complete/`, {
+    method: 'POST',
   });
 };
 
@@ -3443,7 +3462,7 @@ export const updateMessageTemplateAPI = async (
   }
 ) => {
   return apiRequest<MessageTemplateType>(`/integrations/templates/${id}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
 };
@@ -4404,6 +4423,16 @@ export const deleteClientCallAPI = async (clientCallId: number): Promise<void> =
   }
 };
 
+/**
+ * Mark client call follow-up as done
+ * POST /api/client-calls/:id/complete-follow-up/
+ */
+export const completeClientCallFollowUpAPI = async (clientCallId: number) => {
+  return apiRequest<any>(`/client-calls/${clientCallId}/complete-follow-up/`, {
+    method: 'POST',
+  });
+};
+
 // ==================== Client Visits APIs ====================
 
 /** GET /client-visits/ */
@@ -4576,6 +4605,16 @@ export const deleteClientTaskAPI = async (clientTaskId: number): Promise<void> =
   }
 };
 
+/**
+ * Mark client task reminder as done
+ * POST /api/client-tasks/:id/complete-reminder/
+ */
+export const completeClientTaskReminderAPI = async (clientTaskId: number) => {
+  return apiRequest<any>(`/client-tasks/${clientTaskId}/complete-reminder/`, {
+    method: 'POST',
+  });
+};
+
 // ==================== Todos APIs ====================
 // TODO: يمكن استخدام Tasks API للـ Todos أيضاً، أو إضافة endpoint منفصل
 
@@ -4614,7 +4653,7 @@ export const createChannelAPI = async (channelData: any) => {
 
 export const updateChannelAPI = async (channelId: number, channelData: any) => {
   return apiRequest<any>(`/settings/channels/${channelId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(channelData),
   });
 };
@@ -4643,7 +4682,7 @@ export const createStageAPI = async (stageData: any) => {
 
 export const updateStageAPI = async (stageId: number, stageData: any) => {
   return apiRequest<any>(`/settings/stages/${stageId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(stageData),
   });
 };
@@ -4672,7 +4711,7 @@ export const createStatusAPI = async (statusData: any) => {
 
 export const updateStatusAPI = async (statusId: number, statusData: any) => {
   return apiRequest<any>(`/settings/statuses/${statusId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(statusData),
   });
 };
@@ -4700,7 +4739,7 @@ export const createCallMethodAPI = async (callMethodData: any) => {
 
 export const updateCallMethodAPI = async (callMethodId: number, callMethodData: any) => {
   return apiRequest<any>(`/settings/call-methods/${callMethodId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(callMethodData),
   });
 };
@@ -4725,7 +4764,7 @@ export const createVisitTypeAPI = async (visitTypeData: any) => {
 
 export const updateVisitTypeAPI = async (visitTypeId: number, visitTypeData: any) => {
   return apiRequest<any>(`/settings/visit-types/${visitTypeId}/`, {
-    method: 'PUT',
+    method: 'PATCH',
     body: JSON.stringify(visitTypeData),
   });
 };

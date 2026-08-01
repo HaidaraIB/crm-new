@@ -9,7 +9,6 @@ import {
 import {
   WA_AVATAR,
   WA_HEADER_BG,
-  WA_HEADER_TEXT,
   WA_LIST_ACTIVE,
   WA_LIST_BG,
   WA_LIST_HOVER,
@@ -68,14 +67,15 @@ export const ConversationList: React.FC<Props> = ({
 
   return (
     <div className={`flex h-full min-h-0 w-full flex-col border-e border-gray-200 dark:border-gray-800 md:w-80 lg:w-96 ${WA_LIST_BG}`}>
-      <div className={`${WA_HEADER_BG} ${WA_HEADER_TEXT} flex shrink-0 items-center justify-start gap-2 px-3 py-2`}>
+      <div className={`${WA_HEADER_BG} shrink-0 px-3 py-2.5`}>
         <Button
-          className="!shrink-0 !border-0 !bg-white/20 !px-2 !py-1.5 !text-xs !text-white hover:!bg-white/30 sm:!text-sm"
+          className="!h-9 w-full !gap-2 !rounded-lg !border-0 !bg-white !px-3 !py-1.5 !text-sm !font-semibold !text-primary shadow-sm hover:!bg-white/95 focus:!ring-white/50 focus:!ring-offset-primary dark:!border dark:!border-white/25 dark:!bg-white/10 dark:!text-white dark:!shadow-none dark:hover:!border-white/40 dark:hover:!bg-white/20 dark:focus:!ring-white/30 dark:focus:!ring-offset-0"
           onClick={onStartNew}
         >
-          <PlusIcon className="me-1 w-4 h-4" />
-          <span className="hidden sm:inline">{t('startNewConversation')}</span>
-          <span className="sm:hidden">+</span>
+          <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 dark:bg-white/15">
+            <PlusIcon className="h-3.5 w-3.5" />
+          </span>
+          <span className="truncate">{t('startNewConversation')}</span>
         </Button>
       </div>
       <div className="shrink-0 p-2">

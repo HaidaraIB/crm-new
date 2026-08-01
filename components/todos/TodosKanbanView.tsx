@@ -144,11 +144,7 @@ export const TodosKanbanView = ({
                 <TodoKanbanCard
                     item={item}
                     formatDealStage={formatDealStage}
-                    onOpen={
-                        onOpenItem && item.entityType === 'deal_task'
-                            ? onOpenItem
-                            : undefined
-                    }
+                    onOpen={onOpenItem}
                 />
             )}
         />

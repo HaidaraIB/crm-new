@@ -10,7 +10,7 @@ import type { LeadApiFilters } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getLeadStatusCountsAPI, getMissionBarSummaryAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
+  getLeadsAPI, getLeadAPI, getLeadStatusCountsAPI, getMissionBarSummaryAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
@@ -22,9 +22,9 @@ import {
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
   createDealAPI, updateDealAPI, patchDealAPI, deleteDealAPI,
-  createTaskAPI, updateTaskAPI, deleteTaskAPI,
-  createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI,
-  createClientCallAPI, updateClientCallAPI, deleteClientCallAPI,
+  createTaskAPI, updateTaskAPI, patchTaskAPI, deleteTaskAPI, completeTaskAPI,
+  createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI, completeClientTaskReminderAPI,
+  createClientCallAPI, updateClientCallAPI, deleteClientCallAPI, completeClientCallFollowUpAPI,
   createClientVisitAPI, updateClientVisitAPI, deleteClientVisitAPI,
   createClientFieldVisitAPI,
   createDeveloperAPI, updateDeveloperAPI, deleteDeveloperAPI,
@@ -64,6 +64,7 @@ export const queryKeys = {
   users: (page?: number, pageSize?: number, filters?: { roles?: string[]; excludeRoles?: string[] }) =>
     ['users', page ?? 'all', pageSize ?? 'default', filters?.roles?.join('|') ?? '', filters?.excludeRoles?.join('|') ?? ''] as const,
   leads: (filters?: LeadApiFilters, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
+  lead: (id?: number) => ['lead', id] as const,
   leadStatusCounts: (filters?: LeadApiFilters) => ['leadStatusCounts', filters] as const,
   missionBarSummary: ['missionBarSummary'] as const,
   employeeReport: (params?: ReportQueryParams) => ['employeeReport', params] as const,
@@ -165,6 +166,22 @@ export const useLeads = (
       return data;
     },
     staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+export const useLead = (
+  id?: number | null,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.lead(id ?? undefined),
+    queryFn: async () => {
+      if (!id) throw new Error('Lead id is required');
+      return normalizeLead(await getLeadAPI(id));
+    },
+    enabled: typeof id === 'number' && id > 0,
+    staleTime: 1 * 60 * 1000,
     ...options,
   });
 };
@@ -681,6 +698,7 @@ export const useUpdateLead = (options?: UseMutationOptions<any, Error, { id: num
     mutationFn: ({ id, data }: { id: number; data: any }) => updateLeadAPI(id, data),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lead(variables.id) });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       // Invalidate events for this specific lead to show updates in timeline
       queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.id) });
@@ -704,6 +722,7 @@ export const usePatchLead = (
       patchLeadAPI(id, data),
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lead(variables.id) });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.id) });
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
@@ -718,8 +737,9 @@ export const useDeleteLead = (options?: UseMutationOptions<void, Error, number>)
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteLeadAPI(id),
-    onSuccess: () => {
+    onSuccess: (_data, id) => {
       queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.removeQueries({ queryKey: queryKeys.lead(id) });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
     },
@@ -902,10 +922,37 @@ export const useUpdateTask = (options?: UseMutationOptions<any, Error, { id: num
   });
 };
 
+export const usePatchTask = (
+  options?: UseMutationOptions<any, Error, { id: number; data: Record<string, unknown> }>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
+      patchTaskAPI(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+    },
+    ...options,
+  });
+};
+
 export const useDeleteTask = (options?: UseMutationOptions<void, Error, number>) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => deleteTaskAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+    },
+    ...options,
+  });
+};
+
+export const useCompleteTask = (options?: UseMutationOptions<any, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => completeTaskAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
@@ -960,6 +1007,20 @@ export const useDeleteClientTask = (options?: UseMutationOptions<void, Error, nu
   });
 };
 
+export const useCompleteClientTaskReminder = (options?: UseMutationOptions<any, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => completeClientTaskReminderAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+    },
+    ...options,
+  });
+};
+
 export const useCreateClientCall = (options?: UseMutationOptions<any, Error, any>) => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -996,6 +1057,20 @@ export const useDeleteClientCall = (options?: UseMutationOptions<void, Error, nu
     mutationFn: (id: number) => deleteClientCallAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+    },
+    ...options,
+  });
+};
+
+export const useCompleteClientCallFollowUp = (options?: UseMutationOptions<any, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => completeClientCallFollowUpAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },

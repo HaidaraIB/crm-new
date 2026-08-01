@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Status } from '../../types';
 import { useUpdateStatus } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -28,6 +29,20 @@ export const EditStatusModal = () => {
     // Update status mutation
     const updateStatusMutation = useUpdateStatus();
     const loading = updateStatusMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => {
+        const raw = state.autoDeleteHoursRaw.trim();
+        return {
+            name: state.name,
+            description: state.description,
+            category: state.category,
+            color: state.color,
+            company: currentUser?.company?.id,
+            is_default: state.isDefault,
+            auto_delete_after_hours: raw === '' ? null : parseInt(raw, 10),
+        };
+    };
 
     const [formState, setFormState] = useState({
         name: '',
@@ -86,17 +101,21 @@ export const EditStatusModal = () => {
             }
             
             const adh = (editingStatus as any).auto_delete_after_hours ?? (editingStatus as any).autoDeleteAfterHours;
-            setFormState({
+            const initState = {
                 name: editingStatus.name,
                 description: editingStatus.description || '',
                 category: categoryValue as 'active' | 'inactive' | 'follow_up' | 'closed',
                 color: editingStatus.color || '#808080',
                 isDefault: (editingStatus as any).isDefault ?? (editingStatus as any).is_default ?? false,
                 autoDeleteHoursRaw: adh != null && adh !== '' ? String(adh) : '',
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingStatus]);
+    }, [editingStatus, currentUser?.company?.id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -118,20 +137,16 @@ export const EditStatusModal = () => {
         }
 
         try {
-            const raw = formState.autoDeleteHoursRaw.trim();
-            const auto_delete_after_hours = raw === '' ? null : parseInt(raw, 10);
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
 
             await updateStatusMutation.mutateAsync({
                 id: editingStatus.id,
-                data: {
-                    name: formState.name,
-                    description: formState.description,
-                    category: formState.category,
-                    color: formState.color,
-                    company: currentUser?.company?.id,
-                    is_default: formState.isDefault,
-                    auto_delete_after_hours,
-                }
+                data: patch,
             });
 
             handleClose();

@@ -57,7 +57,8 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
     }, []);
 
     useEffect(() => {
-        userScrolledRef.current = false;
+        // Do not reset userScrolledRef here — action clicks (edit/open/delete) re-render
+        // children and would snap the table back to the start.
 
         const runLayout = () => {
             updateSpacerWidth();

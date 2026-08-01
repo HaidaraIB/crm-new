@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Channel } from '../../types';
 import { useUpdateChannel } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -31,6 +32,15 @@ export const EditChannelModal = () => {
     // Update channel mutation
     const updateChannelMutation = useUpdateChannel();
     const loading = updateChannelMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name,
+        type: state.type,
+        priority: state.priority,
+        company: currentUser?.company?.id,
+        is_default: state.isDefault,
+    });
 
     // Use channel types from API, fallback to default types for selection
     const apiChannelTypes = channelTypes && Array.isArray(channelTypes) ? channelTypes : [];
@@ -80,15 +90,19 @@ export const EditChannelModal = () => {
     useEffect(() => {
         if (editingChannel) {
             const ch = editingChannel as Channel & { is_default?: boolean };
-            setFormState({
+            const initState = {
                 name: editingChannel.name,
                 type: editingChannel.type,
                 priority: (editingChannel.priority?.toLowerCase() || 'medium') as 'high' | 'medium' | 'low',
                 isDefault: ch.isDefault ?? ch.is_default ?? false,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingChannel]);
+    }, [editingChannel, currentUser?.company?.id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value, type } = e.target;
@@ -116,15 +130,16 @@ export const EditChannelModal = () => {
         }
 
         try {
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
+
             await updateChannelMutation.mutateAsync({
                 id: editingChannel.id,
-                data: {
-                    name: formState.name,
-                    type: formState.type,
-                    priority: formState.priority,
-                    company: currentUser.company.id,
-                    is_default: formState.isDefault,
-                }
+                data: patch,
             });
 
             handleClose();

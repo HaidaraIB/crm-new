@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import type { MessageTemplateType, TemplateButtonPayload } from '../../services/api';
@@ -6,6 +6,7 @@ import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTempla
 import { SelectMediaModal } from './SelectMediaModal';
 import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
 import { clearFieldError } from '../../utils/formFieldErrors';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const NAME_MAX = 200;
 const BODY_MAX = 1000;
@@ -117,11 +118,59 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const [showValidationConfirm, setShowValidationConfirm] = useState(false);
   const [showSelectMedia, setShowSelectMedia] = useState(false);
   const [headerMediaName, setHeaderMediaName] = useState<string | null>(null);
+  const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
 
   const isEdit = !!template?.id;
   const isWhatsApp = channelType === 'whatsapp_api';
   const metaStatus = template?.meta_status ? String(template.meta_status).toUpperCase() : '';
   const canSendToReview = !metaStatus || metaStatus === 'REJECTED';
+
+  const buildTemplatePayload = useCallback((
+    args: {
+      name: string;
+      channelType: 'sms' | 'whatsapp_api';
+      content: string;
+      category: string;
+      templateLanguage: string;
+      headerType: string;
+      headerText: string;
+      footer: string;
+      buttons: TemplateButton[];
+      isWhatsApp: boolean;
+    }
+  ): Record<string, unknown> => {
+    const categoryForBackend = args.isWhatsApp
+      ? (CATEGORY_OPTIONS.find((c) => c.value === args.category)?.backendValue ?? args.category)
+      : 'utility';
+    const payload: Record<string, unknown> = {
+      name: args.name.trim(),
+      channel_type: args.channelType,
+      content: args.content.trim(),
+      category: categoryForBackend,
+    };
+    if (args.isWhatsApp) {
+      payload.language = args.templateLanguage;
+      payload.header_type = args.headerType;
+      if (args.headerType === 'text' && args.headerText.trim()) {
+        payload.header_text = args.headerText.trim();
+      }
+      if (args.footer.trim()) {
+        payload.footer = args.footer.trim();
+      }
+      if (args.buttons.length > 0) {
+        payload.buttons = args.buttons.map((b): TemplateButtonPayload => {
+          const item: TemplateButtonPayload = {
+            type: b.type as TemplateButtonPayload['type'],
+            button_text: b.buttonText.trim(),
+          };
+          if (b.type === 'phone' && b.phone) item.phone = b.phone.trim();
+          if (b.type === 'url' && b.url) item.url = b.url.trim();
+          return item;
+        });
+      }
+    }
+    return payload;
+  }, []);
 
   useEffect(() => {
     if (template) {
@@ -129,25 +178,43 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       setName(template.name);
       setContent(template.content);
       const cat = (template.category || '').toLowerCase();
-      setCategory(cat === 'marketing' ? 'marketing' : cat === 'auth' ? 'auth' : 'utility');
-      setTemplateLanguage((template as any).language || 'en_US');
-      setHeaderType((template as any).header_type || 'none');
-      setHeaderText((template as any).header_text || '');
-      setFooter((template as any).footer || '');
+      const categoryValue = cat === 'marketing' ? 'marketing' : cat === 'auth' ? 'auth' : 'utility';
+      setCategory(categoryValue);
+      const lang = (template as any).language || 'en_US';
+      setTemplateLanguage(lang);
+      const hdrType = (template as any).header_type || 'none';
+      setHeaderType(hdrType);
+      const hdrText = (template as any).header_text || '';
+      setHeaderText(hdrText);
+      const footerValue = (template as any).footer || '';
+      setFooter(footerValue);
       const rawButtons = (template as any).buttons;
+      let parsedButtons: TemplateButton[] = [];
       if (Array.isArray(rawButtons) && rawButtons.length > 0) {
-        setButtons(
-          rawButtons.map((b: any, i: number) => ({
-            id: `btn-${i}-${Date.now()}`,
-            type: (b.type === 'phone' || b.type === 'url' || b.type === 'reply' ? b.type : 'reply') as 'phone' | 'url' | 'reply',
-            buttonText: b.button_text ?? b.buttonText ?? '',
-            ...(b.type === 'phone' && { phone: b.phone ?? '' }),
-            ...(b.type === 'url' && { url: b.url ?? '', dynamicUrl: false }),
-          }))
-        );
+        parsedButtons = rawButtons.map((b: any, i: number) => ({
+          id: `btn-${i}-${Date.now()}`,
+          type: (b.type === 'phone' || b.type === 'url' || b.type === 'reply' ? b.type : 'reply') as 'phone' | 'url' | 'reply',
+          buttonText: b.button_text ?? b.buttonText ?? '',
+          ...(b.type === 'phone' && { phone: b.phone ?? '' }),
+          ...(b.type === 'url' && { url: b.url ?? '', dynamicUrl: false }),
+        }));
+        setButtons(parsedButtons);
       } else {
         setButtons([]);
       }
+      const whatsApp = template.channel_type !== 'sms';
+      initialPayloadRef.current = buildTemplatePayload({
+        name: template.name,
+        channelType: (template.channel_type === 'sms' ? 'sms' : 'whatsapp_api') as 'sms' | 'whatsapp_api',
+        content: template.content,
+        category: categoryValue,
+        templateLanguage: lang,
+        headerType: hdrType,
+        headerText: hdrText,
+        footer: footerValue,
+        buttons: parsedButtons,
+        isWhatsApp: whatsApp,
+      });
     } else {
       setChannelType('whatsapp_api');
       setName('');
@@ -158,9 +225,10 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       setHeaderText('');
       setFooter('');
       setButtons([]);
+      initialPayloadRef.current = null;
     }
     setErrors({});
-  }, [template, isOpen]);
+  }, [template, isOpen, buildTemplatePayload]);
 
   const insertPlaceholder = (insert: string) => {
     setContent((prev) => prev + insert);
@@ -202,34 +270,27 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
     setErrors({});
     setSaving(true);
     try {
-      const categoryForBackend = isWhatsApp ? (CATEGORY_OPTIONS.find((c) => c.value === category)?.backendValue ?? category) : 'utility';
-      const payload: Parameters<typeof createMessageTemplateAPI>[0] = {
-        name: name.trim(),
-        channel_type: channelType,
-        content: content.trim(),
-        category: categoryForBackend,
-        ...(isWhatsApp && {
-          language: templateLanguage,
-          header_type: headerType,
-          ...(headerType === 'text' && headerText.trim() && { header_text: headerText.trim() }),
-          ...(footer.trim() && { footer: footer.trim() }),
-          ...(buttons.length > 0 && {
-            buttons: buttons.map((b): TemplateButtonPayload => {
-              const item: TemplateButtonPayload = {
-                type: b.type as TemplateButtonPayload['type'],
-                button_text: b.buttonText.trim(),
-              };
-              if (b.type === 'phone' && b.phone) item.phone = b.phone.trim();
-              if (b.type === 'url' && b.url) item.url = b.url.trim();
-              return item;
-            }),
-          }),
-        }),
-      };
+      const next = buildTemplatePayload({
+        name,
+        channelType,
+        content,
+        category,
+        templateLanguage,
+        headerType,
+        headerText,
+        footer,
+        buttons,
+        isWhatsApp,
+      });
       if (isEdit && template) {
-        await updateMessageTemplateAPI(template.id, payload);
+        const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+        if (Object.keys(patch).length === 0) {
+          onClose();
+          return;
+        }
+        await updateMessageTemplateAPI(template.id, patch as Parameters<typeof updateMessageTemplateAPI>[1]);
       } else {
-        await createMessageTemplateAPI(payload);
+        await createMessageTemplateAPI(next as Parameters<typeof createMessageTemplateAPI>[0]);
       }
       onSuccess();
       onClose();

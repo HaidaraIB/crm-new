@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { ProductCategory } from '../../types';
 import { useUpdateProductCategory, useProductCategories } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -39,6 +40,20 @@ export const EditProductCategoryModal = () => {
     // Update product category mutation
     const updateProductCategoryMutation = useUpdateProductCategory();
     const loading = updateProductCategoryMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => {
+        const selectedParentCategory = state.parentCategory
+            ? productCategories.find(cat => cat.name === state.parentCategory)
+            : null;
+
+        return {
+            name: state.name.trim(),
+            description: state.description?.trim() || '',
+            company: currentUser?.company?.id || currentUser?.company_id,
+            parent_category: selectedParentCategory ? selectedParentCategory.id : null,
+        };
+    };
     
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -82,14 +97,18 @@ export const EditProductCategoryModal = () => {
                 }
             }
             
-            setFormState({
+            const initState = {
                 name: editingProductCategory.name || '',
                 description: editingProductCategory.description || '',
                 parentCategory: parentCategoryName,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingProductCategory, productCategories]);
+    }, [editingProductCategory, productCategories, currentUser?.company?.id, currentUser?.company_id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -111,21 +130,16 @@ export const EditProductCategoryModal = () => {
         }
 
         try {
-            // Find parent category by name to get its ID
-            const selectedParentCategory = formState.parentCategory 
-                ? productCategories.find(cat => cat.name === formState.parentCategory)
-                : null;
-
-            const updateData: any = {
-                name: formState.name.trim(),
-                description: formState.description?.trim() || '',
-                company: currentUser?.company?.id || currentUser?.company_id,
-                parent_category: selectedParentCategory ? selectedParentCategory.id : null,
-            };
+            const updateData = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, updateData);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
 
             await updateProductCategoryMutation.mutateAsync({
                 id: editingProductCategory.id,
-                data: updateData
+                data: patch,
             });
 
             // Close modal immediately and show success modal

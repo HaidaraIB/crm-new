@@ -1,10 +1,11 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
-import { useUpdateTask, useDeals, useStages, useTasks } from '../../hooks/useQueries';
+import { usePatchTask, useDeals, useStages, useTasks } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -50,8 +51,16 @@ export const EditTodoModal = ({ todoId, onClose }: EditTodoModalProps) => {
     const currentTodo = todoId ? allTasksRaw.find((task: any) => task.id === todoId) : null;
 
     // Update task mutation
-    const updateTaskMutation = useUpdateTask();
+    const updateTaskMutation = usePatchTask();
     const loading = updateTaskMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        deal: Number(state.dealId),
+        stage: Number(state.stageId),
+        notes: state.notes || '',
+        reminder_date: state.reminderDate,
+    });
     
     const [formState, setFormState] = useState({
         dealId: '',
@@ -90,13 +99,17 @@ export const EditTodoModal = ({ todoId, onClose }: EditTodoModalProps) => {
                 }
             }
             
-            setFormState({
+            const initState = {
                 dealId: dealId ? dealId.toString() : '',
                 stageId: stageId ? stageId.toString() : '',
                 notes: currentTodo.notes || '',
                 reminderDate: formattedReminderDate,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
     }, [todoId, currentTodo]);
 
@@ -147,17 +160,16 @@ export const EditTodoModal = ({ todoId, onClose }: EditTodoModalProps) => {
         }
 
         try {
-            const payload = {
-                deal: Number(formState.dealId), // API expects 'deal' field with deal ID
-                stage: Number(formState.stageId), // API expects stage ID (pk), not name
-                notes: formState.notes || '',
-                reminder_date: formState.reminderDate, // API expects snake_case
-            };
-            
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                onClose();
+                return;
+            }
             
             await updateTaskMutation.mutateAsync({ 
                 id: todoId, 
-                data: payload
+                data: patch,
             });
 
             // Close modal and show success message

@@ -124,7 +124,13 @@ export const TodoKanbanCard = ({
             </div>
 
             {formattedReminder ? (
-                <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400 tabular-nums">
+                <p
+                    className={`mt-2 text-[11px] tabular-nums ${
+                        item.reminderDate && new Date(item.reminderDate).getTime() < Date.now()
+                            ? 'text-rose-600 dark:text-rose-400 font-medium'
+                            : 'text-gray-500 dark:text-gray-400'
+                    }`}
+                >
                     {formattedReminder}
                 </p>
             ) : null}

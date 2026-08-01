@@ -1,13 +1,13 @@
 
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, LeadStatusDropdown, LeadStatusBadge, LeadContactPhoneList } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadContactPhoneList } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
-import { useUsers, useClientTasks, useStatuses, useLeads, useUpdateLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels } from '../hooks/useQueries';
+import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
@@ -31,94 +31,25 @@ import {
 } from '../utils/timelineEvents';
 import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
+import { normalizeRole } from '../utils/roles';
+import { getCompanyRoute } from '../utils/routing';
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission } = useAppContext();
     
     const canPbxDial = usePbxDialEnabled();
+    const deleteLeadMutation = useDeleteLead();
 
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
     const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
     const [sendWhatsAppModal, setSendWhatsAppModal] = React.useState<{ phone: string } | null>(null);
     const [updatingMetaQualification, setUpdatingMetaQualification] = React.useState(false);
-    
-    // Handle status change
-    const handleStatusChange = async (leadId: number, newStatusId: number) => {
-        setUpdatingLeadId(leadId);
-        try {
-            const status = statuses.find(s => s.id === newStatusId);
-            if (!status) {
-                throw new Error('Status not found');
-            }
-            
-            // Get the lead to preserve other fields
-            const lead = allLeads.find((l: any) => l.id === leadId);
-            if (!lead) {
-                throw new Error('Lead not found');
-            }
-            
-            // Get company ID
-            const companyId = lead.company?.id || lead.company || lead.company_id;
-            if (!companyId) {
-                throw new Error('Company ID not found');
-            }
-            
-            const assignedRaw = lead.assigned_to ?? lead.assignedTo;
-            const assignedToId =
-                assignedRaw && typeof assignedRaw === 'object'
-                    ? (assignedRaw as { id?: number }).id ?? null
-                    : assignedRaw
-                      ? Number(assignedRaw)
-                      : null;
-            const communicationRaw = lead.communication_way ?? lead.communicationWay;
-            const communicationWayId =
-                communicationRaw && typeof communicationRaw === 'object'
-                    ? (communicationRaw as { id?: number }).id ?? null
-                    : communicationRaw
-                      ? Number(communicationRaw)
-                      : null;
 
-            // Prepare update data (snake_case for Django serializer)
-            const updateData: any = {
-                name: lead.name,
-                phone_number: lead.phone_number || lead.phone || '',
-                budget: lead.budget || 0,
-                budget_max: lead.budget_max ?? lead.budgetMax ?? null,
-                assigned_to: assignedToId,
-                type: lead.type || '',
-                communication_way: communicationWayId,
-                priority: lead.priority || '',
-                status: status.id,
-                company: companyId,
-                lead_company_name: lead.lead_company_name ?? lead.leadCompanyName ?? null,
-                profession: lead.profession ?? null,
-            };
-            
-            // Include phone_numbers if they exist
-            if (lead.phone_numbers && lead.phone_numbers.length > 0) {
-                updateData.phone_numbers = lead.phone_numbers;
-            }
-            
-            await updateLeadMutation.mutateAsync({
-                id: leadId,
-                data: updateData,
-            });
-            
-            // Refetch leads to update the display
-            refetchLeads();
-        } catch (error) {
-            console.error('Error updating lead status:', error);
-            alert(t('errorUpdatingLeadStatus') || 'Failed to update lead status. Please try again.');
-        } finally {
-            setUpdatingLeadId(null);
-        }
-    };
-    
     // Get leadId from URL
     const pathname = decodeURIComponent(window.location.pathname);
     const leadIdFromUrl = pathname.match(/\/view-lead\/(\d+)/)?.[1];
-    const leadId = leadIdFromUrl ? parseInt(leadIdFromUrl) : selectedLead?.id;
-    
+    const leadId = leadIdFromUrl ? parseInt(leadIdFromUrl, 10) : selectedLead?.id;
+
     // Fetch data using React Query hooks
     const { data: usersResponse } = useUsers();
     const users = usersResponse?.results || [];
@@ -171,33 +102,26 @@ export const ViewLeadPage = () => {
         ? stagesData 
         : (stagesData?.results || []);
     
-    // Fetch leads to get updated data
-    const { data: leadsResponse, refetch: refetchLeads } = useLeads();
-    const allLeads = leadsResponse?.results || [];
-    const updateLeadMutation = useUpdateLead();
-    
-    // Find the current lead from the fetched leads list (most up-to-date)
+    const {
+        data: leadData,
+        isLoading: leadLoading,
+        isFetching: leadFetching,
+        isError: leadError,
+        refetch: refetchLead,
+    } = useLead(leadId);
+    const patchLeadMutation = usePatchLead();
+
+    // Find the current lead from the fetched lead detail (most up-to-date)
     const currentLead = useMemo(() => {
-        // First try to find by leadId from URL
-        if (leadId) {
-            const apiLead = allLeads.find((l: any) => l.id === leadId);
-            if (apiLead) {
-                return mapApiLeadToDisplayLead(apiLead);
-            }
+        if (leadData) {
+            return mapApiLeadToDisplayLead(leadData);
         }
-        
-        // Fallback to selectedLead if no leadId from URL
-        if (!selectedLead?.id) return selectedLead;
-        
-        // Find lead from API data
-        const apiLead = allLeads.find((l: any) => l.id === selectedLead.id);
-        if (apiLead) {
-            return mapApiLeadToDisplayLead(apiLead);
+        // Optimistic fallback while loading (e.g. navigated from list with selectedLead)
+        if (selectedLead?.id && (!leadId || selectedLead.id === leadId)) {
+            return selectedLead;
         }
-        
-        // Fallback to selectedLead from context
-        return selectedLead;
-    }, [allLeads, selectedLead, leadId]);
+        return null;
+    }, [leadData, selectedLead, leadId]);
     
     // Update selectedLead when currentLead is found from URL
     useEffect(() => {
@@ -229,13 +153,32 @@ export const ViewLeadPage = () => {
     useEffect(() => {
         hasUpdatedLead.current = false;
     }, [selectedLead?.id]);
-    
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 500);
-        return () => clearTimeout(timer);
-    }, [selectedLead?.id]);
+    // Use currentLead instead of selectedLead for display
+    const displayLead = currentLead || selectedLead;
+
+    // Handle status change
+    const handleStatusChange = async (targetLeadId: number, newStatusId: number) => {
+        setUpdatingLeadId(targetLeadId);
+        try {
+            const status = statuses.find(s => s.id === newStatusId);
+            if (!status) {
+                throw new Error('Status not found');
+            }
+
+            await patchLeadMutation.mutateAsync({
+                id: targetLeadId,
+                data: { status: status.id },
+            });
+
+            await refetchLead();
+        } catch (error) {
+            console.error('Error updating lead status:', error);
+            alert(t('errorUpdatingLeadStatus') || 'Failed to update lead status. Please try again.');
+        } finally {
+            setUpdatingLeadId(null);
+        }
+    };
 
     // Helper function to convert status to translation key
     const getStatusTranslationKey = (status: string): string => {
@@ -264,8 +207,45 @@ export const ViewLeadPage = () => {
         return stage;
     };
 
-    // Use currentLead instead of selectedLead for display
-    const displayLead = currentLead || selectedLead;
+    const canDeleteLead = (lead: Lead) => {
+        const currentRole = normalizeRole(currentUser?.role);
+        const isAdmin = currentRole === 'Owner';
+        const canDelete = Boolean(currentUser?.can_delete_clients);
+        const isSupervisorWithLeads =
+            currentRole === 'Supervisor' &&
+            hasSupervisorPermission('can_manage_leads') &&
+            canDelete;
+        const isAssignedEmployee =
+            canDelete &&
+            (currentRole === 'Employee' || currentRole === 'Doctor') &&
+            lead.assignedTo === currentUser?.id;
+        return isAdmin || isSupervisorWithLeads || isAssignedEmployee;
+    };
+
+    const handleDeleteLead = (lead: Lead) => {
+        setConfirmDeleteConfig({
+            title: t('deleteLead') || 'Delete Lead',
+            message: t('confirmDeleteLead') || 'Are you sure you want to delete',
+            itemName: lead.name,
+            onConfirm: async () => {
+                try {
+                    await deleteLeadMutation.mutateAsync(lead.id);
+                    setSelectedLead(null);
+                    if (currentUser?.company) {
+                        const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
+                        window.history.pushState({}, '', route);
+                    } else {
+                        window.history.pushState({}, '', '/leads');
+                    }
+                    setCurrentPage('Leads');
+                } catch (error: any) {
+                    console.error('Error deleting lead:', error);
+                    throw error;
+                }
+            },
+        });
+        setIsConfirmDeleteModalOpen(true);
+    };
 
     const formatPbxCallSummary = (cc: Record<string, unknown>): string => {
         const parts: string[] = [];
@@ -356,49 +336,13 @@ export const ViewLeadPage = () => {
 
     const handleMetaQualificationChange = async (newStatus: '' | 'qualified' | 'unqualified') => {
         if (!displayLead?.id) return;
-        const lead = allLeads.find((l: any) => l.id === displayLead.id) ?? displayLead;
-        const companyId = (lead as any).company?.id || (lead as any).company || (lead as any).company_id;
-        if (!companyId) {
-            alert(t('errorUpdatingLead') || 'Failed to update lead.');
-            return;
-        }
         setUpdatingMetaQualification(true);
         try {
-            const assignedRaw = (lead as any).assigned_to ?? lead.assignedTo;
-            const assignedToId =
-                assignedRaw && typeof assignedRaw === 'object'
-                    ? assignedRaw.id ?? null
-                    : assignedRaw
-                      ? Number(assignedRaw)
-                      : null;
-            const communicationRaw = (lead as any).communication_way ?? lead.communicationWay;
-            const communicationWayId =
-                communicationRaw && typeof communicationRaw === 'object'
-                    ? communicationRaw.id ?? null
-                    : communicationRaw
-                      ? Number(communicationRaw)
-                      : null;
-
-            const updateData: Record<string, unknown> = {
-                name: lead.name,
-                phone_number: (lead as any).phone_number || lead.phone || '',
-                budget: lead.budget || 0,
-                budget_max: (lead as any).budget_max ?? lead.budgetMax ?? null,
-                assigned_to: assignedToId,
-                type: lead.type || '',
-                communication_way: communicationWayId,
-                priority: lead.priority || '',
-                status: (lead as any).status?.id ?? (lead as any).status,
-                company: companyId,
-                lead_company_name: (lead as any).lead_company_name ?? lead.leadCompanyName ?? null,
-                profession: lead.profession ?? null,
-                meta_qualification_status: newStatus === '' ? null : newStatus,
-            };
-            if ((lead as any).phone_numbers?.length) {
-                updateData.phone_numbers = (lead as any).phone_numbers;
-            }
-            await updateLeadMutation.mutateAsync({ id: displayLead.id, data: updateData });
-            await refetchLeads();
+            await patchLeadMutation.mutateAsync({
+                id: displayLead.id,
+                data: { meta_qualification_status: newStatus === '' ? null : newStatus },
+            });
+            await refetchLead();
         } catch (error) {
             console.error('Error updating Meta qualification:', error);
             alert(t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
@@ -697,18 +641,20 @@ export const ViewLeadPage = () => {
         return [...actions, ...calls, ...visits, ...fieldVisits, ...events, ...smsEntries, ...waEntries];
     }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, channels, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
 
-    if (!displayLead) {
-        return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
-    }
+    const isResolvingLead = Boolean(leadId) && !displayLead && (leadLoading || leadFetching) && !leadError;
 
-    if (loading) {
+    if (isResolvingLead) {
         return (
-            <PageWrapper title={displayLead.name}>
+            <PageWrapper title={t('leads')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
                     <Loader variant="primary" className="h-12"/>
                 </div>
             </PageWrapper>
         );
+    }
+
+    if (!displayLead) {
+        return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
     }
 
     return (
@@ -751,6 +697,19 @@ export const ViewLeadPage = () => {
                             {t('editClient')}
                         </span>
                     </Button>
+                    {canDeleteLead(displayLead) && (
+                        <Button
+                            variant="danger"
+                            type="button"
+                            className="w-full sm:w-auto shrink-0"
+                            onClick={() => handleDeleteLead(displayLead)}
+                        >
+                            <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                                <TrashIcon className="w-4 h-4 shrink-0" />
+                                {t('deleteLead') || 'Delete Lead'}
+                            </span>
+                        </Button>
+                    )}
                     <Button
                         variant="secondary"
                         type="button"

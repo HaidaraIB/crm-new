@@ -11,7 +11,7 @@ import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole, normalizeRole } fr
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { buildLeadLocationApiBody } from '../utils/leadLocation';
-import { validateLeadForm } from '../utils/leadFormValidation';
+import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -252,6 +252,9 @@ export const CreateLeadPage = () => {
             }
             return newPhones;
         });
+        if (field === 'phone_number') {
+            clearError('phone');
+        }
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -328,51 +331,7 @@ export const CreateLeadPage = () => {
             }
         } catch (error: any) {
             console.error('Error creating lead:', error);
-            
-            // Display field-specific errors if available
-            if (error.fields) {
-                const fieldErrors: { [key: string]: string } = {};
-                const fieldLabels: { [key: string]: string } = {
-                    name: t('clientName') || 'Name',
-                    phone: t('phoneNumbers') || 'Phone Numbers',
-                    phone_number: t('phoneNumbers') || 'Phone Numbers',
-                    phone_numbers: t('phoneNumbers') || 'Phone Numbers',
-                    budget: t('budget') || 'Budget',
-                    budget_max: t('budgetMaxOptional') || 'Budget (max)',
-                    assigned_to: t('assignedTo') || 'Assigned To',
-                    type: t('type') || 'Type',
-                    communication_way: t('communicationWay') || 'Communication Way',
-                    priority: t('priority') || 'Priority',
-                    status: t('status') || 'Status',
-                    company: t('company') || 'Company',
-                    lead_company_name: t('leadCompanyName') || 'Company name',
-                    profession: t('profession') || 'Profession',
-                    interested_developer: t('interestedDeveloper') || 'Developer',
-                    interested_project: t('interestedProject') || 'Project',
-                    interested_unit: t('interestedUnit') || 'Unit',
-                    residence: t('residence') || 'Residence',
-                };
-                
-                Object.keys(error.fields).forEach(field => {
-                    const fieldError = error.fields[field];
-                    let errorMessage = '';
-                    if (Array.isArray(fieldError)) {
-                        errorMessage = fieldError[0];
-                    } else {
-                        errorMessage = String(fieldError);
-                    }
-                    
-                    // Add field label to error message
-                    const fieldLabel = fieldLabels[field] || field;
-                    fieldErrors[field] = `${fieldLabel}: ${errorMessage}`;
-                });
-                setErrors(fieldErrors);
-            } else {
-                // Show general error message
-                setErrors({ 
-                    general: error.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.' 
-                });
-            }
+            setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorCreatingLead'));
         }
     };
 
@@ -551,6 +510,7 @@ export const CreateLeadPage = () => {
                                                     value={pn.phone_number}
                                                     onChange={(value) => handlePhoneNumberChange(index, 'phone_number', value)}
                                                     defaultCountry="IQ"
+                                                    error={!!errors.phone}
                                                 />
                                             </div>
                                             <div className="col-span-6 md:col-span-2">
@@ -587,6 +547,9 @@ export const CreateLeadPage = () => {
                                         </div>
                                     ))}
                                 </div>
+                            )}
+                            {errors.phone && phoneNumbers.length > 0 && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
                             )}
                         </div>
                         {!isDataEntryUser && (

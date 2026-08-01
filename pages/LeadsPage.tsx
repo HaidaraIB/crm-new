@@ -9,7 +9,7 @@ import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead, LeadApiFilters, Status, User } from '../types';
-import { useLeads, useLeadStatusCounts, useDeleteLead, useUpdateLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
+import { useLeads, useLeadStatusCounts, useDeleteLead, usePatchLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { pbxDialAPI, getPbxDialStatusAPI, getLeadsAPI } from '../services/api';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
@@ -221,8 +221,8 @@ export const LeadsPage = () => {
     // Delete lead mutation
     const deleteLeadMutation = useDeleteLead();
     
-    // Update lead mutation
-    const updateLeadMutation = useUpdateLead();
+    // Sparse status PATCH (avoid full-body PUT false edit events)
+    const updateLeadMutation = usePatchLead();
     
     // Assign unassigned clients mutation
     const assignUnassignedMutation = useAssignUnassignedClients({
@@ -307,7 +307,7 @@ export const LeadsPage = () => {
 
     const showLeadSearchClear = leadSearchDraft.length > 0 || Boolean(leadFilters.search);
 
-    // Handle status change
+    // Handle status change — sparse PATCH only
     const handleStatusChange = async (leadId: number, newStatusId: number) => {
         setUpdatingLeadId(leadId);
         try {
@@ -315,72 +315,10 @@ export const LeadsPage = () => {
             if (!status) {
                 throw new Error('Status not found');
             }
-            
-            // Get the lead to preserve other fields
-            const lead = normalizedLeads.find(l => l.id === leadId);
-            if (!lead) {
-                throw new Error('Lead not found');
-            }
-            
-            // Get the original lead data to access company field
-            const originalLead = allLeads.find((l: any) => l.id === leadId);
-            if (!originalLead) {
-                throw new Error('Original lead data not found');
-            }
-            
-            // Get company ID (handle both object and ID formats)
-            const companyId = originalLead.company?.id || originalLead.company || originalLead.company_id;
-            if (!companyId) {
-                throw new Error('Company ID not found');
-            }
-            
-            const assignedRaw = (originalLead as any).assigned_to ?? lead.assignedTo;
-            const assignedToId =
-                assignedRaw && typeof assignedRaw === 'object'
-                    ? (assignedRaw as { id?: number }).id ?? null
-                    : assignedRaw
-                      ? Number(assignedRaw)
-                      : null;
-            const communicationRaw =
-                (originalLead as any).communication_way ?? lead.communicationWay;
-            const communicationWayId =
-                communicationRaw && typeof communicationRaw === 'object'
-                    ? (communicationRaw as { id?: number }).id ?? null
-                    : communicationRaw
-                      ? Number(communicationRaw)
-                      : null;
 
-            // Prepare update data (snake_case for Django serializer)
-            const updateData: any = {
-                name: lead.name,
-                phone_number: lead.phone || (originalLead as any).phone_number || '',
-                budget: lead.budget,
-                budget_max: (originalLead as any).budget_max ?? (lead as any).budgetMax ?? null,
-                assigned_to: assignedToId,
-                type: lead.type,
-                communication_way: communicationWayId,
-                priority: lead.priority,
-                status: status.id,
-                company: companyId,
-                lead_company_name:
-                    (originalLead as any).lead_company_name ??
-                    (lead as any).leadCompanyName ??
-                    null,
-                profession: (originalLead as any).profession ?? (lead as any).profession ?? null,
-                notes: (originalLead as any).notes ?? (lead as any).notes ?? null,
-            };
-            
-            const phoneNumbers =
-                lead.phoneNumbers ||
-                (originalLead as any).phone_numbers ||
-                [];
-            if (phoneNumbers.length > 0) {
-                updateData.phone_numbers = phoneNumbers;
-            }
-            
             await updateLeadMutation.mutateAsync({
                 id: leadId,
-                data: updateData,
+                data: { status: status.id },
             });
         } catch (error) {
             console.error('Error updating lead status:', error);

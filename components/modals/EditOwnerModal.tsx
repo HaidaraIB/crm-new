@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { useUpdateOwner } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -29,6 +30,15 @@ export const EditOwnerModal = () => {
     // Update owner mutation
     const updateOwnerMutation = useUpdateOwner();
     const isLoading = updateOwnerMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name.trim(),
+        phone: state.phone,
+        city: state.city,
+        district: state.district,
+        company: currentUser?.company?.id,
+    });
     
     const [formState, setFormState] = useState({
         name: '',
@@ -61,14 +71,18 @@ export const EditOwnerModal = () => {
 
     useEffect(() => {
         if (editingOwner) {
-            setFormState({
+            const initState = {
                 name: editingOwner.name,
                 phone: editingOwner.phone,
                 city: editingOwner.city,
                 district: editingOwner.district,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingOwner]);
+    }, [editingOwner, currentUser?.company?.id]);
 
     const handleClose = () => {
         setIsEditOwnerModalOpen(false);
@@ -95,20 +109,19 @@ export const EditOwnerModal = () => {
         }
         
         try {
-            // Prepare owner data with all fields and company ID
-            const ownerData = {
-                name: formState.name.trim(),
-                phone: formState.phone,
-                city: formState.city,
-                district: formState.district,
-                company: currentUser?.company?.id,
-            };
+            const ownerData = buildPayload(formState);
             
             if (!ownerData.company) {
                 throw new Error(t('companyRequired') || 'Company information is required');
             }
+
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, ownerData);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
             
-            await updateOwnerMutation.mutateAsync({ id: editingOwner.id, data: ownerData });
+            await updateOwnerMutation.mutateAsync({ id: editingOwner.id, data: patch });
 
             // Close modal immediately and show success modal
             handleClose();

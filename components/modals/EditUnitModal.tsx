@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -7,6 +7,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Project, Unit } from '../../types';
 import { useUpdateUnit, useProjects } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -34,6 +35,27 @@ export const EditUnitModal = () => {
     // Update unit mutation
     const updateUnitMutation = useUpdateUnit();
     const isLoading = updateUnitMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState, fallbackName?: string): Record<string, unknown> => ({
+        name: state.name.trim() || fallbackName || '',
+        code: state.code.trim(),
+        project: Number(state.project),
+        bedrooms: Number(state.bedrooms) || 0,
+        price: Number(state.price) || 0,
+        bathrooms: Number(state.bathrooms) || 0,
+        type: state.type || 'Apartment',
+        finishing: state.finishing || 'Finished',
+        city: state.city || '',
+        district: state.district || '',
+        zone: state.zone || '',
+        lounge: state.lounge ? Number(state.lounge) : null,
+        area: state.area ? Number(state.area) : null,
+        currency: state.currency || null,
+        isSold: state.isSold,
+        is_sold: state.isSold,
+        company: currentUser?.company?.id,
+    });
     
     const [formState, setFormState] = useState({
         name: '',
@@ -97,7 +119,7 @@ export const EditUnitModal = () => {
                 projectId = foundProject ? foundProject.id.toString() : '';
             }
             
-            setFormState({
+            const initState = {
                 name: editingUnit.name || '',
                 code: editingUnit.code || '',
                 project: projectId,
@@ -113,9 +135,13 @@ export const EditUnitModal = () => {
                 area: editingUnit.area?.toString() ?? '',
                 currency: editingUnit.currency || 'SAR',
                 isSold: editingUnit.isSold || false,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState, editingUnit.name);
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingUnit, projects]);
+    }, [editingUnit, projects, currentUser?.company?.id]);
 
     const handleClose = () => {
         setIsEditUnitModalOpen(false);
@@ -142,39 +168,23 @@ export const EditUnitModal = () => {
         }
         
         try {
-            // Prepare unit data with project ID (not name) and proper types
-            // Include ALL fields from formState to ensure nothing is missed
-            // Use snake_case for API fields if needed, but try camelCase first
-            const unitData: any = {
-                name: formState.name.trim() || editingUnit.name || '',
-                code: formState.code.trim(),
-                project: Number(formState.project), // Convert to number (ID)
-                bedrooms: Number(formState.bedrooms) || 0,
-                price: Number(formState.price) || 0,
-                bathrooms: Number(formState.bathrooms) || 0,
-                type: formState.type || 'Apartment',
-                finishing: formState.finishing || 'Finished',
-                city: formState.city || '',
-                district: formState.district || '',
-                zone: formState.zone || '',
-                lounge: formState.lounge ? Number(formState.lounge) : null,
-                area: formState.area ? Number(formState.area) : null,
-                currency: formState.currency || null,
-                isSold: formState.isSold, // Send boolean value directly
-                is_sold: formState.isSold, // Also send in snake_case format (API might expect this)
-                company: currentUser?.company?.id,
-            };
+            const unitData = buildPayload(formState, editingUnit.name);
             
             if (!unitData.company) {
                 throw new Error(t('companyRequired') || 'Company information is required');
             }
             
-            if (!unitData.project || isNaN(unitData.project)) {
+            if (!unitData.project || isNaN(Number(unitData.project))) {
                 throw new Error(t('projectRequired') || 'Project is required');
             }
+
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, unitData);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
             
-            
-            await updateUnitMutation.mutateAsync({ id: editingUnit.id, data: unitData });
+            await updateUnitMutation.mutateAsync({ id: editingUnit.id, data: patch });
 
             // Close modal immediately and show success modal
             handleClose();

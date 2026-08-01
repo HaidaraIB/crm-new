@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -8,6 +8,7 @@ import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { ServiceProvider } from '../../types';
 import { useUpdateServiceProvider } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-secondary mb-1">{children}</label>
@@ -26,6 +27,16 @@ export const EditServiceProviderModal = () => {
     // Update service provider mutation
     const updateServiceProviderMutation = useUpdateServiceProvider();
     const loading = updateServiceProviderMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name.trim(),
+        phone: state.phone?.trim() || '',
+        email: state.email?.trim() || '',
+        specialization: state.specialization?.trim() || '',
+        rating: state.rating ? Number(state.rating) : undefined,
+        company: currentUser?.company?.id || currentUser?.company_id,
+    });
     
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -60,16 +71,20 @@ export const EditServiceProviderModal = () => {
 
     useEffect(() => {
         if (editingServiceProvider) {
-            setFormState({
+            const initState = {
                 name: editingServiceProvider.name || '',
                 phone: editingServiceProvider.phone || '',
                 email: editingServiceProvider.email || '',
                 specialization: editingServiceProvider.specialization || '',
                 rating: editingServiceProvider.rating !== undefined && editingServiceProvider.rating !== null ? editingServiceProvider.rating.toString() : '',
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingServiceProvider]);
+    }, [editingServiceProvider, currentUser?.company?.id, currentUser?.company_id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -91,16 +106,16 @@ export const EditServiceProviderModal = () => {
         }
 
         try {
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
+
             await updateServiceProviderMutation.mutateAsync({
                 id: editingServiceProvider.id,
-                data: {
-                    name: formState.name.trim(),
-                    phone: formState.phone?.trim() || '',
-                    email: formState.email?.trim() || '',
-                    specialization: formState.specialization?.trim() || '',
-                    rating: formState.rating ? Number(formState.rating) : undefined,
-                    company: currentUser?.company?.id || currentUser?.company_id,
-                }
+                data: patch,
             });
 
             // Close modal immediately and show success modal

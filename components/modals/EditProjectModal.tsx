@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Developer } from '../../types';
 import { useUpdateProject, useDevelopers } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -42,6 +43,17 @@ export const EditProjectModal = () => {
     // Update project mutation
     const updateProjectMutation = useUpdateProject();
     const isLoading = updateProjectMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name,
+        developer: Number(state.developer),
+        type: state.type || null,
+        city: state.city || null,
+        payment_method: state.paymentMethod || null,
+        paymentMethod: state.paymentMethod || null,
+        company: currentUser?.company?.id,
+    });
 
     const validateForm = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -85,15 +97,19 @@ export const EditProjectModal = () => {
             // Handle paymentMethod - API might return payment_method (snake_case) or paymentMethod (camelCase)
             const paymentMethod = (editingProject as any).paymentMethod || (editingProject as any).payment_method || 'Cash';
             
-            setFormState({
+            const initState = {
                 name: editingProject.name,
                 developer: developerId,
                 type: editingProject.type || '',
                 city: editingProject.city || '',
                 paymentMethod: paymentMethod,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingProject, developers]);
+    }, [editingProject, developers, currentUser?.company?.id]);
 
     const handleClose = () => {
         setIsEditProjectModalOpen(false);
@@ -115,28 +131,25 @@ export const EditProjectModal = () => {
         }
         
         try {
-            // Prepare project data with developer ID (not name) and company ID
-            const projectData: any = {
-                name: formState.name,
-                developer: Number(formState.developer), // Convert to number (ID)
-                type: formState.type || null,
-                city: formState.city || null,
-                payment_method: formState.paymentMethod || null, // Send as payment_method (snake_case) for API
-                paymentMethod: formState.paymentMethod || null, // Also send as paymentMethod (camelCase) for compatibility
-                company: currentUser?.company?.id,
-            };
+            const projectData = buildPayload(formState);
             
             if (!projectData.company) {
                 throw new Error(t('companyRequired') || 'Company information is required');
             }
             
-            if (!projectData.developer || isNaN(projectData.developer)) {
+            if (!projectData.developer || isNaN(Number(projectData.developer))) {
                 throw new Error(t('developerRequired') || 'Developer is required');
+            }
+
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, projectData);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
             }
             
             await updateProjectMutation.mutateAsync({
                 id: editingProject.id,
-                data: projectData,
+                data: patch,
             });
 
             // Close modal immediately and show success modal

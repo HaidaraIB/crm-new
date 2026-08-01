@@ -30,6 +30,18 @@ export const unwrapApiFieldErrors = (raw: any): Record<string, unknown> => {
     return raw as Record<string, unknown>;
 };
 
+/** Keys that are business metadata, not form fields. */
+const API_FIELD_META_KEYS = new Set([
+    'non_field_errors',
+    'detail',
+    'error_key',
+    'code',
+    'message',
+    'error',
+    'success',
+]);
+
+
 export const scrollToFirstFieldError = (
     fieldErrors: Record<string, string>,
     domIdMap: Record<string, string>,
@@ -98,6 +110,17 @@ export const translateBackendError = (
             return t('usernameAlreadyExists') || 'This username is already taken. Please choose another.';
         }
         if (hint.includes('phone') || lowerMessage.includes('phone')) {
+            // Lead company-wide uniqueness (distinct from user registration phone taken)
+            if (
+                lowerMessage.includes('in your company') ||
+                lowerMessage.includes('already exists in your company') ||
+                lowerMessage.includes('lead with this phone')
+            ) {
+                return (
+                    t('duplicate_lead_phone') ||
+                    'A lead with this phone number already exists in your company.'
+                );
+            }
             return (
                 t('phoneAlreadyExists') ||
                 'This phone number is already registered. Please use a different number.'
@@ -164,8 +187,10 @@ export const mapApiFieldsToUiErrors = (
     };
 
     Object.entries(source).forEach(([apiKey, value]) => {
-        if (apiKey === 'non_field_errors' || apiKey === 'detail') {
-            fieldErrors.general = translateBackendError(normalizeErrorMessage(value), t);
+        if (API_FIELD_META_KEYS.has(apiKey)) {
+            if (apiKey === 'non_field_errors' || apiKey === 'detail') {
+                fieldErrors.general = translateBackendError(normalizeErrorMessage(value), t);
+            }
             return;
         }
         if (value && typeof value === 'object' && !Array.isArray(value)) {

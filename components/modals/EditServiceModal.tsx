@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -8,6 +8,7 @@ import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
 import { Service, ServiceProvider } from '../../types';
 import { useUpdateService, useServiceProviders } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -36,6 +37,29 @@ export const EditServiceModal = () => {
     // Update service mutation
     const updateServiceMutation = useUpdateService();
     const loading = updateServiceMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => {
+        const selectedProvider = state.provider
+            ? serviceProviders.find(prov => prov.name === state.provider)
+            : null;
+
+        const updateData: Record<string, unknown> = {
+            name: state.name.trim(),
+            description: state.description?.trim() || '',
+            price: Number(state.price) || 0,
+            duration: state.duration?.trim() || '',
+            category: state.category?.trim() || '',
+            company: currentUser?.company?.id || currentUser?.company_id,
+            is_active: state.isActive,
+        };
+
+        if (selectedProvider) {
+            updateData.provider = selectedProvider.id;
+        }
+
+        return updateData;
+    };
 
     const [formState, setFormState] = useState({
         name: '',
@@ -84,7 +108,7 @@ export const EditServiceModal = () => {
                 providerName = editingService.provider;
             }
             
-            setFormState({
+            const initState = {
                 name: editingService.name || '',
                 description: editingService.description || '',
                 price: editingService.price !== undefined && editingService.price !== null ? editingService.price.toString() : '',
@@ -92,10 +116,14 @@ export const EditServiceModal = () => {
                 category: editingService.category || '',
                 provider: providerName,
                 isActive: editingService.isActive !== undefined ? editingService.isActive : true,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingService, serviceProviders]);
+    }, [editingService, serviceProviders, currentUser?.company?.id, currentUser?.company_id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;
@@ -121,29 +149,16 @@ export const EditServiceModal = () => {
         }
 
         try {
-            // Find provider by name to get its ID
-            const selectedProvider = formState.provider 
-                ? serviceProviders.find(prov => prov.name === formState.provider)
-                : null;
-
-            const updateData: any = {
-                name: formState.name.trim(),
-                description: formState.description?.trim() || '',
-                price: Number(formState.price) || 0,
-                duration: formState.duration?.trim() || '',
-                category: formState.category?.trim() || '',
-                company: currentUser?.company?.id || currentUser?.company_id,
-                is_active: formState.isActive,
-            };
-
-            // Only include provider if it's selected
-            if (selectedProvider) {
-                updateData.provider = selectedProvider.id;
+            const updateData = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, updateData);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
             }
 
             await updateServiceMutation.mutateAsync({
                 id: editingService.id,
-                data: updateData
+                data: patch,
             });
 
             // Close modal immediately and show success modal

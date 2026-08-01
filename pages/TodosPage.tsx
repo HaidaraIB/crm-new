@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, Loader, PlusIcon, EditIcon, TrashIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode } from '../components/index';
+import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, PlusIcon, EditIcon, TrashIcon, EyeIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode, PageLoadingState } from '../components/index';
 import { TodosKanbanView } from '../components/todos/TodosKanbanView';
 import type { TodoKanbanItem } from '../components/todos/TodoKanbanCard';
-import { Todo, TaskStage, Stage } from '../types';
+import { TaskStage, Stage, Lead, Deal } from '../types';
 
 type CallMethodItem = { id: number; name: string; color?: string };
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
@@ -15,11 +15,50 @@ import {
     isOverdueFollowUpTask,
     type MissionBarTodosPreset,
 } from '../utils/missionBarNavigation';
-import { useTasks, useUpdateTask, useDeleteTask, useStages, useDeals, useClientTasks, useClientCalls, useDeleteClientTask, useDeleteClientCall, useCallMethods } from '../hooks/useQueries';
+import { getCompanyViewLeadRoute } from '../utils/routing';
+import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
+import {
+    useTasks,
+    useCompleteTask,
+    useDeleteTask,
+    useStages,
+    useDeals,
+    useClientTasks,
+    useClientCalls,
+    useDeleteClientTask,
+    useDeleteClientCall,
+    useCompleteClientTaskReminder,
+    useCompleteClientCallFollowUp,
+    useCallMethods,
+} from '../hooks/useQueries';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 type FilterType = 'all' | string;
+type TaskTypeFilter = 'all' | 'deal_task' | 'client_task' | 'client_call';
+
+const isTodoCompleted = (todo: any): boolean => {
+    const taskType = todo?.type || 'deal_task';
+    if (taskType === 'deal_task') {
+        return !!(todo.completed_at || todo.completedAt);
+    }
+    if (taskType === 'client_task') {
+        return !!(todo.reminder_completed_at || todo.reminderCompletedAt || todo.isCompleted);
+    }
+    if (taskType === 'client_call') {
+        return !!(todo.follow_up_completed_at || todo.followUpCompletedAt || todo.isCompleted);
+    }
+    return false;
+};
+
+const isReminderOverdue = (reminderDate: string | null | undefined): boolean => {
+    if (!reminderDate) return false;
+    try {
+        return new Date(reminderDate).getTime() < Date.now();
+    } catch {
+        return false;
+    }
+};
 
 // Map stage categories to icons
 const getStageIcon = (stage: TaskStage) => {
@@ -51,6 +90,14 @@ export const TodosPage = () => {
         setIsConfirmDeleteModalOpen,
         todosPagePreset,
         setTodosPagePreset,
+        setSelectedLead,
+        setCurrentPage,
+        setViewingDeal,
+        setIsViewDealModalOpen,
+        currentUser,
+        setAlertMessage,
+        setAlertVariant,
+        setIsAlertModalOpen,
     } = useAppContext();
     
     // Load selected date from localStorage or default to today
@@ -72,6 +119,8 @@ export const TodosPage = () => {
     });
     
     const [activeFilter, setActiveFilter] = useState<FilterType>('all');
+    const [typeFilter, setTypeFilter] = useState<TaskTypeFilter>('all');
+    const [searchQuery, setSearchQuery] = useState('');
     const [calendarOverdueOnly, setCalendarOverdueOnly] = useState(
         () => readMissionBarTodosPreset() === 'overdue',
     );
@@ -172,9 +221,7 @@ export const TodosPage = () => {
 
     // Transform ClientTasks and ClientCalls to unified task format
     const transformedClientTasks = useMemo(() => {
-        return allClientTasks
-            .filter((ct: any) => !ct.reminder_completed_at && !ct.reminderCompletedAt)
-            .map((ct: any) => {
+        return allClientTasks.map((ct: any) => {
             const clientId = ct.client || ct.clientId;
             const clientName = ct.client_name || '';
             const stageName = ct.stage_name || ct.stage || '';
@@ -183,6 +230,7 @@ export const TodosPage = () => {
             const createdBy = ct.created_by || null;
             const createdByUsername = ct.created_by_username || '';
             const createdAt = ct.created_at || ct.createdAt || null;
+            const reminderCompletedAt = ct.reminder_completed_at || ct.reminderCompletedAt || null;
             
             return {
                 id: `client-task-${ct.id}`, // Prefix to avoid conflicts
@@ -204,14 +252,15 @@ export const TodosPage = () => {
                 dealId: null,
                 dealStage: null,
                 dealEmployeeUsername: null,
+                reminder_completed_at: reminderCompletedAt,
+                reminderCompletedAt,
+                isCompleted: !!reminderCompletedAt,
             };
         });
     }, [allClientTasks]);
     
     const transformedClientCalls = useMemo(() => {
-        return allClientCalls
-            .filter((cc: any) => !cc.follow_up_completed_at && !cc.followUpCompletedAt)
-            .map((cc: any) => {
+        return allClientCalls.map((cc: any) => {
             const clientId = cc.client || cc.clientId;
             const clientName = cc.client_name || '';
             const callMethodName = cc.call_method_name || cc.call_method || '';
@@ -220,6 +269,7 @@ export const TodosPage = () => {
             const createdBy = cc.created_by || null;
             const createdByUsername = cc.created_by_username || '';
             const createdAt = cc.created_at || cc.createdAt || null;
+            const followUpCompletedAt = cc.follow_up_completed_at || cc.followUpCompletedAt || null;
             
             return {
                 id: `client-call-${cc.id}`, // Prefix to avoid conflicts
@@ -236,6 +286,9 @@ export const TodosPage = () => {
                 dealId: null,
                 dealStage: null,
                 dealEmployeeUsername: null,
+                follow_up_completed_at: followUpCompletedAt,
+                followUpCompletedAt,
+                isCompleted: !!followUpCompletedAt,
             };
         });
     }, [allClientCalls]);
@@ -244,10 +297,6 @@ export const TodosPage = () => {
     // Based on TaskSerializer, we get: deal_client_name, deal_employee_username, stage_name
     // Note: deal_stage might not be included in TaskSerializer - it's optional
     const allTasks = useMemo(() => {
-        // Debug: log raw data only in development
-        if (process.env.NODE_ENV === 'development' && allTasksRaw.length > 0) {
-        }
-        
         return allTasksRaw.map((task: any) => {
             // Get deal ID - handle both deal object and deal_id
             const dealId = task.deal_id || (typeof task.deal === 'number' ? task.deal : (task.deal?.id)) || null;
@@ -263,6 +312,7 @@ export const TodosPage = () => {
             const dealClientName = task.deal_client_name ?? '';
             const dealEmployeeUsername = task.deal_employee_username ?? '';
             const stageName = task.stage_name ?? '';
+            const completedAt = task.completed_at || task.completedAt || null;
             
             // Get deal_stage from deals if not in TaskSerializer
             // Try to get from API response first, then from deals lookup
@@ -284,6 +334,8 @@ export const TodosPage = () => {
                 reminderDate: task.reminder_date || task.reminderDate || null,
                 createdAt: task.created_at || task.createdAt || null,
                 updatedAt: task.updated_at || task.updatedAt || null,
+                completed_at: completedAt,
+                completedAt,
                 // Use API field names directly from serializer (snake_case from TaskSerializer)
                 dealClientName: dealClientName,
                 clientName: dealClientName,
@@ -312,42 +364,17 @@ export const TodosPage = () => {
     }, [allTasks, transformedClientTasks, transformedClientCalls]);
 
     const overdueFollowUpTasks = useMemo(
-        () => allCombinedTasks.filter((task) => isOverdueFollowUpTask(task)),
+        () => allCombinedTasks.filter((task) => !isTodoCompleted(task) && isOverdueFollowUpTask(task)),
         [allCombinedTasks],
     );
 
-    // Separate active and completed todos - check if reminder_date has passed
-    // Note: API doesn't have a "completed" field, so we use reminder_date logic
+    // Active = not explicitly completed; overdue stays Active until marked done
     const todos = useMemo(() => {
-        return allCombinedTasks.filter(task => {
-            // Task is active if reminder_date is in the future or null
-            const reminderDate = (task as any).reminderDate || (task as any).reminder_date;
-            if (!reminderDate) return true; // No reminder date = active
-            try {
-                const reminder = new Date(reminderDate);
-                const now = new Date();
-                // Consider task active if reminder is today or in the future
-                return reminder >= now;
-            } catch {
-                return true; // If date parsing fails, show as active
-            }
-        });
+        return allCombinedTasks.filter((task) => !isTodoCompleted(task));
     }, [allCombinedTasks]);
     
     const completedTodos = useMemo(() => {
-        return allCombinedTasks.filter(task => {
-            // Task is completed if reminder_date has passed (in the past)
-            const reminderDate = (task as any).reminderDate || (task as any).reminder_date;
-            if (!reminderDate) return false; // No reminder date = not completed
-            try {
-                const reminder = new Date(reminderDate);
-                const now = new Date();
-                // Consider task completed if reminder is in the past
-                return reminder < now;
-            } catch {
-                return false; // If date parsing fails, don't show as completed
-            }
-        });
+        return allCombinedTasks.filter((task) => isTodoCompleted(task));
     }, [allCombinedTasks]);
 
     // Fetch stages (not statuses - stages are used for tasks)
@@ -364,7 +391,9 @@ export const TodosPage = () => {
         : (callMethodsData?.results || []);
 
     // Update task mutation (for completing todos)
-    const updateTaskMutation = useUpdateTask();
+    const completeTaskMutation = useCompleteTask();
+    const completeClientTaskMutation = useCompleteClientTaskReminder();
+    const completeClientCallMutation = useCompleteClientCallFollowUp();
     // Delete task mutation
     const deleteTaskMutation = useDeleteTask();
     // Delete client task mutation
@@ -389,78 +418,83 @@ export const TodosPage = () => {
         setWeekDays(getWeekDays(new Date()));
     }, []);
 
+    const showError = (message: string) => {
+        setAlertMessage(message);
+        setAlertVariant('error');
+        setIsAlertModalOpen(true);
+    };
+
     const handleCompleteTodo = async (id: number | string) => {
         try {
-            // Find the task to get all required fields
             const task = allCombinedTasks.find(t => t.id === id);
             if (!task) {
-                alert(t('taskNotFound') || 'Task not found');
+                showError(t('taskNotFound') || 'Task not found');
                 return;
             }
             
             const taskType = (task as any)?.type;
-            const isClientTask = taskType === 'client_task';
-            const isClientCall = taskType === 'client_call';
-            
-            // Extract numeric ID from prefixed ID
             const numericId = typeof id === 'string' ? parseInt(id.replace(/^(client-task-|client-call-)/, '')) : id;
             
-            // For client tasks and client calls, we can't mark them as completed the same way
-            // They don't have a deal, so we'll just show a message
-            if (isClientTask || isClientCall) {
-                alert(t('clientTasksCannotBeCompleted') || 'Client tasks and calls cannot be marked as completed. They are automatically filtered by follow-up date.');
+            if (taskType === 'client_task') {
+                await completeClientTaskMutation.mutateAsync(numericId);
+                return;
+            }
+            if (taskType === 'client_call') {
+                await completeClientCallMutation.mutateAsync(numericId);
                 return;
             }
             
-            // Get deal ID - required by API
-            const dealId = (task as any).dealId || (task as any).deal_id || (typeof (task as any).deal === 'number' ? (task as any).deal : ((task as any).deal?.id)) || null;
-            if (!dealId) {
-                alert(t('dealRequiredForTask') || 'Deal information is required to complete this task');
-                return;
-            }
-            
-            // Get stage ID if available
-            const stageId = (task as any).stage || (task as any).stage_id || (typeof (task as any).stage === 'object' ? (task as any).stage?.id : null) || null;
-            
-            // Get current reminder_date
-            const currentReminderDate = (task as any).reminderDate || (task as any).reminder_date || null;
-            
-            // To mark as completed, set reminder_date to 1 hour ago (in the past)
-            // This will make it appear in the completed tab
-            // Using 1 hour ago ensures it's definitely in the past
-            const oneHourAgo = new Date();
-            oneHourAgo.setHours(oneHourAgo.getHours() - 1);
-            
-            // Send all required fields in snake_case format for API (PUT requires all fields)
-            const updateData: any = {
-                deal: dealId,
-                stage: stageId, // Can be null
-                notes: (task as any).notes || '',
-                reminder_date: oneHourAgo.toISOString(), // Set to 1 hour ago to mark as completed
-            };
-            
-            
-            await updateTaskMutation.mutateAsync({ 
-                id: numericId, 
-                data: updateData
-            });
+            await completeTaskMutation.mutateAsync(numericId);
         } catch (error: any) {
             console.error('Error completing todo:', error);
-            const errorMessage = error?.message || error?.fields || t('failedToCompleteTodo') || 'Failed to complete todo. Please try again.';
-            alert(typeof errorMessage === 'string' ? errorMessage : JSON.stringify(errorMessage));
+            showError(getLocalizedApiErrorMessage(error, t, 'failedToCompleteTodo'));
         }
     };
 
     const handleEditTodo = (id: number | string) => {
-        // Only allow editing deal tasks for now
         const task = allCombinedTasks.find(t => t.id === id);
         const taskType = (task as any)?.type;
         if (taskType === 'client_task' || taskType === 'client_call') {
-            alert(t('clientTasksCannotBeEdited') || 'Client tasks and calls cannot be edited from this page.');
+            handleOpenRelated(id);
             return;
         }
         const numericId = typeof id === 'string' ? parseInt(id.replace(/^(client-task-|client-call-)/, '')) : id;
         setEditingTodoId(numericId);
+    };
+
+    const handleOpenRelated = (id: number | string) => {
+        const todo = allCombinedTasks.find(t => t.id === id);
+        if (!todo) return;
+        const taskType = (todo as any)?.type || 'deal_task';
+
+        if (taskType === 'deal_task') {
+            const dealId = (todo as any).dealId || (todo as any).deal_id || (typeof (todo as any).deal === 'number' ? (todo as any).deal : (todo as any).deal?.id);
+            if (!dealId) {
+                showError(t('dealRequiredForTask') || 'Deal information is required');
+                return;
+            }
+            const deal = allDeals.find((d: any) => d.id === dealId);
+            if (deal) {
+                setViewingDeal(deal as Deal);
+                setIsViewDealModalOpen(true);
+            } else {
+                setViewingDeal({ id: dealId } as Deal);
+                setIsViewDealModalOpen(true);
+            }
+            return;
+        }
+
+        const clientId = (todo as any).clientId;
+        if (!clientId) {
+            showError(t('taskNotFound') || 'Task not found');
+            return;
+        }
+        setSelectedLead({ id: Number(clientId) } as Lead);
+        const route = currentUser?.company
+            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, Number(clientId))
+            : `/view-lead/${clientId}`;
+        window.history.pushState({}, '', route);
+        setCurrentPage('ViewLead');
     };
 
     const handleDeleteTodo = (id: number | string) => {
@@ -500,18 +534,18 @@ export const TodosPage = () => {
         setIsConfirmDeleteModalOpen(true);
     };
 
+    const isCompleting =
+        completeTaskMutation.isPending ||
+        completeClientTaskMutation.isPending ||
+        completeClientCallMutation.isPending;
+
     const currentTodos = activeTab === 'active' ? todos : completedTodos;
     
     // Get all available stages from settings for filters (not just stages used in todos)
     const availableStages = useMemo(() => {
         // Return all stages from settings, not just those used in current todos
-        // This allows filtering by any stage even if there are no todos with that stage yet
-        // Only show warning if not loading and stages are empty
         if (!stagesLoading && (!stages || stages.length === 0)) {
-            // Silently return empty array - stages might not be configured yet
             return [];
-        }
-        if (stages && stages.length > 0) {
         }
         return stages || [];
     }, [stages, stagesLoading]);
@@ -520,6 +554,29 @@ export const TodosPage = () => {
         return (sourceTodos: typeof allCombinedTasks) =>
             sourceTodos.filter((todo) => {
                 const reminderDate = (todo as any).reminderDate || (todo as any).reminder_date || '';
+                const taskType = ((todo as any).type || 'deal_task') as TaskTypeFilter;
+
+                if (typeFilter !== 'all' && taskType !== typeFilter) return false;
+
+                const q = searchQuery.trim().toLowerCase();
+                if (q) {
+                    const haystack = [
+                        (todo as any).clientName,
+                        (todo as any).dealClientName,
+                        (todo as any).deal_client_name,
+                        (todo as any).notes,
+                        (todo as any).stageName,
+                        (todo as any).stage_name,
+                        (todo as any).callMethodName,
+                        (todo as any).dealEmployeeUsername,
+                        (todo as any).deal_employee_username,
+                        (todo as any).createdByUsername,
+                    ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                    if (!haystack.includes(q)) return false;
+                }
 
                 if (calendarOverdueOnly) {
                     if (!isOverdueFollowUpTask(todo)) return false;
@@ -544,7 +601,7 @@ export const TodosPage = () => {
                 const isStageMatch = activeFilter === 'all' || stageName === activeFilter;
                 return isDateMatch && isStageMatch;
             });
-    }, [activeFilter, calendarOverdueOnly, selectedDate]);
+    }, [activeFilter, calendarOverdueOnly, selectedDate, searchQuery, typeFilter]);
 
     const dateFilteredActiveCount = useMemo(() => {
         if (calendarOverdueOnly) {
@@ -588,13 +645,30 @@ export const TodosPage = () => {
         return applyDateAndStageFilters(sourceTodos);
     }, [applyDateAndStageFilters, calendarOverdueOnly, currentTodos, overdueFollowUpTasks]);
 
-    /** Board: date/tab filters only — stage chips become columns. Calls have no stage. */
+    /** Board: active items only — stage chips become columns. Calls have no stage. */
     const boardTodos = useMemo((): TodoKanbanItem[] => {
-        const sourceTodos = calendarOverdueOnly ? overdueFollowUpTasks : currentTodos;
+        const sourceTodos = calendarOverdueOnly ? overdueFollowUpTasks : todos;
         return sourceTodos
             .filter((todo) => {
                 const taskType = (todo as any).type || 'deal_task';
                 if (taskType === 'client_call') return false;
+                if (typeFilter !== 'all' && taskType !== typeFilter) return false;
+
+                const q = searchQuery.trim().toLowerCase();
+                if (q) {
+                    const haystack = [
+                        (todo as any).clientName,
+                        (todo as any).dealClientName,
+                        (todo as any).notes,
+                        (todo as any).stageName,
+                        (todo as any).dealEmployeeUsername,
+                        (todo as any).createdByUsername,
+                    ]
+                        .filter(Boolean)
+                        .join(' ')
+                        .toLowerCase();
+                    if (!haystack.includes(q)) return false;
+                }
 
                 const reminderDate = (todo as any).reminderDate || (todo as any).reminder_date || '';
                 if (calendarOverdueOnly) {
@@ -648,9 +722,11 @@ export const TodosPage = () => {
     }, [
         calendarOverdueOnly,
         overdueFollowUpTasks,
-        currentTodos,
+        todos,
         selectedDate,
         stages,
+        searchQuery,
+        typeFilter,
     ]);
 
     const totalTodoPages = Math.max(1, Math.ceil(filteredTodos.length / todosPageSize));
@@ -662,7 +738,7 @@ export const TodosPage = () => {
 
     useEffect(() => {
         setTodosPageNumber(1);
-    }, [activeTab, selectedDate, activeFilter]);
+    }, [activeTab, selectedDate, activeFilter, searchQuery, typeFilter]);
     useEffect(() => {
         setTodosPageNumber(1);
     }, [todosPageSize]);
@@ -781,6 +857,35 @@ export const TodosPage = () => {
                         )}
                     </div>
 
+                    {/* Search + type filters */}
+                    <div className="mb-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={t('searchTodos') || 'Search by client, notes, stage…'}
+                            className="w-full sm:max-w-xs px-3 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary"
+                        />
+                        <div className="flex items-center gap-2 flex-wrap">
+                            {(
+                                [
+                                    ['all', t('all') || 'All'],
+                                    ['deal_task', t('dealTask') || 'Deal Task'],
+                                    ['client_task', t('leadAction') || t('action') || 'Lead Action'],
+                                    ['client_call', t('callFollowUp') || t('call') || 'Call Follow-up'],
+                                ] as Array<[TaskTypeFilter, string]>
+                            ).map(([value, label]) => (
+                                <Button
+                                    key={value}
+                                    variant={typeFilter === value ? 'primary' : 'ghost'}
+                                    onClick={() => setTypeFilter(value)}
+                                >
+                                    {label}
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+
                     {/* Stage filters for active and completed todos (table only — board columns are stages) */}
                     {!isBoardView && !stagesLoading && (
                         <div className="flex items-center gap-2 mb-4 flex-wrap">
@@ -809,11 +914,7 @@ export const TodosPage = () => {
                     </div>
 
                     {tasksLoading ? (
-                        <Card>
-                            <div className="flex items-center justify-center py-10">
-                                <Loader variant="primary" className="h-12"/>
-                            </div>
-                        </Card>
+                        <PageLoadingState label={t('loadingTodos') || t('loading') || 'Loading todos'} />
                     ) : tasksError ? (
                         <Card>
                             <div className="text-center py-10">
@@ -832,7 +933,13 @@ export const TodosPage = () => {
                             canDrag
                             isLoading={stagesLoading}
                             formatDealStage={formatDealStage}
-                            onOpenItem={(item) => handleEditTodo(item.entityId)}
+                            onOpenItem={(item) => {
+                                if (item.entityType === 'deal_task') {
+                                    handleEditTodo(item.entityId);
+                                } else {
+                                    handleOpenRelated(`client-task-${item.entityId}`);
+                                }
+                            }}
                             enabled={isBoardView}
                         />
                     ) : filteredTodos.length > 0 ? (
@@ -845,13 +952,13 @@ export const TodosPage = () => {
                                                 <tr>
                                                     <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('type') || 'Type'}</th>
                                                     <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('stage')}</th>
-                                                    <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('callMethod') || 'Call Method'}</th>
+                                                    <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center hidden md:table-cell">{t('callMethod') || 'Call Method'}</th>
                                                     <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('clientName') || 'Client Name'}</th>
-                                                    <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('dealStage') || 'Deal Stage'}</th>
+                                                    <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center hidden lg:table-cell">{t('dealStage') || 'Deal Stage'}</th>
                                                     <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('employee') || 'Employee'}</th>
                                                     <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('reminderDate') || 'Reminder Date'}</th>
                                                     <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('notes')}</th>
-                                                    <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('createdAt')}</th>
+                                                    <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center hidden sm:table-cell">{t('createdAt')}</th>
                                                     <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('actions')}</th>
                                         </tr>
                                     </thead>
@@ -922,6 +1029,7 @@ export const TodosPage = () => {
                                             
                                             // Format reminder_date
                                             const reminderDate = (todo as any).reminderDate || (todo as any).reminder_date || null;
+                                            const overdue = activeTab === 'active' && isReminderOverdue(reminderDate);
                                             const formattedReminderDate = reminderDate ? (() => {
                                                 try {
                                                     const date = new Date(reminderDate);
@@ -960,7 +1068,7 @@ export const TodosPage = () => {
                                                         const notes = (todo as any).notes || '-';
                                             
                                 return (
-                                                            <tr key={todo.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
+                                                            <tr key={todo.id} className={`hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150 ${overdue ? 'bg-rose-50/40 dark:bg-rose-950/20' : ''}`}>
                                                                 <td className="px-4 py-4 whitespace-nowrap text-center">
                                                                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                                                                         taskType === 'client_task' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
@@ -986,7 +1094,7 @@ export const TodosPage = () => {
                                                             </span>
                                                         )}
                                                     </td>
-                                                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                                <td className="px-4 py-4 whitespace-nowrap text-center hidden md:table-cell">
                                                         {taskType === 'client_call' ? (
                                                             // Show call method for client calls
                                                             (() => {
@@ -994,7 +1102,7 @@ export const TodosPage = () => {
                                                                 const callMethodObj = callMethods.find(c => c.name === callMethodName);
                                                                 const callMethodColor = callMethodObj?.color || '#808080';
                                                                 
-                                                                const hexToRgb = (hex: string) => {
+                                                                const hexToRgbLocal = (hex: string) => {
                                                                     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
                                                                     return result ? {
                                                                         r: parseInt(result[1], 16),
@@ -1003,20 +1111,20 @@ export const TodosPage = () => {
                                                                     } : null;
                                                                 };
                                                                 
-                                                                const rgb = hexToRgb(callMethodColor);
-                                                                const bgColor = rgb 
-                                                                    ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
+                                                                const cmRgb = hexToRgbLocal(callMethodColor);
+                                                                const cmBg = cmRgb 
+                                                                    ? `rgba(${cmRgb.r}, ${cmRgb.g}, ${cmRgb.b}, 0.1)`
                                                                     : 'bg-gray-100 dark:bg-gray-700';
-                                                                const textColor = rgb
-                                                                    ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
+                                                                const cmText = cmRgb
+                                                                    ? `rgb(${cmRgb.r}, ${cmRgb.g}, ${cmRgb.b})`
                                                                     : 'text-gray-800 dark:text-gray-200';
                                                                 
                                                                 return (
                                                                     <span 
-                                                                        className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
-                                                                        style={rgb ? {
-                                                                            backgroundColor: bgColor,
-                                                                            color: textColor,
+                                                                        className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full whitespace-nowrap ${!cmRgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
+                                                                        style={cmRgb ? {
+                                                                            backgroundColor: cmBg,
+                                                                            color: cmText,
                                                                         } : undefined}
                                                                     >
                                                                         {callMethodName || '-'}
@@ -1029,39 +1137,64 @@ export const TodosPage = () => {
                                                         )}
                                                     </td>
                                                                 <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                                    <span className="text-sm font-medium text-gray-900 dark:text-white">{clientName || '-'}</span>
+                                                                    <button
+                                                                        type="button"
+                                                                        className="text-sm font-medium text-primary-700 dark:text-primary-300 hover:underline hover:text-primary-800 dark:hover:text-primary-200"
+                                                                        onClick={() => handleOpenRelated(todo.id)}
+                                                                    >
+                                                                        {clientName || '-'}
+                                                                    </button>
                                                                 </td>
-                                                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                                <td className="px-4 py-4 whitespace-nowrap text-center hidden lg:table-cell">
                                                                     <span className="text-sm text-gray-700 dark:text-gray-300">{dealStage}</span>
                                                                 </td>
                                                                 <td className="px-4 py-4 whitespace-nowrap text-center">
                                                                     <span className="text-sm text-gray-700 dark:text-gray-300">{displayEmployeeUsername}</span>
                                                                 </td>
                                                                 <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                                    <span className="text-sm text-gray-600 dark:text-gray-400">{formattedReminderDate}</span>
+                                                                    <span className={`text-sm tabular-nums ${overdue ? 'text-rose-600 dark:text-rose-400 font-medium' : 'text-gray-600 dark:text-gray-400'}`}>
+                                                                        {formattedReminderDate}
+                                                                    </span>
                                                                 </td>
                                                                 <td className="px-4 py-4 whitespace-nowrap text-center">
                                                                     <span className="text-sm text-gray-700 dark:text-gray-300 max-w-xs truncate block mx-auto">{notes}</span>
                                                                 </td>
-                                                                <td className="px-4 py-4 whitespace-nowrap text-center">
+                                                                <td className="px-4 py-4 whitespace-nowrap text-center hidden sm:table-cell">
                                                                     <span className="text-sm text-gray-600 dark:text-gray-400">{formattedCreatedAt}</span>
                                                                 </td>
                                                                 <td className="px-4 py-4 whitespace-nowrap text-center">
                                                                     <div className="flex items-center justify-center gap-1.5">
-                                            {activeTab === 'active' && (
-                                                                            <>
+                                                                                <Button
+                                                                                    variant="ghost"
+                                                                                    className="p-1.5 h-auto !text-blue-600 dark:!text-blue-400 hover:!bg-blue-50 dark:hover:!bg-blue-900/20 rounded-md transition-colors"
+                                                                                    onClick={() => handleOpenRelated(todo.id)}
+                                                                                    title={t('open') || 'Open'}
+                                                                                >
+                                                                                    <EyeIcon className="w-4 h-4" />
+                                                                                </Button>
                                                                                 {taskType === 'deal_task' && (
-                                                                                    <Button 
-                                                                                        variant="ghost" 
-                                                                                        className="p-1.5 h-auto !text-green-600 dark:!text-green-400 hover:!bg-green-50 dark:hover:!bg-green-900/20 rounded-md transition-colors" 
-                                                                                        onClick={() => handleCompleteTodo(todo.id)}
-                                                                                        title={t('complete') || 'Complete'}
-                                                                                        disabled={updateTaskMutation.isPending}
+                                                                                    <Button
+                                                                                        variant="ghost"
+                                                                                        className="p-1.5 h-auto !text-amber-600 dark:!text-amber-400 hover:!bg-amber-50 dark:hover:!bg-amber-900/20 rounded-md transition-colors"
+                                                                                        onClick={() => handleEditTodo(todo.id)}
+                                                                                        title={t('edit') || 'Edit'}
                                                                                     >
-                                                                                        <CheckIcon className="w-4 h-4" />
+                                                                                        <EditIcon className="w-4 h-4" />
                                                                                     </Button>
                                                                                 )}
-                                                                                {/* Edit functionality can be added later for client tasks/calls */}
+                                            {activeTab === 'active' && (
+                                                                            <>
+                                                                                {(taskType === 'deal_task' || !!reminderDate) && (
+                                                                                <Button 
+                                                                                    variant="ghost" 
+                                                                                    className="p-1.5 h-auto !text-green-600 dark:!text-green-400 hover:!bg-green-50 dark:hover:!bg-green-900/20 rounded-md transition-colors" 
+                                                                                    onClick={() => handleCompleteTodo(todo.id)}
+                                                                                    title={t('complete') || 'Complete'}
+                                                                                    disabled={isCompleting}
+                                                                                >
+                                                                                    <CheckIcon className="w-4 h-4" />
+                                                                                </Button>
+                                                                                )}
                                                                                 <Button 
                                                                                     variant="ghost" 
                                                                                     className="p-1.5 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 rounded-md transition-colors" 
@@ -1075,7 +1208,7 @@ export const TodosPage = () => {
                                             )}
                                             {activeTab === 'completed' && (
                                                                             <>
-                                                                <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full">
+                                                                <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full" title={t('completed') || 'Completed'}>
                                                                     <CheckIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
                                                 </div>
                                                                                 <Button 
@@ -1083,7 +1216,7 @@ export const TodosPage = () => {
                                                                                     className="p-1.5 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 rounded-md transition-colors" 
                                                                                     onClick={() => handleDeleteTodo(todo.id)}
                                                                                     title={t('delete') || 'Delete'}
-                                                                                    disabled={deleteTaskMutation.isPending}
+                                                                                    disabled={deleteTaskMutation.isPending || deleteClientTaskMutation.isPending || deleteClientCallMutation.isPending}
                                                                                 >
                                                                                     <TrashIcon className="w-4 h-4" />
                                                                                 </Button>
@@ -1161,13 +1294,18 @@ export const TodosPage = () => {
                             </div>
                         </Card>
                         ) : (
-                            <Card className="text-center py-10">
-                            <p className="text-gray-600 dark:text-gray-400">
+                            <Card className="text-center py-10 px-4">
+                            <p className="text-gray-600 dark:text-gray-400 mb-4">
                                 {selectedDate 
                                     ? `${t('noTasksForDate')} ${selectedDate.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits())}.`
                                     : (t('noTasksFound') || 'No tasks found.')
                                 }
                             </p>
+                            {activeTab === 'active' && (
+                                <Button onClick={() => setIsAddTodoModalOpen(true)}>
+                                    <PlusIcon className="w-4 h-4" /> {t('addTodo')}
+                                </Button>
+                            )}
                             </Card>
                         )}
                 </main>

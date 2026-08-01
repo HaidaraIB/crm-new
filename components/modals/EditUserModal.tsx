@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { isMedicalSpecialization } from '../../utils/medicalTranslationOverrides';
 import { Modal } from '../Modal';
@@ -11,6 +11,7 @@ import { useUpdateUser } from '../../hooks/useQueries';
 import { normalizeRoleForApi } from '../../utils/roles';
 import { validateEmailField, validatePhoneField, validatePasswordField, validateNameField } from '../../utils/formValidation';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const EDIT_USER_DOM_ID_MAP: Record<string, string> = {
     name: 'edit-user-name',
@@ -43,6 +44,48 @@ export const EditUserModal = () => {
     // Update user mutation
     const updateUserMutation = useUpdateUser();
     const loading = updateUserMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (
+        state: typeof formState,
+        user: NonNullable<typeof selectedUser>
+    ): Record<string, unknown> => {
+        const nameParts = state.name.trim().split(/\s+/);
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
+        const currentRole = normalizeRoleForApi(user.role);
+        const isAdmin = currentRole === 'admin';
+        const roleToSend = isAdmin ? 'admin' : (state.role?.toLowerCase() || 'employee');
+
+        const payload: Record<string, unknown> = {
+            first_name: firstName,
+            last_name: lastName,
+            username: user.username || '',
+            phone: state.phone,
+            email: state.email,
+            role: roleToSend,
+        };
+
+        if (state.password) {
+            payload.password = state.password;
+        }
+
+        if (
+            roleToSend === 'employee' ||
+            roleToSend === 'data_entry' ||
+            roleToSend === 'doctor' ||
+            roleToSend === 'reception'
+        ) {
+            payload.weekly_day_off =
+                state.weeklyDayOff === '' ? null : parseInt(state.weeklyDayOff, 10);
+        }
+        if (roleToSend === 'employee' || roleToSend === 'doctor') {
+            payload.can_delete_clients = state.canDeleteClients;
+        }
+
+        return payload;
+    };
 
     const [formState, setFormState] = useState({
         name: '',
@@ -102,7 +145,19 @@ export const EditUserModal = () => {
                     wdo !== undefined && wdo !== null ? String(wdo) : '',
                 canDeleteClients: Boolean(selectedUser.can_delete_clients),
             });
+            initialPayloadRef.current = buildPayload({
+                name: fullName,
+                phone: selectedUser.phone || '',
+                email: selectedUser.email || '',
+                password: '',
+                role: roleForForm,
+                weeklyDayOff:
+                    wdo !== undefined && wdo !== null ? String(wdo) : '',
+                canDeleteClients: Boolean(selectedUser.can_delete_clients),
+            }, selectedUser);
             setPasswordVisible(false);
+        } else {
+            initialPayloadRef.current = null;
         }
     }, [selectedUser, isEditUserModalOpen, isMedicalCompany]);
 
@@ -185,40 +240,16 @@ export const EditUserModal = () => {
         setErrors({});
 
         try {
-            // Split name into first_name and last_name
-            const nameParts = formState.name.trim().split(/\s+/);
-            const firstName = nameParts[0] || '';
-            const lastName = nameParts.slice(1).join(' ') || '';
-            
-            const currentRole = normalizeRoleForApi(selectedUser.role);
-            const isAdmin = currentRole === 'admin';
-            const roleToSend = isAdmin ? 'admin' : (formState.role?.toLowerCase() || 'employee');
-            
-            const payload: Record<string, unknown> = {
-                first_name: firstName,
-                last_name: lastName,
-                username: selectedUser.username || '',
-                phone: formState.phone,
-                email: formState.email,
-                password: formState.password || undefined,
-                role: roleToSend,
-            };
-            if (
-                roleToSend === 'employee' ||
-                roleToSend === 'data_entry' ||
-                roleToSend === 'doctor' ||
-                roleToSend === 'reception'
-            ) {
-                payload.weekly_day_off =
-                    formState.weeklyDayOff === '' ? null : parseInt(formState.weeklyDayOff, 10);
-            }
-            if (roleToSend === 'employee' || roleToSend === 'doctor') {
-                payload.can_delete_clients = formState.canDeleteClients;
+            const payload = buildPayload(formState, selectedUser);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, payload);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
             }
 
             await updateUserMutation.mutateAsync({
                 id: selectedUser.id,
-                data: payload as any,
+                data: patch as any,
             });
 
             // Close modal immediately and show success modal

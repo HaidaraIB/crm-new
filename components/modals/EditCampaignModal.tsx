@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { useUpdateCampaign } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -18,6 +19,14 @@ export const EditCampaignModal = () => {
     // Update campaign mutation
     const updateCampaignMutation = useUpdateCampaign();
     const isLoading = updateCampaignMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState, companyId: number): Record<string, unknown> => ({
+        name: state.name.trim(),
+        budget: Number(state.budget) || 0,
+        is_active: state.isActive,
+        company: companyId,
+    });
 
     const [formState, setFormState] = useState({
         name: '',
@@ -29,19 +38,27 @@ export const EditCampaignModal = () => {
 
     useEffect(() => {
         if (editingCampaign) {
-            // Handle both camelCase and snake_case from API
             const isActive = (editingCampaign as any).is_active !== undefined 
                 ? (editingCampaign as any).is_active 
                 : (editingCampaign.isActive !== undefined ? editingCampaign.isActive : true);
             
-            setFormState({
+            const initState = {
                 name: editingCampaign.name || '',
                 code: editingCampaign.code || '',
                 budget: editingCampaign.budget ? String(editingCampaign.budget) : '',
                 isActive: isActive,
-            });
+            };
+            setFormState(initState);
+            const companyId = currentUser?.company?.id;
+            if (companyId) {
+                initialPayloadRef.current = buildPayload(initState, companyId);
+            } else {
+                initialPayloadRef.current = null;
+            }
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingCampaign]);
+    }, [editingCampaign, currentUser?.company?.id]);
 
     const handleClose = () => {
         setIsEditCampaignModalOpen(false);
@@ -83,15 +100,16 @@ export const EditCampaignModal = () => {
         }
         
         try {
-            // Send data in snake_case format for API
+            const next = buildPayload(formState, companyId);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
+
             await updateCampaignMutation.mutateAsync({
                 id: editingCampaign.id,
-                data: {
-                    name: formState.name.trim(),
-                    budget: Number(formState.budget) || 0,
-                    is_active: formState.isActive, // Send as snake_case for API
-                    company: companyId,
-                }
+                data: patch,
             });
 
             // Close modal immediately and show success modal

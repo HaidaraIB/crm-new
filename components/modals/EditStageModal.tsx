@@ -1,11 +1,12 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { Button } from '../Button';
 import { Stage } from '../../types';
 import { useUpdateStage } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -17,6 +18,15 @@ export const EditStageModal = () => {
     // Update stage mutation
     const updateStageMutation = useUpdateStage();
     const loading = updateStageMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name,
+        description: state.description,
+        color: state.color,
+        company: currentUser?.company?.id,
+        is_default: state.isDefault,
+    });
 
     const [formState, setFormState] = useState({
         name: '',
@@ -50,15 +60,19 @@ export const EditStageModal = () => {
     useEffect(() => {
         if (editingStage) {
             const st = editingStage as Stage & { is_default?: boolean };
-            setFormState({
+            const initState = {
                 name: editingStage.name,
                 description: editingStage.description || '',
                 color: editingStage.color || '#808080',
                 isDefault: st.isDefault ?? st.is_default ?? false,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingStage]);
+    }, [editingStage, currentUser?.company?.id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;
@@ -86,15 +100,16 @@ export const EditStageModal = () => {
         }
 
         try {
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
+
             await updateStageMutation.mutateAsync({
                 id: editingStage.id,
-                data: {
-                    name: formState.name,
-                    description: formState.description,
-                    color: formState.color,
-                    company: currentUser.company.id,
-                    is_default: formState.isDefault,
-                }
+                data: patch,
             });
 
             handleClose();

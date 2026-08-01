@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -8,6 +8,7 @@ import { Checkbox } from '../Checkbox';
 import { Button } from '../Button';
 import { Service, ServicePackage } from '../../types';
 import { useUpdateServicePackage, useServices } from '../../hooks/useQueries';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -33,6 +34,17 @@ export const EditServicePackageModal = () => {
     // Update service package mutation
     const updateServicePackageMutation = useUpdateServicePackage();
     const loading = updateServicePackageMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name.trim(),
+        description: state.description?.trim() || '',
+        price: Number(state.price) || 0,
+        duration: state.duration?.trim() || '',
+        services: state.selectedServices,
+        company: currentUser?.company?.id || currentUser?.company_id,
+        is_active: state.isActive,
+    });
     
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -87,17 +99,21 @@ export const EditServicePackageModal = () => {
                     .filter((id): id is number => id !== undefined);
             }
 
-            setFormState({
+            const initState = {
                 name: editingServicePackage.name || '',
                 description: editingServicePackage.description || '',
                 price: editingServicePackage.price !== undefined && editingServicePackage.price !== null ? editingServicePackage.price.toString() : '',
                 duration: editingServicePackage.duration || '',
                 selectedServices: serviceIds,
                 isActive: editingServicePackage.isActive !== undefined ? editingServicePackage.isActive : true,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingServicePackage, services]);
+    }, [editingServicePackage, services, currentUser?.company?.id, currentUser?.company_id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;
@@ -129,18 +145,16 @@ export const EditServicePackageModal = () => {
         }
 
         try {
-            // Use service IDs directly (API expects IDs)
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
+
             await updateServicePackageMutation.mutateAsync({
                 id: editingServicePackage.id,
-                data: {
-                    name: formState.name.trim(),
-                    description: formState.description?.trim() || '',
-                    price: Number(formState.price) || 0,
-                    duration: formState.duration?.trim() || '',
-                    services: formState.selectedServices, // API expects service IDs
-                    company: currentUser?.company?.id || currentUser?.company_id,
-                    is_active: formState.isActive,
-                }
+                data: patch,
             });
 
             // Close modal immediately and show success modal

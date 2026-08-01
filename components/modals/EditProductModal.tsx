@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -9,6 +9,7 @@ import { Checkbox } from '../Checkbox';
 import { Product, ProductCategory, Supplier } from '../../types';
 import { useUpdateProduct, useProductCategories, useSuppliers } from '../../hooks/useQueries';
 import { normalizeRole } from '../../utils/roles';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -43,6 +44,35 @@ export const EditProductModal = () => {
     // Update product mutation
     const updateProductMutation = useUpdateProduct();
     const loading = updateProductMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => {
+        const selectedCategory = productCategories.find(cat => cat.name === state.category);
+        const selectedSupplier = state.supplier
+            ? suppliers.find(sup => sup.name === state.supplier)
+            : null;
+
+        const updateData: Record<string, unknown> = {
+            name: state.name.trim(),
+            description: state.description?.trim() || '',
+            price: Number(state.price) || 0,
+            cost: Number(state.cost) || 0,
+            stock: Number(state.stock) || 0,
+            category: selectedCategory?.id,
+            company: currentUser?.company?.id || currentUser?.company_id,
+            is_active: state.isActive,
+        };
+
+        if (selectedSupplier) {
+            updateData.supplier = selectedSupplier.id;
+        }
+
+        if (state.sku?.trim()) {
+            updateData.sku = state.sku.trim();
+        }
+
+        return updateData;
+    };
 
     const [formState, setFormState] = useState({
         name: '',
@@ -106,7 +136,7 @@ export const EditProductModal = () => {
                 supplierName = editingProduct.supplier;
             }
             
-            setFormState({
+            const initState = {
                 name: editingProduct.name || '',
                 description: editingProduct.description || '',
                 price: editingProduct.price !== undefined && editingProduct.price !== null ? editingProduct.price.toString() : '',
@@ -116,10 +146,14 @@ export const EditProductModal = () => {
                 supplier: supplierName,
                 sku: editingProduct.sku || '',
                 isActive: editingProduct.isActive !== undefined ? editingProduct.isActive : true,
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingProduct, productCategories, suppliers]);
+    }, [editingProduct, productCategories, suppliers, currentUser?.company?.id, currentUser?.company_id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;
@@ -151,36 +185,16 @@ export const EditProductModal = () => {
         }
 
         try {
-            // Find category and supplier by name to get their IDs
-            const selectedCategory = productCategories.find(cat => cat.name === formState.category);
-            const selectedSupplier = formState.supplier 
-                ? suppliers.find(sup => sup.name === formState.supplier)
-                : null;
-
-            const updateData: any = {
-                name: formState.name.trim(),
-                description: formState.description?.trim() || '',
-                price: Number(formState.price) || 0,
-                cost: Number(formState.cost) || 0,
-                stock: Number(formState.stock) || 0,
-                category: selectedCategory?.id,
-                company: currentUser?.company?.id || currentUser?.company_id,
-                is_active: formState.isActive,
-            };
-
-            // Only include supplier if it's selected
-            if (selectedSupplier) {
-                updateData.supplier = selectedSupplier.id;
-            }
-
-            // Only include sku if it's provided
-            if (formState.sku?.trim()) {
-                updateData.sku = formState.sku.trim();
+            const updateData = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, updateData);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
             }
 
             await updateProductMutation.mutateAsync({
                 id: editingProduct.id,
-                data: updateData
+                data: patch,
             });
 
             // Close modal immediately and show success modal

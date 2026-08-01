@@ -15,20 +15,8 @@ import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole } from '../../utils
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../LeadLocationMapPicker';
 import { buildLeadLocationApiBody } from '../../utils/leadLocation';
-import { validateLeadForm } from '../../utils/leadFormValidation';
-import { clearFieldError, mapApiFieldsToUiErrors } from '../../utils/formFieldErrors';
-
-const LEAD_API_FIELD_MAP: Record<string, string> = {
-    phone_number: 'phone',
-    phone_numbers: 'phone',
-    communication_way: 'communicationWay',
-    assigned_to: 'assignedTo',
-    lead_company_name: 'leadCompanyName',
-    budget_max: 'budgetMax',
-    interested_developer: 'interestedDeveloper',
-    interested_project: 'interestedProject',
-    interested_unit: 'interestedUnit',
-};
+import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../../utils/leadFormValidation';
+import { clearFieldError } from '../../utils/formFieldErrors';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -299,26 +287,7 @@ export const AddLeadModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating lead:', error);
-            const code = error?.code || error?.error_key;
-            if (code === 'employee_weekly_day_off') {
-                setErrors({
-                    assignedTo:
-                        t('employeeWeeklyDayOffAssignError')
-                        || error?.message
-                        || 'Cannot assign to this employee on their weekly day off.',
-                });
-                return;
-            }
-            if (error?.fields) {
-                const fieldErrors = mapApiFieldsToUiErrors(error.fields, t, LEAD_API_FIELD_MAP);
-                setErrors(
-                    Object.keys(fieldErrors).length > 0
-                        ? fieldErrors
-                        : { general: error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.' }
-                );
-                return;
-            }
-            setErrors({ general: error?.message || t('errorCreatingLead') || 'Failed to create lead. Please try again.' });
+            setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorCreatingLead'));
         }
     };
 
@@ -426,6 +395,7 @@ export const AddLeadModal = () => {
                                                 value={pn.phone_number}
                                                 onChange={(value) => handlePhoneNumberChange(index, 'phone_number', value)}
                                                 defaultCountry="IQ"
+                                                error={!!errors.phone}
                                             />
                                         </div>
                                         <div className="col-span-6 sm:col-span-2">
@@ -463,7 +433,7 @@ export const AddLeadModal = () => {
                                 ))}
                             </div>
                         )}
-                        {phoneNumbers.length > 0 && errors.phone && (
+                        {errors.phone && phoneNumbers.length > 0 && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
                         )}
                     </div>

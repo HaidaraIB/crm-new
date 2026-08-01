@@ -24,7 +24,7 @@ export const DEAL_STAGE_COLORS: Record<string, string> = {
     on_hold: '#eab308',
     won: '#22c55e',
     lost: '#ef4444',
-    cancelled: '#94a3b8',
+    cancelled: '#a855f7',
 };
 
 type DealsKanbanViewProps = {

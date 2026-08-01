@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -9,6 +9,7 @@ import { Supplier } from '../../types';
 import { useUpdateSupplier } from '../../hooks/useQueries';
 import { validateEmailField, validatePhoneField } from '../../utils/formValidation';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -34,6 +35,17 @@ export const EditSupplierModal = () => {
     // Update supplier mutation
     const updateSupplierMutation = useUpdateSupplier();
     const loading = updateSupplierMutation.isPending;
+    const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+
+    const buildPayload = (state: typeof formState): Record<string, unknown> => ({
+        name: state.name.trim(),
+        phone: state.phone?.trim() || '',
+        email: state.email?.trim() || '',
+        address: state.address?.trim() || '',
+        contact_person: state.contactPerson?.trim() || '',
+        specialization: state.specialization?.trim() || '',
+        company: currentUser?.company?.id || currentUser?.company_id,
+    });
     
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -70,17 +82,21 @@ export const EditSupplierModal = () => {
 
     useEffect(() => {
         if (editingSupplier) {
-            setFormState({
+            const initState = {
                 name: editingSupplier.name || '',
                 phone: editingSupplier.phone || '',
                 email: editingSupplier.email || '',
                 address: editingSupplier.address || '',
                 contactPerson: editingSupplier.contactPerson || '',
                 specialization: editingSupplier.specialization || '',
-            });
+            };
+            setFormState(initState);
+            initialPayloadRef.current = buildPayload(initState);
             setErrors({});
+        } else {
+            initialPayloadRef.current = null;
         }
-    }, [editingSupplier]);
+    }, [editingSupplier, currentUser?.company?.id, currentUser?.company_id]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
@@ -102,17 +118,16 @@ export const EditSupplierModal = () => {
         }
 
         try {
+            const next = buildPayload(formState);
+            const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
+            if (Object.keys(patch).length === 0) {
+                handleClose();
+                return;
+            }
+
             await updateSupplierMutation.mutateAsync({
                 id: editingSupplier.id,
-                data: {
-                    name: formState.name.trim(),
-                    phone: formState.phone?.trim() || '',
-                    email: formState.email?.trim() || '',
-                    address: formState.address?.trim() || '',
-                    contact_person: formState.contactPerson?.trim() || '',
-                    specialization: formState.specialization?.trim() || '',
-                    company: currentUser?.company?.id || currentUser?.company_id,
-                }
+                data: patch,
             });
 
             // Close modal immediately and show success modal

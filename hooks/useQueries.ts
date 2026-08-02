@@ -18,6 +18,7 @@ import {
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
+  getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI,
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
@@ -103,6 +104,7 @@ export const queryKeys = {
   whatsappChatMessages: (clientId?: number, phone?: string) =>
     ['whatsappChatMessages', clientId ?? null, phone ?? ''] as const,
   whatsAppConversations: ['whatsAppConversations'] as const,
+  whatsAppUnreadCount: ['whatsAppUnreadCount'] as const,
 };
 
 /** Cuts refetch bursts on data-heavy views (aligns with API UserRateThrottle). */
@@ -662,6 +664,37 @@ export const useWhatsAppConversations = (
     refetchInterval,
     enabled,
     ...rest,
+  });
+};
+
+/** Sidebar badge: unread inbound WhatsApp messages in the caller's ACL scope. */
+export const useWhatsAppUnreadCount = (
+  options?: Omit<UseQueryOptions<{ unread_count: number }, Error>, 'queryKey' | 'queryFn'> & {
+    refetchInterval?: number | false;
+    enabled?: boolean;
+  }
+) => {
+  const { refetchInterval = 15_000, enabled = true, ...rest } = options || {};
+  return useQuery({
+    queryKey: queryKeys.whatsAppUnreadCount,
+    queryFn: getWhatsAppUnreadCountAPI,
+    staleTime: 5 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
+    enabled,
+    select: (d) => d?.unread_count ?? 0,
+    ...rest,
+  });
+};
+
+export const useMarkWhatsAppConversationRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markWhatsAppConversationReadAPI,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppUnreadCount });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
+    },
   });
 };
 

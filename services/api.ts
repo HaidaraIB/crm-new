@@ -3231,6 +3231,36 @@ export const sendWhatsAppMessageAPI = async (data: {
   });
 };
 
+/**
+ * POST /api/integrations/whatsapp/send-media/
+ * Multipart: file, to, optional caption / client_id / is_voice_note
+ */
+export const sendWhatsAppMediaAPI = async (data: {
+  to: string;
+  file: File;
+  caption?: string;
+  client_id?: number;
+  phone_number_id?: string;
+  is_voice_note?: boolean;
+}) => {
+  const form = new FormData();
+  form.append('file', data.file);
+  form.append('to', data.to);
+  if (data.caption) form.append('caption', data.caption);
+  if (data.client_id != null) form.append('client_id', String(data.client_id));
+  if (data.phone_number_id) form.append('phone_number_id', data.phone_number_id);
+  if (data.is_voice_note) form.append('is_voice_note', 'true');
+  return apiRequest<any>('/integrations/whatsapp/send-media/', {
+    method: 'POST',
+    body: form,
+  });
+};
+
+/** Authenticated attachment download URL for a stored WhatsApp message. */
+export function getWhatsAppMessageAttachmentUrl(messageId: number): string {
+  return `${BASE_URL}/integrations/whatsapp/messages/${messageId}/attachment/`;
+}
+
 export type WhatsAppSessionWindowResponse = {
   in_session: boolean;
   last_inbound_at: string | null;
@@ -3301,6 +3331,16 @@ export interface LeadWhatsAppMessageResponse {
   created_by: number | null;
   created_by_username: string;
   created_at: string;
+  is_read?: boolean;
+  attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
+  attachment_mime?: string | null;
+  attachment_size?: number | null;
+  attachment_width?: number | null;
+  attachment_height?: number | null;
+  original_filename?: string | null;
+  attachment_url?: string | null;
+  is_voice_note?: boolean;
+  meta_media_id?: string | null;
 }
 
 /**
@@ -3382,9 +3422,41 @@ export const getWhatsAppContactByPhoneAPI = async (
  * قائمة العملاء الذين لديهم محادثات واتساب (مركز المراسلات)
  */
 export const getWhatsAppConversationsAPI = async (): Promise<
-  Array<{ id: number; name: string; phone_number: string; company_name: string }>
+  Array<{
+    id: number;
+    name: string;
+    phone_number: string;
+    company_name?: string;
+    lead_company_name?: string;
+    last_message_at?: string | null;
+    last_message_preview?: string;
+    assigned_to_id?: number | null;
+    unread_count?: number;
+  }>
 > => {
   return apiRequest<any[]>(`/integrations/whatsapp/conversations/`);
+};
+
+/** GET /api/integrations/whatsapp/unread-count/ — scoped to assignee for staff. */
+export const getWhatsAppUnreadCountAPI = async (): Promise<{ unread_count: number }> => {
+  return apiRequest<{ unread_count: number }>(`/integrations/whatsapp/unread-count/`);
+};
+
+/** POST /api/integrations/whatsapp/conversations/mark-read/ */
+export const markWhatsAppConversationReadAPI = async (params: {
+  clientId?: number;
+  phone?: string;
+}): Promise<{ marked: number; client_id?: number }> => {
+  const body: Record<string, string | number> = {};
+  if (typeof params.clientId === 'number') body.client = params.clientId;
+  if (params.phone) body.phone = params.phone;
+  return apiRequest<{ marked: number; client_id?: number }>(
+    `/integrations/whatsapp/conversations/mark-read/`,
+    {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }
+  );
 };
 
 export type TemplateButtonPayload = {

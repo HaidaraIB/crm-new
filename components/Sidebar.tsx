@@ -11,6 +11,7 @@ import { ChevronDownIcon, XIcon } from './icons';
 import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
+import { useWhatsAppUnreadCount } from '../hooks/useQueries';
 
 type SidebarItemProps = { 
     name: string; 
@@ -85,6 +86,14 @@ export const Sidebar = () => {
     const normalizedCurrentRole = normalizeRole(currentUser?.role);
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
     const isReceptionUser = normalizedCurrentRole === 'Reception';
+    const chatsNavVisible =
+        !isDataEntryUser &&
+        !isReceptionUser &&
+        (normalizedCurrentRole !== 'Supervisor' || canAccessPage('Chats'));
+    const { data: whatsappUnreadCount = 0 } = useWhatsAppUnreadCount({
+        enabled: Boolean(currentUser?.company?.id) && chatsNavVisible,
+        refetchInterval: 15_000,
+    });
 
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
@@ -288,6 +297,12 @@ export const Sidebar = () => {
                                 hasSubItems={!!subItems && subItems.length > 0}
                                 isOpen={isOpen}
                                 onClick={() => subItems && subItems.length ? handleToggleSubMenu(item.name) : void handleNavigation(item.name)}
+                                badgeCount={item.name === 'Chats' ? whatsappUnreadCount : undefined}
+                                badgeAriaLabel={
+                                    item.name === 'Chats' && whatsappUnreadCount > 0
+                                        ? `${whatsappUnreadCount} unread`
+                                        : undefined
+                                }
                             />
                             {subItems && subItems.length > 0 && isOpen && (
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>

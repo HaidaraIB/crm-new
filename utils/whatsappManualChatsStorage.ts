@@ -9,8 +9,14 @@ export type ManualChatMessage = {
   time: string;
   status?: ChatMessageStatus;
   /** How the message was sent (for resend). */
-  sendKind?: 'text' | 'template';
+  sendKind?: 'text' | 'template' | 'media';
   templateId?: number;
+  deliveryError?: string;
+  createdByUsername?: string;
+  attachmentKind?: 'image' | 'video' | 'audio' | 'document' | null;
+  attachmentUrl?: string | null;
+  attachmentFilename?: string | null;
+  isVoiceNote?: boolean;
 };
 
 type ManualConversation = { client: Record<string, unknown> };

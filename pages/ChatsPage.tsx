@@ -5,7 +5,7 @@ import { ChatToast } from '../components/ChatToast';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { WhatsAppChatLayout, type ChatBubbleMessage } from '../components/whatsapp/WhatsAppChatLayout';
 import { useAppContext } from '../context/AppContext';
-import { useConnectedAccounts, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
+import { useConnectedAccounts, useMarkWhatsAppConversationRead, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
 import {
   deleteWhatsAppConversationAPI,
   deleteWhatsAppMessageAPI,
@@ -13,10 +13,12 @@ import {
   getWhatsAppContactByPhoneAPI,
   getWhatsAppSessionWindowAPI,
   resolveLocalizedApiError,
+  sendWhatsAppMediaAPI,
   sendWhatsAppMessageAPI,
   sendWhatsAppTemplateAPI,
   type MessageTemplateType,
 } from '../services/api';
+import { compressImageForChat } from '../utils/compressImageForChat';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole } from '../utils/roles';
 import {
@@ -36,26 +38,57 @@ import {
 
 const SESSION_MS = 24 * 60 * 60 * 1000;
 
+function inferChatAttachmentKind(file: File): 'image' | 'video' | 'audio' | 'document' {
+  const t = (file.type || '').toLowerCase();
+  if (t.startsWith('image/')) return 'image';
+  if (t.startsWith('video/')) return 'video';
+  if (t.startsWith('audio/')) return 'audio';
+  return 'document';
+}
+
 function replaceTemplatePlaceholders(text: string, client: any, companyName: string): string {
-  if (!client) return text;
-  const customerName = (
-    client.name ||
-    client.contact_name ||
-    (client.first_name && client.last_name ? `${client.first_name} ${client.last_name}`.trim() : '') ||
+  if (!text) return text;
+  const customerNameRaw = (
+    client?.name ||
+    client?.contact_name ||
+    (client?.first_name && client?.last_name
+      ? `${client.first_name} ${client.last_name}`.trim()
+      : '') ||
     ''
   ).trim();
-  const leadCompany = String(client.lead_company_name || '').trim();
+  // "WhatsApp: 4477…" titles → use digits/phone as display name when no real name
+  const customerName = customerNameRaw.toLowerCase().startsWith('whatsapp:')
+    ? customerNameRaw.split(':').slice(1).join(':').trim() ||
+      String(client?.phone_number || client?.phone || '').trim()
+    : customerNameRaw;
+  const leadCompany = String(client?.lead_company_name || '').trim();
   const company = (companyName || '').trim() || leadCompany;
+  const phone = String(client?.phone_number || client?.phone || '').trim();
   const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const replacePlaceholder = (out: string, pattern: string, value: string) =>
+  const replaceBracket = (out: string, pattern: string, value: string) =>
     value ? out.replace(new RegExp(`\\[\\s*${escapeRegex(pattern)}\\s*\\]`, 'g'), value) : out;
+
   let out = text;
-  out = replacePlaceholder(out, 'اسم_العميل', customerName);
-  out = replacePlaceholder(out, 'اسم العميل', customerName);
-  out = replacePlaceholder(out, 'Customer Name', customerName);
-  out = replacePlaceholder(out, 'شركة', company);
-  out = replacePlaceholder(out, 'الشركة', company);
-  out = replacePlaceholder(out, 'Company', company);
+  out = replaceBracket(out, 'اسم_العميل', customerName);
+  out = replaceBracket(out, 'اسم العميل', customerName);
+  out = replaceBracket(out, 'Customer Name', customerName);
+  out = replaceBracket(out, 'شركة', company);
+  out = replaceBracket(out, 'الشركة', company);
+  out = replaceBracket(out, 'Company', company);
+  out = replaceBracket(out, 'الهاتف', phone);
+  out = replaceBracket(out, 'رقم_الهاتف', phone);
+  out = replaceBracket(out, 'Phone', phone);
+
+  // Meta-style {{1}}, {{2}}, … — fill from lead context (name, company, phone, …)
+  const positionalPool = [customerName, company, phone, leadCompany].map((v) =>
+    (v || '').trim()
+  );
+  out = out.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, numStr: string) => {
+    const idx = Math.max(0, parseInt(numStr, 10) - 1);
+    const value = positionalPool[idx] || positionalPool.find((v) => v) || '';
+    return value || '-';
+  });
+
   return out;
 }
 
@@ -98,6 +131,10 @@ export const ChatsPage: React.FC = () => {
   const manualChatsHydratedRef = useRef(false);
   const [optimisticMessages, setOptimisticMessages] = useState<ManualChatMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
+  const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
+  const [pendingIsVoiceNote, setPendingIsVoiceNote] = useState(false);
+  const [compressingAttachment, setCompressingAttachment] = useState(false);
+  const mediaResendFilesRef = useRef<Map<string, { file: File; isVoiceNote: boolean }>>(new Map());
   const [chatTemplateSendId, setChatTemplateSendId] = useState<number | ''>('');
   const [chatTemplateSending, setChatTemplateSending] = useState(false);
   const [isStartNewOpen, setIsStartNewOpen] = useState(false);
@@ -109,6 +146,9 @@ export const ChatsPage: React.FC = () => {
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
   const lastInboundKeyRef = useRef<string>('');
+  const markReadClientKeyRef = useRef<string>('');
+
+  const markConversationRead = useMarkWhatsAppConversationRead();
 
   const { data: accountsResponse } = useConnectedAccounts('whatsapp');
   const accounts = useMemo(() => {
@@ -211,8 +251,12 @@ export const ChatsPage: React.FC = () => {
       lastInboundKeyRef.current = key;
       void queryClient.invalidateQueries({ queryKey: ['whatsappSession'] });
       void refetchWaSession();
+      // Thread is open: new inbound should not keep the sidebar badge elevated.
+      if (typeof selectedChatLeadId === 'number') {
+        markConversationRead.mutate({ clientId: selectedChatLeadId });
+      }
     }
-  }, [leadWhatsAppMessages, queryClient, refetchWaSession]);
+  }, [leadWhatsAppMessages, queryClient, refetchWaSession, selectedChatLeadId, markConversationRead]);
 
   useEffect(() => {
     if (!selectedChatClient) return;
@@ -251,6 +295,29 @@ export const ChatsPage: React.FC = () => {
       cancelled = true;
     };
   }, [selectedChatPhone, selectedChatClient?.id, companyId]);
+
+  useEffect(() => {
+    if (!selectedChatClient) {
+      markReadClientKeyRef.current = '';
+      return;
+    }
+    if (isManualChatClient(selectedChatClient) && typeof selectedChatClient.id !== 'number') {
+      return;
+    }
+    const key =
+      typeof selectedChatClient.id === 'number'
+        ? `c:${selectedChatClient.id}`
+        : `p:${normalizeChatPhone(selectedChatClient)}`;
+    if (!key || key === 'p:' || markReadClientKeyRef.current === key) return;
+    markReadClientKeyRef.current = key;
+    if (typeof selectedChatClient.id === 'number') {
+      markConversationRead.mutate({ clientId: selectedChatClient.id });
+      return;
+    }
+    const phone = normalizeChatPhone(selectedChatClient);
+    if (!phone) return;
+    markConversationRead.mutate({ phone });
+  }, [selectedChatClient?.id, selectedChatPhone]);
 
   useEffect(() => {
     if (!leadWhatsAppMessages.length) return;
@@ -351,6 +418,8 @@ export const ChatsPage: React.FC = () => {
   const selectChatClient = (client: any) => {
     setChatToast(null);
     setComposerAlert(null);
+    setPendingAttachment(null);
+    setPendingIsVoiceNote(false);
     setSelectedChatClient(client);
     const phone = normalizeChatPhone(client);
     if (isManualChatClient(client)) {
@@ -427,7 +496,10 @@ export const ChatsPage: React.FC = () => {
   const sendOutbound = async (
     client: any,
     msgId: string,
-    payload: { kind: 'text'; body: string } | { kind: 'template'; templateId: number; previewBody: string }
+    payload:
+      | { kind: 'text'; body: string }
+      | { kind: 'template'; templateId: number; previewBody: string }
+      | { kind: 'media'; file: File; caption: string; isVoiceNote: boolean }
   ) => {
     const to = normalizeChatPhone(client);
     if (!to) {
@@ -441,6 +513,15 @@ export const ChatsPage: React.FC = () => {
           template_id: payload.templateId,
           client_id: typeof client.id === 'number' ? client.id : undefined,
         });
+      } else if (payload.kind === 'media') {
+        await sendWhatsAppMediaAPI({
+          to,
+          file: payload.file,
+          caption: payload.caption || undefined,
+          client_id: typeof client.id === 'number' ? client.id : undefined,
+          is_voice_note: payload.isVoiceNote,
+        });
+        mediaResendFilesRef.current.delete(msgId);
       } else {
         await sendWhatsAppMessageAPI({
           to,
@@ -468,7 +549,8 @@ export const ChatsPage: React.FC = () => {
   };
 
   const handleSendMessage = async () => {
-    if (!selectedChatClient || !messageInput.trim()) return;
+    if (!selectedChatClient) return;
+    if (!messageInput.trim() && !pendingAttachment) return;
     if (whatsappSendBlocked) {
       showAlert(t('whatsappReconnectRequired') || 'WhatsApp disconnected', 'warning');
       return;
@@ -483,8 +565,53 @@ export const ChatsPage: React.FC = () => {
       return;
     }
     const body = messageInput.trim();
+    let file = pendingAttachment;
+    const isVoice = pendingIsVoiceNote;
     setMessageInput('');
+    setPendingAttachment(null);
+    setPendingIsVoiceNote(false);
+
+    if (file && file.type.startsWith('image/') && file.type !== 'image/gif') {
+      setCompressingAttachment(true);
+      try {
+        file = await compressImageForChat(file);
+      } catch {
+        // keep original
+      } finally {
+        setCompressingAttachment(false);
+      }
+    }
+
     const msgId = newChatMessageId();
+    if (file) {
+      const kind = inferChatAttachmentKind(file);
+      const previewUrl = URL.createObjectURL(file);
+      mediaResendFilesRef.current.set(msgId, { file, isVoiceNote: isVoice });
+      pushOptimistic(selectedChatClient, (prev) => [
+        ...prev,
+        {
+          id: msgId,
+          body,
+          direction: 'out',
+          time: formatChatTime(),
+          status: 'sending',
+          sendKind: 'media',
+          createdByUsername: currentUser?.username,
+          attachmentKind: kind,
+          attachmentUrl: previewUrl,
+          attachmentFilename: file!.name,
+          isVoiceNote: isVoice,
+        },
+      ]);
+      await sendOutbound(selectedChatClient, msgId, {
+        kind: 'media',
+        file,
+        caption: body,
+        isVoiceNote: isVoice,
+      });
+      return;
+    }
+
     pushOptimistic(selectedChatClient, (prev) => [
       ...prev,
       {
@@ -495,7 +622,7 @@ export const ChatsPage: React.FC = () => {
         status: 'sending',
         sendKind: 'text',
         createdByUsername: currentUser?.username,
-      } as any,
+      },
     ]);
     await sendOutbound(selectedChatClient, msgId, { kind: 'text', body });
   };
@@ -555,17 +682,27 @@ export const ChatsPage: React.FC = () => {
           deliveryError: wa.delivery_error || undefined,
           createdByUsername: wa.created_by_username || null,
           apiId: wa.id,
+          attachmentKind: wa.attachment_kind || null,
+          attachmentUrl: wa.attachment_url || null,
+          attachmentFilename: wa.original_filename || null,
+          attachmentWidth: wa.attachment_width ?? null,
+          attachmentHeight: wa.attachment_height ?? null,
+          isVoiceNote: Boolean(wa.is_voice_note),
         };
       })
       .reverse();
     const optimistic: ChatBubbleMessage[] = optimisticMessages.map((m) => ({
-      id: m.id,
+      id: m.id!,
       body: m.body,
       direction: m.direction,
       time: m.time,
       status: m.status,
-      deliveryError: (m as any).deliveryError,
-      createdByUsername: (m as any).createdByUsername || currentUser?.username,
+      deliveryError: m.deliveryError,
+      createdByUsername: m.createdByUsername || currentUser?.username,
+      attachmentKind: m.attachmentKind,
+      attachmentUrl: m.attachmentUrl,
+      attachmentFilename: m.attachmentFilename,
+      isVoiceNote: m.isVoiceNote,
     }));
     return [...apiMsgs, ...optimistic];
   }, [leadWhatsAppMessages, optimisticMessages, language, currentUser?.username]);
@@ -621,7 +758,22 @@ export const ChatsPage: React.FC = () => {
     if (!selectedChatClient || !msg.id) return;
     setResendingMessageId(msg.id);
     try {
-      await sendOutbound(selectedChatClient, msg.id, { kind: 'text', body: msg.body });
+      const media = mediaResendFilesRef.current.get(msg.id);
+      pushOptimistic(selectedChatClient, (prev) =>
+        prev.map((m) =>
+          m.id === msg.id ? { ...m, status: 'sending' as const, deliveryError: undefined } : m
+        )
+      );
+      if (media) {
+        await sendOutbound(selectedChatClient, msg.id, {
+          kind: 'media',
+          file: media.file,
+          caption: msg.body || '',
+          isVoiceNote: media.isVoiceNote,
+        });
+      } else {
+        await sendOutbound(selectedChatClient, msg.id, { kind: 'text', body: msg.body });
+      }
     } finally {
       setResendingMessageId(null);
     }
@@ -666,6 +818,11 @@ export const ChatsPage: React.FC = () => {
             session: effectiveSession,
             displayNameBlockedHint,
             composerAlert,
+            pendingAttachment,
+            setPendingAttachment,
+            pendingIsVoiceNote,
+            setPendingIsVoiceNote,
+            compressingAttachment,
             onInsertQuickTemplate: (content, templateId) => {
               if (blockFreeText || whatsappSendBlocked) return;
               const resolved = replaceTemplatePlaceholders(content, selectedChatClient, companyName);

@@ -1,12 +1,10 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, Loader } from '../index';
-import {
-  WhatsAppFormatToolbar,
-  applyWhatsAppFormatToInput,
-  textLooksWhatsAppFormatted,
-  WhatsAppFormattedText,
-  type WhatsAppFormatKind,
-} from '../../utils/whatsappFormatting';
+import { MicrophoneIcon, PaperclipIcon } from '../icons';
+import { ChatPendingAttachmentChip } from '../chat/ChatPendingAttachmentChip';
+import { ChatVoiceRecordingBar } from '../chat/ChatVoiceRecordingBar';
+import { useChatVoiceRecorder } from '../../hooks/useChatVoiceRecorder';
+import { useAppContext } from '../../context/AppContext';
 import { WA_ALERT_ERROR, WA_ALERT_INFO, WA_ALERT_WARN, WA_COMPOSER_BG, WA_INPUT_SHELL, WA_SEND_BTN } from './whatsappChatTheme';
 import type { MessageTemplateType } from '../../services/api';
 
@@ -32,7 +30,38 @@ type Props = {
   displayNameBlockedHint?: string | null;
   composerAlert?: { variant: 'error' | 'warning' | 'info'; message: string } | null;
   onInsertQuickTemplate: (content: string, templateId?: number) => void;
+  pendingAttachment: File | null;
+  setPendingAttachment: (file: File | null) => void;
+  pendingIsVoiceNote?: boolean;
+  setPendingIsVoiceNote?: (v: boolean) => void;
+  compressingAttachment?: boolean;
 };
+
+const COMPOSER_MIN_H_PX = 32;
+const COMPOSER_MAX_H_PX = 160;
+
+/** Caret/base direction from UI language when empty, else first strong letter (ar → rtl, en → ltr). */
+function composerTextDir(text: string, uiIsRtl: boolean): 'ltr' | 'rtl' {
+  for (const ch of text) {
+    const code = ch.codePointAt(0);
+    if (code == null) continue;
+    if (
+      (code >= 0x0590 && code <= 0x08ff) ||
+      (code >= 0xfb1d && code <= 0xfdff) ||
+      (code >= 0xfe70 && code <= 0xfeff)
+    ) {
+      return 'rtl';
+    }
+    if (
+      (code >= 0x41 && code <= 0x5a) ||
+      (code >= 0x61 && code <= 0x7a) ||
+      (code >= 0xc0 && code <= 0x24f)
+    ) {
+      return 'ltr';
+    }
+  }
+  return uiIsRtl ? 'rtl' : 'ltr';
+}
 
 export const ChatComposer: React.FC<Props> = ({
   t,
@@ -50,35 +79,53 @@ export const ChatComposer: React.FC<Props> = ({
   displayNameBlockedHint,
   composerAlert,
   onInsertQuickTemplate,
+  pendingAttachment,
+  setPendingAttachment,
+  setPendingIsVoiceNote,
+  compressingAttachment = false,
 }) => {
+  const { language } = useAppContext();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [micError, setMicError] = useState<string | null>(null);
   const freeTextDisabled = whatsappSendBlocked || blockFreeText;
   const [showTemplates, setShowTemplates] = useState(false);
+  const isRtl = language === 'ar';
+  const textDir = composerTextDir(messageInput, isRtl);
+  const canSend = Boolean(messageInput.trim() || pendingAttachment);
+  const showMic = !canSend;
 
-  const applyFormat = (kind: WhatsAppFormatKind) => {
+  const {
+    voiceRecording,
+    voicePaused,
+    elapsedLabel,
+    startVoiceRecording,
+    stopVoiceRecording,
+    pauseVoiceRecording,
+    resumeVoiceRecording,
+    cancelVoiceRecording,
+  } = useChatVoiceRecorder({
+    enabled: !freeTextDisabled,
+    busy: freeTextDisabled || compressingAttachment,
+    onRecordingComplete: (file) => {
+      setPendingAttachment(file);
+      setPendingIsVoiceNote?.(true);
+    },
+    onError: (key) => setMicError(t(key) || key),
+  });
+
+  const resizeComposer = () => {
     const el = textareaRef.current;
     if (!el) return;
-    const { next, selectionStart, selectionEnd } = applyWhatsAppFormatToInput(
-      messageInput,
-      el.selectionStart,
-      el.selectionEnd,
-      kind
-    );
-    setMessageInput(next);
-    requestAnimationFrame(() => {
-      el.focus();
-      el.setSelectionRange(selectionStart, selectionEnd);
-    });
+    el.style.height = '0px';
+    const next = Math.min(Math.max(el.scrollHeight, COMPOSER_MIN_H_PX), COMPOSER_MAX_H_PX);
+    el.style.height = `${next}px`;
   };
 
-  useEffect(() => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${Math.min(el.scrollHeight, 88)}px`;
+  useLayoutEffect(() => {
+    resizeComposer();
   }, [messageInput]);
 
-  // Auto-expand templates panel when free-text is blocked (session closed).
   useEffect(() => {
     if (blockFreeText && !whatsappSendBlocked) setShowTemplates(true);
   }, [blockFreeText, whatsappSendBlocked]);
@@ -183,44 +230,123 @@ export const ChatComposer: React.FC<Props> = ({
         </div>
       )}
 
-      <div className="flex items-end gap-2">
-        <div className={WA_INPUT_SHELL}>
-          <WhatsAppFormatToolbar disabled={freeTextDisabled} onFormat={applyFormat} />
-          <textarea
-            ref={textareaRef}
-            rows={1}
-            value={messageInput}
-            onChange={(e) => setMessageInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (!freeTextDisabled && messageInput.trim()) onSend();
-              }
-            }}
-            disabled={freeTextDisabled}
-            placeholder={t('typeMessageWhatsApp')}
-            className="max-h-[88px] min-h-[32px] w-full resize-none border-0 bg-transparent px-1 py-1 text-sm text-gray-900 outline-none placeholder:text-gray-400 disabled:opacity-60 dark:text-gray-100"
-          />
-          {textLooksWhatsAppFormatted(messageInput) && (
-            <div className="px-1 pb-1">
-              <WhatsAppFormattedText
-                text={messageInput}
-                as="div"
-                className="break-words whitespace-pre-wrap text-sm text-gray-800 dark:text-gray-100"
+      {pendingAttachment ? (
+        <ChatPendingAttachmentChip
+          file={pendingAttachment}
+          onClear={() => {
+            setPendingAttachment(null);
+            setPendingIsVoiceNote?.(false);
+          }}
+          clearAriaLabel={t('teamChatClearAttachment') || 'Clear attachment'}
+        />
+      ) : null}
+      {compressingAttachment ? (
+        <p className="px-0.5 text-[10px] text-gray-500 dark:text-gray-400">
+          {t('teamChatCompressing') || 'Compressing…'}
+        </p>
+      ) : null}
+      {micError ? <p className="px-0.5 text-[10px] text-red-600 dark:text-red-400">{micError}</p> : null}
+
+      {/* dir=ltr keeps attach | input | action spacing stable under Arabic page RTL */}
+      <div className="flex w-full min-w-0 items-center gap-2" dir="ltr">
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) {
+              setPendingAttachment(f);
+              setPendingIsVoiceNote?.(false);
+            }
+            e.target.value = '';
+          }}
+        />
+        <div
+          className={`${WA_INPUT_SHELL} flex min-h-11 min-w-0 flex-1 items-center gap-0.5 rounded-3xl py-1.5 ${
+            voiceRecording ? 'ring-1 ring-red-400/40 border-red-400/50' : ''
+          }`}
+        >
+          {voiceRecording ? (
+            <ChatVoiceRecordingBar
+              variant="whatsapp"
+              elapsedLabel={elapsedLabel}
+              paused={voicePaused}
+              onPause={pauseVoiceRecording}
+              onResume={resumeVoiceRecording}
+              onStop={stopVoiceRecording}
+              onCancel={cancelVoiceRecording}
+              t={t}
+            />
+          ) : (
+            <>
+              <button
+                type="button"
+                className="flex size-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/10"
+                disabled={freeTextDisabled || compressingAttachment}
+                onClick={() => fileInputRef.current?.click()}
+                aria-label={t('teamChatAttach') || 'Attach'}
+                title={t('teamChatAttach') || 'Attach'}
+              >
+                <PaperclipIcon className="size-[1.2rem]" />
+              </button>
+              <textarea
+                ref={textareaRef}
+                rows={1}
+                value={messageInput}
+                onChange={(e) => {
+                  setMessageInput(e.target.value);
+                }}
+                onInput={resizeComposer}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    if (!freeTextDisabled && canSend) onSend();
+                  }
+                }}
+                disabled={freeTextDisabled || compressingAttachment}
+                placeholder={t('typeMessageWhatsApp')}
+                dir={textDir}
+                wrap="soft"
+                className={`custom-scrollbar box-border min-h-0 min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-1 py-1 text-sm leading-5 text-gray-900 outline-none placeholder:text-gray-400 disabled:opacity-60 dark:text-gray-100 [overflow-wrap:anywhere] whitespace-pre-wrap ${
+                  textDir === 'rtl' ? 'text-right' : 'text-left'
+                }`}
+                style={{ height: COMPOSER_MIN_H_PX, minHeight: COMPOSER_MIN_H_PX, maxHeight: COMPOSER_MAX_H_PX }}
               />
-            </div>
+            </>
           )}
         </div>
-        <Button
-          className={WA_SEND_BTN}
-          disabled={freeTextDisabled || !messageInput.trim()}
-          onClick={onSend}
-          aria-label={t('send') || 'Send'}
-        >
-          <svg viewBox="0 0 24 24" className="h-5 w-5 text-white" fill="currentColor" aria-hidden>
-            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-          </svg>
-        </Button>
+        {voiceRecording ? null : showMic ? (
+          <button
+            type="button"
+            className={`inline-flex shrink-0 items-center justify-center self-center ${WA_SEND_BTN}`}
+            disabled={freeTextDisabled || compressingAttachment}
+            onClick={() => {
+              setMicError(null);
+              void startVoiceRecording();
+            }}
+            aria-label={t('teamChatRecordVoice') || 'Record voice'}
+          >
+            <MicrophoneIcon className="h-5 w-5 text-white" />
+          </button>
+        ) : (
+          <Button
+            className={`${WA_SEND_BTN} !self-center`}
+            disabled={freeTextDisabled || !canSend || compressingAttachment}
+            onClick={onSend}
+            aria-label={t('send') || 'Send'}
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-5 w-5 text-white"
+              fill="currentColor"
+              aria-hidden
+            >
+              <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+            </svg>
+          </Button>
+        )}
       </div>
     </div>
   );

@@ -5,6 +5,8 @@
 
 export const WA_HEADER_BG = 'bg-primary dark:bg-primary-600';
 export const WA_HEADER_TEXT = 'text-white';
+/** Shared top bar height for conversation list + chat thread headers. */
+export const WA_HEADER_BAR = `${WA_HEADER_BG} flex h-14 shrink-0 items-center px-3`;
 export const WA_LIST_BG = 'bg-white dark:bg-gray-900';
 export const WA_LIST_HOVER = 'hover:bg-gray-50 dark:hover:bg-gray-800/80';
 export const WA_LIST_ACTIVE = 'bg-primary/10 dark:bg-primary/20';
@@ -31,6 +33,6 @@ export const WA_ALERT_ERROR =
 export const WA_ALERT_INFO =
   'rounded-md px-3 py-2 text-xs bg-sky-50 dark:bg-sky-950/40 text-sky-900 dark:text-sky-100 border border-sky-200/80 dark:border-sky-800/60';
 export const WA_INPUT_SHELL =
-  'flex-1 rounded-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-2 py-1.5 shadow-sm';
+  'min-w-0 flex-1 rounded-3xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-2 shadow-sm';
 export const WA_LAYOUT_SHELL =
   'flex flex-col md:flex-row min-h-[560px] h-[calc(100vh-11rem)] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900';

@@ -136,12 +136,18 @@ export function WhatsAppFormattedText({
   text,
   className,
   as: Tag = 'p',
+  dir,
 }: {
   text: string;
   className?: string;
   as?: 'p' | 'span' | 'div';
+  dir?: 'auto' | 'ltr' | 'rtl';
 }) {
-  return <Tag className={className}>{parseWhatsAppFormatting(text || '')}</Tag>;
+  return (
+    <Tag className={className} dir={dir}>
+      {parseWhatsAppFormatting(text || '')}
+    </Tag>
+  );
 }
 
 export type WhatsAppFormatKind = 'bold' | 'italic' | 'strike' | 'code';

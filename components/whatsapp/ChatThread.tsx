@@ -10,7 +10,7 @@ import { ChatMessageBubble, type ChatBubbleMessage } from './ChatMessageBubble';
 import { ChatComposer, type SessionInfo } from './ChatComposer';
 import {
   WA_AVATAR,
-  WA_HEADER_BG,
+  WA_HEADER_BAR,
   WA_HEADER_TEXT,
   WA_THREAD_WALLPAPER,
 } from './whatsappChatTheme';
@@ -64,23 +64,23 @@ export const ChatThread: React.FC<Props> = ({
 
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-gray-900">
-      <div className={`${WA_HEADER_BG} ${WA_HEADER_TEXT} flex shrink-0 items-center gap-3 px-3 py-2`}>
-        <div className={`${WA_AVATAR} !bg-white/20 !text-white !ring-white/30`}>
+      <div className={`${WA_HEADER_BAR} ${WA_HEADER_TEXT} gap-3`}>
+        <div className={`${WA_AVATAR} !h-9 !w-9 !bg-white/20 !text-white !ring-white/30`}>
           {getWhatsAppContactAvatarLabel(selectedClient)}
         </div>
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 leading-tight">
           {isPhoneLike(title) ? (
-            <PhoneText as="p" className="font-semibold truncate">
+            <PhoneText as="p" className="truncate text-sm font-semibold">
               {title}
             </PhoneText>
           ) : (
-            <p className="font-semibold truncate">{title}</p>
+            <p className="truncate text-sm font-semibold">{title}</p>
           )}
           {subtitle ? (
             isPhoneLike(subtitle) ? (
-              <PhoneText className="text-xs opacity-80 truncate block">{subtitle}</PhoneText>
+              <PhoneText className="block truncate text-xs opacity-80">{subtitle}</PhoneText>
             ) : (
-              <p className="text-xs opacity-80 truncate">{subtitle}</p>
+              <p className="truncate text-xs opacity-80">{subtitle}</p>
             )
           ) : null}
         </div>
@@ -88,27 +88,33 @@ export const ChatThread: React.FC<Props> = ({
           <button
             type="button"
             onClick={onRefresh}
-            className="p-2 rounded-full hover:bg-white/10"
+            className="rounded-full p-2 hover:bg-white/10"
             aria-label={t('refresh') || 'Refresh'}
           >
-            <RefreshIcon className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+            <RefreshIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
         )}
       </div>
 
-      <div className={`min-h-0 flex-1 space-y-2 overflow-y-auto custom-scrollbar px-3 py-2 ${WA_THREAD_WALLPAPER}`}>
-        {messages.map((msg) => (
-          <ChatMessageBubble
-            key={msg.id}
-            msg={msg}
-            t={t}
-            onDelete={onDeleteMessage}
-            onResend={onResendMessage}
-            deleting={deletingMessageId === msg.id}
-            resending={resendingMessageId === msg.id}
-          />
-        ))}
-        <div ref={bottomRef} />
+      <div
+        className={`flex min-h-0 flex-1 flex-col overflow-y-auto custom-scrollbar ${WA_THREAD_WALLPAPER}`}
+        dir="ltr"
+        lang="und"
+      >
+        <div className="mt-auto flex flex-col space-y-2 px-3 py-2">
+          {messages.map((msg) => (
+            <ChatMessageBubble
+              key={msg.id}
+              msg={msg}
+              t={t}
+              onDelete={onDeleteMessage}
+              onResend={onResendMessage}
+              deleting={deletingMessageId === msg.id}
+              resending={resendingMessageId === msg.id}
+            />
+          ))}
+          <div ref={bottomRef} />
+        </div>
       </div>
 
       <div className="shrink-0">

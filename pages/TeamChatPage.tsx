@@ -5,17 +5,18 @@ import { useAppContext } from '../context/AppContext';
 import { withLatinDigits } from '../utils/dateUtils';
 import { PageWrapper, Button, Modal } from '../components/index';
 import {
-  ArrowDownToLineIcon,
   ChatBubbleIcon,
   CheckIcon,
   ChevronDownIcon,
   MicrophoneIcon,
   PaperclipIcon,
   SendPlaneIcon,
-  SquareFillIcon,
 } from '../components/icons';
+import { ChatBlobMedia } from '../components/chat/ChatBlobMedia';
+import { ChatPendingAttachmentChip } from '../components/chat/ChatPendingAttachmentChip';
+import { ChatVoiceRecordingBar } from '../components/chat/ChatVoiceRecordingBar';
+import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
 import {
-  getAuthenticatedBinaryRequestHeaders,
   getTenantChatConversationsAPI,
   getTenantChatEligibleUsersAPI,
   getTenantChatMessagesAPI,
@@ -287,524 +288,6 @@ function replyTargetSnippet(m: TenantChatMessage, t: (key: string) => string): s
   return label || '';
 }
 
-function tenantChatBinaryUrlIdentity(absoluteUrl: string): string {
-  try {
-    const u = new URL(absoluteUrl);
-    return `${u.origin}${u.pathname}`;
-  } catch {
-    return absoluteUrl;
-  }
-}
-
-const TENANT_CHAT_BLOB_CACHE_MAX = 40;
-const tenantChatBlobUrlLru = new Map<string, string>();
-
-function tenantChatBlobCacheTake(identity: string): string | null {
-  const v = tenantChatBlobUrlLru.get(identity);
-  if (v == null) return null;
-  tenantChatBlobUrlLru.delete(identity);
-  tenantChatBlobUrlLru.set(identity, v);
-  return v;
-}
-
-function tenantChatBlobCachePut(identity: string, objectUrl: string) {
-  const existing = tenantChatBlobUrlLru.get(identity);
-  if (existing != null && existing !== objectUrl) {
-    tenantChatBlobUrlLru.delete(identity);
-    URL.revokeObjectURL(existing);
-  }
-  while (tenantChatBlobUrlLru.size >= TENANT_CHAT_BLOB_CACHE_MAX) {
-    const firstKey = tenantChatBlobUrlLru.keys().next().value as string | undefined;
-    if (firstKey == null) break;
-    const old = tenantChatBlobUrlLru.get(firstKey);
-    tenantChatBlobUrlLru.delete(firstKey);
-    if (old) URL.revokeObjectURL(old);
-  }
-  tenantChatBlobUrlLru.set(identity, objectUrl);
-}
-
-/** In-flow box so aspect-ratio reserves space; absolute overlays alone collapse in flex parents. */
-function TenantChatLazyAspectSizer({ aspectRatio }: { aspectRatio: string }) {
-  return (
-    <div
-      className="pointer-events-none block w-full max-h-64"
-      style={{ aspectRatio }}
-      aria-hidden
-    />
-  );
-}
-
-function formatChatAudioClock(seconds: number): string {
-  const s = Math.max(0, Math.floor(seconds));
-  const m = Math.floor(s / 60);
-  const r = s % 60;
-  return `${m}:${String(r).padStart(2, '0')}`;
-}
-
-function tenantChatVoiceWavePercents(seed: string, count: number): number[] {
-  let h = 0;
-  for (let i = 0; i < seed.length; i++) h = (Math.imul(h, 33) + seed.charCodeAt(i)) >>> 0;
-  const out: number[] = [];
-  let x = h || 1;
-  for (let i = 0; i < count; i++) {
-    x = (Math.imul(x, 1664525) + 1013904223) >>> 0;
-    out.push(32 + (x % 68));
-  }
-  return out;
-}
-
-const TENANT_CHAT_VOICE_RATES = [0.5, 1, 1.5, 2] as const;
-
-type TenantChatVoiceInlineProps = {
-  blobUrl: string;
-  mine: boolean;
-  t: (key: string) => string;
-  onIntrinsicLayout?: () => void;
-};
-
-function TenantChatVoiceInline({ blobUrl, mine, t, onIntrinsicLayout }: TenantChatVoiceInlineProps) {
-  const audioRef = useRef<HTMLAudioElement | null>(null);
-  const wavePercents = useMemo(() => tenantChatVoiceWavePercents(blobUrl, 34), [blobUrl]);
-  const [duration, setDuration] = useState(0);
-  const [position, setPosition] = useState(0);
-  const [playing, setPlaying] = useState(false);
-  const [rate, setRate] = useState<(typeof TENANT_CHAT_VOICE_RATES)[number]>(1);
-  const [scrubValue, setScrubValue] = useState<number | null>(null);
-  const scrubbingRef = useRef(false);
-
-  useEffect(() => {
-    setDuration(0);
-    setPosition(0);
-    setPlaying(false);
-    setScrubValue(null);
-    scrubbingRef.current = false;
-  }, [blobUrl]);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (!a) return;
-    const onMeta = () => {
-      const d = a.duration;
-      setDuration(Number.isFinite(d) && d > 0 ? d : 0);
-      onIntrinsicLayout?.();
-    };
-    const onTime = () => {
-      if (!scrubbingRef.current) setPosition(a.currentTime);
-    };
-    const syncPlaying = () => setPlaying(!a.paused);
-    const onEnded = () => {
-      setPlaying(false);
-      const d = a.duration;
-      if (Number.isFinite(d) && d > 0) setPosition(d);
-    };
-    a.addEventListener('loadedmetadata', onMeta);
-    a.addEventListener('durationchange', onMeta);
-    a.addEventListener('timeupdate', onTime);
-    a.addEventListener('play', syncPlaying);
-    a.addEventListener('pause', syncPlaying);
-    a.addEventListener('ended', onEnded);
-    return () => {
-      a.removeEventListener('loadedmetadata', onMeta);
-      a.removeEventListener('durationchange', onMeta);
-      a.removeEventListener('timeupdate', onTime);
-      a.removeEventListener('play', syncPlaying);
-      a.removeEventListener('pause', syncPlaying);
-      a.removeEventListener('ended', onEnded);
-    };
-  }, [blobUrl, onIntrinsicLayout]);
-
-  useEffect(() => {
-    const a = audioRef.current;
-    if (a) a.playbackRate = rate;
-  }, [rate]);
-
-  const dur = duration > 0 && Number.isFinite(duration) ? duration : 0;
-  const pos = scrubValue ?? position;
-  const progress = dur > 0 ? Math.min(1, Math.max(0, pos / dur)) : 0;
-  const filledBars = Math.min(wavePercents.length, Math.ceil(wavePercents.length * progress));
-
-  const timeFromClientX = useCallback(
-    (target: HTMLElement, clientX: number) => {
-      if (dur <= 0) return 0;
-      const r = target.getBoundingClientRect();
-      const frac = Math.min(1, Math.max(0, (clientX - r.left) / Math.max(1, r.width)));
-      return frac * dur;
-    },
-    [dur]
-  );
-
-  const shellClass = mine
-    ? 'bg-black/25 ring-1 ring-white/20 shadow-inner shadow-black/10'
-    : 'bg-gray-950/[0.06] ring-1 ring-gray-900/10 shadow-inner shadow-black/5 dark:bg-black/30 dark:ring-white/10 dark:shadow-black/20';
-
-  const playBtnClass = mine
-    ? 'bg-white text-primary shadow-sm shadow-black/10 hover:bg-white/95'
-    : 'bg-primary text-white shadow-sm shadow-primary/25 hover:opacity-95 dark:bg-primary-500';
-
-  const waveActiveClass = mine ? 'bg-white' : 'bg-primary dark:bg-primary-300';
-  const waveMutedClass = mine ? 'bg-white/30' : 'bg-gray-400/55 dark:bg-gray-500/55';
-
-  const rateLabel =
-    rate === 1 ? '1×' : rate === 0.5 ? '0.5×' : rate === 1.5 ? '1.5×' : '2×';
-
-  const cycleRate = () => {
-    const i = TENANT_CHAT_VOICE_RATES.indexOf(rate);
-    const next = TENANT_CHAT_VOICE_RATES[(i + 1) % TENANT_CHAT_VOICE_RATES.length];
-    setRate(next);
-  };
-
-  const togglePlay = () => {
-    const a = audioRef.current;
-    if (!a) return;
-    if (a.paused) void a.play().catch(() => {});
-    else a.pause();
-  };
-
-  return (
-    <div
-      dir="ltr"
-      className={`mt-1 flex w-full min-w-0 items-center gap-2.5 rounded-2xl px-2.5 py-2 ${shellClass}`}
-    >
-      <audio ref={audioRef} src={blobUrl} preload="metadata" className="hidden" />
-      <button
-        type="button"
-        onClick={togglePlay}
-        className={`flex size-9 shrink-0 items-center justify-center rounded-full outline-none ring-primary/40 transition-[transform,opacity] hover:scale-[1.03] focus-visible:ring-2 active:scale-[0.98] ${playBtnClass}`}
-        aria-label={playing ? t('teamChatVoicePauseAria') : t('teamChatVoicePlayAria')}
-      >
-        {playing ? (
-          <svg className="size-3.5" viewBox="0 0 24 24" aria-hidden>
-            <path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z" />
-          </svg>
-        ) : (
-          <svg className="ms-0.5 size-4" viewBox="0 0 24 24" aria-hidden>
-            <path fill="currentColor" d="M8 5v14l11-7z" />
-          </svg>
-        )}
-      </button>
-      <div className="flex min-w-0 flex-1 flex-col gap-1">
-        <div
-          role="slider"
-          tabIndex={0}
-          aria-valuemin={0}
-          aria-valuemax={Math.round(dur * 1000)}
-          aria-valuenow={Math.round(pos * 1000)}
-          aria-label={t('teamChatVoiceSeekAria')}
-          className={`flex h-7 cursor-pointer touch-none items-end justify-center gap-px rounded-md px-0.5 outline-none ring-primary/40 focus-visible:ring-2 ${
-            mine ? 'ring-offset-2 ring-offset-transparent' : ''
-          }`}
-          onKeyDown={(e) => {
-            const a = audioRef.current;
-            if (!a || dur <= 0) return;
-            if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-              e.preventDefault();
-              const step = Math.min(5, dur / 10);
-              const delta = e.key === 'ArrowLeft' ? -step : step;
-              a.currentTime = Math.min(dur, Math.max(0, a.currentTime + delta));
-              setPosition(a.currentTime);
-            }
-            if (e.key === ' ' || e.key === 'Enter') {
-              e.preventDefault();
-              togglePlay();
-            }
-          }}
-          onPointerDown={(e) => {
-            if (e.button !== 0 || dur <= 0) return;
-            (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
-            scrubbingRef.current = true;
-            setScrubValue(timeFromClientX(e.currentTarget, e.clientX));
-          }}
-          onPointerMove={(e) => {
-            const el = e.currentTarget as HTMLDivElement;
-            if (!el.hasPointerCapture(e.pointerId)) return;
-            setScrubValue(timeFromClientX(el, e.clientX));
-          }}
-          onPointerUp={(e) => {
-            const el = e.currentTarget as HTMLDivElement;
-            if (!el.hasPointerCapture(e.pointerId)) return;
-            el.releasePointerCapture(e.pointerId);
-            const tSeek = timeFromClientX(el, e.clientX);
-            const a = audioRef.current;
-            if (a && dur > 0) {
-              a.currentTime = tSeek;
-              setPosition(tSeek);
-            }
-            setScrubValue(null);
-            scrubbingRef.current = false;
-          }}
-          onPointerCancel={(e) => {
-            const el = e.currentTarget as HTMLDivElement;
-            if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-            setScrubValue(null);
-            scrubbingRef.current = false;
-          }}
-        >
-          {wavePercents.map((pct, i) => (
-            <div
-              key={i}
-              className={`min-h-[3px] flex-1 rounded-full transition-[height,background-color] ${i < filledBars ? waveActiveClass : waveMutedClass}`}
-              style={{ height: `${pct}%`, maxWidth: 4 }}
-            />
-          ))}
-        </div>
-        <div
-          className={`flex items-center justify-between gap-2 text-[10px] font-medium tabular-nums leading-none ${
-            mine ? 'text-white/85' : 'text-gray-600 dark:text-gray-300'
-          }`}
-        >
-          <span>
-            {formatChatAudioClock(pos)}
-            <span className={mine ? 'text-white/45' : 'text-gray-400 dark:text-gray-500'}>
-              {' '}
-              / {formatChatAudioClock(dur || pos)}
-            </span>
-          </span>
-          <button
-            type="button"
-            onClick={cycleRate}
-            className={`shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-semibold outline-none ring-primary/40 transition-colors hover:bg-black/10 focus-visible:ring-2 dark:hover:bg-white/10 ${
-              mine ? 'text-white/90 hover:bg-white/10' : 'text-primary dark:text-primary-300'
-            }`}
-            aria-label={t('teamChatVoicePlaybackSpeedAria')}
-          >
-            {rateLabel}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-type TenantChatBlobMediaProps = {
-  url: string;
-  kind: 'image' | 'video' | 'audio' | 'document';
-  mine: boolean;
-  filename?: string | null;
-  attachmentWidth?: number | null;
-  attachmentHeight?: number | null;
-  t: (key: string) => string;
-  /** Fires when intrinsic media layout is known (image decode, video metadata, etc.). */
-  onIntrinsicLayout?: () => void;
-};
-
-function TenantChatBlobMedia({
-  url,
-  kind,
-  mine,
-  filename,
-  attachmentWidth,
-  attachmentHeight,
-  t,
-  onIntrinsicLayout,
-}: TenantChatBlobMediaProps) {
-  const urlIdentity = useMemo(() => tenantChatBinaryUrlIdentity(url), [url]);
-  const lazyVisual = kind === 'image' || kind === 'video';
-
-  const aspectRatioCss =
-    attachmentWidth != null &&
-    attachmentHeight != null &&
-    attachmentWidth > 0 &&
-    attachmentHeight > 0
-      ? `${attachmentWidth} / ${attachmentHeight}`
-      : '16 / 9';
-
-  const hasKnownAspect =
-    attachmentWidth != null &&
-    attachmentHeight != null &&
-    attachmentWidth > 0 &&
-    attachmentHeight > 0;
-
-  const [blobUrl, setBlobUrl] = useState<string | null>(() =>
-    lazyVisual ? tenantChatBlobCacheTake(urlIdentity) : null
-  );
-  const [failed, setFailed] = useState(false);
-  const [lazyRequested, setLazyRequested] = useState(false);
-  const [lazyLoading, setLazyLoading] = useState(false);
-
-  useEffect(() => {
-    setFailed(false);
-    if (lazyVisual) {
-      const cached = tenantChatBlobCacheTake(urlIdentity);
-      setBlobUrl(cached);
-      setLazyRequested(false);
-      setLazyLoading(false);
-      return;
-    }
-    let cancelled = false;
-    let objectUrl: string | null = null;
-    setBlobUrl(null);
-    void (async () => {
-      try {
-        const r = await fetch(url, { headers: getAuthenticatedBinaryRequestHeaders() });
-        if (!r.ok || cancelled) return;
-        const blob = await r.blob();
-        if (cancelled) return;
-        objectUrl = URL.createObjectURL(blob);
-        setBlobUrl(objectUrl);
-      } catch {
-        if (!cancelled) setFailed(true);
-      }
-    })();
-    return () => {
-      cancelled = true;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [url, urlIdentity, lazyVisual]);
-
-  useEffect(() => {
-    if (!lazyVisual || !lazyRequested || blobUrl != null) return;
-    let cancelled = false;
-    void (async () => {
-      setLazyLoading(true);
-      try {
-        const r = await fetch(url, { headers: getAuthenticatedBinaryRequestHeaders() });
-        if (!r.ok || cancelled) {
-          if (!cancelled) {
-            setFailed(true);
-            setLazyRequested(false);
-          }
-          return;
-        }
-        const blob = await r.blob();
-        if (cancelled) return;
-        const objectUrl = URL.createObjectURL(blob);
-        tenantChatBlobCachePut(urlIdentity, objectUrl);
-        setBlobUrl(objectUrl);
-      } catch {
-        if (!cancelled) {
-          setFailed(true);
-          setLazyRequested(false);
-        }
-      } finally {
-        if (!cancelled) setLazyLoading(false);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [lazyVisual, lazyRequested, blobUrl, url, urlIdentity]);
-
-  const startLazyLoad = useCallback(() => {
-    const cached = tenantChatBlobCacheTake(urlIdentity);
-    if (cached != null) {
-      tenantChatBlobUrlLru.set(urlIdentity, cached);
-      setBlobUrl(cached);
-      return;
-    }
-    setLazyRequested(true);
-  }, [urlIdentity]);
-
-  if (failed) {
-    return (
-      <span className={`text-xs ${mine ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
-        {t('teamChatCouldNotLoad')}
-      </span>
-    );
-  }
-
-  const mediaShellClass = `relative w-full overflow-hidden rounded-lg max-h-64 ${
-    mine
-      ? 'bg-white/10'
-      : 'bg-gradient-to-br from-gray-200/90 to-gray-300/80 dark:from-gray-700/80 dark:to-gray-800/70'
-  }`;
-
-  if (lazyVisual && !blobUrl) {
-    return (
-      <div className={mediaShellClass}>
-        <TenantChatLazyAspectSizer aspectRatio={aspectRatioCss} />
-        <button
-          type="button"
-          className="absolute inset-0 z-10 flex w-full flex-col items-center justify-center gap-2 border-0 bg-transparent p-3 outline-none ring-primary/40 focus-visible:ring-2"
-          aria-label={t('teamChatTapToLoadAria')}
-          onClick={startLazyLoad}
-          disabled={lazyLoading}
-        >
-          <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-black/50 text-white shadow-md">
-            {lazyLoading ? (
-              <span className="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
-            ) : (
-              <ArrowDownToLineIcon className="size-5" aria-hidden />
-            )}
-          </span>
-          <span
-            className={`pointer-events-none max-w-[90%] text-center text-[11px] font-medium leading-snug ${
-              mine ? 'text-white/90' : 'text-gray-700 dark:text-gray-200'
-            }`}
-          >
-            {t('teamChatTapToLoad')}
-          </span>
-        </button>
-      </div>
-    );
-  }
-
-  if (!blobUrl) {
-    return <span className={`text-xs ${mine ? 'text-white/70' : 'text-gray-400'}`}>…</span>;
-  }
-
-  const docName = filename || 'download';
-
-  const lazyAspectBoxClass = 'relative w-full overflow-hidden rounded-lg max-h-64';
-
-  if (kind === 'image') {
-    if (hasKnownAspect) {
-      return (
-        <div className={lazyAspectBoxClass}>
-          <TenantChatLazyAspectSizer aspectRatio={aspectRatioCss} />
-          <img
-            src={blobUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-contain"
-            onLoad={onIntrinsicLayout}
-          />
-        </div>
-      );
-    }
-    return (
-      <img
-        src={blobUrl}
-        alt=""
-        className="max-h-64 w-full rounded-lg object-contain"
-        onLoad={onIntrinsicLayout}
-      />
-    );
-  }
-  if (kind === 'video') {
-    if (hasKnownAspect) {
-      return (
-        <div className={lazyAspectBoxClass}>
-          <TenantChatLazyAspectSizer aspectRatio={aspectRatioCss} />
-          <video
-            src={blobUrl}
-            controls
-            className="absolute inset-0 h-full w-full object-contain"
-            onLoadedMetadata={onIntrinsicLayout}
-          />
-        </div>
-      );
-    }
-    return (
-      <video
-        src={blobUrl}
-        controls
-        className="max-h-64 w-full rounded-lg"
-        onLoadedMetadata={onIntrinsicLayout}
-      />
-    );
-  }
-  if (kind === 'audio') {
-    return <TenantChatVoiceInline blobUrl={blobUrl} mine={mine} t={t} onIntrinsicLayout={onIntrinsicLayout} />;
-  }
-  return (
-    <a
-      href={blobUrl}
-      download={docName}
-      className={`inline-flex text-sm font-semibold underline ${mine ? 'text-white' : 'text-primary dark:text-primary-200'}`}
-    >
-      {t('teamChatDownload')}
-    </a>
-  );
-}
 
 export type TeamChatPageProps = {
   variant?: 'page' | 'dialog';
@@ -826,14 +309,10 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   const [forwardCaption, setForwardCaption] = useState('');
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
   const [compressingAttachment, setCompressingAttachment] = useState(false);
-  const [voiceRecording, setVoiceRecording] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
   /** True after a short quiet period while draft has text (typing indicator for peer). */
   const [draftTypingSignal, setDraftTypingSignal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const mediaChunksRef = useRef<Blob[]>([]);
-  const recordStreamRef = useRef<MediaStream | null>(null);
   const [msgActionsOpenId, setMsgActionsOpenId] = useState<number | null>(null);
   const [msgActionsMenuPos, setMsgActionsMenuPos] = useState<MsgFloatingMenuGeom | null>(null);
   const msgActionsMenuPortalRef = useRef<HTMLDivElement | null>(null);
@@ -1075,6 +554,22 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     return () => window.clearTimeout(tid);
   }, [draft, selectedId]);
 
+  const {
+    voiceRecording,
+    voicePaused,
+    elapsedLabel,
+    startVoiceRecording,
+    stopVoiceRecording,
+    pauseVoiceRecording,
+    resumeVoiceRecording,
+    cancelVoiceRecording,
+  } = useChatVoiceRecorder({
+    enabled: !!selectedId,
+    busy: sendMutation.isPending,
+    onRecordingComplete: (file) => setPendingAttachment(file),
+    onError: (key) => setMicError(t(key)),
+  });
+
   const derivedLocalPresence = useMemo((): TenantChatPeerPresenceAction => {
     if (voiceRecording) return 'recording_voice';
     if (compressingAttachment || pendingAttachment) return 'uploading_media';
@@ -1297,18 +792,6 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     setForwardCaption('');
     setPendingAttachment(null);
     setMicError(null);
-    const mr = mediaRecorderRef.current;
-    if (mr && mr.state === 'recording') {
-      try {
-        mr.stop();
-      } catch {
-        //
-      }
-    }
-    recordStreamRef.current?.getTracks().forEach((tr) => tr.stop());
-    recordStreamRef.current = null;
-    mediaRecorderRef.current = null;
-    setVoiceRecording(false);
     setThreadScrollFab({ show: false, peerBelow: 0 });
     lastMessageTailIdForScrollRef.current = null;
     pinnedToBottomRef.current = true;
@@ -1505,59 +988,6 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [msgActionsOpenId]);
-
-  const stopVoiceRecording = useCallback(() => {
-    const mr = mediaRecorderRef.current;
-    if (mr && mr.state === 'recording') {
-      try {
-        mr.stop();
-      } catch {
-        //
-      }
-    }
-  }, []);
-
-  const startVoiceRecording = useCallback(async () => {
-    if (!selectedId || voiceRecording || sendMutation.isPending) return;
-    setMicError(null);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      recordStreamRef.current = stream;
-      mediaChunksRef.current = [];
-      const mime = MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-        ? 'audio/webm;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm')
-          ? 'audio/webm'
-          : '';
-      const mr = mime
-        ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64000 })
-        : new MediaRecorder(stream, { audioBitsPerSecond: 64000 });
-      mr.ondataavailable = (ev) => {
-        if (ev.data.size > 0) mediaChunksRef.current.push(ev.data);
-      };
-      mr.onstop = () => {
-        stream.getTracks().forEach((tr) => tr.stop());
-        recordStreamRef.current = null;
-        mediaRecorderRef.current = null;
-        setVoiceRecording(false);
-        const chunks = mediaChunksRef.current.slice();
-        mediaChunksRef.current = [];
-        const blob = new Blob(chunks, { type: mr.mimeType || 'audio/webm' });
-        if (blob.size > 0) {
-          setPendingAttachment(new File([blob], `voice-${Date.now()}.webm`, { type: blob.type }));
-        }
-      };
-      mediaRecorderRef.current = mr;
-      mr.start(400);
-      setVoiceRecording(true);
-      window.setTimeout(() => {
-        stopVoiceRecording();
-      }, 4 * 60 * 1000);
-    } catch {
-      setMicError(t('teamChatMicDenied'));
-      setVoiceRecording(false);
-    }
-  }, [selectedId, sendMutation.isPending, stopVoiceRecording, t, voiceRecording]);
 
   const handleSend = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -2050,7 +1480,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                             : 'mb-2 w-[min(85vw,28rem)] max-w-full'
                                         }
                                       >
-                                        <TenantChatBlobMedia
+                                        <ChatBlobMedia
                                           url={m.attachment_url}
                                           kind={m.attachment_kind}
                                           mine={mine}
@@ -2179,19 +1609,12 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                   </div>
                 ) : null}
                 {pendingAttachment ? (
-                  <div className="mx-auto mb-2 flex max-w-3xl items-center gap-2 rounded-2xl border border-gray-200 bg-gray-50 px-3 py-2 text-sm dark:border-gray-600 dark:bg-gray-800/90">
-                    <PaperclipIcon className="size-4 shrink-0 text-gray-500 dark:text-gray-400" aria-hidden />
-                    <span className="min-w-0 flex-1 truncate text-gray-800 dark:text-gray-100">
-                      {pendingAttachment.name}
-                    </span>
-                    <button
-                      type="button"
-                      className="flex size-8 shrink-0 items-center justify-center rounded-full text-gray-500 hover:bg-black/10 dark:text-gray-400 dark:hover:bg-white/10"
-                      onClick={() => setPendingAttachment(null)}
-                      aria-label={t('teamChatClearAttachment')}
-                    >
-                      ×
-                    </button>
+                  <div className="mx-auto mb-2 max-w-3xl">
+                    <ChatPendingAttachmentChip
+                      file={pendingAttachment}
+                      onClear={() => setPendingAttachment(null)}
+                      clearAriaLabel={t('teamChatClearAttachment')}
+                    />
                   </div>
                 ) : null}
                 {compressingAttachment ? (
@@ -2215,60 +1638,65 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                     }}
                   />
                   <div
-                    className={`flex min-h-11 min-w-0 flex-1 items-end gap-0.5 rounded-[1.35rem] border bg-white px-1 py-1 shadow-sm dark:bg-gray-800/95 dark:shadow-none ${
+                    className={`flex min-h-11 min-w-0 flex-1 items-center gap-0.5 rounded-[1.35rem] border bg-white px-1 py-1 shadow-sm dark:bg-gray-800/95 dark:shadow-none ${
                       voiceRecording
                         ? 'border-red-400/70 ring-1 ring-red-400/30 dark:border-red-500/50'
                         : 'border-gray-200/95 dark:border-gray-600'
                     }`}
                   >
-                    <button
-                      type="button"
-                      className="flex size-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700/80"
-                      disabled={sendMutation.isPending || voiceRecording || compressingAttachment}
-                      onClick={() => fileInputRef.current?.click()}
-                      aria-label={t('teamChatAttach')}
-                      title={t('teamChatAttach')}
-                    >
-                      <PaperclipIcon className="size-[1.35rem]" />
-                    </button>
-                    <textarea
-                      ref={composerRef}
-                      rows={1}
-                      placeholder={t('teamChatMessagePlaceholder')}
-                      value={draft}
-                      onChange={(e) => setDraft(e.target.value)}
-                      onKeyDown={handleComposerKeyDown}
-                      disabled={sendMutation.isPending || compressingAttachment}
-                      autoComplete="off"
-                      dir={composerDir}
-                      className={`custom-scrollbar m-0 box-border max-h-[min(40vh,15rem)] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0.5 py-2 text-base leading-normal text-gray-900 shadow-none placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${chatAutoDirClass}`}
-                    />
-                    <button
-                      type="button"
-                      className={`flex size-10 shrink-0 items-center justify-center rounded-full transition-colors disabled:pointer-events-none disabled:opacity-40 ${
-                        voiceRecording
-                          ? 'bg-red-500/15 text-red-600 animate-pulse dark:bg-red-500/20 dark:text-red-400'
-                          : 'text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-700/80'
-                      }`}
-                      disabled={sendMutation.isPending || compressingAttachment}
-                      onClick={() => {
-                        if (voiceRecording) stopVoiceRecording();
-                        else void startVoiceRecording();
-                      }}
-                      aria-label={voiceRecording ? t('teamChatStopRecording') : t('teamChatRecordVoice')}
-                      title={voiceRecording ? t('teamChatStopRecording') : t('teamChatRecordVoice')}
-                    >
-                      {voiceRecording ? (
-                        <SquareFillIcon className="size-[1.1rem]" />
-                      ) : (
-                        <MicrophoneIcon className="size-[1.35rem]" />
-                      )}
-                    </button>
+                    {voiceRecording ? (
+                      <ChatVoiceRecordingBar
+                        variant="team"
+                        elapsedLabel={elapsedLabel}
+                        paused={voicePaused}
+                        onPause={pauseVoiceRecording}
+                        onResume={resumeVoiceRecording}
+                        onStop={stopVoiceRecording}
+                        onCancel={cancelVoiceRecording}
+                        t={t}
+                      />
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="flex size-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700/80"
+                          disabled={sendMutation.isPending || compressingAttachment}
+                          onClick={() => fileInputRef.current?.click()}
+                          aria-label={t('teamChatAttach')}
+                          title={t('teamChatAttach')}
+                        >
+                          <PaperclipIcon className="size-[1.35rem]" />
+                        </button>
+                        <textarea
+                          ref={composerRef}
+                          rows={1}
+                          placeholder={t('teamChatMessagePlaceholder')}
+                          value={draft}
+                          onChange={(e) => setDraft(e.target.value)}
+                          onKeyDown={handleComposerKeyDown}
+                          disabled={sendMutation.isPending || compressingAttachment}
+                          autoComplete="off"
+                          dir={composerDir}
+                          className={`custom-scrollbar m-0 box-border max-h-[min(40vh,15rem)] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0.5 py-2 text-base leading-normal text-gray-900 shadow-none placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${chatAutoDirClass}`}
+                        />
+                        <button
+                          type="button"
+                          className="flex size-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700/80"
+                          disabled={sendMutation.isPending || compressingAttachment}
+                          onClick={() => void startVoiceRecording()}
+                          aria-label={t('teamChatRecordVoice')}
+                          title={t('teamChatRecordVoice')}
+                        >
+                          <MicrophoneIcon className="size-[1.35rem]" />
+                        </button>
+                      </>
+                    )}
                   </div>
                   <Button
                     type="submit"
                     variant="primary"
                     disabled={
+                      voiceRecording ||
                       sendMutation.isPending ||
                       compressingAttachment ||
                       (!draft.trim() && !pendingAttachment)

@@ -68,27 +68,15 @@ export function PbxSettingsForm({
   const [isEnabled, setIsEnabled] = useState(false);
   const [autoLog, setAutoLog] = useState(true);
   const [screenPop, setScreenPop] = useState(true);
-  const [softphoneEnabled, setSoftphoneEnabled] = useState(false);
-  const [sipDomain, setSipDomain] = useState('');
-  const [sipPort, setSipPort] = useState('5162');
-  const [wssUri, setWssUri] = useState('');
-  const [stunServer, setStunServer] = useState('');
-  const [turnServer, setTurnServer] = useState('');
   const [showAmiPassword, setShowAmiPassword] = useState(false);
   const [extUserId, setExtUserId] = useState('');
   const [extNumber, setExtNumber] = useState('');
-  const [extSipPassword, setExtSipPassword] = useState('');
-  const [extSoftphoneEnabled, setExtSoftphoneEnabled] = useState(true);
-  const [showSipPassword, setShowSipPassword] = useState(false);
   const [downloading, setDownloading] = useState(false);
   const [addingExtension, setAddingExtension] = useState(false);
   const [extensionBusyId, setExtensionBusyId] = useState<number | null>(null);
   const [editingExtensionId, setEditingExtensionId] = useState<number | null>(null);
   const [editUserId, setEditUserId] = useState('');
   const [editNumber, setEditNumber] = useState('');
-  const [editSipPassword, setEditSipPassword] = useState('');
-  const [editSoftphoneEnabled, setEditSoftphoneEnabled] = useState(true);
-  const [showEditSipPassword, setShowEditSipPassword] = useState(false);
   const [savingExtensionEdit, setSavingExtensionEdit] = useState(false);
   const [healthRefreshNotice, setHealthRefreshNotice] = useState<'success' | 'error' | null>(null);
   const queryClient = useQueryClient();
@@ -128,12 +116,6 @@ export function PbxSettingsForm({
         setIsEnabled(!!data.is_enabled);
         setAutoLog(data.auto_log_calls !== false);
         setScreenPop(data.screen_pop_enabled !== false);
-        setSoftphoneEnabled(!!data.softphone_enabled);
-        setSipDomain(data.sip_domain || '');
-        setSipPort(String(data.sip_port || 5162));
-        setWssUri(data.wss_uri || '');
-        setStunServer(data.stun_server || '');
-        setTurnServer(data.turn_server || '');
       })
       .catch(() => { if (!cancelled) setErrors({ general: t('failedToLoadPbxSettings') }); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -162,12 +144,6 @@ export function PbxSettingsForm({
       is_enabled: isEnabled,
       auto_log_calls: autoLog,
       screen_pop_enabled: screenPop,
-      softphone_enabled: softphoneEnabled,
-      sip_domain: sipDomain,
-      sip_port: parseInt(sipPort, 10) || 5162,
-      wss_uri: wssUri,
-      stun_server: stunServer,
-      turn_server: turnServer,
     };
     if (amiPassword) payload.ami_password = amiPassword;
     updatePbxSettingsAPI(payload)
@@ -196,13 +172,10 @@ export function PbxSettingsForm({
     savePbxExtensionAPI({
       user_id: parseInt(extUserId, 10),
       extension: extNumber.trim(),
-      ...(extSipPassword ? { sip_password: extSipPassword } : {}),
-      softphone_enabled: extSoftphoneEnabled,
     })
       .then(() => {
         setExtUserId('');
         setExtNumber('');
-        setExtSipPassword('');
         refetchExtensions();
         refetchHealth();
       })
@@ -214,23 +187,16 @@ export function PbxSettingsForm({
     setEditingExtensionId(null);
     setEditUserId('');
     setEditNumber('');
-    setEditSipPassword('');
-    setEditSoftphoneEnabled(true);
-    setShowEditSipPassword(false);
   };
 
   const startEditExtension = (row: {
     id: number;
     user_id?: number;
     extension?: string;
-    softphone_enabled?: boolean;
   }) => {
     setEditingExtensionId(row.id);
     setEditUserId(row.user_id ? String(row.user_id) : '');
     setEditNumber(row.extension || '');
-    setEditSipPassword('');
-    setEditSoftphoneEnabled(row.softphone_enabled !== false);
-    setShowEditSipPassword(false);
     setErrors({});
   };
 
@@ -241,8 +207,6 @@ export function PbxSettingsForm({
     updatePbxExtensionAPI(editingExtensionId, {
       user_id: parseInt(editUserId, 10),
       extension: editNumber.trim(),
-      softphone_enabled: editSoftphoneEnabled,
-      ...(editSipPassword ? { sip_password: editSipPassword } : {}),
     })
       .then(() => {
         cancelEditExtension();
@@ -403,40 +367,6 @@ export function PbxSettingsForm({
           <input type="checkbox" checked={screenPop} onChange={(e) => setScreenPop(e.target.checked)} />
           <span>{t('pbxScreenPop')}</span>
         </label>
-        <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
-          <input type="checkbox" checked={softphoneEnabled} onChange={(e) => setSoftphoneEnabled(e.target.checked)} />
-          <span>{t('pbxSoftphoneEnabled')}</span>
-        </label>
-
-        {softphoneEnabled ? (
-          <div className="space-y-3 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
-            <h4 className="text-sm font-semibold text-gray-900 dark:text-gray-100">{t('pbxMobileSoftphoneServer')}</h4>
-            <div>
-              <FieldLabel>{t('pbxSipDomain')}</FieldLabel>
-              <Input value={sipDomain} onChange={(e) => setSipDomain(e.target.value)} placeholder={t('pbxSipDomainPlaceholder')} />
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>{t('pbxSipPort')}</FieldLabel>
-                <Input value={sipPort} onChange={(e) => setSipPort(e.target.value)} inputMode="numeric" />
-              </div>
-              <div>
-                <FieldLabel>{t('pbxWssUri')}</FieldLabel>
-                <Input value={wssUri} onChange={(e) => setWssUri(e.target.value)} placeholder={t('pbxWssUriPlaceholder')} dir="ltr" />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div>
-                <FieldLabel>{t('pbxStunServer')}</FieldLabel>
-                <Input value={stunServer} onChange={(e) => setStunServer(e.target.value)} dir="ltr" />
-              </div>
-              <div>
-                <FieldLabel>{t('pbxTurnServer')}</FieldLabel>
-                <Input value={turnServer} onChange={(e) => setTurnServer(e.target.value)} dir="ltr" />
-              </div>
-            </div>
-          </div>
-        ) : null}
 
         {errors.general ? <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p> : null}
         {success ? <p className="text-sm text-green-600 dark:text-green-400">{t('savedSuccessfully')}</p> : null}
@@ -508,42 +438,7 @@ export function PbxSettingsForm({
             <CheckRow ok={healthChecks.connector_online} label={t('pbxCheckConnector')} />
             <CheckRow ok={healthChecks.extensions_mapped} label={t('pbxCheckExtensions')} />
             <CheckRow ok={healthChecks.events_received} label={t('pbxCheckEvents')} />
-            {healthChecks.recordings_clear !== undefined ? (
-              <CheckRow ok={!!healthChecks.recordings_clear} label={t('pbxCheckRecordings')} />
-            ) : null}
           </ul>
-          {health?.recordings &&
-          (health.recordings.pending > 0 ||
-            health.recordings.failed > 0 ||
-            health.recordings.last_ready_at) ? (
-            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 px-4 py-3 space-y-1 text-sm">
-              <p className="font-medium text-gray-900 dark:text-gray-100">{t('pbxRecordingsPipeline')}</p>
-              {health.recordings.pending > 0 ? (
-                <p className="text-amber-700 dark:text-amber-300">
-                  {(t('pbxRecordingsPending') as string).replace(
-                    '{count}',
-                    String(health.recordings.pending)
-                  )}
-                </p>
-              ) : null}
-              {health.recordings.failed > 0 ? (
-                <p className="text-red-600 dark:text-red-400">
-                  {(t('pbxRecordingsFailed') as string).replace(
-                    '{count}',
-                    String(health.recordings.failed)
-                  )}
-                </p>
-              ) : null}
-              {health.recordings.last_ready_at ? (
-                <p className="text-gray-600 dark:text-gray-400">
-                  {(t('pbxRecordingsLastReady') as string).replace(
-                    '{time}',
-                    formatDateTimeToLocal(health.recordings.last_ready_at)
-                  )}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
           <div className="text-sm text-gray-600 dark:text-gray-400 space-y-2">
             <p>
               {t('pbxPushEventPrimaryHint')}{' '}
@@ -605,7 +500,7 @@ export function PbxSettingsForm({
         </div>
 
         <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/80 dark:bg-gray-800/40 p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(7rem,9rem)_minmax(0,1.4fr)_auto] gap-3 items-end">
+          <div className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_minmax(7rem,9rem)_auto] gap-3 items-end">
             <div>
               <FieldLabel>{t('user')}</FieldLabel>
               <select
@@ -632,28 +527,6 @@ export function PbxSettingsForm({
                 disabled={addingExtension}
               />
             </div>
-            <div className="min-w-0">
-              <FieldLabel>{t('pbxSipPassword')}</FieldLabel>
-              <div className="relative">
-                <input
-                  type={showSipPassword ? 'text' : 'password'}
-                  value={extSipPassword}
-                  onChange={(e) => setExtSipPassword(e.target.value)}
-                  placeholder={t('pbxSipPasswordPlaceholder')}
-                  autoComplete="new-password"
-                  disabled={addingExtension}
-                  className={`${inputClass} pe-10`}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowSipPassword((v) => !v)}
-                  className="absolute end-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                  title={showSipPassword ? t('hide') : t('show')}
-                >
-                  {showSipPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                </button>
-              </div>
-            </div>
             <Button
               onClick={handleAddExtension}
               disabled={!extUserId || !extNumber.trim() || addingExtension}
@@ -663,15 +536,6 @@ export function PbxSettingsForm({
               {addingExtension ? t('pbxAddingExtension') : t('add')}
             </Button>
           </div>
-          <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200 mt-2">
-            <input
-              type="checkbox"
-              checked={extSoftphoneEnabled}
-              onChange={(e) => setExtSoftphoneEnabled(e.target.checked)}
-              disabled={addingExtension}
-            />
-            <span>{t('pbxSoftphoneUserEnabled')}</span>
-          </label>
         </div>
 
         <div className="relative rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
@@ -685,10 +549,9 @@ export function PbxSettingsForm({
             </div>
           ) : (
             <>
-              <div className="hidden sm:grid sm:grid-cols-4 sm:justify-items-center gap-4 px-4 py-2.5 bg-gray-100/90 dark:bg-gray-800/90 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 text-center">
+              <div className="hidden sm:grid sm:grid-cols-3 sm:justify-items-center gap-4 px-4 py-2.5 bg-gray-100/90 dark:bg-gray-800/90 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 text-center">
                 <span className="w-full">{t('user')}</span>
                 <span className="w-full">{t('extension')}</span>
-                <span className="w-full">{t('pbxSoftphoneStatus')}</span>
                 <span className="w-full">{t('pbxExtensionActions')}</span>
               </div>
               <ul className={`divide-y divide-gray-200 dark:divide-gray-700 ${extensionsFetching ? 'opacity-60 pointer-events-none' : ''}`}>
@@ -728,42 +591,7 @@ export function PbxSettingsForm({
                               disabled={savingExtensionEdit}
                             />
                           </div>
-                          <div className="sm:col-span-2 min-w-0">
-                            <FieldLabel>{t('pbxSipPassword')}</FieldLabel>
-                            <div className="relative">
-                              <input
-                                type={showEditSipPassword ? 'text' : 'password'}
-                                value={editSipPassword}
-                                onChange={(e) => setEditSipPassword(e.target.value)}
-                                placeholder={
-                                  row.sip_password_masked
-                                    ? t('pbxSipPasswordKeepHint')
-                                    : t('pbxSipPasswordPlaceholder')
-                                }
-                                autoComplete="new-password"
-                                disabled={savingExtensionEdit}
-                                className={`${inputClass} pe-10`}
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowEditSipPassword((v) => !v)}
-                                className="absolute end-2 top-1/2 -translate-y-1/2 p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
-                                title={showEditSipPassword ? t('hide') : t('show')}
-                              >
-                                {showEditSipPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                              </button>
-                            </div>
-                          </div>
                         </div>
-                        <label className="flex items-center gap-2 text-sm text-gray-800 dark:text-gray-200">
-                          <input
-                            type="checkbox"
-                            checked={editSoftphoneEnabled}
-                            onChange={(e) => setEditSoftphoneEnabled(e.target.checked)}
-                            disabled={savingExtensionEdit}
-                          />
-                          <span>{t('pbxSoftphoneUserEnabled')}</span>
-                        </label>
                         <div className="flex flex-wrap gap-2 justify-end">
                           <Button
                             type="button"
@@ -784,7 +612,7 @@ export function PbxSettingsForm({
                         </div>
                       </div>
                     ) : (
-                      <div className="grid grid-cols-1 sm:grid-cols-4 sm:justify-items-center gap-3 sm:gap-4 sm:items-center text-center">
+                      <div className="grid grid-cols-1 sm:grid-cols-3 sm:justify-items-center gap-3 sm:gap-4 sm:items-center text-center">
                         <div className="flex w-full flex-col items-center justify-center min-w-0">
                           <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden mb-1">{t('user')}</p>
                           <p className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate max-w-full">
@@ -798,18 +626,6 @@ export function PbxSettingsForm({
                             dir="ltr"
                           >
                             {row.extension}
-                          </span>
-                        </div>
-                        <div className="flex w-full flex-col items-center justify-center">
-                          <p className="text-xs text-gray-500 dark:text-gray-400 sm:hidden mb-1">{t('pbxSoftphoneStatus')}</p>
-                          <span
-                            className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
-                              row.softphone_enabled !== false
-                                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
-                                : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
-                            }`}
-                          >
-                            {row.softphone_enabled !== false ? t('pbxSoftphoneActive') : t('pbxSoftphoneInactive')}
                           </span>
                         </div>
                         <div className="flex w-full flex-col items-center justify-center">

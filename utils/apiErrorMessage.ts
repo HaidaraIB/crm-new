@@ -15,6 +15,7 @@ const API_ERROR_CODE_TO_KEY: Partial<Record<string, TranslationKey>> = {
   pbx_no_phone: 'errorPbxNoPhoneNumber',
   pbx_lead_not_in_company: 'errorPbxLeadNotInCompany',
   pbx_user_not_in_company: 'errorPbxUserNotInCompany',
+  whatsapp_voice_note_requires_ogg: 'whatsapp_voice_note_requires_ogg',
 };
 
 const API_ERROR_MESSAGE_TO_KEY: Partial<Record<string, TranslationKey>> = {
@@ -32,6 +33,10 @@ const API_ERROR_MESSAGE_TO_KEY: Partial<Record<string, TranslationKey>> = {
   'Lead not in your company': 'errorPbxLeadNotInCompany',
   'User must belong to your company.': 'errorPbxUserNotInCompany',
   'User must belong to your company': 'errorPbxUserNotInCompany',
+  'Voice notes require OGG/Opus. Install ffmpeg on the server or record in a browser that supports audio/ogg.':
+    'whatsapp_voice_note_requires_ogg',
+  'Voice notes require OGG/Opus. Install ffmpeg on the server or record in a browser that supports audio/ogg':
+    'whatsapp_voice_note_requires_ogg',
 };
 
 function normalizeApiMessage(message: string): string {

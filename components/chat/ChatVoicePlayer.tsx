@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { translations } from '../../constants';
 
 const VOICE_RATES = [0.5, 1, 1.5, 2] as const;
 
@@ -121,7 +122,7 @@ function resolveAudioDuration(audio: HTMLAudioElement): Promise<number> {
 export type ChatVoicePlayerProps = {
   blobUrl: string;
   mine: boolean;
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   onIntrinsicLayout?: () => void;
 };
 

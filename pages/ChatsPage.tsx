@@ -2,8 +2,15 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IntegrationPlatformIcon } from '../components/integrations/IntegrationPlatformIcon';
 import { ChatToast } from '../components/ChatToast';
+import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
+import {
+  buildChatMediaAlbum,
+  findChatMediaAlbumIndex,
+  type ChatMediaAlbumItem,
+} from '../components/chat/chatMediaAlbum';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { WhatsAppChatLayout, type ChatBubbleMessage } from '../components/whatsapp/WhatsAppChatLayout';
+import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { useAppContext } from '../context/AppContext';
 import { useConnectedAccounts, useMarkWhatsAppConversationRead, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
 import {
@@ -113,7 +120,9 @@ export const ChatsPage: React.FC = () => {
     setIsAlertModalOpen,
     setConfirmDeleteConfig,
     setIsConfirmDeleteModalOpen,
+    openCallsFiltered,
   } = useAppContext();
+  const whatsappCalling = useWhatsAppCallingOptional();
   const queryClient = useQueryClient();
   const companyId = currentUser?.company?.id as number | string | undefined;
   const companyName = currentUser?.company?.name || '';
@@ -145,6 +154,10 @@ export const ChatsPage: React.FC = () => {
   } | null>(null);
   const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
   const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
+  const [mediaViewer, setMediaViewer] = useState<{
+    items: ChatMediaAlbumItem[];
+    index: number;
+  } | null>(null);
   const lastInboundKeyRef = useRef<string>('');
   const markReadClientKeyRef = useRef<string>('');
 
@@ -490,6 +503,10 @@ export const ChatsPage: React.FC = () => {
       setChatToast({ message: t('whatsappContactNotFound') || 'Contact not found', variant: 'warning' });
       return;
     }
+    if (key === 'whatsapp_voice_note_requires_ogg') {
+      showAlert(t('whatsapp_voice_note_requires_ogg'), 'error');
+      return;
+    }
     showAlert(resolveLocalizedApiError(e, t, t('error') || 'Error'), 'error');
   };
 
@@ -707,6 +724,25 @@ export const ChatsPage: React.FC = () => {
     return [...apiMsgs, ...optimistic];
   }, [leadWhatsAppMessages, optimisticMessages, language, currentUser?.username]);
 
+  const mediaAlbum = useMemo(
+    () =>
+      buildChatMediaAlbum(
+        threadMessages.map((m) => ({
+          id: m.id,
+          kind: m.attachmentKind,
+          url: m.attachmentUrl,
+          filename: m.attachmentFilename,
+          width: m.attachmentWidth,
+          height: m.attachmentHeight,
+        }))
+      ),
+    [threadMessages]
+  );
+
+  useEffect(() => {
+    setMediaViewer(null);
+  }, [selectedChatClient?.id]);
+
   const handleDeleteConversation = (client: any) => {
     const phone = normalizeChatPhone(client);
     const clientId = typeof client.id === 'number' ? client.id : undefined;
@@ -800,10 +836,55 @@ export const ChatsPage: React.FC = () => {
             void refetchLeadWhatsApp();
             void refetchWaSession();
           }}
+          onWhatsAppCall={() => {
+            if (!selectedChatClient || !whatsappCalling) return;
+            if (whatsappCalling.isStartingOutbound) return;
+            const phone =
+              selectedChatClient.phone_number ||
+              selectedChatClient.phone ||
+              selectedChatClient.manual_phone ||
+              '';
+            if (!phone) return;
+            void whatsappCalling.startOutboundCall({
+              to: String(phone),
+              clientId:
+                typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined,
+            });
+          }}
+          isWhatsAppCalling={Boolean(
+            whatsappCalling?.isStartingOutbound ||
+              whatsappCalling?.phase === 'connecting' ||
+              whatsappCalling?.phase === 'ringing'
+          )}
+          onViewCalls={() => {
+            if (!selectedChatClient) return;
+            const id =
+              typeof selectedChatClient.id === 'number'
+                ? selectedChatClient.id
+                : Number(selectedChatClient.id);
+            if (!Number.isFinite(id) || id <= 0 || isManualChatClient(selectedChatClient)) {
+              openCallsFiltered({
+                search: String(
+                  selectedChatClient.phone_number ||
+                    selectedChatClient.phone ||
+                    selectedChatClient.manual_phone ||
+                    ''
+                ).replace(/\s+/g, ''),
+              });
+              return;
+            }
+            openCallsFiltered({ clientId: String(id) });
+          }}
           onDeleteMessage={handleDeleteMessage}
           onResendMessage={handleResend}
           deletingMessageId={deletingMessageId}
           resendingMessageId={resendingMessageId}
+          onOpenMedia={(msg) => {
+            setMediaViewer({
+              items: mediaAlbum,
+              index: findChatMediaAlbumIndex(mediaAlbum, String(msg.id)),
+            });
+          }}
           composerProps={{
             messageInput,
             setMessageInput,
@@ -823,6 +904,21 @@ export const ChatsPage: React.FC = () => {
             pendingIsVoiceNote,
             setPendingIsVoiceNote,
             compressingAttachment,
+            onOpenPendingMedia: (_url, kind) => {
+              if (!pendingAttachment) return;
+              const ownUrl = URL.createObjectURL(pendingAttachment);
+              setMediaViewer({
+                items: [
+                  {
+                    id: 'pending-attachment',
+                    kind,
+                    url: ownUrl,
+                    filename: pendingAttachment.name,
+                  },
+                ],
+                index: 0,
+              });
+            },
             onInsertQuickTemplate: (content, templateId) => {
               if (blockFreeText || whatsappSendBlocked) return;
               const resolved = replaceTemplatePlaceholders(content, selectedChatClient, companyName);
@@ -847,6 +943,21 @@ export const ChatsPage: React.FC = () => {
           onDismiss={() => setChatToast(null)}
         />
       )}
+      {mediaViewer && mediaViewer.items.length > 0 ? (
+        <ChatMediaViewer
+          items={mediaViewer.items}
+          initialIndex={mediaViewer.index}
+          onClose={() => {
+            for (const it of mediaViewer.items) {
+              if (it.id === 'pending-attachment' && it.url.startsWith('blob:')) {
+                URL.revokeObjectURL(it.url);
+              }
+            }
+            setMediaViewer(null);
+          }}
+          t={t}
+        />
+      ) : null}
     </div>
   );
 };

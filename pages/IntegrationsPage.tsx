@@ -7,7 +7,7 @@ import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, Se
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { CheckIcon, EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page } from '../types';
-import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, getMujebConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, type MetaHealthResponse } from '../services/api';
+import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, getMujebConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, enableWhatsAppCallingAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import {
     WhatsAppFormattedText,
@@ -891,6 +891,7 @@ export const IntegrationsPage = () => {
     const [submittingTemplateId, setSubmittingTemplateId] = useState<number | null>(null);
     const [syncingTemplates, setSyncingTemplates] = useState(false);
     const [syncingPhoneAccountId, setSyncingPhoneAccountId] = useState<number | null>(null);
+    const [enablingCallingAccountId, setEnablingCallingAccountId] = useState<number | null>(null);
     const [isEditTemplateOpen, setIsEditTemplateOpen] = useState(false);
     const [templateSearch, setTemplateSearch] = useState('');
     const [isStartNewConversationOpen, setIsStartNewConversationOpen] = useState(false);
@@ -2292,6 +2293,23 @@ export const IntegrationsPage = () => {
         }
     };
 
+    const handleEnableWhatsAppCalling = async () => {
+        setEnablingCallingAccountId(1);
+        try {
+            const res = await enableWhatsAppCallingAPI();
+            showAlert(
+                res.calling_enabled
+                    ? t('enableWhatsAppCallingSuccess')
+                    : t('enableWhatsAppCallingHint'),
+                'info'
+            );
+        } catch (error: any) {
+            showAlert(resolveLocalizedApiError(error, t, t('whatsappCallFailed')), 'error');
+        } finally {
+            setEnablingCallingAccountId(null);
+        }
+    };
+
     useEffect(() => {
         if (pendingConnectAccountId == null) return;
         const id = pendingConnectAccountId;
@@ -3034,6 +3052,7 @@ export const IntegrationsPage = () => {
                                         </div>
                                         <div className="flex items-center gap-2">
                                             {account.status === 'Connected' && (
+                                                <>
                                                 <Button
                                                     variant="ghost"
                                                     disabled={syncingPhoneAccountId === account.id}
@@ -3042,6 +3061,16 @@ export const IntegrationsPage = () => {
                                                 >
                                                     {syncingPhoneAccountId === account.id ? t('syncing') : t('refreshWhatsAppPhoneNumbers')}
                                                 </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    disabled={enablingCallingAccountId != null}
+                                                    onClick={() => void handleEnableWhatsAppCalling()}
+                                                    title={t('enableWhatsAppCallingHint')}
+                                                    className="rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                                                >
+                                                    {enablingCallingAccountId != null ? t('loading') : t('enableWhatsAppCalling')}
+                                                </Button>
+                                                </>
                                             )}
                                             {account.status !== 'Connected' && (
                                                 <Button

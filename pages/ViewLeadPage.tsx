@@ -13,6 +13,7 @@ import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../serv
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
+import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import {
     clientLocationEventTranslationKey,
@@ -35,9 +36,10 @@ import { normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered } = useAppContext();
     
     const canPbxDial = usePbxDialEnabled();
+    const whatsappCalling = useWhatsAppCallingOptional();
     const deleteLeadMutation = useDeleteLead();
 
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
@@ -267,6 +269,24 @@ export const ViewLeadPage = () => {
         return parts.length ? parts.join(' · ') : legacyNotes;
     };
 
+    const formatWhatsAppCallSummary = (cc: Record<string, unknown>): string => {
+        const parts: string[] = [t('whatsappCallMade')];
+        const direction = (cc.whatsapp_direction ?? cc.whatsappDirection) as string | undefined;
+        if (direction === 'inbound') parts.push(t('incoming'));
+        else if (direction === 'outbound') parts.push(t('outgoing'));
+        const status = (cc.whatsapp_call_status ?? cc.whatsappCallStatus) as string | undefined;
+        if (status) {
+            const key = `whatsappCallStatus_${String(status).toLowerCase()}`;
+            const translated = t(key);
+            parts.push(translated === key ? String(status).replace(/_/g, ' ') : translated);
+        }
+        const duration = (cc.whatsapp_duration_sec ?? cc.whatsappDurationSec) as number | undefined;
+        if (duration) {
+            parts.push(t('callDurationSeconds').replace('{n}', String(duration)));
+        }
+        return parts.join(' · ');
+    };
+
     const pollPbxDialStatus = async (commandId: number) => {
         for (let attempt = 0; attempt < 15; attempt += 1) {
             await new Promise((resolve) => setTimeout(resolve, 2000));
@@ -436,8 +456,13 @@ export const ViewLeadPage = () => {
             const callDateTimeFormatted = formatDetailDateTime(callDate);
             const followUpDateFormatted = formatDetailDateTime(cc.follow_up_date);
             const isPbxCall = cc.source === 'pbx';
-            const recordingUrl = (cc.pbx_recording_url ?? cc.pbxRecordingUrl) as string | undefined;
-            const recordingStatus = (cc.pbx_recording_status ?? cc.pbxRecordingStatus) as string | undefined;
+            const isWhatsAppCall = cc.source === 'whatsapp';
+            const recordingUrl = isWhatsAppCall
+                ? ((cc.whatsapp_recording_url ?? cc.whatsappRecordingUrl) as string | undefined)
+                : undefined;
+            const recordingStatus = isWhatsAppCall
+                ? ((cc.whatsapp_recording_status ?? cc.whatsappRecordingStatus) as string | undefined)
+                : undefined;
 
             return {
                 id: `call-${cc.id}`,
@@ -446,12 +471,24 @@ export const ViewLeadPage = () => {
                 avatar: user?.avatar || '',
                 action: isPbxCall
                     ? formatPbxCallSummary(cc)
-                    : t('callMade'),
-                details: isPbxCall ? '' : (cc.notes || ''),
+                    : isWhatsAppCall
+                      ? formatWhatsAppCallSummary(cc)
+                      : t('callMade'),
+                details: isPbxCall
+                    ? ''
+                    : isWhatsAppCall
+                      ? ((cc.notes as string) || '').includes('\n')
+                          ? ((cc.notes as string).split('\n').slice(1).join('\n') || '')
+                          : ''
+                      : (cc.notes || ''),
                 date: formatTimelineDate(callDate, lang),
                 timestamp: timestamp,
-                stage: isPbxCall ? t('pbxCallSource') : callMethodName,
-                color: isPbxCall ? '#4f46e5' : callMethod?.color,
+                stage: isPbxCall
+                    ? t('pbxCallSource')
+                    : isWhatsAppCall
+                      ? t('whatsappCallSource')
+                      : callMethodName,
+                color: isPbxCall ? '#4f46e5' : isWhatsAppCall ? '#16a34a' : callMethod?.color,
                 callDatetime: callDateTimeFormatted,
                 followUpDate: followUpDateFormatted,
                 recordingUrl: recordingUrl || undefined,
@@ -847,6 +884,65 @@ export const ViewLeadPage = () => {
                                     onPbxDial={handlePbxDial}
                                     t={t}
                                 />
+                                {whatsappCalling ? (
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={
+                                            whatsappCalling.isStartingOutbound ||
+                                            whatsappCalling.phase === 'connecting' ||
+                                            whatsappCalling.phase === 'ringing' ||
+                                            whatsappCalling.phase === 'active'
+                                        }
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                        onClick={() => {
+                                            const phone =
+                                                displayLead.phoneNumbers?.[0]?.number ||
+                                                displayLead.phone ||
+                                                '';
+                                            if (!phone) return;
+                                            void whatsappCalling.startOutboundCall({
+                                                to: String(phone),
+                                                clientId: displayLead.id,
+                                            });
+                                        }}
+                                    >
+                                        {whatsappCalling.isStartingOutbound ||
+                                        whatsappCalling.phase === 'connecting' ? (
+                                            <Loader size="sm" variant="primary" className="!h-3.5" />
+                                        ) : (
+                                            <PhoneIcon className="h-3.5 w-3.5" />
+                                        )}
+                                        {whatsappCalling.isStartingOutbound ||
+                                        whatsappCalling.phase === 'connecting'
+                                            ? t('whatsappCallStarting')
+                                            : t('whatsappCallButton')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                        onClick={() =>
+                                            openCallsFiltered({
+                                                clientId: String(displayLead.id),
+                                            })
+                                        }
+                                    >
+                                        {t('viewLeadCalls')}
+                                    </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                        onClick={() =>
+                                            openCallsFiltered({
+                                                clientId: String(displayLead.id),
+                                            })
+                                        }
+                                    >
+                                        {t('viewLeadCalls')}
+                                    </button>
+                                )}
                             </div>
                         </div>
                         <div>

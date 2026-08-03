@@ -3595,6 +3595,173 @@ export const getWhatsAppLimitsAPI = async (): Promise<{
   return apiRequest('/integrations/whatsapp/limits/');
 };
 
+/** WhatsApp Cloud Calling */
+export type WhatsAppCallRecord = {
+  id: number;
+  meta_call_id: string;
+  direction: 'inbound' | 'outbound';
+  status: string;
+  peer_phone: string;
+  peer_name?: string | null;
+  client?: number | null;
+  client_name?: string | null;
+  client_stage?: string | null;
+  agent?: number | null;
+  agent_username?: string | null;
+  whatsapp_account_id?: number;
+  offer_sdp?: string | null;
+  answer_sdp?: string | null;
+  started_at?: string | null;
+  answered_at?: string | null;
+  ended_at?: string | null;
+  duration_sec?: number;
+  notes?: string;
+  recording_status?: string;
+  recording_url?: string | null;
+  client_call?: number | null;
+  error_message?: string;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export const getWhatsAppCallsAPI = async (params?: {
+  status?: string;
+  direction?: string;
+  my_calls?: boolean;
+  has_recording?: boolean;
+  search?: string;
+  client?: number;
+  agent?: number;
+  ordering?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  count: number;
+  results: WhatsAppCallRecord[];
+  status_counts?: Record<string, number>;
+}> => {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.direction) q.set('direction', params.direction);
+  if (params?.my_calls) q.set('my_calls', 'true');
+  if (params?.has_recording) q.set('has_recording', 'true');
+  if (params?.search) q.set('search', params.search);
+  if (params?.client != null) q.set('client', String(params.client));
+  if (params?.agent != null) q.set('agent', String(params.agent));
+  if (params?.ordering) q.set('ordering', params.ordering);
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  if (params?.offset != null) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return apiRequest(`/integrations/whatsapp/calls/${qs ? `?${qs}` : ''}`);
+};
+
+export const getWhatsAppCallsPendingAPI = async (): Promise<{
+  results: WhatsAppCallRecord[];
+}> => {
+  return apiRequest('/integrations/whatsapp/calls/pending/');
+};
+
+export const getWhatsAppCallDetailAPI = async (id: number): Promise<WhatsAppCallRecord> => {
+  return apiRequest(`/integrations/whatsapp/calls/${id}/`);
+};
+
+export const whatsappCallPreAcceptAPI = async (id: number, sdp: string) => {
+  return apiRequest<WhatsAppCallRecord>(`/integrations/whatsapp/calls/${id}/pre-accept/`, {
+    method: 'POST',
+    body: JSON.stringify({ sdp }),
+  });
+};
+
+export const whatsappCallAcceptAPI = async (id: number, sdp: string) => {
+  return apiRequest<WhatsAppCallRecord>(`/integrations/whatsapp/calls/${id}/accept/`, {
+    method: 'POST',
+    body: JSON.stringify({ sdp }),
+  });
+};
+
+export const whatsappCallRejectAPI = async (id: number) => {
+  return apiRequest<WhatsAppCallRecord>(`/integrations/whatsapp/calls/${id}/reject/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  });
+};
+
+export const whatsappCallTerminateAPI = async (id: number, notes?: string) => {
+  return apiRequest<WhatsAppCallRecord>(`/integrations/whatsapp/calls/${id}/terminate/`, {
+    method: 'POST',
+    body: JSON.stringify(notes ? { notes } : {}),
+  });
+};
+
+export const whatsappCallInitiateAPI = async (data: {
+  to: string;
+  sdp: string;
+  client_id?: number;
+  whatsapp_account_id?: number;
+  skip_permission_check?: boolean;
+}) => {
+  return apiRequest<WhatsAppCallRecord>('/integrations/whatsapp/calls/initiate/', {
+    method: 'POST',
+    body: JSON.stringify({
+      to: data.to,
+      sdp: data.sdp,
+      ...(data.client_id != null && { client: data.client_id }),
+      ...(data.whatsapp_account_id != null && {
+        whatsapp_account_id: data.whatsapp_account_id,
+      }),
+      ...(data.skip_permission_check && { skip_permission_check: true }),
+    }),
+  });
+};
+
+export const getWhatsAppCallPermissionsAPI = async (to: string) => {
+  return apiRequest<{ permissions: unknown; can_start_call: boolean }>(
+    `/integrations/whatsapp/calls/permissions/?to=${encodeURIComponent(to)}`
+  );
+};
+
+export const sendWhatsAppCallPermissionRequestAPI = async (data: {
+  to: string;
+  template_id?: number;
+  template_name?: string;
+  language?: string;
+}) => {
+  return apiRequest('/integrations/whatsapp/calls/permission-request/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export const enableWhatsAppCallingAPI = async (whatsapp_account_id?: number) => {
+  return apiRequest<{ calling_enabled: boolean; whatsapp_account_id: number }>(
+    '/integrations/whatsapp/calling/enable/',
+    {
+      method: 'POST',
+      body: JSON.stringify(
+        whatsapp_account_id != null ? { whatsapp_account_id } : {}
+      ),
+    }
+  );
+};
+
+export const uploadWhatsAppCallRecordingAPI = async (
+  callId: number,
+  file: Blob,
+  notes?: string,
+  filename = 'call.webm'
+) => {
+  const form = new FormData();
+  form.append('file', file, filename);
+  if (notes) form.append('notes', notes);
+  return apiRequest<WhatsAppCallRecord>(
+    `/integrations/whatsapp/calls/${callId}/recording/`,
+    {
+      method: 'POST',
+      body: form,
+    }
+  );
+};
+
 /**
  * الحصول على قائمة المنصات المدعومة
  * GET /api/integrations/accounts/platforms/
@@ -3696,13 +3863,6 @@ export interface PbxSettingsResponse {
   is_enabled?: boolean;
   auto_log_calls?: boolean;
   screen_pop_enabled?: boolean;
-  softphone_enabled?: boolean;
-  sip_domain?: string;
-  sip_port?: number;
-  sip_transport?: string;
-  wss_uri?: string;
-  stun_server?: string;
-  turn_server?: string;
   connector_last_seen_at?: string | null;
   connector_online?: boolean;
   connector_package_version?: string;
@@ -3715,8 +3875,6 @@ export interface PbxExtensionRow {
   user_id?: number;
   username?: string;
   extension: string;
-  sip_password_masked?: string | null;
-  softphone_enabled?: boolean;
 }
 
 export const getPbxSettingsAPI = async (): Promise<PbxSettingsResponse> => {
@@ -3735,7 +3893,6 @@ export const getPbxSettingsAPI = async (): Promise<PbxSettingsResponse> => {
     ) {
       return {
         is_enabled: false,
-        softphone_enabled: false,
         screen_pop_enabled: false,
         auto_log_calls: false,
       };
@@ -3752,13 +3909,6 @@ export const updatePbxSettingsAPI = async (data: {
   is_enabled?: boolean;
   auto_log_calls?: boolean;
   screen_pop_enabled?: boolean;
-  softphone_enabled?: boolean;
-  sip_domain?: string;
-  sip_port?: number;
-  sip_transport?: string;
-  wss_uri?: string;
-  stun_server?: string;
-  turn_server?: string;
 }): Promise<PbxSettingsResponse> => {
   return apiRequest<PbxSettingsResponse>('/integrations/pbx/settings/', {
     method: 'PUT',
@@ -3794,8 +3944,6 @@ export const getPbxExtensionsAPI = async (): Promise<PbxExtensionRow[]> => {
 export const savePbxExtensionAPI = async (data: {
   user_id: number;
   extension: string;
-  sip_password?: string;
-  softphone_enabled?: boolean;
 }) => {
   return apiRequest<PbxExtensionRow>('/integrations/pbx/extensions/', {
     method: 'POST',
@@ -3808,8 +3956,6 @@ export const updatePbxExtensionAPI = async (
   data: {
     user_id?: number;
     extension?: string;
-    sip_password?: string;
-    softphone_enabled?: boolean;
   }
 ) => {
   return apiRequest<PbxExtensionRow>(`/integrations/pbx/extensions/${id}/`, {
@@ -3844,11 +3990,6 @@ export interface PbxHealthResponse {
   webhook_url?: string;
   push_event_url_hint?: string;
   push_event_connector_hint?: string;
-  recordings?: {
-    pending: number;
-    failed: number;
-    last_ready_at?: string | null;
-  };
   checks: {
     integration_enabled: boolean;
     pbx_host_configured: boolean;
@@ -3856,7 +3997,6 @@ export interface PbxHealthResponse {
     connector_online: boolean;
     extensions_mapped: boolean;
     events_received: boolean;
-    recordings_clear?: boolean;
   };
 }
 

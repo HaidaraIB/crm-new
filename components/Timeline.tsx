@@ -7,6 +7,23 @@ import {
     clientLocationMapsUrl,
     formatClientLocationPair,
 } from '../utils/leadLocation';
+import { ChatVoicePlayer } from './chat/ChatVoicePlayer';
+import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
+
+const TimelineRecordingPlayer: React.FC<{ url: string; t: (key: string) => string }> = ({
+    url,
+    t,
+}) => {
+    const blobUrl = useAuthBlobUrl(url);
+    if (!blobUrl) {
+        return <p className="mt-2 text-xs text-gray-400">{t('loading')}…</p>;
+    }
+    return (
+        <div className="mt-2" dir="ltr">
+            <ChatVoicePlayer blobUrl={blobUrl} mine={false} t={t} />
+        </div>
+    );
+};
 
 const TIMELINE_SORT_KEY = 'leadTimelineSortOrder';
 
@@ -397,23 +414,7 @@ export const Timeline = ({ history }: TimelineProps) => {
                                     )}
 
                                     {entry.recordingStatus === 'ready' && entry.recordingUrl ? (
-                                        <div className="mt-2 flex flex-wrap items-center gap-3" dir="ltr">
-                                            <a
-                                                href={entry.recordingUrl}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="inline-flex items-center gap-1.5 text-sm font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
-                                            >
-                                                {t('playRecording')}
-                                            </a>
-                                            <a
-                                                href={entry.recordingUrl}
-                                                download
-                                                className="inline-flex items-center gap-1.5 text-sm font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200"
-                                            >
-                                                {t('downloadRecording')}
-                                            </a>
-                                        </div>
+                                        <TimelineRecordingPlayer url={entry.recordingUrl} t={t} />
                                     ) : entry.recordingStatus === 'pending' || entry.recordingStatus === 'processing' ? (
                                         <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">
                                             {t('recordingProcessing')}

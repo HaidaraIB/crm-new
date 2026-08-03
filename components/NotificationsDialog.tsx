@@ -348,8 +348,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                           className="block text-sm font-semibold text-gray-900 dark:text-white"
                           dir={
                             n.type === 'pbx_incoming_call' ||
-                            n.type === 'pbx_call_missed' ||
-                            n.type === 'softphone_incoming_call'
+                            n.type === 'pbx_call_missed'
                               ? 'ltr'
                               : undefined
                           }

@@ -4,9 +4,10 @@ import { ChatThread } from './ChatThread';
 import type { ChatBubbleMessage } from './ChatMessageBubble';
 import type { SessionInfo } from './ChatComposer';
 import type { MessageTemplateType } from '../../services/api';
+import { translations } from '../../constants';
 
 type Props = {
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   language: string;
   conversations: ConversationRow[];
   selectedClient: any | null;
@@ -16,10 +17,14 @@ type Props = {
   messages: ChatBubbleMessage[];
   isFetchingMessages?: boolean;
   onRefreshMessages?: () => void;
+  onWhatsAppCall?: () => void;
+  isWhatsAppCalling?: boolean;
+  onViewCalls?: () => void;
   onDeleteMessage?: (msg: ChatBubbleMessage) => void;
   onResendMessage?: (msg: ChatBubbleMessage) => void;
   deletingMessageId?: string | null;
   resendingMessageId?: string | null;
+  onOpenMedia?: (msg: ChatBubbleMessage) => void;
   composerProps: React.ComponentProps<typeof ChatThread>['composerProps'];
 };
 
@@ -41,10 +46,14 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         messages={props.messages}
         isFetching={props.isFetchingMessages}
         onRefresh={props.onRefreshMessages}
+        onWhatsAppCall={props.onWhatsAppCall}
+        isWhatsAppCalling={props.isWhatsAppCalling}
+        onViewCalls={props.onViewCalls}
         onDeleteMessage={props.onDeleteMessage}
         onResendMessage={props.onResendMessage}
         deletingMessageId={props.deletingMessageId}
         resendingMessageId={props.resendingMessageId}
+        onOpenMedia={props.onOpenMedia}
         composerProps={props.composerProps}
       />
     </div>

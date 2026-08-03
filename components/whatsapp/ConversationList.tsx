@@ -13,6 +13,8 @@ import {
   WA_LIST_BG,
   WA_LIST_HOVER,
 } from './whatsappChatTheme';
+import { translations } from '../../constants';
+import { localizeWhatsAppMessageBody } from '../../utils/whatsappMessageBodyDisplay';
 
 export type ConversationRow = {
   client: any;
@@ -26,7 +28,7 @@ type Props = {
   onSelect: (client: any) => void;
   onStartNew: () => void;
   onDeleteConversation?: (client: any) => void;
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   language: string;
 };
 
@@ -96,7 +98,10 @@ export const ConversationList: React.FC<Props> = ({
           const id = client.id;
           const active = selectedId != null && String(selectedId) === String(id);
           const title = getWhatsAppContactTitle(client);
-          const subtitle = lastMessagePreview || getWhatsAppContactSubtitle(client) || '';
+          const rawPreview = lastMessagePreview || getWhatsAppContactSubtitle(client) || '';
+          const subtitle = lastMessagePreview
+            ? localizeWhatsAppMessageBody(lastMessagePreview, t)
+            : rawPreview;
           return (
             <li key={String(id)} className="group relative">
               <button

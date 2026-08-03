@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useSta
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
+import { translations } from '../constants';
 import { withLatinDigits } from '../utils/dateUtils';
 import { PageWrapper, Button, Modal } from '../components/index';
 import {
@@ -13,6 +14,13 @@ import {
   SendPlaneIcon,
 } from '../components/icons';
 import { ChatBlobMedia } from '../components/chat/ChatBlobMedia';
+import { ChatMediaThumb } from '../components/chat/ChatMediaThumb';
+import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
+import {
+  buildChatMediaAlbum,
+  findChatMediaAlbumIndex,
+  type ChatMediaAlbumItem,
+} from '../components/chat/chatMediaAlbum';
 import { ChatPendingAttachmentChip } from '../components/chat/ChatPendingAttachmentChip';
 import { ChatVoiceRecordingBar } from '../components/chat/ChatVoiceRecordingBar';
 import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
@@ -36,6 +44,8 @@ import {
   type TenantChatPeerPresenceAction,
 } from '../services/api';
 import { compressImageForChat } from '../utils/compressImageForChat';
+
+type TFn = (key: keyof typeof translations.en) => string;
 
 function peerDisplayName(p: TenantChatPeer): string {
   const n = `${p.first_name || ''} ${p.last_name || ''}`.trim();
@@ -62,7 +72,7 @@ function tenantChatConvIsGroup(c: TenantChatConversation): boolean {
   return tenantChatConvKind(c) === 'company_group';
 }
 
-function tenantChatConvTitle(c: TenantChatConversation, t: (key: string) => string): string {
+function tenantChatConvTitle(c: TenantChatConversation, t: TFn): string {
   if (tenantChatConvIsGroup(c)) {
     const g = (c.group_title || '').trim();
     return g || t('teamChatCompanyRoom');
@@ -71,7 +81,7 @@ function tenantChatConvTitle(c: TenantChatConversation, t: (key: string) => stri
   return peerDisplayName(c.other_user);
 }
 
-function tenantChatConvInitials(c: TenantChatConversation, t: (key: string) => string): string {
+function tenantChatConvInitials(c: TenantChatConversation, t: TFn): string {
   if (tenantChatConvIsGroup(c)) {
     const raw = (c.group_title || t('teamChatCompanyRoom')).trim();
     const letters = raw.replace(/[^\p{L}\p{N}]/gu, '');
@@ -82,7 +92,7 @@ function tenantChatConvInitials(c: TenantChatConversation, t: (key: string) => s
   return peerInitials(c.other_user);
 }
 
-function tenantChatPeerRoleLabel(role: string | undefined, t: (key: string) => string): string {
+function tenantChatPeerRoleLabel(role: string | undefined, t: TFn): string {
   const r = (role || '').toLowerCase();
   if (r === 'admin') return t('teamChatRoleAdmin');
   if (r === 'super_admin') return t('teamChatRoleSuperAdmin');
@@ -126,7 +136,7 @@ function ChatText({ children, className = '' }: { children: React.ReactNode; cla
 
 function formatLastSeenRelative(
   lastSeenAt: string | null | undefined,
-  t: (key: string) => string
+  t: TFn
 ): string {
   if (!lastSeenAt) return t('lastSeenUnknown');
   const parsed = new Date(lastSeenAt);
@@ -152,7 +162,7 @@ function formatChatDaySeparator(
   dayStart: Date,
   now: Date,
   language: string,
-  t: (key: string) => string
+  t: TFn
 ): string {
   const loc = language === 'ar' ? 'ar' : 'en';
   const today = startOfLocalDay(now);
@@ -262,7 +272,7 @@ function countPeerMessagesBelowViewport(
   return n;
 }
 
-function tenantChatQuoteLabel(q: TenantChatMessageQuote, t: (key: string) => string): string {
+function tenantChatQuoteLabel(q: TenantChatMessageQuote, t: TFn): string {
   const cap = (q.body || '').trim();
   const kind = q.attachment_kind;
   let label = '';
@@ -275,7 +285,7 @@ function tenantChatQuoteLabel(q: TenantChatMessageQuote, t: (key: string) => str
   return label || '';
 }
 
-function replyTargetSnippet(m: TenantChatMessage, t: (key: string) => string): string {
+function replyTargetSnippet(m: TenantChatMessage, t: TFn): string {
   const cap = (m.body || '').replace(/\s+/g, ' ').trim().slice(0, 120);
   const kind = m.attachment_kind;
   let label = '';
@@ -312,6 +322,10 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   const [micError, setMicError] = useState<string | null>(null);
   /** True after a short quiet period while draft has text (typing indicator for peer). */
   const [draftTypingSignal, setDraftTypingSignal] = useState(false);
+  const [mediaViewer, setMediaViewer] = useState<{
+    items: ChatMediaAlbumItem[];
+    index: number;
+  } | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [msgActionsOpenId, setMsgActionsOpenId] = useState<number | null>(null);
   const [msgActionsMenuPos, setMsgActionsMenuPos] = useState<MsgFloatingMenuGeom | null>(null);
@@ -415,7 +429,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   const readCursorRef = useRef(0);
   const prevThreadIdForReadCursorRef = useRef<number | null>(null);
   const pendingMarkReadIdRef = useRef(0);
-  const markReadDebounceTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const markReadDebounceTimerRef = useRef<number | null>(null);
   const selectedIdRef = useRef<number | null>(null);
   selectedIdRef.current = selectedId;
   const [threadScrollFab, setThreadScrollFab] = useState({ show: false, peerBelow: 0 });
@@ -625,6 +639,25 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     );
   }, [messagesQuery.data]);
 
+  const mediaAlbum = useMemo(
+    () =>
+      buildChatMediaAlbum(
+        messages.map((m) => ({
+          id: m.id,
+          kind: m.attachment_kind,
+          url: m.attachment_url,
+          filename: m.original_filename,
+          width: m.attachment_width,
+          height: m.attachment_height,
+        }))
+      ),
+    [messages]
+  );
+
+  useEffect(() => {
+    setMediaViewer(null);
+  }, [selectedId]);
+
   const messagesByDay = useMemo(() => {
     const groups: { dayKey: string; dayStart: Date; messages: TenantChatMessage[] }[] = [];
     for (const m of messages) {
@@ -690,7 +723,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     const act = 'activity' in pr ? pr.activity : null;
     if (!other || !act) return null;
     const name = peerDisplayName(other);
-    const fill = (key: string) => t(key).replace(/\{name\}/g, name);
+    const fill = (key: keyof typeof translations.en) => t(key).replace(/\{name\}/g, name);
     if (act === 'typing') return fill('teamChatPeerTyping');
     if (act === 'uploading_media') return fill('teamChatPeerUploading');
     if (act === 'recording_voice') return fill('teamChatPeerRecording');
@@ -1061,13 +1094,13 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     if (variant !== 'dialog' || !onClose) return;
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (newChatOpen || forwardSourceId != null) return;
+      if (newChatOpen || forwardSourceId != null || mediaViewer != null) return;
       e.preventDefault();
       onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [variant, onClose, newChatOpen, forwardSourceId]);
+  }, [variant, onClose, newChatOpen, forwardSourceId, mediaViewer]);
 
   const shellMinH =
     variant === 'dialog' ? 'min-h-[260px] lg:min-h-[420px]' : 'min-h-[420px] lg:min-h-[580px]';
@@ -1489,6 +1522,19 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                           attachmentHeight={m.attachment_height}
                                           t={t}
                                           onIntrinsicLayout={onChatMediaIntrinsicLayout}
+                                          onOpen={
+                                            m.attachment_kind === 'image' ||
+                                            m.attachment_kind === 'video'
+                                              ? () =>
+                                                  setMediaViewer({
+                                                    items: mediaAlbum,
+                                                    index: findChatMediaAlbumIndex(
+                                                      mediaAlbum,
+                                                      String(m.id)
+                                                    ),
+                                                  })
+                                              : undefined
+                                          }
                                         />
                                       </div>
                                     ) : null}
@@ -1568,12 +1614,51 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                 className="border-t border-gray-200 bg-white/95 p-3 backdrop-blur-sm dark:border-gray-700 dark:bg-gray-900/95 sm:p-4"
               >
                 {replyToMessage ? (
-                  <div className="mx-auto mb-3 flex max-w-3xl items-center gap-3 rounded-xl border border-primary/30 bg-primary/[0.07] px-3 py-2 dark:bg-primary/15">
+                  <div className="mx-auto mb-3 flex max-w-3xl items-center gap-3 rounded-xl border border-primary/40 bg-primary/[0.08] px-3 py-2 dark:border-primary/50 dark:bg-primary/25">
+                    {replyToMessage.attachment_url &&
+                    (replyToMessage.attachment_kind === 'image' ||
+                      replyToMessage.attachment_kind === 'video') ? (
+                      <button
+                        type="button"
+                        className="size-11 shrink-0 overflow-hidden rounded-lg outline-none ring-primary/40 focus-visible:ring-2 cursor-zoom-in"
+                        aria-label={t('chatMediaOpenAria')}
+                        onClick={() => {
+                          const id = String(replyToMessage.id);
+                          const inAlbum = mediaAlbum.some((it) => it.id === id);
+                          if (inAlbum) {
+                            setMediaViewer({
+                              items: mediaAlbum,
+                              index: findChatMediaAlbumIndex(mediaAlbum, id),
+                            });
+                            return;
+                          }
+                          setMediaViewer({
+                            items: [
+                              {
+                                id,
+                                kind: replyToMessage.attachment_kind as 'image' | 'video',
+                                url: replyToMessage.attachment_url!,
+                                filename: replyToMessage.original_filename,
+                                width: replyToMessage.attachment_width,
+                                height: replyToMessage.attachment_height,
+                              },
+                            ],
+                            index: 0,
+                          });
+                        }}
+                      >
+                        <ChatMediaThumb
+                          url={replyToMessage.attachment_url}
+                          kind={replyToMessage.attachment_kind}
+                          className="size-full"
+                        />
+                      </button>
+                    ) : null}
                     <div className="min-w-0 flex-1">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-primary-700 dark:text-primary-200">
                         {t('teamChatReplyingTo')}
                       </p>
-                      <p className="truncate text-sm text-gray-800 dark:text-gray-100">
+                      <p className="truncate text-sm text-gray-800 dark:text-gray-50">
                         {(() => {
                           const snippet = replyTargetSnippet(replyToMessage, t);
                           const showBadge = selected && tenantChatConvIsGroup(selected);
@@ -1588,7 +1673,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                   {tenantChatPeerRoleLabel(replyToMessage.sender.role, t)}
                                 </span>
                               ) : null}
-                              <span className="shrink-0 text-gray-500 dark:text-gray-400">·</span>
+                              <span className="shrink-0 text-gray-500 dark:text-gray-300">·</span>
                               <span className="min-w-0 truncate">
                                 {snippet.slice(0, 120)}
                                 {snippet.length > 120 ? '…' : ''}
@@ -1601,7 +1686,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                     <button
                       type="button"
                       onClick={() => setReplyToMessage(null)}
-                      className="shrink-0 rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-black/10 dark:text-gray-300 dark:hover:bg-white/10"
+                      className="shrink-0 rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-black/10 dark:text-gray-200 dark:hover:bg-white/10"
                       aria-label={t('teamChatCancelReply')}
                     >
                       ×
@@ -1614,6 +1699,23 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                       file={pendingAttachment}
                       onClear={() => setPendingAttachment(null)}
                       clearAriaLabel={t('teamChatClearAttachment')}
+                      openAriaLabel={t('chatMediaOpenAria')}
+                      onOpen={(_url, kind) => {
+                        const f = pendingAttachment;
+                        if (!f) return;
+                        const ownUrl = URL.createObjectURL(f);
+                        setMediaViewer({
+                          items: [
+                            {
+                              id: 'pending-attachment',
+                              kind,
+                              url: ownUrl,
+                              filename: f.name,
+                            },
+                          ],
+                          index: 0,
+                        });
+                      }}
                     />
                   </div>
                 ) : null}
@@ -1900,6 +2002,21 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
           <p className="mt-2 text-sm text-red-600 dark:text-red-400">{t('teamChatCouldNotSend')}</p>
         ) : null}
       </Modal>
+      {mediaViewer && mediaViewer.items.length > 0 ? (
+        <ChatMediaViewer
+          items={mediaViewer.items}
+          initialIndex={mediaViewer.index}
+          onClose={() => {
+            for (const it of mediaViewer.items) {
+              if (it.id === 'pending-attachment' && it.url.startsWith('blob:')) {
+                URL.revokeObjectURL(it.url);
+              }
+            }
+            setMediaViewer(null);
+          }}
+          t={t}
+        />
+      ) : null}
     </>
   );
 

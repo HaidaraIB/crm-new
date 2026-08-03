@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
-import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
+import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, CallFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
 import {
   isMedicalSpecialization,
@@ -15,6 +15,7 @@ import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI } from '../services/api';
 import { normalizeRole, roleReportsPresence } from '../utils/roles';
 import { navigateToPage, NavigateToPageOptions } from '../utils/routing';
+import { DEFAULT_CALL_FILTERS, callFiltersToQuery } from '../utils/callFilters';
 
 // --- Helper Functions ---
 /**
@@ -125,6 +126,8 @@ export interface AppContextType {
   setIsAssignLeadModalOpen: (isOpen: boolean) => void;
   isFilterDrawerOpen: boolean;
   setIsFilterDrawerOpen: (isOpen: boolean) => void;
+  isCallFilterDrawerOpen: boolean;
+  setIsCallFilterDrawerOpen: (isOpen: boolean) => void;
   isActivitiesFilterDrawerOpen: boolean;
   setIsActivitiesFilterDrawerOpen: (isOpen: boolean) => void;
   isDeveloperFilterDrawerOpen: boolean;
@@ -341,6 +344,10 @@ export interface AppContextType {
   // Filters (UI state only)
   leadFilters: LeadFilters;
   setLeadFilters: React.Dispatch<React.SetStateAction<LeadFilters>>;
+  callFilters: CallFilters;
+  setCallFilters: React.Dispatch<React.SetStateAction<CallFilters>>;
+  /** Navigate to Calls inbox with filters (e.g. from a lead). */
+  openCallsFiltered: (partial: Partial<CallFilters>) => void;
   /** One-shot preset when navigating to Todos from mission bar chips. */
   todosPagePreset: import('../utils/missionBarNavigation').MissionBarTodosPreset | null;
   setTodosPagePreset: React.Dispatch<React.SetStateAction<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>>;
@@ -486,6 +493,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     lastContactedTo: '',
   });
   const [todosPagePreset, setTodosPagePreset] = useState<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>(null);
+  const [callFilters, setCallFilters] = useState<CallFilters>(DEFAULT_CALL_FILTERS);
   const [activityFilters, setActivityFilters] = useState<ActivityFilters>({
     user: 'All',
     stage: 'All',
@@ -649,6 +657,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isAddTodoModalOpen, setIsAddTodoModalOpen] = useState(false);
   const [isAssignLeadModalOpen, setIsAssignLeadModalOpen] = useState(false);
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
+  const [isCallFilterDrawerOpen, setIsCallFilterDrawerOpen] = useState(false);
   const [isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen] = useState(false);
   const [isDeveloperFilterDrawerOpen, setIsDeveloperFilterDrawerOpen] = useState(false);
   const [isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen] = useState(false);
@@ -1291,6 +1300,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'TikTok':
       case 'WhatsApp':
       case 'Chats':
+      case 'Calls':
       case 'Twilio':
       case 'AI':
       case 'Lead API':
@@ -1430,6 +1440,15 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     setCurrentPage(page);
   }, [currentUser?.company?.name, currentUser?.company?.domain]);
 
+  const openCallsFiltered = useCallback(
+    (partial: Partial<CallFilters>) => {
+      const next = { ...DEFAULT_CALL_FILTERS, ...partial };
+      setCallFilters(next);
+      goToPage('Calls', { query: callFiltersToQuery(next) });
+    },
+    [goToPage]
+  );
+
   const value: AppContextType = { 
     theme, setTheme, 
     language, setLanguage: setLang, 
@@ -1457,6 +1476,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isAddTodoModalOpen, setIsAddTodoModalOpen,
     isAssignLeadModalOpen, setIsAssignLeadModalOpen,
     isFilterDrawerOpen, setIsFilterDrawerOpen,
+    isCallFilterDrawerOpen, setIsCallFilterDrawerOpen,
     isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen,
     isDeveloperFilterDrawerOpen, setIsDeveloperFilterDrawerOpen,
     isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen,
@@ -1539,6 +1559,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     showAlert,
     // Filters (UI state only)
     leadFilters, setLeadFilters,
+    callFilters, setCallFilters,
+    openCallsFiltered,
     todosPagePreset, setTodosPagePreset,
     dealFilters, setDealFilters,
     campaignFilters, setCampaignFilters,

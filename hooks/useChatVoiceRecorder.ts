@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { translations } from '../constants';
 
 const MAX_VOICE_MS = 4 * 60 * 1000;
 
@@ -8,9 +9,9 @@ export type UseChatVoiceRecorderOptions = {
   /** Extra busy gate (e.g. send in flight). */
   busy?: boolean;
   onRecordingComplete: (file: File) => void;
-  onError?: (messageKey: string) => void;
+  onError?: (messageKey: keyof typeof translations.en) => void;
   /** i18n key when mic permission denied. Default: teamChatMicDenied */
-  micDeniedKey?: string;
+  micDeniedKey?: keyof typeof translations.en;
 };
 
 function formatElapsed(ms: number): string {

@@ -13,6 +13,7 @@ export type Page =
   | 'Campaigns'
   | 'Messaging Center'
   | 'Chats'
+  | 'Calls'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
   | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'Mujeb' | 'PBX'
   | 'Call Reports'
@@ -146,7 +147,7 @@ export interface TimelineEntry {
   callDatetime?: string; // Optional: formatted call datetime for calls
   followUpDate?: string; // Optional: formatted follow-up date for calls
   locationPhotoUrl?: string; // Optional: client location photo for field visits
-  recordingUrl?: string; // Optional: PBX call recording playback URL
+  recordingUrl?: string; // Optional: WhatsApp call recording playback URL
   recordingStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'skipped' | string;
 }
 
@@ -245,6 +246,20 @@ export interface LeadFilters {
   interestedProject: string; // 'All' or project id (real estate)
   lastContactedFrom: string;
   lastContactedTo: string;
+}
+
+/** WhatsApp Calls inbox filters (drawer + URL deep links). */
+export interface CallFilters {
+  /** Sidebar status key: all | ringing | answered | missed | no_answer | rejected */
+  status: string;
+  /** 'All' | inbound | outbound */
+  direction: string;
+  /** 'All' | 'me' | user id string (owners/supervisors) */
+  agent: string;
+  /** Lead/client id as string, or '' */
+  clientId: string;
+  hasRecording: boolean;
+  search: string;
 }
 
 /** Query params sent to GET /clients/ and /clients/status-counts/ */

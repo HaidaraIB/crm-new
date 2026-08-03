@@ -4,6 +4,8 @@
  * instead of the frozen strings stored when the notification was sent.
  */
 
+import { localizeWhatsAppMessageBodyForLang } from './whatsappMessageBodyDisplay';
+
 export type NotificationLang = 'ar' | 'en';
 
 export type NotificationDisplayInput = {
@@ -111,10 +113,6 @@ const TEMPLATES: Record<string, Record<NotificationLang, Template>> = {
     en: { title: 'Call Reminder', body: '{minutes_remaining} minutes remaining for follow-up call with {lead_name}' },
   },
   pbx_incoming_call: {
-    ar: { title: 'مكالمة واردة', body: 'مكالمة واردة من {phone}' },
-    en: { title: 'Incoming Call', body: 'Incoming call from {phone}' },
-  },
-  softphone_incoming_call: {
     ar: { title: 'مكالمة واردة', body: 'مكالمة واردة من {phone}' },
     en: { title: 'Incoming Call', body: 'Incoming call from {phone}' },
   },
@@ -266,7 +264,10 @@ function normalizeLang(language: string | undefined | null): NotificationLang {
   return language === 'en' ? 'en' : 'ar';
 }
 
-function flattenData(data: Record<string, unknown> | null | undefined): Record<string, unknown> {
+function flattenData(
+  data: Record<string, unknown> | null | undefined,
+  language?: string | null,
+): Record<string, unknown> {
   const out: Record<string, unknown> = { ...(data || {}) };
   // Common aliases used across send sites
   if (out.lead == null && out.lead_name != null) out.lead = out.lead_name;
@@ -276,6 +277,9 @@ function flattenData(data: Record<string, unknown> | null | undefined): Record<s
   }
   if (out.message_preview == null && out.message != null) out.message_preview = out.message;
   if (out.phone == null && out.caller != null) out.phone = out.caller;
+  if (out.message_preview != null) {
+    out.message_preview = localizeWhatsAppMessageBodyForLang(str(out.message_preview), language);
+  }
   return out;
 }
 
@@ -315,7 +319,7 @@ export function getNotificationDisplay(
 ): NotificationDisplay {
   const lang = normalizeLang(language);
   const type = n.type || 'general';
-  const data = flattenData(n.data);
+  const data = flattenData(n.data, language);
   const apiTitle = str(n.title).trim();
   const apiBody = str(n.body).trim();
 
@@ -323,9 +327,7 @@ export function getNotificationDisplay(
     return teamActivityDisplay(lang, data);
   }
 
-  const typeKey =
-    type === 'softphone_incoming_call' ? 'softphone_incoming_call' : type;
-  const tplSet = TEMPLATES[typeKey];
+  const tplSet = TEMPLATES[type];
   if (!tplSet) {
     return {
       title: apiTitle || (lang === 'ar' ? 'إشعار' : 'Notification'),
@@ -341,12 +343,8 @@ export function getNotificationDisplay(
   }
   const body = formatTemplate(bodyTpl, data);
 
-  // PBX / softphone: prefer caller phone as title when no matched lead name.
-  if (
-    type === 'pbx_incoming_call' ||
-    type === 'pbx_call_missed' ||
-    type === 'softphone_incoming_call'
-  ) {
+  // PBX: prefer caller phone as title when no matched lead name.
+  if (type === 'pbx_incoming_call' || type === 'pbx_call_missed') {
     const phone = str(data.phone).trim();
     const clientName = str(data.client_name || data.lead_name).trim();
     const title = clientName || phone || tpl.title;

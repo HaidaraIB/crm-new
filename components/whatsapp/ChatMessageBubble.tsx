@@ -1,6 +1,10 @@
 import React from 'react';
 import { ChatBlobMedia } from '../chat/ChatBlobMedia';
 import { WhatsAppFormattedText } from '../../utils/whatsappFormatting';
+import {
+  isWhatsAppTypeStubBody,
+  localizeWhatsAppMessageBody,
+} from '../../utils/whatsappMessageBodyDisplay';
 import { WA_BUBBLE_IN, WA_BUBBLE_OUT, WA_BUBBLE_OUT_FAILED, WA_TICK_READ } from './whatsappChatTheme';
 
 export type ChatBubbleMessage = {
@@ -69,11 +73,12 @@ function DeliveryTicks({
 
 type Props = {
   msg: ChatBubbleMessage;
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   onDelete?: (msg: ChatBubbleMessage) => void;
   onResend?: (msg: ChatBubbleMessage) => void;
   deleting?: boolean;
   resending?: boolean;
+  onOpenMedia?: (msg: ChatBubbleMessage) => void;
 };
 
 export const ChatMessageBubble: React.FC<Props> = ({
@@ -83,6 +88,7 @@ export const ChatMessageBubble: React.FC<Props> = ({
   onResend,
   deleting,
   resending,
+  onOpenMedia,
 }) => {
   const isOut = msg.direction === 'out';
   const bubbleClass = isOut
@@ -95,6 +101,11 @@ export const ChatMessageBubble: React.FC<Props> = ({
     ? 'text-white/50'
     : 'text-gray-500 dark:text-gray-400';
   const hasMedia = Boolean(msg.attachmentKind && msg.attachmentUrl);
+  const displayBody = hasMedia
+    ? isWhatsAppTypeStubBody(msg.body)
+      ? ''
+      : msg.body
+    : localizeWhatsAppMessageBody(msg.body, t);
 
   return (
     <div className={`flex w-full items-end ${isOut ? 'justify-end' : 'justify-start'}`}>
@@ -119,12 +130,18 @@ export const ChatMessageBubble: React.FC<Props> = ({
               attachmentWidth={msg.attachmentWidth}
               attachmentHeight={msg.attachmentHeight}
               t={t}
+              onOpen={
+                onOpenMedia &&
+                (msg.attachmentKind === 'image' || msg.attachmentKind === 'video')
+                  ? () => onOpenMedia(msg)
+                  : undefined
+              }
             />
           </div>
         ) : null}
-        {msg.body.trim() ? (
+        {displayBody.trim() ? (
           <WhatsAppFormattedText
-            text={msg.body}
+            text={displayBody}
             as="p"
             dir="auto"
             className={`text-sm whitespace-pre-wrap break-words ${AUTO_DIR_CLASS}`}
@@ -161,7 +178,7 @@ export const ChatMessageBubble: React.FC<Props> = ({
                 disabled={resending}
                 onClick={() => onResend(msg)}
               >
-                {t('resend') || 'Resend'}
+                {t('resend')}
               </button>
             )}
             {onDelete && (
@@ -171,7 +188,7 @@ export const ChatMessageBubble: React.FC<Props> = ({
                 disabled={deleting}
                 onClick={() => onDelete(msg)}
               >
-                {t('delete') || 'Delete'}
+                {t('delete')}
               </button>
             )}
           </div>

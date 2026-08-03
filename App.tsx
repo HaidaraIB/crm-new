@@ -7,9 +7,10 @@ import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotificatio
 import { useWhatsAppAwayNotifications } from './hooks/useWhatsAppAwayNotifications';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
-import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage } from './pages';
+import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage } from './pages';
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
+import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import ImpersonationBanner from './components/ImpersonationBanner';
 import ImpersonationSessionGuard from './components/ImpersonationSessionGuard';
@@ -77,6 +78,8 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <IntegrationsPage key="MessagingCenter" />;
         case 'Chats':
             return <ChatsPage />;
+        case 'Calls':
+            return <CallsPage />;
         case 'Todos':
             return <TodosPage />;
         case 'Team Chat':
@@ -375,6 +378,7 @@ const TheApp = () => {
                 'messaging-center': 'Messaging Center',
                 'messaging center': 'Messaging Center',
                 'chats': 'Chats',
+                'calls': 'Calls',
                 'todos': 'Todos',
                 'reports': 'Reports',
                 'teams report': 'Teams Report',
@@ -658,6 +662,7 @@ const TheApp = () => {
             'messaging-center': 'Messaging Center',
             'messaging center': 'Messaging Center',
             'chats': 'Chats',
+            'calls': 'Calls',
             'todos': 'Todos',
             'reports': 'Reports',
             'teams report': 'Teams Report',
@@ -1033,6 +1038,7 @@ const TheApp = () => {
             {fieldVisitsAllowed && <AddFieldVisitModal />}
             <AssignLeadModal />
             <FilterDrawer />
+            <CallsFilterDrawer />
             <ActivitiesFilterDrawer />
             <DevelopersFilterDrawer />
             <ProjectsFilterDrawer />
@@ -1129,7 +1135,9 @@ function App() {
     // FIX: The AppProvider component requires children.
     <AppProvider>
       <ImpersonationSessionGuard>
-        <TheApp />
+        <WhatsAppCallListener>
+          <TheApp />
+        </WhatsAppCallListener>
       </ImpersonationSessionGuard>
     </AppProvider>
   );

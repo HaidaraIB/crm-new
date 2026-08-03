@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { PhoneText, isPhoneLike } from '../index';
-import { RefreshIcon } from '../icons';
+import { RefreshIcon, PhoneIcon, ListIcon } from '../icons';
 import {
   getWhatsAppContactAvatarLabel,
   getWhatsAppContactSubtitle,
@@ -15,17 +15,22 @@ import {
   WA_THREAD_WALLPAPER,
 } from './whatsappChatTheme';
 import type { MessageTemplateType } from '../../services/api';
+import { translations } from '../../constants';
 
 type Props = {
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   selectedClient: any | null;
   messages: ChatBubbleMessage[];
   isFetching?: boolean;
   onRefresh?: () => void;
+  onWhatsAppCall?: () => void;
+  isWhatsAppCalling?: boolean;
+  onViewCalls?: () => void;
   onDeleteMessage?: (msg: ChatBubbleMessage) => void;
   onResendMessage?: (msg: ChatBubbleMessage) => void;
   deletingMessageId?: string | null;
   resendingMessageId?: string | null;
+  onOpenMedia?: (msg: ChatBubbleMessage) => void;
   composerProps: Omit<React.ComponentProps<typeof ChatComposer>, 't'>;
   emptyHint?: string;
 };
@@ -36,10 +41,14 @@ export const ChatThread: React.FC<Props> = ({
   messages,
   isFetching,
   onRefresh,
+  onWhatsAppCall,
+  isWhatsAppCalling,
+  onViewCalls,
   onDeleteMessage,
   onResendMessage,
   deletingMessageId,
   resendingMessageId,
+  onOpenMedia,
   composerProps,
   emptyHint,
 }) => {
@@ -84,12 +93,40 @@ export const ChatThread: React.FC<Props> = ({
             )
           ) : null}
         </div>
+        {onViewCalls && (
+          <button
+            type="button"
+            onClick={onViewCalls}
+            className="rounded-full p-2 hover:bg-white/10"
+            aria-label={t('viewLeadCalls')}
+            title={t('viewLeadCalls')}
+          >
+            <ListIcon className="h-4 w-4" />
+          </button>
+        )}
+        {onWhatsAppCall && (
+          <button
+            type="button"
+            onClick={onWhatsAppCall}
+            disabled={isWhatsAppCalling}
+            className="rounded-full p-2 hover:bg-white/10 disabled:cursor-wait disabled:opacity-60"
+            aria-label={t('whatsappCallButton')}
+            title={isWhatsAppCalling ? t('whatsappCallStarting') : t('whatsappCallButton')}
+            aria-busy={isWhatsAppCalling || undefined}
+          >
+            {isWhatsAppCalling ? (
+              <RefreshIcon className="h-4 w-4 animate-spin" />
+            ) : (
+              <PhoneIcon className="h-4 w-4" />
+            )}
+          </button>
+        )}
         {onRefresh && (
           <button
             type="button"
             onClick={onRefresh}
             className="rounded-full p-2 hover:bg-white/10"
-            aria-label={t('refresh') || 'Refresh'}
+            aria-label={t('refresh')}
           >
             <RefreshIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
           </button>
@@ -111,6 +148,7 @@ export const ChatThread: React.FC<Props> = ({
               onResend={onResendMessage}
               deleting={deletingMessageId === msg.id}
               resending={resendingMessageId === msg.id}
+              onOpenMedia={onOpenMedia}
             />
           ))}
           <div ref={bottomRef} />

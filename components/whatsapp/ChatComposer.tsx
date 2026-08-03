@@ -5,6 +5,7 @@ import { ChatPendingAttachmentChip } from '../chat/ChatPendingAttachmentChip';
 import { ChatVoiceRecordingBar } from '../chat/ChatVoiceRecordingBar';
 import { useChatVoiceRecorder } from '../../hooks/useChatVoiceRecorder';
 import { useAppContext } from '../../context/AppContext';
+import { translations } from '../../constants';
 import { WA_ALERT_ERROR, WA_ALERT_INFO, WA_ALERT_WARN, WA_COMPOSER_BG, WA_INPUT_SHELL, WA_SEND_BTN } from './whatsappChatTheme';
 import type { MessageTemplateType } from '../../services/api';
 
@@ -15,7 +16,7 @@ export type SessionInfo = {
 } | null;
 
 type Props = {
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   messageInput: string;
   setMessageInput: (v: string) => void;
   onSend: () => void;
@@ -35,6 +36,7 @@ type Props = {
   pendingIsVoiceNote?: boolean;
   setPendingIsVoiceNote?: (v: boolean) => void;
   compressingAttachment?: boolean;
+  onOpenPendingMedia?: (previewUrl: string, kind: 'image' | 'video') => void;
 };
 
 const COMPOSER_MIN_H_PX = 32;
@@ -83,6 +85,7 @@ export const ChatComposer: React.FC<Props> = ({
   setPendingAttachment,
   setPendingIsVoiceNote,
   compressingAttachment = false,
+  onOpenPendingMedia,
 }) => {
   const { language } = useAppContext();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -237,12 +240,14 @@ export const ChatComposer: React.FC<Props> = ({
             setPendingAttachment(null);
             setPendingIsVoiceNote?.(false);
           }}
-          clearAriaLabel={t('teamChatClearAttachment') || 'Clear attachment'}
+          clearAriaLabel={t('teamChatClearAttachment')}
+          openAriaLabel={t('chatMediaOpenAria')}
+          onOpen={onOpenPendingMedia}
         />
       ) : null}
       {compressingAttachment ? (
         <p className="px-0.5 text-[10px] text-gray-500 dark:text-gray-400">
-          {t('teamChatCompressing') || 'Compressing…'}
+          {t('teamChatCompressing')}
         </p>
       ) : null}
       {micError ? <p className="px-0.5 text-[10px] text-red-600 dark:text-red-400">{micError}</p> : null}
@@ -286,8 +291,8 @@ export const ChatComposer: React.FC<Props> = ({
                 className="flex size-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/10"
                 disabled={freeTextDisabled || compressingAttachment}
                 onClick={() => fileInputRef.current?.click()}
-                aria-label={t('teamChatAttach') || 'Attach'}
-                title={t('teamChatAttach') || 'Attach'}
+                aria-label={t('teamChatAttach')}
+                title={t('teamChatAttach')}
               >
                 <PaperclipIcon className="size-[1.2rem]" />
               </button>
@@ -326,7 +331,7 @@ export const ChatComposer: React.FC<Props> = ({
               setMicError(null);
               void startVoiceRecording();
             }}
-            aria-label={t('teamChatRecordVoice') || 'Record voice'}
+            aria-label={t('teamChatRecordVoice')}
           >
             <MicrophoneIcon className="h-5 w-5 text-white" />
           </button>
@@ -335,7 +340,7 @@ export const ChatComposer: React.FC<Props> = ({
             className={`${WA_SEND_BTN} !self-center`}
             disabled={freeTextDisabled || !canSend || compressingAttachment}
             onClick={onSend}
-            aria-label={t('send') || 'Send'}
+            aria-label={t('send')}
           >
             <svg
               viewBox="0 0 24 24"

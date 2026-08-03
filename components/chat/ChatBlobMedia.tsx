@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDownToLineIcon } from '../icons';
+import { ArrowDownToLineIcon, PlayIcon } from '../icons';
 import { ChatVoicePlayer } from './ChatVoicePlayer';
+import { translations } from '../../constants';
 import {
   chatMediaBinaryUrlIdentity,
   chatMediaBlobCachePut,
@@ -26,8 +27,10 @@ export type ChatBlobMediaProps = {
   filename?: string | null;
   attachmentWidth?: number | null;
   attachmentHeight?: number | null;
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   onIntrinsicLayout?: () => void;
+  /** Open fullscreen media viewer (image/video after load). */
+  onOpen?: () => void;
 };
 
 export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
@@ -39,6 +42,7 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
   attachmentHeight,
   t,
   onIntrinsicLayout,
+  onOpen,
 }) => {
   const urlIdentity = useMemo(() => chatMediaBinaryUrlIdentity(url), [url]);
   const lazyVisual = kind === 'image' || kind === 'video';
@@ -138,7 +142,7 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
   if (failed) {
     return (
       <span className={`text-xs ${mine ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
-        {t('teamChatCouldNotLoad')}
+        {t('chatMediaCouldNotLoad')}
       </span>
     );
   }
@@ -183,55 +187,96 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
     return <span className={`text-xs ${mine ? 'text-white/70' : 'text-gray-400'}`}>…</span>;
   }
 
-  const docName = filename || 'download';
+  const docName = filename || t('chatMediaDefaultFileName');
   const lazyAspectBoxClass = 'relative w-full overflow-hidden rounded-lg max-h-64';
+  const openAria = t('chatMediaOpenAria');
 
   if (kind === 'image') {
-    if (hasKnownAspect) {
-      return (
-        <div className={lazyAspectBoxClass}>
-          <LazyAspectSizer aspectRatio={aspectRatioCss} />
-          <img
-            src={blobUrl}
-            alt=""
-            className="absolute inset-0 h-full w-full object-contain"
-            onLoad={onIntrinsicLayout}
-          />
-        </div>
-      );
-    }
-    return (
+    const img = hasKnownAspect ? (
+      <>
+        <LazyAspectSizer aspectRatio={aspectRatioCss} />
+        <img
+          src={blobUrl}
+          alt=""
+          className="absolute inset-0 h-full w-full object-contain"
+          onLoad={onIntrinsicLayout}
+          draggable={false}
+        />
+      </>
+    ) : (
       <img
         src={blobUrl}
         alt=""
         className="max-h-64 w-full rounded-lg object-contain"
         onLoad={onIntrinsicLayout}
+        draggable={false}
       />
     );
-  }
-  if (kind === 'video') {
-    if (hasKnownAspect) {
+
+    if (onOpen) {
       return (
-        <div className={lazyAspectBoxClass}>
-          <LazyAspectSizer aspectRatio={aspectRatioCss} />
-          <video
-            src={blobUrl}
-            controls
-            className="absolute inset-0 h-full w-full object-contain"
-            onLoadedMetadata={onIntrinsicLayout}
-          />
-        </div>
+        <button
+          type="button"
+          className={`${hasKnownAspect ? lazyAspectBoxClass : 'block w-full overflow-hidden rounded-lg'} cursor-zoom-in border-0 bg-transparent p-0 outline-none ring-primary/40 focus-visible:ring-2`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          aria-label={openAria}
+        >
+          {img}
+        </button>
       );
     }
-    return (
-      <video
-        src={blobUrl}
-        controls
-        className="max-h-64 w-full rounded-lg"
-        onLoadedMetadata={onIntrinsicLayout}
-      />
-    );
+    return hasKnownAspect ? <div className={lazyAspectBoxClass}>{img}</div> : img;
   }
+
+  if (kind === 'video') {
+    const videoInner = (
+      <>
+        {hasKnownAspect ? <LazyAspectSizer aspectRatio={aspectRatioCss} /> : null}
+        <video
+          src={blobUrl}
+          muted
+          playsInline
+          preload="metadata"
+          className={
+            hasKnownAspect
+              ? 'absolute inset-0 h-full w-full object-contain'
+              : 'max-h-64 w-full rounded-lg object-contain'
+          }
+          onLoadedMetadata={onIntrinsicLayout}
+        />
+        <span className="pointer-events-none absolute inset-0 flex items-center justify-center bg-black/20">
+          <span className="flex size-11 items-center justify-center rounded-full bg-black/55 text-white shadow-md">
+            <PlayIcon className="size-5 ms-0.5" aria-hidden />
+          </span>
+        </span>
+      </>
+    );
+
+    const boxClass = hasKnownAspect
+      ? lazyAspectBoxClass
+      : 'relative max-h-64 w-full overflow-hidden rounded-lg';
+
+    if (onOpen) {
+      return (
+        <button
+          type="button"
+          className={`${boxClass} cursor-pointer border-0 bg-transparent p-0 outline-none ring-primary/40 focus-visible:ring-2`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onOpen();
+          }}
+          aria-label={openAria}
+        >
+          {videoInner}
+        </button>
+      );
+    }
+    return <div className={boxClass}>{videoInner}</div>;
+  }
+
   if (kind === 'audio') {
     return (
       <ChatVoicePlayer

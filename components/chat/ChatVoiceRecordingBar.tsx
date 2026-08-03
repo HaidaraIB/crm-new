@@ -1,5 +1,6 @@
-import React from 'react';
+﻿import React from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { translations } from '../../constants';
 import { PauseIcon, PlayIcon, SquareFillIcon } from '../icons';
 
 type Props = {
@@ -9,7 +10,7 @@ type Props = {
   onResume: () => void;
   onStop: () => void;
   onCancel?: () => void;
-  t: (key: string) => string;
+  t: (key: keyof typeof translations.en) => string;
   /** Compact styling for WhatsApp vs Team Chat shells */
   variant?: 'whatsapp' | 'team';
 };
@@ -55,17 +56,15 @@ export const ChatVoiceRecordingBar: React.FC<Props> = ({
           isRtl ? 'text-right' : 'text-left'
         }`}
       >
-        {paused
-          ? t('teamChatRecordingPaused') || 'Paused'
-          : t('teamChatRecording') || 'Recording…'}
+        {paused ? t('teamChatRecordingPaused') : t('teamChatRecording')}
       </span>
       {onCancel ? (
         <button
           type="button"
           className={btn}
           onClick={onCancel}
-          aria-label={t('teamChatCancelRecording') || 'Cancel recording'}
-          title={t('teamChatCancelRecording') || 'Cancel recording'}
+          aria-label={t('teamChatCancelRecording')}
+          title={t('teamChatCancelRecording')}
         >
           <span className="text-lg leading-none" aria-hidden>
             ×
@@ -76,16 +75,8 @@ export const ChatVoiceRecordingBar: React.FC<Props> = ({
         type="button"
         className={btn}
         onClick={() => (paused ? onResume() : onPause())}
-        aria-label={
-          paused
-            ? t('teamChatResumeRecording') || 'Resume'
-            : t('teamChatPauseRecording') || 'Pause'
-        }
-        title={
-          paused
-            ? t('teamChatResumeRecording') || 'Resume'
-            : t('teamChatPauseRecording') || 'Pause'
-        }
+        aria-label={paused ? t('teamChatResumeRecording') : t('teamChatPauseRecording')}
+        title={paused ? t('teamChatResumeRecording') : t('teamChatPauseRecording')}
       >
         {paused ? <PlayIcon className="size-[1.15rem]" /> : <PauseIcon className="size-[1.15rem]" />}
       </button>
@@ -93,8 +84,8 @@ export const ChatVoiceRecordingBar: React.FC<Props> = ({
         type="button"
         className="inline-flex size-10 shrink-0 items-center justify-center rounded-full bg-red-500 text-white transition-colors hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-400"
         onClick={onStop}
-        aria-label={t('teamChatStopRecording') || 'Stop'}
-        title={t('teamChatStopRecording') || 'Stop'}
+        aria-label={t('teamChatStopRecording')}
+        title={t('teamChatStopRecording')}
       >
         <SquareFillIcon className="size-[1.05rem]" />
       </button>

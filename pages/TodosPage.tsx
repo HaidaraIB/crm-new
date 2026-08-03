@@ -815,7 +815,7 @@ export const TodosPage = () => {
                 </aside>
                 
                 {/* Main Todos Area */}
-                <main className="flex-1 min-w-0 overflow-hidden">
+                <main className="flex-1 min-w-0">
                     {calendarOverdueOnly && (
                         <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-xl border border-rose-200/80 bg-rose-50/90 px-4 py-3 dark:border-rose-900/50 dark:bg-rose-950/30">
                             <p className="text-sm text-rose-900 dark:text-rose-100">
@@ -878,7 +878,11 @@ export const TodosPage = () => {
                                 <Button
                                     key={value}
                                     variant={typeFilter === value ? 'primary' : 'ghost'}
-                                    onClick={() => setTypeFilter(value)}
+                                    onClick={() => {
+                                        setTypeFilter(value);
+                                        requestAnimationFrame(() => (document.activeElement as HTMLElement | null)?.blur?.());
+                                    }}
+                                    className="focus:ring-0 focus-visible:ring-2 focus-visible:!ring-inset focus-visible:!ring-offset-0"
                                 >
                                     {label}
                                 </Button>
@@ -889,7 +893,16 @@ export const TodosPage = () => {
                     {/* Stage filters for active and completed todos (table only — board columns are stages) */}
                     {!isBoardView && !stagesLoading && (
                         <div className="flex items-center gap-2 mb-4 flex-wrap">
-                            <Button variant={activeFilter === 'all' ? 'primary' : 'ghost'} onClick={() => setActiveFilter('all')}><ListIcon className="w-4 h-4" /> {t('all')}</Button>
+                            <Button
+                                variant={activeFilter === 'all' ? 'primary' : 'ghost'}
+                                onClick={() => {
+                                    setActiveFilter('all');
+                                    requestAnimationFrame(() => (document.activeElement as HTMLElement | null)?.blur?.());
+                                }}
+                                className="focus:ring-0 focus-visible:ring-2 focus-visible:!ring-inset focus-visible:!ring-offset-0"
+                            >
+                                <ListIcon className="w-4 h-4" /> {t('all')}
+                            </Button>
                             {availableStages.length > 0 ? (
                                 availableStages.map(stage => {
                                 const Icon = getStageIcon(stage.name as TaskStage);
@@ -897,7 +910,11 @@ export const TodosPage = () => {
                                     <Button 
                                         key={stage.id} 
                                         variant={activeFilter === stage.name ? 'primary' : 'ghost'} 
-                                        onClick={() => setActiveFilter(stage.name as FilterType)}
+                                        onClick={() => {
+                                            setActiveFilter(stage.name as FilterType);
+                                            requestAnimationFrame(() => (document.activeElement as HTMLElement | null)?.blur?.());
+                                        }}
+                                        className="focus:ring-0 focus-visible:ring-2 focus-visible:!ring-inset focus-visible:!ring-offset-0"
                                     >
                                         <Icon className="w-4 h-4" /> {stage.name}
                                     </Button>
@@ -1295,17 +1312,12 @@ export const TodosPage = () => {
                         </Card>
                         ) : (
                             <Card className="text-center py-10 px-4">
-                            <p className="text-gray-600 dark:text-gray-400 mb-4">
+                            <p className="text-gray-600 dark:text-gray-400">
                                 {selectedDate 
                                     ? `${t('noTasksForDate')} ${selectedDate.toLocaleDateString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits())}.`
                                     : (t('noTasksFound') || 'No tasks found.')
                                 }
                             </p>
-                            {activeTab === 'active' && (
-                                <Button onClick={() => setIsAddTodoModalOpen(true)}>
-                                    <PlusIcon className="w-4 h-4" /> {t('addTodo')}
-                                </Button>
-                            )}
                             </Card>
                         )}
                 </main>

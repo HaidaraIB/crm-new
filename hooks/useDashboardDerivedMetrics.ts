@@ -4,6 +4,8 @@ type ClientTaskLike = {
   client?: number;
   clientId?: number;
   reminder_date?: string | null;
+  reminder_completed_at?: string | null;
+  reminderCompletedAt?: string | null;
   created_at?: string;
   createdAt?: string;
 };
@@ -59,12 +61,16 @@ export function useDashboardDerivedMetrics(leads: LeadLike[], clientTasks: Clien
       (lead) => !(lead.assigned_to || lead.assignedTo),
     ).length;
 
-    const overdueFollowUps = clientTasks.filter((ct) => {
+    const openClientTasks = clientTasks.filter(
+      (ct) => !(ct.reminder_completed_at || ct.reminderCompletedAt),
+    );
+
+    const overdueFollowUps = openClientTasks.filter((ct) => {
       if (!ct.reminder_date) return false;
       return isBeforeToday(ct.reminder_date, today);
     }).length;
 
-    const tasksByClient = buildTasksByClient(clientTasks);
+    const tasksByClient = buildTasksByClient(openClientTasks);
 
     const leadsToContactToday = leads.filter((lead) => {
       const assignedToId = lead.assigned_to || lead.assignedTo;

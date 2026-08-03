@@ -20,9 +20,37 @@ function formatElapsed(ms: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
+/** Prefer OGG/Opus for WhatsApp, then WebM, then Safari-friendly MP4/AAC. */
+const VOICE_MIME_CANDIDATES = [
+  'audio/ogg;codecs=opus',
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/mp4',
+  'audio/aac',
+] as const;
+
+function pickVoiceRecorderMime(): string {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
+  for (const candidate of VOICE_MIME_CANDIDATES) {
+    if (MediaRecorder.isTypeSupported(candidate)) return candidate;
+  }
+  return '';
+}
+
+/** Map MediaRecorder MIME to a real file extension (never invent .webm for MP4). */
+function extensionForAudioMime(mime: string): string {
+  const base = (mime || '').split(';')[0].trim().toLowerCase();
+  if (base.includes('ogg') || base.includes('opus')) return 'ogg';
+  if (base.includes('webm')) return 'webm';
+  if (base === 'audio/aac') return 'aac';
+  if (base.includes('mp4') || base.includes('m4a') || base.includes('aac')) return 'm4a';
+  if (base.includes('mpeg') || base.includes('mp3')) return 'mp3';
+  return 'webm';
+}
+
 /**
  * Shared MediaRecorder hook for Team Chat and WhatsApp composers.
- * Prefers ogg/opus when available, else webm/opus, else browser default.
+ * Prefers ogg/opus when available, else webm, else mp4/aac (Safari), else browser default.
  * Supports pause/resume and an elapsed timer (paused time is excluded).
  */
 export function useChatVoiceRecorder({
@@ -157,13 +185,7 @@ export function useChatVoiceRecorder({
       recordStreamRef.current = stream;
       mediaChunksRef.current = [];
       resetTiming();
-      const mime = MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')
-        ? 'audio/ogg;codecs=opus'
-        : MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
-          ? 'audio/webm;codecs=opus'
-          : MediaRecorder.isTypeSupported('audio/webm')
-            ? 'audio/webm'
-            : '';
+      const mime = pickVoiceRecorderMime();
       const mr = mime
         ? new MediaRecorder(stream, { mimeType: mime, audioBitsPerSecond: 64000 })
         : new MediaRecorder(stream, { audioBitsPerSecond: 64000 });
@@ -182,10 +204,10 @@ export function useChatVoiceRecorder({
         const chunks = mediaChunksRef.current.slice();
         mediaChunksRef.current = [];
         if (discard) return;
-        const type = mr.mimeType || 'audio/webm';
+        const type = mr.mimeType || mime || 'audio/webm';
         const blob = new Blob(chunks, { type });
         if (blob.size > 0) {
-          const ext = type.includes('ogg') ? 'ogg' : 'webm';
+          const ext = extensionForAudioMime(type);
           onRecordingComplete(new File([blob], `voice-${Date.now()}.${ext}`, { type }));
         }
       };

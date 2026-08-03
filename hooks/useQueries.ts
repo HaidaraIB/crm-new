@@ -670,7 +670,6 @@ export const useWhatsAppConversations = (
 /** Sidebar badge: unread inbound WhatsApp messages in the caller's ACL scope. */
 export const useWhatsAppUnreadCount = (
   options?: Omit<UseQueryOptions<{ unread_count: number }, Error>, 'queryKey' | 'queryFn'> & {
-    refetchInterval?: number | false;
     enabled?: boolean;
   }
 ) => {

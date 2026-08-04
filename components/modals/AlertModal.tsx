@@ -45,13 +45,6 @@ export const AlertModal = () => {
     const { bg, path } = iconByVariant[alertVariant];
     const iconColor = iconColorByVariant[alertVariant];
 
-    const displayMessage =
-        typeof alertMessage === 'string'
-            ? alertMessage
-            : alertMessage != null
-              ? JSON.stringify(alertMessage)
-              : '';
-
     return (
         <Modal
             isOpen={isAlertModalOpen}
@@ -65,9 +58,9 @@ export const AlertModal = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={path} />
                         </svg>
                     </div>
-                    <p className="text-gray-700 dark:text-gray-300 text-base pt-0.5 flex-1">
-                        {displayMessage}
-                    </p>
+                    <div className="text-gray-700 dark:text-gray-300 text-base pt-0.5 flex-1">
+                        {alertMessage}
+                    </div>
                 </div>
                 <div className="flex justify-end pt-2">
                     <Button onClick={() => setIsAlertModalOpen(false)}>

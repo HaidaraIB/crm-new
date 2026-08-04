@@ -9,6 +9,7 @@ import {
 } from '../utils/leadLocation';
 import { ChatVoicePlayer } from './chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
+import { PhoneText } from './PhoneText';
 
 const TimelineRecordingPlayer: React.FC<{ url: string; t: (key: string) => string }> = ({
     url,
@@ -323,13 +324,12 @@ export const Timeline = ({ history }: TimelineProps) => {
                                                               }
                                                             : undefined
                                                     }
-                                                    dir={
-                                                        entry.type === 'sms' || entry.type === 'whatsapp'
-                                                            ? 'ltr'
-                                                            : undefined
-                                                    }
                                                 >
-                                                    {entry.stage}
+                                                    {entry.type === 'sms' || entry.type === 'whatsapp' ? (
+                                                        <PhoneText>{entry.stage}</PhoneText>
+                                                    ) : (
+                                                        entry.stage
+                                                    )}
                                                 </span>
                                             )}
                                         </div>

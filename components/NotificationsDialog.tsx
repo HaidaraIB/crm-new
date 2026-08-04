@@ -15,6 +15,7 @@ import {
 import { formatDateTimeToLocal } from '../utils/dateUtils';
 import { getNotificationDisplay } from '../utils/notificationDisplay';
 import { getCompanyViewLeadRoute, navigateToCompanyRoute } from '../utils/routing';
+import { PhoneText, isPhoneLike } from './PhoneText';
 
 const NOTIFICATIONS_QK = ['notifications', 'list'] as const;
 const NOTIFICATIONS_UNREAD_QK = ['notifications', 'unread-count'] as const;
@@ -353,7 +354,13 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                               : undefined
                           }
                         >
-                          {display.title}
+                          {(n.type === 'pbx_incoming_call' ||
+                            n.type === 'pbx_call_missed') &&
+                          isPhoneLike(display.title) ? (
+                            <PhoneText>{display.title}</PhoneText>
+                          ) : (
+                            display.title
+                          )}
                         </span>
                         <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
                           {display.typeLabel}

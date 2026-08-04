@@ -2275,9 +2275,14 @@ export const IntegrationsPage = () => {
             queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
             const display = res.display_phone_number || res.phone_number_id || '';
             showAlert(
-                display
-                    ? (t('whatsappPhoneNumbersSynced') || 'Phone numbers synced.') + ` ${display}`
-                    : (t('whatsappPhoneNumbersSynced') || 'Phone numbers synced.'),
+                display ? (
+                    <>
+                        {t('whatsappPhoneNumbersSynced') || 'Phone numbers synced.'}{' '}
+                        <PhoneText>{display}</PhoneText>
+                    </>
+                ) : (
+                    t('whatsappPhoneNumbersSynced') || 'Phone numbers synced.'
+                ),
                 'info'
             );
         } catch (error: any) {

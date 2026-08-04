@@ -5,6 +5,7 @@
  */
 
 import { localizeWhatsAppMessageBodyForLang } from './whatsappMessageBodyDisplay';
+import { isolatePhoneBidi } from '../components/PhoneText';
 
 export type NotificationLang = 'ar' | 'en';
 
@@ -346,9 +347,12 @@ export function getNotificationDisplay(
   // PBX: prefer caller phone as title when no matched lead name.
   if (type === 'pbx_incoming_call' || type === 'pbx_call_missed') {
     const phone = str(data.phone).trim();
+    const isolatedPhone = phone ? isolatePhoneBidi(phone) : '';
     const clientName = str(data.client_name || data.lead_name).trim();
-    const title = clientName || phone || tpl.title;
-    const localizedBody = phone ? formatTemplate(tpl.body, { ...data, phone }) : tpl.title;
+    const title = clientName || isolatedPhone || tpl.title;
+    const localizedBody = phone
+      ? formatTemplate(tpl.body, { ...data, phone: isolatedPhone })
+      : tpl.title;
     return { title, body: localizedBody, typeLabel: tpl.title };
   }
 

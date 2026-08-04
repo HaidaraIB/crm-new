@@ -38,11 +38,24 @@ export function PhoneText({
 }
 
 /**
+ * Wrap a phone string with Unicode LRI/PDI so it stays LTR inside RTL prose
+ * when the result must remain a plain string (e.g. notification templates).
+ */
+export function isolatePhoneBidi(value: string | null | undefined): string {
+  const s = String(value ?? '').trim();
+  if (!s) return '';
+  return `\u2066${s}\u2069`;
+}
+
+/**
  * True when a display string is likely a phone (leading `+`, or mostly digits/separators).
  * Use for ambiguous titles such as WhatsApp account.name or contact titles.
  */
 export function isPhoneLike(value: string | null | undefined): boolean {
-  const s = String(value ?? '').trim();
+  // Strip BiDi isolates (LRI/RLI/FSI/PDI) and LRM/RLM so pre-isolated strings still match.
+  const s = String(value ?? '')
+    .replace(/[\u2066-\u2069\u200E\u200F]/g, '')
+    .trim();
   if (!s) return false;
   if (s.startsWith('+')) return true;
   const stripped = s.replace(/[\s\-().]/g, '');

@@ -12,6 +12,7 @@ import { DEFAULT_CALL_FILTERS } from '../../utils/callFilters';
 import type { CallFilters } from '../../types';
 import { getUserDisplayName } from '../../types';
 import { normalizeRole, usersForOperationalEmployeeLists } from '../../utils/roles';
+import { PhoneText } from '../PhoneText';
 
 export { DEFAULT_CALL_FILTERS };
 
@@ -184,9 +185,9 @@ export const CallsFilterDrawer: React.FC = () => {
                     {lead.name || t('unknown')}
                   </span>
                   {lead.phone ? (
-                    <span className="text-xs text-gray-500 dark:text-gray-400" dir="ltr">
+                    <PhoneText className="text-xs text-gray-500 dark:text-gray-400">
                       {lead.phone}
-                    </span>
+                    </PhoneText>
                   ) : null}
                 </button>
               ))

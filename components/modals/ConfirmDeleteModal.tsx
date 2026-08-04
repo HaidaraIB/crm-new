@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { PhoneText, isPhoneLike } from '../PhoneText';
 import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
 
 interface ConfirmDeleteModalProps {
@@ -80,7 +81,11 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
                 <p className="text-gray-700 dark:text-gray-300">
                     {itemName ? (
                         <>
-                            {message} <span className="font-bold">{itemName}</span>? {showWarning && (t('confirmDeleteWarning') || 'This action cannot be undone.')}
+                            {message}{' '}
+                            <span className="font-bold">
+                                {isPhoneLike(itemName) ? <PhoneText>{itemName}</PhoneText> : itemName}
+                            </span>
+                            ? {showWarning && (t('confirmDeleteWarning') || 'This action cannot be undone.')}
                         </>
                     ) : (
                         <>

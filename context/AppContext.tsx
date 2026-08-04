@@ -101,7 +101,7 @@ export interface AppContextType {
   selectedUser: User | null;
   setSelectedUser: (user: User | null) => void;
   currentUser: User | null;
-  setCurrentUser: React.Dispatch<React.SetStateAction<User | null>>;
+  setCurrentUser: (user: User | null) => void;
   /** True after auth profile has been loaded/synced (avoid UI flashes from stale localStorage). */
   isUserDataReady: boolean;
   isSidebarOpen: boolean;
@@ -335,11 +335,11 @@ export interface AppContextType {
   // Alert Modal state (info / warning / error messages instead of browser alert)
   isAlertModalOpen: boolean;
   setIsAlertModalOpen: (isOpen: boolean) => void;
-  alertMessage: string;
-  setAlertMessage: (message: string) => void;
+  alertMessage: ReactNode;
+  setAlertMessage: (message: ReactNode) => void;
   alertVariant: 'info' | 'warning' | 'error';
   setAlertVariant: (v: 'info' | 'warning' | 'error') => void;
-  showAlert: (message: string, variant?: 'info' | 'warning' | 'error') => void;
+  showAlert: (message: ReactNode, variant?: 'info' | 'warning' | 'error') => void;
 
   // Filters (UI state only)
   leadFilters: LeadFilters;
@@ -790,7 +790,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
 
   // Alert Modal state (replaces browser alert for app-styled messages)
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
-  const [alertMessage, setAlertMessage] = useState('');
+  const [alertMessage, setAlertMessage] = useState<ReactNode>('');
   const [alertVariant, setAlertVariant] = useState<'info' | 'warning' | 'error'>('info');
 
 
@@ -867,11 +867,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
             // Update userData with latest subscription info
             if (userData.company?.subscription) {
               userData.company.subscription.is_active = subscriptionStatus.is_truly_active;
-              userData.company.subscription.end_date = subscriptionStatus.end_date;
+              userData.company.subscription.end_date = subscriptionStatus.end_date ?? undefined;
             }
             
             // Check if subscription is expiring soon
-            if (subscriptionStatus.is_expiring_soon && subscriptionStatus.days_until_expiry > 0) {
+            if (
+              subscriptionStatus.is_expiring_soon &&
+              (subscriptionStatus.days_until_expiry ?? 0) > 0
+            ) {
               // Store subscription warning in localStorage for display
               localStorage.setItem('subscriptionExpiringWarning', JSON.stringify({
                 days: subscriptionStatus.days_until_expiry,
@@ -1013,14 +1016,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         const currentEndDate = latestUser.company.subscription.end_date;
         
         if (currentIsActive !== status.is_truly_active || currentEndDate !== status.end_date) {
-          const updatedUser = {
+          const updatedUser: User = {
             ...latestUser,
             company: {
               ...latestUser.company,
               subscription: {
                 ...latestUser.company.subscription,
                 is_active: status.is_truly_active,
-                end_date: status.end_date
+                end_date: status.end_date ?? undefined,
               }
             }
           };
@@ -1059,7 +1062,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         }
         
         // Check if subscription is expiring soon
-        if (status.is_expiring_soon && status.days_until_expiry > 0) {
+        if (status.is_expiring_soon && (status.days_until_expiry ?? 0) > 0) {
           localStorage.setItem('subscriptionExpiringWarning', JSON.stringify({
             days: status.days_until_expiry,
             endDate: status.end_date,
@@ -1393,14 +1396,15 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [theme, language]);
 
-  const showAlert = (message: string, variant: 'info' | 'warning' | 'error' = 'info') => {
+  const showAlert = (message: ReactNode, variant: 'info' | 'warning' | 'error' = 'info') => {
     setAlertMessage(message);
     setAlertVariant(variant);
     setIsAlertModalOpen(true);
   };
 
   const t = (key: keyof typeof translations.en) => {
-    const base = translations[language][key] || translations.en[key];
+    const table = (language === 'ar' ? translations.ar : translations.en) as typeof translations.en;
+    const base = table[key] || translations.en[key];
     const lang: 'en' | 'ar' = language === 'ar' ? 'ar' : 'en';
     const dealOverride = getDealTerminologyOverride(
       currentUser?.company?.specialization,

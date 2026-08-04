@@ -25,6 +25,7 @@ import { EditTemplateModal } from '../components/modals/EditTemplateModal';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { SmsSendPreviewModal } from '../components/modals/SmsSendPreviewModal';
 import { replaceSmsTemplatePlaceholders, leadHasPhone, resolveLeadPhoneRaw } from '../utils/smsSendHelpers';
+import { replaceTemplatePlaceholders } from '../utils/messagePlaceholders';
 import { FileTextIcon, SearchIcon, EditIcon, MegaphoneIcon, ClockIcon, RefreshIcon } from '../components/icons';
 import {
     getWhatsAppContactAvatarLabel,
@@ -2414,7 +2415,9 @@ export const IntegrationsPage = () => {
             if (!body) return undefined;
             for (const tpl of approvedWaTemplates) {
                 let preview = selectedChatClient
-                    ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient)
+                    ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient, {
+                          tenantCompanyName: currentUser?.company?.name || '',
+                      })
                     : (tpl.content || '');
                 preview = preview.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();
                 if (preview && preview === body) return tpl.id;
@@ -2610,45 +2613,14 @@ export const IntegrationsPage = () => {
         const formatChatTime = () =>
             new Date().toLocaleTimeString(language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US', withLatinDigits({ hour: '2-digit', minute: '2-digit' }));
 
-        /** Replace template placeholders (EN and AR) with actual lead/client values; if no value, leave placeholder as-is */
-        const replaceTemplatePlaceholders = (text: string, client: any): string => {
-            if (!client) return text;
-            const customerName = (client.name || client.contact_name || (client.first_name && client.last_name ? `${client.first_name} ${client.last_name}`.trim() : '') || '').trim();
-            const leadCompany = String(client.lead_company_name || '').trim();
-            const tenantCompany = (currentUser?.company?.name || '').trim();
-            const company = tenantCompany || leadCompany;
-            const amount = client.amount ?? client.last_invoice_amount ?? '';
-            const amountStr = amount !== undefined && amount !== null && String(amount).trim() !== '' ? String(amount).trim() : null;
-            const invoiceNumber = client.invoice_number ?? client.last_invoice_number ?? '';
-            const invoiceStr = invoiceNumber !== undefined && invoiceNumber !== null && String(invoiceNumber).trim() !== '' ? String(invoiceNumber).trim() : null;
-
-            const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const replacePlaceholder = (out: string, pattern: string, value: string) =>
-                value ? out.replace(new RegExp(`\\[\\s*${escapeRegex(pattern)}\\s*\\]`, 'g'), value) : out;
-
-            let out = text;
-            out = replacePlaceholder(out, 'اسم_العميل', customerName);
-            out = replacePlaceholder(out, 'اسم العميل', customerName);
-            out = replacePlaceholder(out, 'Customer Name', customerName);
-            out = replacePlaceholder(out, 'شركة', company);
-            out = replacePlaceholder(out, 'الشركة', company);
-            out = replacePlaceholder(out, 'Company', company);
-            if (amountStr !== null) {
-                out = replacePlaceholder(out, 'المبلغ', amountStr);
-                out = replacePlaceholder(out, 'Amount', amountStr);
-            }
-            if (invoiceStr !== null) {
-                out = replacePlaceholder(out, 'رقم_الفاتورة', invoiceStr);
-                out = replacePlaceholder(out, 'رقم الفاتورة', invoiceStr);
-                out = replacePlaceholder(out, 'Invoice Number', invoiceStr);
-            }
-            return out;
-        };
-
         const buildTemplatePreviewBody = (templateId: number): string => {
             const tpl = approvedWaTemplates.find((t) => t.id === templateId);
             if (!tpl) return 'Template';
-            let body = selectedChatClient ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient) : (tpl.content || '');
+            let body = selectedChatClient
+                ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient, {
+                      tenantCompanyName: currentUser?.company?.name || '',
+                  })
+                : (tpl.content || '');
             body = body.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();
             return body || tpl.name || 'Template';
         };
@@ -2735,7 +2707,11 @@ export const IntegrationsPage = () => {
         };
 
         const handleApplyQuickTemplate = (content: string) => {
-            const resolved = selectedChatClient ? replaceTemplatePlaceholders(content, selectedChatClient) : content;
+            const resolved = selectedChatClient
+                ? replaceTemplatePlaceholders(content, selectedChatClient, {
+                      tenantCompanyName: currentUser?.company?.name || '',
+                  })
+                : content;
             setMessageInput((prev) => prev + (prev ? '\n' : '') + resolved);
         };
 

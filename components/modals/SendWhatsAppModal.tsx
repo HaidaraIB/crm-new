@@ -7,6 +7,7 @@ import { Loader } from '../Loader';
 import { PhoneText } from '../PhoneText';
 import { sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, getMessageTemplatesAPI, resolveLocalizedApiError } from '../../services/api';
 import { clearFieldError } from '../../utils/formFieldErrors';
+import { replaceTemplatePlaceholders } from '../../utils/messagePlaceholders';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -15,37 +16,6 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 function stripAnsi(str: string | undefined | null): string {
     if (str == null || typeof str !== 'string') return '';
     return str.replace(/\x1b\[[0-9;]*m/g, '').trim();
-}
-
-/** Replace [Customer Name], [Company], etc. (EN/AR) with lead data */
-function replaceTemplatePlaceholders(text: string, lead: any): string {
-    if (!lead) return text;
-    const customerName = (lead.name || lead.contact_name || (lead.first_name && lead.last_name ? `${lead.first_name} ${lead.last_name}`.trim() : '') || '').trim();
-    const company = (typeof lead.company_name === 'string' ? lead.company_name : (lead.company && (typeof lead.company === 'string' ? lead.company : lead.company?.name)) || '').trim();
-    const amount = lead.amount ?? lead.last_invoice_amount ?? '';
-    const amountStr = amount !== undefined && amount !== null && String(amount).trim() !== '' ? String(amount).trim() : null;
-    const invoiceNumber = lead.invoice_number ?? lead.last_invoice_number ?? '';
-    const invoiceStr = invoiceNumber !== undefined && invoiceNumber !== null && String(invoiceNumber).trim() !== '' ? String(invoiceNumber).trim() : null;
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const replacePlaceholder = (out: string, pattern: string, value: string) =>
-        value ? out.replace(new RegExp(`\\[\\s*${escapeRegex(pattern)}\\s*\\]`, 'g'), value) : out;
-    let out = text;
-    out = replacePlaceholder(out, 'اسم_العميل', customerName);
-    out = replacePlaceholder(out, 'اسم العميل', customerName);
-    out = replacePlaceholder(out, 'Customer Name', customerName);
-    out = replacePlaceholder(out, 'شركة', company);
-    out = replacePlaceholder(out, 'الشركة', company);
-    out = replacePlaceholder(out, 'Company', company);
-    if (amountStr !== null) {
-        out = replacePlaceholder(out, 'المبلغ', amountStr);
-        out = replacePlaceholder(out, 'Amount', amountStr);
-    }
-    if (invoiceStr !== null) {
-        out = replacePlaceholder(out, 'رقم_الفاتورة', invoiceStr);
-        out = replacePlaceholder(out, 'رقم الفاتورة', invoiceStr);
-        out = replacePlaceholder(out, 'Invoice Number', invoiceStr);
-    }
-    return out;
 }
 
 type SendWhatsAppModalProps = {

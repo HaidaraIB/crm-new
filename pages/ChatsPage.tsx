@@ -42,6 +42,11 @@ import {
   saveSelectedManualPhone,
   type ManualChatMessage,
 } from '../utils/whatsappManualChatsStorage';
+import {
+  playIncomingWhatsAppSound,
+  preloadIncomingWhatsAppSound,
+} from '../utils/whatsappIncomingSound';
+import { replaceTemplatePlaceholders } from '../utils/messagePlaceholders';
 
 const SESSION_MS = 24 * 60 * 60 * 1000;
 
@@ -51,52 +56,6 @@ function inferChatAttachmentKind(file: File): 'image' | 'video' | 'audio' | 'doc
   if (t.startsWith('video/')) return 'video';
   if (t.startsWith('audio/')) return 'audio';
   return 'document';
-}
-
-function replaceTemplatePlaceholders(text: string, client: any, companyName: string): string {
-  if (!text) return text;
-  const customerNameRaw = (
-    client?.name ||
-    client?.contact_name ||
-    (client?.first_name && client?.last_name
-      ? `${client.first_name} ${client.last_name}`.trim()
-      : '') ||
-    ''
-  ).trim();
-  // "WhatsApp: 4477…" titles → use digits/phone as display name when no real name
-  const customerName = customerNameRaw.toLowerCase().startsWith('whatsapp:')
-    ? customerNameRaw.split(':').slice(1).join(':').trim() ||
-      String(client?.phone_number || client?.phone || '').trim()
-    : customerNameRaw;
-  const leadCompany = String(client?.lead_company_name || '').trim();
-  const company = (companyName || '').trim() || leadCompany;
-  const phone = String(client?.phone_number || client?.phone || '').trim();
-  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const replaceBracket = (out: string, pattern: string, value: string) =>
-    value ? out.replace(new RegExp(`\\[\\s*${escapeRegex(pattern)}\\s*\\]`, 'g'), value) : out;
-
-  let out = text;
-  out = replaceBracket(out, 'اسم_العميل', customerName);
-  out = replaceBracket(out, 'اسم العميل', customerName);
-  out = replaceBracket(out, 'Customer Name', customerName);
-  out = replaceBracket(out, 'شركة', company);
-  out = replaceBracket(out, 'الشركة', company);
-  out = replaceBracket(out, 'Company', company);
-  out = replaceBracket(out, 'الهاتف', phone);
-  out = replaceBracket(out, 'رقم_الهاتف', phone);
-  out = replaceBracket(out, 'Phone', phone);
-
-  // Meta-style {{1}}, {{2}}, … — fill from lead context (name, company, phone, …)
-  const positionalPool = [customerName, company, phone, leadCompany].map((v) =>
-    (v || '').trim()
-  );
-  out = out.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, numStr: string) => {
-    const idx = Math.max(0, parseInt(numStr, 10) - 1);
-    const value = positionalPool[idx] || positionalPool.find((v) => v) || '';
-    return value || '-';
-  });
-
-  return out;
 }
 
 function deriveSessionFromMessages(messages: { direction?: string; created_at?: string }[]): boolean {
@@ -160,6 +119,9 @@ export const ChatsPage: React.FC = () => {
   } | null>(null);
   const lastInboundKeyRef = useRef<string>('');
   const markReadClientKeyRef = useRef<string>('');
+  /** Hydrate-safe tracker so opening a thread with history does not play sound. */
+  const inboundSoundHydratedRef = useRef(false);
+  const inboundSoundLatestIdRef = useRef<number | null>(null);
 
   const markConversationRead = useMarkWhatsAppConversationRead();
 
@@ -235,6 +197,8 @@ export const ChatsPage: React.FC = () => {
     data: leadWhatsAppMessages = [],
     refetch: refetchLeadWhatsApp,
     isFetching: isFetchingChatMessages,
+    isFetched: isChatMessagesFetched,
+    isSuccess: isChatMessagesSuccess,
   } = useWhatsAppChatMessages({
     clientId: selectedChatLeadId,
     phone: selectedChatPhone || undefined,
@@ -297,6 +261,50 @@ export const ChatsPage: React.FC = () => {
       }
     }
   }, [leadWhatsAppMessages, queryClient, refetchWaSession, selectedChatLeadId, markConversationRead]);
+
+  // Reset trackers when switching conversations (must run before in-thread sound hydrate).
+  useEffect(() => {
+    inboundSoundHydratedRef.current = false;
+    inboundSoundLatestIdRef.current = null;
+    lastInboundKeyRef.current = '';
+  }, [selectedChatClient?.id, selectedChatPhone]);
+
+  // Real WhatsApp–style: play notification_whatsapp when inbound arrives in the open thread.
+  useEffect(() => {
+    if (!selectedChatClient) {
+      inboundSoundHydratedRef.current = false;
+      inboundSoundLatestIdRef.current = null;
+      return;
+    }
+    // Wait for first fetch so history load does not count as a "new" inbound.
+    if (!isChatMessagesFetched || !isChatMessagesSuccess) return;
+
+    preloadIncomingWhatsAppSound();
+
+    const inboundIds = (leadWhatsAppMessages as any[])
+      .filter((m) => m.direction === 'inbound' && typeof m.id === 'number')
+      .map((m) => m.id as number);
+    const latestId = inboundIds.length ? Math.max(...inboundIds) : null;
+
+    if (!inboundSoundHydratedRef.current) {
+      inboundSoundLatestIdRef.current = latestId;
+      inboundSoundHydratedRef.current = true;
+      return;
+    }
+
+    if (latestId != null && (inboundSoundLatestIdRef.current == null || latestId > inboundSoundLatestIdRef.current)) {
+      playIncomingWhatsAppSound();
+    }
+    if (latestId != null) {
+      inboundSoundLatestIdRef.current = latestId;
+    }
+  }, [
+    leadWhatsAppMessages,
+    selectedChatClient?.id,
+    selectedChatPhone,
+    isChatMessagesFetched,
+    isChatMessagesSuccess,
+  ]);
 
   useEffect(() => {
     if (!selectedChatClient) return;

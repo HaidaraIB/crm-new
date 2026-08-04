@@ -186,13 +186,16 @@ export const medicalTranslationOverrides: {
     whatsapp_template_parameter_mismatch: 'Could not fill template variables from this patient.',
     whatsapp_template_not_found_or_language:
         'This WhatsApp template was not found for the selected language, or it is not approved yet. Sync templates and confirm the language matches Meta.',
-    newLeadSmsSettings: 'New patient SMS',
+    newLeadSmsSettings: 'New patient welcome',
     newLeadSmsEnable: 'Send SMS automatically when a new patient is created',
     newLeadSmsIntegrationsNote:
       'Messages are sent via your configured SMS provider (Twilio or OTPIQ). Enable the integration and complete credentials under Integrations → SMS.',
     newLeadSmsGoIntegrations: 'Go to Integrations → SMS',
     newLeadSmsGoIntegrationsHint:
       'Opens SMS integration settings to choose a provider (Twilio or OTPIQ) and enter credentials.',
+    newLeadWhatsAppEnable: 'Send WhatsApp template automatically when a new patient is created',
+    newLeadWhatsAppIntegrationsNote:
+      'Messages are sent via your connected WhatsApp Business number using an approved Meta template. Connect WhatsApp under Messaging Center → Accounts.',
     twilioSmsIntegration: 'SMS Notifications Integration',
     smsProviderNote: 'Choose Twilio or OTPIQ as your SMS provider. Configure credentials below.',
     leadAssignmentSettings: 'Patient assignment settings',
@@ -407,13 +410,16 @@ export const medicalTranslationOverrides: {
     whatsapp_template_parameter_mismatch: 'تعذر ملء متغيرات القالب من هذا المريض.',
     whatsapp_template_not_found_or_language:
         'ميتا لم تجد اسم القالب+اللغة على حساب واتساب المرتبط برقمك المتصل (خطأ 132001). القوالب مرتبطة بـ WABA — حدّث أرقام الهاتف ثم زامن القوالب وتأكد أن القالب موجود لنفس الحساب في ميتا.',
-    newLeadSmsSettings: 'رسائل المريض الجديد',
+    newLeadSmsSettings: 'رسالة ترحيب للمريض الجديد',
     newLeadSmsEnable: 'إرسال رسالة تلقائياً عند إنشاء مريض جديد',
     newLeadSmsIntegrationsNote:
       'تُرسل الرسائل عبر مزود SMS المضبوط (Twilio أو OTPIQ). يجب تفعيل التكامل وإكمال البيانات من التكاملات → الرسائل القصيرة.',
     newLeadSmsGoIntegrations: 'الانتقال إلى التكاملات → الرسائل القصيرة',
     newLeadSmsGoIntegrationsHint:
       'يفتح إعدادات SMS لاختيار المزود (Twilio أو OTPIQ) وإدخال بيانات الاعتماد.',
+    newLeadWhatsAppEnable: 'إرسال قالب واتساب تلقائياً عند إنشاء مريض جديد',
+    newLeadWhatsAppIntegrationsNote:
+      'تُرسل الرسائل عبر رقم واتساب الأعمال المتصل باستخدام قالب معتمد من ميتا. اربط واتساب من مركز المراسلات → الحسابات.',
     twilioSmsIntegration: 'ربط إشعارات SMS',
     smsProviderNote: 'اختر Twilio أو OTPIQ كمزود للرسائل القصيرة. أدخل بيانات الاعتماد أدناه.',
     leadAssignmentSettings: 'إعدادات إسناد المرضى',

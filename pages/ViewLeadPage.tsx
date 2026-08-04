@@ -652,6 +652,7 @@ export const ViewLeadPage = () => {
         // Format WhatsApp messages
         const waEntries = (leadWhatsAppMessages as any[]).map((wa) => {
             const isInbound = wa.direction === 'inbound';
+            const isAutoWelcome = !isInbound && wa.send_source === 'auto_welcome';
             const actor = resolveTimelineActor({
                 createdById: wa.created_by,
                 createdByUsername: wa.created_by_username,
@@ -661,7 +662,11 @@ export const ViewLeadPage = () => {
                 contactName: leadContactName,
                 contactPhone: wa.phone_number || leadContactPhone,
             });
-            const dir = isInbound ? t('whatsappReceived') : t('whatsappSent');
+            const dir = isInbound
+                ? t('whatsappReceived')
+                : isAutoWelcome
+                  ? t('whatsappSentAutoWelcome') || t('whatsappSent')
+                  : t('whatsappSent');
             return {
                 id: `wa-${wa.id}`,
                 type: 'whatsapp' as const,

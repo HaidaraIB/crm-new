@@ -1,9 +1,25 @@
-/** Placeholder patterns aligned with API `_content_to_meta_body` in templates_whatsapp.py */
+/** Placeholder patterns aligned with API Meta conversion in message_placeholders.py / templates_whatsapp.py */
 const PLACEHOLDER_PATTERNS: RegExp[] = [
-  /\[\s*Customer Name\s*\]|\[\s*اسم_العميل\s*\]|\[\s*اسم العميل\s*\]/gi,
-  /\[\s*Company\s*\]|\[\s*الشركة\s*\]|\[\s*شركة\s*\]/gi,
-  /\[\s*Amount\s*\]|\[\s*المبلغ\s*\]/gi,
-  /\[\s*Invoice Number\s*\]|\[\s*رقم_الفاتورة\s*\]|\[\s*رقم الفاتورة\s*\]/gi,
+  // Customer name
+  /\[\s*Customer Name\s*\]|\[\s*اسم_العميل\s*\]|\[\s*اسم العميل\s*\]|\{\s*Customer Name\s*\}|\{\s*اسم العميل\s*\}|\{\s*اسم_العميل\s*\}/gi,
+  // Phone
+  /\[\s*Phone\s*\]|\[\s*رقم_الهاتف\s*\]|\[\s*رقم الهاتف\s*\]|\[\s*الهاتف\s*\]|\{\s*Phone\s*\}|\{\s*رقم الهاتف\s*\}|\{\s*رقم_الهاتف\s*\}/gi,
+  // Employee
+  /\[\s*Employee Name\s*\]|\[\s*اسم_الموظف\s*\]|\[\s*اسم الموظف\s*\]|\{\s*Employee Name\s*\}|\{\s*اسم الموظف\s*\}|\{\s*اسم_الموظف\s*\}/gi,
+  // Company
+  /\[\s*Company\s*\]|\[\s*الشركة\s*\]|\[\s*شركة\s*\]|\[\s*اسم الشركة\s*\]|\{\s*Company\s*\}|\{\s*اسم الشركة\s*\}|\{\s*الشركة\s*\}/gi,
+  // Date / time
+  /\[\s*Current Date\s*\]|\[\s*التاريخ الحالي\s*\]|\{\s*Current Date\s*\}|\{\s*التاريخ الحالي\s*\}/gi,
+  /\[\s*Current Time\s*\]|\[\s*الوقت الحالي\s*\]|\{\s*Current Time\s*\}|\{\s*الوقت الحالي\s*\}/gi,
+  // Status / stage / channel / visit / profession
+  /\[\s*Status\s*\]|\[\s*الحالة\s*\]|\{\s*Status\s*\}|\{\s*الحالة\s*\}/gi,
+  /\[\s*Stage\s*\]|\[\s*المرحلة\s*\]|\{\s*Stage\s*\}|\{\s*المرحلة\s*\}/gi,
+  /\[\s*Channel\s*\]|\[\s*قناة التواصل\s*\]|\{\s*Channel\s*\}|\{\s*قناة التواصل\s*\}/gi,
+  /\[\s*Visit Type\s*\]|\[\s*نوع الزيارة\s*\]|\{\s*Visit Type\s*\}|\{\s*نوع الزيارة\s*\}/gi,
+  /\[\s*Profession\s*\]|\[\s*المهنة\s*\]|\{\s*Profession\s*\}|\{\s*المهنة\s*\}/gi,
+  // Legacy
+  /\[\s*Amount\s*\]|\[\s*المبلغ\s*\]|\{\s*Amount\s*\}|\{\s*المبلغ\s*\}/gi,
+  /\[\s*Invoice Number\s*\]|\[\s*رقم_الفاتورة\s*\]|\[\s*رقم الفاتورة\s*\]|\{\s*Invoice Number\s*\}|\{\s*رقم الفاتورة\s*\}/gi,
 ];
 
 export type WhatsAppTemplateValidationKey =

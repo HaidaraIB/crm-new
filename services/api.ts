@@ -3332,6 +3332,7 @@ export interface LeadWhatsAppMessageResponse {
   created_by: number | null;
   created_by_username: string;
   created_at: string;
+  send_source?: 'manual' | 'campaign' | 'auto_welcome';
   is_read?: boolean;
   attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
   attachment_mime?: string | null;
@@ -3801,6 +3802,8 @@ export interface TwilioSettingsResponse {
   is_enabled: boolean;
   lead_created_sms_enabled?: boolean;
   lead_created_sms_template?: string;
+  lead_created_whatsapp_enabled?: boolean;
+  lead_created_whatsapp_template?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -3826,6 +3829,8 @@ export const updateTwilioSettingsAPI = async (data: {
   is_enabled?: boolean;
   lead_created_sms_enabled?: boolean;
   lead_created_sms_template?: string;
+  lead_created_whatsapp_enabled?: boolean;
+  lead_created_whatsapp_template?: number | null;
 }): Promise<TwilioSettingsResponse> => {
   return apiRequest<TwilioSettingsResponse>('/integrations/twilio/settings/', {
     method: 'PUT',

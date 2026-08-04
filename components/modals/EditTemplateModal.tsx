@@ -7,6 +7,10 @@ import { SelectMediaModal } from './SelectMediaModal';
 import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
 import { clearFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import {
+  MESSAGE_PLACEHOLDER_CHIPS,
+  LEGACY_TEMPLATE_PLACEHOLDER_CHIPS,
+} from '../../utils/messagePlaceholders';
 
 const NAME_MAX = 200;
 const BODY_MAX = 1000;
@@ -17,12 +21,7 @@ const BUTTON_TEXT_MAX = 25;
 const PHONE_MAX = 20;
 const URL_MAX = 1000;
 
-const PLACEHOLDERS = [
-  { key: 'templatePlaceholderCustomerName' as const, insertEn: '[Customer Name]', insertAr: '[اسم_العميل]' },
-  { key: 'templatePlaceholderCompany' as const, insertEn: '[Company]', insertAr: '[الشركة]' },
-  { key: 'templatePlaceholderAmount' as const, insertEn: '[Amount]', insertAr: '[المبلغ]' },
-  { key: 'templatePlaceholderInvoiceNumber' as const, insertEn: '[Invoice Number]', insertAr: '[رقم_الفاتورة]' },
-];
+const PLACEHOLDERS = [...MESSAGE_PLACEHOLDER_CHIPS, ...LEGACY_TEMPLATE_PLACEHOLDER_CHIPS];
 
 const LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English', code: 'EN' },

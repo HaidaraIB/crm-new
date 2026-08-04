@@ -7,11 +7,71 @@ import { navigateToCompanyRoute, getCompanyRoute } from '../utils/routing';
 // FIX: Import translations to be used for type casting.
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
-import { ChevronDownIcon, XIcon } from './icons';
+import { ChevronDownIcon, CodeBracketsIcon, XIcon } from './icons';
 import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { useWhatsAppUnreadCount } from '../hooks/useQueries';
+
+type IntegrationLogoConfig = {
+    /** Brand image under /public. Mutually exclusive with `Icon`. */
+    src?: string;
+    /** Stroke SVG for non-brand items (e.g. Custom Lead API). */
+    Icon?: React.FC<React.SVGProps<SVGSVGElement>>;
+    /** Black monochrome marks — invert in dark mode so they stay visible. */
+    mono?: boolean;
+    /** Optical zoom for assets with excess inner padding (TikTok, Mujeb). */
+    scale?: string;
+};
+
+/** Brand image logos / icons for Integrations sidebar sub-items. */
+const INTEGRATION_SUB_LOGOS: Partial<Record<PageType, IntegrationLogoConfig>> = {
+    Meta: { src: '/meta_logo_icon.png' },
+    TikTok: { src: '/tiktok_logo_icon.webp', scale: 'scale-150' },
+    WhatsApp: { src: '/whatsapp_logo_icon.webp' },
+    Twilio: { src: '/sms_logo_icon.png', mono: true },
+    AI: { src: '/chatgpt_logo_icon.png', mono: true },
+    'Lead API': { Icon: CodeBracketsIcon },
+    Mujeb: { src: '/mujeb_logo_icon.png', scale: 'scale-150' },
+    PBX: { src: '/zycoo_logo_icon.webp' },
+};
+
+const IntegrationSubItemIcon = ({
+    page,
+    iconMargin,
+}: {
+    page: PageType;
+    iconMargin: string;
+}) => {
+    const logo = INTEGRATION_SUB_LOGOS[page];
+    if (!logo) {
+        // Reserve space so labels without logos stay aligned with icon rows.
+        return <span className={`inline-block w-5 h-5 shrink-0 ${iconMargin}`} aria-hidden />;
+    }
+    const slotClass = `inline-flex items-center justify-center shrink-0 w-5 h-5 overflow-hidden ${iconMargin}`;
+    if (logo.Icon) {
+        const SvgIcon = logo.Icon;
+        return (
+            <span className={slotClass} aria-hidden>
+                <SvgIcon className="w-5 h-5" />
+            </span>
+        );
+    }
+    if (!logo.src) {
+        return <span className={`inline-block w-5 h-5 shrink-0 ${iconMargin}`} aria-hidden />;
+    }
+    return (
+        <span className={slotClass} aria-hidden>
+            <img
+                src={logo.src}
+                alt=""
+                className={`max-w-full max-h-full object-contain ${logo.scale ?? ''} ${
+                    logo.mono ? 'dark:invert' : ''
+                }`}
+            />
+        </span>
+    );
+};
 
 type SidebarItemProps = { 
     name: string; 
@@ -308,6 +368,8 @@ export const Sidebar = () => {
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>
                                     {subItems.map(sub => {
                                         const subItemNameKey = subItemTranslationKey(sub);
+                                        const isIntegrationsSub = item.name === 'Integrations';
+                                        const subIconMargin = language === 'ar' ? 'ml-2.5' : 'mr-2.5';
                                         return (
                                             <a
                                                 key={sub}
@@ -316,13 +378,16 @@ export const Sidebar = () => {
                                                     e.preventDefault();
                                                     void handleNavigation(sub);
                                                 }}
-                                                className={`block px-4 py-2 font-medium rounded-md transition-colors duration-150 ${
+                                                className={`flex items-center px-4 py-2 font-medium rounded-md transition-colors duration-150 ${
                                                     currentPage === sub
                                                         ? 'bg-gray-100 text-gray-900 dark:bg-primary-600 dark:text-white'
                                                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
                                                 }`}
                                             >
-                                                {t(subItemNameKey)}
+                                                {isIntegrationsSub ? (
+                                                    <IntegrationSubItemIcon page={sub} iconMargin={subIconMargin} />
+                                                ) : null}
+                                                <span className="min-w-0 flex-1 whitespace-nowrap">{t(subItemNameKey)}</span>
                                             </a>
                                         );
                                     })}

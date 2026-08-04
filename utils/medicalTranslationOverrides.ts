@@ -184,6 +184,8 @@ export const medicalTranslationOverrides: {
     templateSmsReady: 'Ready',
     template_counterpart_exists: 'A counterpart template already exists for this channel.',
     whatsapp_template_parameter_mismatch: 'Could not fill template variables from this patient.',
+    whatsapp_template_not_found_or_language:
+        'This WhatsApp template was not found for the selected language, or it is not approved yet. Sync templates and confirm the language matches Meta.',
     newLeadSmsSettings: 'New patient SMS',
     newLeadSmsEnable: 'Send SMS automatically when a new patient is created',
     newLeadSmsIntegrationsNote:
@@ -403,6 +405,8 @@ export const medicalTranslationOverrides: {
     templateSmsReady: 'جاهز',
     template_counterpart_exists: 'يوجد قالب مقابل لهذه القناة بالفعل.',
     whatsapp_template_parameter_mismatch: 'تعذر ملء متغيرات القالب من هذا المريض.',
+    whatsapp_template_not_found_or_language:
+        'لم يُعثر على قالب واتساب بهذه اللغة أو أنه غير معتمد بعد. زامن القوالب وتأكد أن اللغة تطابق ميتا.',
     newLeadSmsSettings: 'رسائل المريض الجديد',
     newLeadSmsEnable: 'إرسال رسالة تلقائياً عند إنشاء مريض جديد',
     newLeadSmsIntegrationsNote:

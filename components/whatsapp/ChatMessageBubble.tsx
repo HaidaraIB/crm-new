@@ -5,6 +5,7 @@ import {
   isWhatsAppTypeStubBody,
   localizeWhatsAppMessageBody,
 } from '../../utils/whatsappMessageBodyDisplay';
+import { localizeMetaDeliveryError } from '../../utils/whatsappMetaErrorDisplay';
 import { WA_BUBBLE_IN, WA_BUBBLE_OUT, WA_BUBBLE_OUT_FAILED, WA_TICK_READ } from './whatsappChatTheme';
 
 export type ChatBubbleMessage = {
@@ -166,7 +167,7 @@ export const ChatMessageBubble: React.FC<Props> = ({
         </div>
         {msg.status === 'failed' && msg.deliveryError && (
           <p className="mt-1 text-[11px] opacity-90" dir="auto">
-            {msg.deliveryError}
+            {localizeMetaDeliveryError(msg.deliveryError, t)}
           </p>
         )}
         {isOut && msg.status === 'failed' && (onResend || onDelete) && (

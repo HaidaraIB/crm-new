@@ -190,10 +190,23 @@ export const ChatsPage: React.FC = () => {
     const pending = accounts.some((a: any) => {
       if (a.status !== 'Connected') return false;
       const meta = a.metadata || {};
-      return meta.display_name_status === 'PENDING' || meta.display_name_approved === false;
+      const st = String(meta.display_name_status || meta.name_status || '').toUpperCase();
+      if (st === 'PENDING' || st === 'PENDING_REVIEW' || st === 'DECLINED' || st === 'EXPIRED') {
+        return true;
+      }
+      return meta.display_name_approved === false;
     });
     return pending ? t('whatsapp_display_name_not_approved') : null;
   }, [accounts, t]);
+
+  // Drop sticky display-name alert when Meta metadata no longer shows pending.
+  useEffect(() => {
+    if (!composerAlert) return;
+    if (displayNameBlockedHint) return;
+    if (composerAlert.message === t('whatsapp_display_name_not_approved')) {
+      setComposerAlert(null);
+    }
+  }, [displayNameBlockedHint, composerAlert, t]);
 
   const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
     enabled: true,
@@ -203,6 +216,10 @@ export const ChatsPage: React.FC = () => {
   const selectedChatLeadId =
     selectedChatClient && typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined;
   const selectedChatPhone = selectedChatClient ? normalizeChatPhone(selectedChatClient) : '';
+
+  useEffect(() => {
+    setComposerAlert(null);
+  }, [selectedChatClient?.id, selectedChatPhone]);
 
   const {
     data: leadWhatsAppMessages = [],
@@ -496,6 +513,13 @@ export const ChatsPage: React.FC = () => {
         message:
           t('whatsappOutsideSessionUseTemplate') ||
           'Outside the 24-hour window. Send an approved template instead.',
+      });
+      return;
+    }
+    if (key === 'whatsapp_template_not_found_or_language') {
+      setComposerAlert({
+        variant: 'error',
+        message: t('whatsapp_template_not_found_or_language'),
       });
       return;
     }

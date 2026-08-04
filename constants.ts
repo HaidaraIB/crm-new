@@ -1401,8 +1401,10 @@ export const translations = {
     whatsapp_template_not_approved: "This template is not approved in Meta yet. Submit it and sync status, or pick another template.",
     whatsapp_template_parameter_count: "Wrong number of template variables. Check placeholders vs. values.",
     whatsapp_template_parameter_mismatch: "Could not fill template variables from this lead.",
+    whatsapp_template_not_found_or_language:
+        "This WhatsApp template was not found for the selected language, or it is not approved yet. Sync templates in Template Management and confirm the language code matches Meta (e.g. ar vs en_US).",
     whatsapp_display_name_not_approved:
-        "Meta has not approved your WhatsApp business display name yet. Open Meta Business Suite -> WhatsApp Manager -> your phone number -> Profile, submit the display name, and wait for approval before sending.",
+        "Meta has not approved this WhatsApp display name yet (required for Cloud API, including Meta test/555 numbers). Open Meta Business Suite → WhatsApp Manager → Phone number → Profile, submit the display name, and wait for approval before sending.",
     whatsapp_recipient_not_deliverable:
         "This phone number cannot receive WhatsApp messages (not on WhatsApp, wrong number, or not added as a Meta test recipient).",
     whatsapp_phone_numbers_not_synced:
@@ -3825,8 +3827,10 @@ export const translations = {
     whatsapp_template_not_approved: "القالب غير معتمد في ميتا بعد. أرسله للمراجعة وحدّث الحالة أو اختر قالباً آخر.",
     whatsapp_template_parameter_count: "عدد متغيرات القالب غير صحيح.",
     whatsapp_template_parameter_mismatch: "تعذر ملء متغيرات القالب من بيانات هذا العميل.",
+    whatsapp_template_not_found_or_language:
+        "لم يُعثر على قالب واتساب بهذه اللغة أو أنه غير معتمد بعد. زامن القوالب من إدارة القوالب وتأكد أن رمز اللغة يطابق ميتا (مثل ar مقابل en_US).",
     whatsapp_display_name_not_approved:
-        "لم تعتمد ميتا اسم العرض التجاري لواتساب بعد. افتح Meta Business Suite -> مدير واتساب -> رقم الهاتف -> الملف الشخصي، أرسل اسم العرض وانتظر الموافقة قبل الإرسال.",
+        "لم تعتمد ميتا اسم العرض لهذا الرقم بعد (مطلوب لواجهة Cloud API، بما فيها أرقام الاختبار 555). افتح Meta Business Suite → مدير واتساب → رقم الهاتف → الملف الشخصي، أرسل اسم العرض وانتظر الموافقة قبل الإرسال.",
     whatsapp_recipient_not_deliverable:
         "لا يمكن لهذا الرقم استلام رسائل واتساب (غير مسجل على واتساب، رقم خاطئ، أو غير مضاف كرقم اختبار في ميتا).",
     whatsapp_phone_numbers_not_synced:

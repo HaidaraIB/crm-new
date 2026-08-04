@@ -3326,6 +3326,7 @@ export interface LeadWhatsAppMessageResponse {
   body: string;
   direction: 'inbound' | 'outbound';
   whatsapp_message_id: string | null;
+  phone_number_id?: string | null;
   delivery_status: string | null;
   delivery_error: string | null;
   created_by: number | null;

@@ -2715,7 +2715,7 @@ export const translations = {
     reportsPageHint: "استخدم المرشّحات لتضييق النتائج حسب التاريخ أو النوع، ثم صدّر عندما تحتاج ملفاً.",
     reportsAllDates: "لا مرشّح تواريخ — تُعرض كل الفترات حتى تحدّد نطاقاً.",
     integrations: "التكاملات",
-    ai: "الذكاء الاصطناعي (ChatGPT)",
+    ai: "AI (ChatGPT)",
     leadApi: "واجهة الليدز",
     mujeb: "مجيب",
     pbxIntegration: "بدّالة / ZYCOO",

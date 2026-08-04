@@ -299,7 +299,7 @@ export const Sidebar = () => {
                     <XIcon className="h-6 w-6" />
                 </button>
             </div>
-            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto custom-scrollbar">
+            <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto overflow-x-hidden custom-scrollbar">
                 {SIDEBAR_ITEMS.filter((item) => {
                     if (isDataEntryUser) {
                         return item.name === 'Leads';
@@ -378,7 +378,7 @@ export const Sidebar = () => {
                                                     e.preventDefault();
                                                     void handleNavigation(sub);
                                                 }}
-                                                className={`flex items-center px-4 py-2 font-medium rounded-md transition-colors duration-150 ${
+                                                className={`flex items-center min-w-0 px-4 py-2 font-medium rounded-md transition-colors duration-150 ${
                                                     currentPage === sub
                                                         ? 'bg-gray-100 text-gray-900 dark:bg-primary-600 dark:text-white'
                                                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -387,7 +387,7 @@ export const Sidebar = () => {
                                                 {isIntegrationsSub ? (
                                                     <IntegrationSubItemIcon page={sub} iconMargin={subIconMargin} />
                                                 ) : null}
-                                                <span className="min-w-0 flex-1 whitespace-nowrap">{t(subItemNameKey)}</span>
+                                                <span className="min-w-0 flex-1 leading-snug break-words">{t(subItemNameKey)}</span>
                                             </a>
                                         );
                                     })}

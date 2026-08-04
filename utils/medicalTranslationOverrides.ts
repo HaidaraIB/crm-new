@@ -406,7 +406,7 @@ export const medicalTranslationOverrides: {
     template_counterpart_exists: 'يوجد قالب مقابل لهذه القناة بالفعل.',
     whatsapp_template_parameter_mismatch: 'تعذر ملء متغيرات القالب من هذا المريض.',
     whatsapp_template_not_found_or_language:
-        'لم يُعثر على قالب واتساب بهذه اللغة أو أنه غير معتمد بعد. زامن القوالب وتأكد أن اللغة تطابق ميتا.',
+        'ميتا لم تجد اسم القالب+اللغة على حساب واتساب المرتبط برقمك المتصل (خطأ 132001). القوالب مرتبطة بـ WABA — حدّث أرقام الهاتف ثم زامن القوالب وتأكد أن القالب موجود لنفس الحساب في ميتا.',
     newLeadSmsSettings: 'رسائل المريض الجديد',
     newLeadSmsEnable: 'إرسال رسالة تلقائياً عند إنشاء مريض جديد',
     newLeadSmsIntegrationsNote:

@@ -203,11 +203,13 @@ export const TemplateManagementSettings = () => {
                                             </td>
                                             <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{categoryDisplay || '—'}</td>
                                             <td className="py-3 px-4 text-center">
-                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : metaStatus === 'PENDING' ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : isWa ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'}`}>
+                                                <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : metaStatus === 'NOT_ON_WABA' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : metaStatus === 'PENDING' ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : isWa ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'}`}>
                                                     {metaStatus === 'APPROVED'
                                                         ? t('templateApproved')
                                                         : metaStatus === 'REJECTED'
                                                           ? t('templateRejected')
+                                                          : metaStatus === 'NOT_ON_WABA'
+                                                            ? t('templateNotOnWaba')
                                                           : metaStatus === 'PENDING'
                                                             ? t('templatePending')
                                                             : isWa
@@ -220,7 +222,6 @@ export const TemplateManagementSettings = () => {
                                                     {canSubmitToWhatsApp && (
                                                         <Button
                                                             variant="secondary"
-                                                            size="sm"
                                                             className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem]"
                                                             disabled={submittingTemplateId === tpl.id}
                                                             onClick={async () => {

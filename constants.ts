@@ -1360,6 +1360,7 @@ export const translations = {
     submittingToWhatsApp: "Submitting…",
     templateSubmittedToWhatsApp: "Template submitted to WhatsApp for review.",
     templateApproved: "Approved",
+    templateNotOnWaba: "Not on this WhatsApp account",
     templateRejected: "Rejected",
     templatePending: "Pending review",
     templateDraft: "Not submitted",
@@ -1402,7 +1403,7 @@ export const translations = {
     whatsapp_template_parameter_count: "Wrong number of template variables. Check placeholders vs. values.",
     whatsapp_template_parameter_mismatch: "Could not fill template variables from this lead.",
     whatsapp_template_not_found_or_language:
-        "This WhatsApp template was not found for the selected language, or it is not approved yet. Sync templates in Template Management and confirm the language code matches Meta (e.g. ar vs en_US).",
+        "Meta could not find this template name+language on the WhatsApp account tied to your connected phone (error 132001). Templates are per WABA — if you switched from a Meta test/555 number to a real number, open Integrations → Refresh phone numbers, then Template Management → Sync, and confirm appointment_reminder exists under that same WABA in Meta (exact language en vs en_US).",
     whatsapp_display_name_not_approved:
         "Meta has not approved this WhatsApp display name yet (required for Cloud API, including Meta test/555 numbers). Open Meta Business Suite → WhatsApp Manager → Phone number → Profile, submit the display name, and wait for approval before sending.",
     whatsapp_recipient_not_deliverable:
@@ -3788,6 +3789,7 @@ export const translations = {
     submittingToWhatsApp: "جاري الإرسال…",
     templateSubmittedToWhatsApp: "تم إرسال القالب إلى واتساب للمراجعة.",
     templateApproved: "معتمد",
+    templateNotOnWaba: "ليس على حساب واتساب الحالي",
     templateRejected: "مرفوض",
     templatePending: "قيد المراجعة",
     templateDraft: "لم يُرسل بعد",
@@ -3830,7 +3832,7 @@ export const translations = {
     whatsapp_template_parameter_count: "عدد متغيرات القالب غير صحيح.",
     whatsapp_template_parameter_mismatch: "تعذر ملء متغيرات القالب من بيانات هذا العميل.",
     whatsapp_template_not_found_or_language:
-        "لم يُعثر على قالب واتساب بهذه اللغة أو أنه غير معتمد بعد. زامن القوالب من إدارة القوالب وتأكد أن رمز اللغة يطابق ميتا (مثل ar مقابل en_US).",
+        "ميتا لم تجد اسم القالب+اللغة على حساب واتساب المرتبط برقمك المتصل (خطأ 132001). القوالب مرتبطة بـ WABA — إذا انتقلت من رقم اختبار 555 إلى رقم حقيقي، افتح التكاملات → تحديث أرقام الهاتف، ثم إدارة القوالب → مزامنة، وتأكد أن القالب موجود لنفس الـ WABA في ميتا (نفس اللغة en مقابل en_US).",
     whatsapp_display_name_not_approved:
         "لم تعتمد ميتا اسم العرض لهذا الرقم بعد (مطلوب لواجهة Cloud API، بما فيها أرقام الاختبار 555). افتح Meta Business Suite → مدير واتساب → رقم الهاتف → الملف الشخصي، أرسل اسم العرض وانتظر الموافقة قبل الإرسال.",
     whatsapp_recipient_not_deliverable:

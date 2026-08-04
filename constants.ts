@@ -1033,6 +1033,7 @@ export const translations = {
     leadApiKeys: "API keys",
     leadApiGenerateKey: "Generate key",
     leadApiKeyName: "Key name",
+    leadApiKeyNameRequired: "Key name is required",
     leadApiKeyNamePlaceholder: "e.g. Website contact form",
     leadApiNewKeyTitle: "New API key",
     leadApiNewKeyWarning: "Copy this key now. You will not be able to see it again.",
@@ -1231,6 +1232,17 @@ export const translations = {
     whatsappCallEnding: "Ending…",
     callDurationSeconds: "{n}s",
     enableWhatsAppCallingSuccess: "WhatsApp calling enabled.",
+    whatsapp_not_cloud_api_number:
+      "Meta rejected Cloud Calling for this number (#141000). Common causes: the number is on WhatsApp Business app coexistence (voice/video stay in the app only — Cloud Calling needs a Cloud-API-only number), or the number is not fully registered for Cloud API. Messaging limit must also be at least 2,000.",
+    whatsapp_calling_coexistence_unsupported:
+      "WhatsApp Cloud Calling is not available on coexistence numbers (Business app + Cloud API). Meta keeps voice and video calls on the Business app only. To use calling in the CRM, connect a Cloud-API-only number (not coexistence).",
+    whatsapp_calling_not_eligible:
+      "Meta cannot enable calling on this number (often messaging limit below 2,000 or country not supported for business calling).",
+    enableWhatsAppCalling: "Enable WhatsApp calling",
+    enableWhatsAppCallingHint: "Turns on Meta Cloud Calling for this connected number (requires a Cloud-API-only number with messaging limit ≥ 2,000 — not available with Business app coexistence).",
+    enableWhatsAppCallingCoexistenceHint:
+      "Cloud Calling is not supported while this number is in coexistence with the WhatsApp Business app. Calls stay in the app only.",
+    whatsappCoexistenceBadge: "Coexistence",
     callsHasRecordingFilter: "Recording",
     callsRefineFilters: "Refine",
     callsClearRefine: "Clear",
@@ -1239,8 +1251,6 @@ export const translations = {
     callsLeadFilterHint: "Type at least 2 characters to find a lead.",
     whatsappCallSource: "WhatsApp call",
     whatsappCallMade: "WhatsApp call",
-    enableWhatsAppCalling: "Enable WhatsApp calling",
-    enableWhatsAppCallingHint: "Turns on Meta Cloud Calling for this connected number (requires calling eligibility on the WABA).",
     whatsappCallButton: "WhatsApp call",
     noRecording: "No recording",
     searchNumber: "Search number",
@@ -3446,6 +3456,7 @@ export const translations = {
     leadApiKeys: "مفاتيح API",
     leadApiGenerateKey: "إنشاء مفتاح",
     leadApiKeyName: "اسم المفتاح",
+    leadApiKeyNameRequired: "اسم المفتاح مطلوب",
     leadApiKeyNamePlaceholder: "مثال: نموذج الموقع",
     leadApiNewKeyTitle: "مفتاح API جديد",
     leadApiNewKeyWarning: "انسخ المفتاح الآن. لن يظهر مرة أخرى.",
@@ -3644,6 +3655,12 @@ export const translations = {
     whatsappCallEnding: "جارٍ الإنهاء…",
     callDurationSeconds: "{n} ث",
     enableWhatsAppCallingSuccess: "تم تفعيل مكالمات واتساب.",
+    whatsapp_not_cloud_api_number:
+      "ميتا رفضت تفعيل مكالمات Cloud Calling لهذا الرقم (#141000). الأسباب الشائعة: الرقم على وضع التعايش مع تطبيق واتساب للأعمال (المكالمات تبقى في التطبيق فقط — مكالمات الـ CRM تحتاج رقماً Cloud API فقط)، أو الرقم غير مسجّل بالكامل لـ Cloud API. كما يلزم حد رسائل يومي ≥ 2000.",
+    whatsapp_calling_coexistence_unsupported:
+      "مكالمات واتساب عبر Cloud Calling غير متاحة لأرقام التعايش (تطبيق الأعمال + Cloud API). ميتا تُبقي المكالمات الصوتية/الفيديو في التطبيق فقط. لاستخدام المكالمات في الـ CRM، اربط رقماً Cloud API فقط (بدون تعايش).",
+    whatsapp_calling_not_eligible:
+      "ميتا لا تسمح بتفعيل المكالمات لهذا الرقم (غالباً حد الرسائل أقل من 2000 أو الدولة غير مدعومة).",
     callsHasRecordingFilter: "التسجيل",
     callsRefineFilters: "تصفية",
     callsClearRefine: "مسح",
@@ -3653,7 +3670,11 @@ export const translations = {
     whatsappCallSource: "مكالمة واتساب",
     whatsappCallMade: "مكالمة واتساب",
     enableWhatsAppCalling: "تفعيل مكالمات واتساب",
-    enableWhatsAppCallingHint: "يفعّل مكالمات Meta Cloud Calling لهذا الرقم المتصل (يتطلب أهلية الاتصال على حساب واتساب).",
+    enableWhatsAppCallingHint:
+      "يفعّل مكالمات Meta Cloud Calling لهذا الرقم المتصل (يتطلب رقماً Cloud API فقط وحد رسائل ≥ 2000 — غير متاح مع تعايش تطبيق الأعمال).",
+    enableWhatsAppCallingCoexistenceHint:
+      "مكالمات Cloud Calling غير مدعومة طالما الرقم في وضع التعايش مع تطبيق واتساب للأعمال. المكالمات تبقى في التطبيق فقط.",
+    whatsappCoexistenceBadge: "تعايش",
     whatsappCallButton: "اتصال واتساب",
     noRecording: "لا يوجد تسجيل",
     searchNumber: "بحث بالرقم",

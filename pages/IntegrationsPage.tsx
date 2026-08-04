@@ -2293,8 +2293,8 @@ export const IntegrationsPage = () => {
         }
     };
 
-    const handleEnableWhatsAppCalling = async () => {
-        setEnablingCallingAccountId(1);
+    const handleEnableWhatsAppCalling = async (integrationAccountId: number) => {
+        setEnablingCallingAccountId(integrationAccountId);
         try {
             const res = await enableWhatsAppCallingAPI();
             showAlert(
@@ -3034,7 +3034,11 @@ export const IntegrationsPage = () => {
                 <Card>
                         {accounts.length > 0 ? (
                             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {accounts.map((account: Account) => (
+                                {accounts.map((account: Account) => {
+                                    const isCoexistence =
+                                        account.metadata?.coexistence === true ||
+                                        account.metadata?.is_on_biz_app === true;
+                                    return (
                                     <li key={account.id} className="p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between">
                                         <div className="flex items-center gap-3 mb-2 sm:mb-0">
                                             <IntegrationPlatformIcon platform="whatsapp" size="md" />
@@ -3047,6 +3051,14 @@ export const IntegrationsPage = () => {
                                                 <span className={`flex items-center text-xs ${account.status === 'Connected' ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
                                                     <span className={`h-2 w-2 me-1.5 rounded-full ${account.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`}></span>
                                                     {account.status === 'Connected' ? t('connected') : t('disconnected')}
+                                                    {isCoexistence && account.status === 'Connected' ? (
+                                                        <span
+                                                            className="ms-2 text-amber-600 dark:text-amber-400"
+                                                            title={t('enableWhatsAppCallingCoexistenceHint')}
+                                                        >
+                                                            · {t('whatsappCoexistenceBadge')}
+                                                        </span>
+                                                    ) : null}
                                                 </span>
                                             </div>
                                         </div>
@@ -3063,12 +3075,30 @@ export const IntegrationsPage = () => {
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
-                                                    disabled={enablingCallingAccountId != null}
-                                                    onClick={() => void handleEnableWhatsAppCalling()}
-                                                    title={t('enableWhatsAppCallingHint')}
-                                                    className="rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30"
+                                                    disabled={
+                                                        isCoexistence ||
+                                                        enablingCallingAccountId === account.id
+                                                    }
+                                                    onClick={() => {
+                                                        if (isCoexistence) {
+                                                            showAlert(
+                                                                t('whatsapp_calling_coexistence_unsupported'),
+                                                                'info'
+                                                            );
+                                                            return;
+                                                        }
+                                                        void handleEnableWhatsAppCalling(account.id);
+                                                    }}
+                                                    title={
+                                                        isCoexistence
+                                                            ? t('enableWhatsAppCallingCoexistenceHint')
+                                                            : t('enableWhatsAppCallingHint')
+                                                    }
+                                                    className="rounded-lg border border-emerald-300 dark:border-emerald-700 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 disabled:opacity-50"
                                                 >
-                                                    {enablingCallingAccountId != null ? t('loading') : t('enableWhatsAppCalling')}
+                                                    {enablingCallingAccountId === account.id
+                                                        ? t('loading')
+                                                        : t('enableWhatsAppCalling')}
                                                 </Button>
                                                 </>
                                             )}
@@ -3094,7 +3124,8 @@ export const IntegrationsPage = () => {
                                             )}
                                         </div>
                                     </li>
-                                ))}
+                                    );
+                                })}
                             </ul>
                         ) : (
                             <div className="text-center py-16">

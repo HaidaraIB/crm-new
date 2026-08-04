@@ -365,7 +365,7 @@ export const Sidebar = () => {
                                 }
                             />
                             {subItems && subItems.length > 0 && isOpen && (
-                                <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1.5rem' }}>
+                                <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1rem' }}>
                                     {subItems.map(sub => {
                                         const subItemNameKey = subItemTranslationKey(sub);
                                         const isIntegrationsSub = item.name === 'Integrations';
@@ -378,7 +378,7 @@ export const Sidebar = () => {
                                                     e.preventDefault();
                                                     void handleNavigation(sub);
                                                 }}
-                                                className={`flex items-center min-w-0 px-4 py-2 font-medium rounded-md transition-colors duration-150 ${
+                                                className={`flex items-center min-w-0 px-3 py-2 font-medium rounded-md transition-colors duration-150 ${
                                                     currentPage === sub
                                                         ? 'bg-gray-100 text-gray-900 dark:bg-primary-600 dark:text-white'
                                                         : 'text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
@@ -387,7 +387,7 @@ export const Sidebar = () => {
                                                 {isIntegrationsSub ? (
                                                     <IntegrationSubItemIcon page={sub} iconMargin={subIconMargin} />
                                                 ) : null}
-                                                <span className="min-w-0 flex-1 leading-snug break-words">{t(subItemNameKey)}</span>
+                                                <span className="min-w-0 flex-1 whitespace-nowrap">{t(subItemNameKey)}</span>
                                             </a>
                                         );
                                     })}

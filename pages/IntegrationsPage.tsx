@@ -59,6 +59,7 @@ import {
 } from '../utils/whatsappManualChatsStorage';
 import { normalizeRole } from '../utils/roles';
 import { clearFieldError } from '../utils/formFieldErrors';
+import { localizeMetaTokenError } from '../utils/metaTokenErrorDisplay';
 
 type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown>; is_active?: boolean };
 
@@ -1025,7 +1026,11 @@ export const IntegrationsPage = () => {
     const [chatTemplateSendId, setChatTemplateSendId] = useState<number | ''>('');
     const [chatTemplateSending, setChatTemplateSending] = useState(false);
     const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
-    const [infoAlert, setInfoAlert] = useState<{ title: string; message: string } | null>(null);
+    const [infoAlert, setInfoAlert] = useState<{
+        title: string;
+        message: string;
+        reconnectAccountId?: number;
+    } | null>(null);
 
     useEffect(() => {
         setChatTemplateSendId('');
@@ -1109,7 +1114,14 @@ export const IntegrationsPage = () => {
         return accountsData.map((acc: any): Account => ({
             id: acc.id,
             name: acc.name,
-            status: acc.status === 'connected' ? 'Connected' : acc.status === 'disconnected' ? 'Disconnected' : acc.status_display || 'Disconnected',
+            status:
+                acc.status === 'connected'
+                    ? 'Connected'
+                    : acc.status === 'expired' || acc.status === 'error'
+                      ? 'Expired'
+                      : acc.status === 'disconnected'
+                        ? 'Disconnected'
+                        : acc.status_display || 'Disconnected',
             platform: acc.platform,
             metadata: acc.metadata,
             is_active: acc.is_active !== false,
@@ -2074,17 +2086,36 @@ export const IntegrationsPage = () => {
             setTestConnectionAccountId(accountId);
             const result = await testConnectionMutation.mutateAsync(accountId);
             if (result.valid) {
-                setSuccessMessage(t('connectionValid') || result.message || 'Connection is valid.');
+                const expiresHint =
+                    result.expires_at != null && Number(result.expires_at) > 0
+                        ? ` ${t('metaTokenExpiresAt') || 'Token expires'}: ${new Date(Number(result.expires_at) * 1000).toLocaleString(
+                              language === 'ar' ? ARABIC_DATE_LOCALE : undefined
+                          )}`
+                        : '';
+                setSuccessMessage(
+                    `${t('connectionValid') || result.message || 'Connection is valid.'}${expiresHint}`
+                );
                 setIsSuccessModalOpen(true);
             } else {
+                const key = result.message_key;
+                const localized =
+                    (key && t(key as any) && t(key as any) !== key ? t(key as any) : null) ||
+                    localizeMetaTokenError(result.message, t);
                 setInfoAlert({
                     title: t('connectionInvalid') || 'Connection check',
-                    message: result.message || (t('connectionInvalidPleaseReconnect') || 'Token is no longer valid. Please disconnect and connect again.'),
+                    message: localized,
+                    reconnectAccountId: accountId,
                 });
             }
         } catch (error: any) {
-            const msg = error?.message || error?.data?.error || t('errorTestingConnection') || 'Failed to test connection.';
-            setInfoAlert({ title: t('connectionCheck') || 'Connection check', message: msg });
+            const msg =
+                localizeMetaTokenError(error?.message, t, 'errorTestingConnection') ||
+                resolveLocalizedApiError(error, t, t('errorTestingConnection') || 'Failed to test connection.');
+            setInfoAlert({
+                title: t('connectionCheck') || 'Connection check',
+                message: msg,
+                reconnectAccountId: accountId,
+            });
         } finally {
             setTestConnectionAccountId(null);
         }
@@ -3161,11 +3192,25 @@ export const IntegrationsPage = () => {
                                             className={`inline-flex items-center gap-1.5 mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
                                                 account.status === 'Connected'
                                                     ? 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-500/20'
-                                                    : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/80'
+                                                    : account.status === 'Expired'
+                                                      ? 'text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-500/20'
+                                                      : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/80'
                                             }`}
                                         >
-                                            <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${account.status === 'Connected' ? 'bg-green-500' : 'bg-gray-400'}`} />
-                                            {account.status === 'Connected' ? t('connected') : t('disconnected')}
+                                            <span
+                                                className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
+                                                    account.status === 'Connected'
+                                                        ? 'bg-green-500'
+                                                        : account.status === 'Expired'
+                                                          ? 'bg-amber-500'
+                                                          : 'bg-gray-400'
+                                                }`}
+                                            />
+                                            {account.status === 'Connected'
+                                                ? t('connected')
+                                                : account.status === 'Expired'
+                                                  ? t('statusExpired') || 'Expired — reconnect required'
+                                                  : t('disconnected')}
                                         </span>
                                     </div>
                                 </div>
@@ -3178,7 +3223,9 @@ export const IntegrationsPage = () => {
                                             disabled={connectingAccountId != null || isStartingConnect}
                                             className="rounded-lg shadow-sm"
                                         >
-                                            {t('connect') || 'Connect'}
+                                            {account.status === 'Expired'
+                                                ? t('reconnect') || 'Reconnect'
+                                                : t('connect') || 'Connect'}
                                         </Button>
                                     )}
                                     {account.status === 'Connected' && account.platform === 'meta' && (
@@ -3311,8 +3358,41 @@ export const IntegrationsPage = () => {
                                     <span className="text-red-600 dark:text-red-400">{t('connectionInvalid') || 'Connection invalid'}</span>
                                 )}
                             </div>
-                            {!!metaHealthData.token.error && (
-                                <div className="text-xs text-red-600 dark:text-red-400 mt-1">{metaHealthData.token.error}</div>
+                            {metaHealthData.token.valid && metaHealthData.token.expires_at != null && Number(metaHealthData.token.expires_at) > 0 && (
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    {t('metaTokenExpiresAt') || 'Token expires'}:{' '}
+                                    {new Date(Number(metaHealthData.token.expires_at) * 1000).toLocaleString(
+                                        language === 'ar' ? ARABIC_DATE_LOCALE : undefined
+                                    )}
+                                </div>
+                            )}
+                            {!metaHealthData.token.valid && (
+                                <div className="text-xs text-red-600 dark:text-red-400 mt-1" dir="auto">
+                                    {(() => {
+                                        const errKey = metaHealthData.token.error_key;
+                                        if (errKey) {
+                                            const byKey = t(errKey as any);
+                                            if (byKey && byKey !== errKey) return byKey;
+                                        }
+                                        return localizeMetaTokenError(metaHealthData.token.error, t);
+                                    })()}
+                                </div>
+                            )}
+                            {!metaHealthData.token.valid && metaHealthAccountId != null && (
+                                <div className="mt-3 space-y-2">
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">{t('reconnectMetaHint')}</p>
+                                    <Button
+                                        variant="primary"
+                                        onClick={() => {
+                                            setMetaHealthModalOpen(false);
+                                            handleConnect(metaHealthAccountId);
+                                        }}
+                                        loading={connectingAccountId === metaHealthAccountId}
+                                        disabled={connectingAccountId != null || isStartingConnect}
+                                    >
+                                        {t('reconnect') || 'Reconnect'}
+                                    </Button>
+                                </div>
                             )}
                         </div>
                         <div className="rounded border border-gray-200 dark:border-gray-700 p-3">
@@ -3320,7 +3400,10 @@ export const IntegrationsPage = () => {
                             <div className="text-sm text-gray-700 dark:text-gray-300">
                                 <div>{t('selectedPage') || 'Selected page'}: {metaHealthData.selection.selected_page_id || '-'}</div>
                                 <div>{t('leadForm') || 'Lead Form'}: {metaHealthData.selection.selected_form_id || '-'}</div>
-                                <div>{t('pageInMetadata') || 'Page in metadata'}: {metaHealthData.selection.page_in_metadata ? 'Yes' : 'No'}</div>
+                                <div>
+                                    {t('pageInMetadata') || 'Page in metadata'}:{' '}
+                                    {metaHealthData.selection.page_in_metadata ? t('yes') : t('no')}
+                                </div>
                             </div>
                         </div>
                         {metaHealthData.conversion_leads && (
@@ -3364,14 +3447,18 @@ export const IntegrationsPage = () => {
                                         <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">{p.id}</div>
                                         <div className="text-xs mt-1">
                                             <span className={p.app_installed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                                {t('appInstalled') || 'App installed'}: {p.app_installed ? 'Yes' : 'No'}
+                                                {t('appInstalled') || 'App installed'}: {p.app_installed ? t('yes') : t('no')}
                                             </span>
                                             {' · '}
                                             <span className={p.leadgen_subscribed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
-                                                {t('leadgenSubscribed') || 'Leadgen subscribed'}: {p.leadgen_subscribed ? 'Yes' : 'No'}
+                                                {t('leadgenSubscribed') || 'Leadgen subscribed'}: {p.leadgen_subscribed ? t('yes') : t('no')}
                                             </span>
                                         </div>
-                                        {!!p.error && <div className="text-xs text-red-600 dark:text-red-400 mt-1">{p.error}</div>}
+                                        {!!p.error && (
+                                            <div className="text-xs text-red-600 dark:text-red-400 mt-1" dir="auto">
+                                                {localizeMetaTokenError(p.error, t)}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -3425,16 +3512,35 @@ export const IntegrationsPage = () => {
                     title={infoAlert.title}
                 >
                     <div className="space-y-4">
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-start gap-3">
                             <div className="flex-shrink-0 w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
                                 <svg className="w-5 h-5 text-amber-600 dark:text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                                 </svg>
                             </div>
-                            <p className="text-gray-700 dark:text-gray-300">{infoAlert.message}</p>
+                            <div className="min-w-0 space-y-2">
+                                <p className="text-gray-700 dark:text-gray-300" dir="auto">{infoAlert.message}</p>
+                                {infoAlert.reconnectAccountId != null && (
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">{t('reconnectMetaHint')}</p>
+                                )}
+                            </div>
                         </div>
-                        <div className="flex justify-end pt-2">
-                            <Button onClick={() => setInfoAlert(null)}>{t('ok') || 'OK'}</Button>
+                        <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="secondary" onClick={() => setInfoAlert(null)}>{t('ok') || 'OK'}</Button>
+                            {infoAlert.reconnectAccountId != null && (
+                                <Button
+                                    variant="primary"
+                                    onClick={() => {
+                                        const id = infoAlert.reconnectAccountId!;
+                                        setInfoAlert(null);
+                                        handleConnect(id);
+                                    }}
+                                    loading={connectingAccountId === infoAlert.reconnectAccountId}
+                                    disabled={connectingAccountId != null || isStartingConnect}
+                                >
+                                    {t('reconnect') || 'Reconnect'}
+                                </Button>
+                            )}
                         </div>
                     </div>
                 </Modal>

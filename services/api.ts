@@ -3037,10 +3037,12 @@ export const deleteConnectedAccountAPI = async (accountId: number) => {
  * POST /api/integrations/accounts/:id/test-connection/
  */
 export const testConnectionAPI = async (accountId: number) => {
-  return apiRequest<{ valid: boolean; message?: string; expires_at?: number }>(
-    `/integrations/accounts/${accountId}/test-connection/`,
-    { method: 'POST' }
-  );
+  return apiRequest<{
+    valid: boolean;
+    message?: string;
+    message_key?: string;
+    expires_at?: number;
+  }>(`/integrations/accounts/${accountId}/test-connection/`, { method: 'POST' });
 };
 
 export type MetaHealthPageStatus = {
@@ -3062,6 +3064,7 @@ export type MetaHealthResponse = {
     scopes?: string[];
     user_id?: string;
     error?: string;
+    error_key?: string | null;
   };
   webhook: {
     callback_url: string;

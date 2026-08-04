@@ -2068,7 +2068,15 @@ export const translations = {
     testing: "Testing...",
     connectionValid: "Connection is valid.",
     connectionInvalid: "Connection invalid",
-    connectionInvalidPleaseReconnect: "Token is no longer valid. Please disconnect and connect again.",
+    connectionInvalidPleaseReconnect:
+      "The Meta connection expired. Click Reconnect and approve access again so new leads keep arriving.",
+    metaTokenSessionInvalidated:
+      "Meta ended this login session (password change or security reset). Reconnect the account to restore lead sync.",
+    metaTokenExpiresAt: "Token expires",
+    reconnect: "Reconnect",
+    reconnectMetaHint:
+      "Reconnect to refresh your Meta token (about 60 days). Permanent tokens need a Meta System User and are not available in this login flow.",
+    statusExpired: "Expired — reconnect required",
     connectionCheck: "Connection check",
     errorTestingConnection: "Failed to test connection. Please try again.",
     ok: "OK",
@@ -4533,7 +4541,15 @@ export const translations = {
     testing: "جاري الاختبار...",
     connectionValid: "الاتصال سليم.",
     connectionInvalid: "الاتصال غير سليم",
-    connectionInvalidPleaseReconnect: "انتهت صلاحية التوكن. يرجى قطع الاتصال ثم الربط مرة أخرى.",
+    connectionInvalidPleaseReconnect:
+      "انتهت صلاحية اتصال ميتا. اضغط «إعادة الربط» ووافق على الصلاحيات مرة أخرى حتى تستمر الليدز بالوصول.",
+    metaTokenSessionInvalidated:
+      "أنهت ميتا جلسة تسجيل الدخول هذه (تغيير كلمة المرور أو إجراء أمني). أعد ربط الحساب لاستئناف مزامنة الليدز.",
+    metaTokenExpiresAt: "ينتهي التوكن في",
+    reconnect: "إعادة الربط",
+    reconnectMetaHint:
+      "أعد الربط لتجديد توكن ميتا (نحو 60 يوماً). التوكنات الدائمة تتطلب System User من ميتا وغير متاحة عبر هذا الربط.",
+    statusExpired: "منتهي — يلزم إعادة الربط",
     connectionCheck: "فحص الاتصال",
     errorTestingConnection: "فشل اختبار الاتصال. يرجى المحاولة مرة أخرى.",
     ok: "موافق",

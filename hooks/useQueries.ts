@@ -1744,7 +1744,7 @@ export const useDisconnectConnectedAccount = (options?: UseMutationOptions<void,
 /**
  * Test Meta connection (validates token, refreshes pages).
  */
-export const useTestConnection = (options?: UseMutationOptions<{ valid: boolean; message?: string }, Error, number>) => {
+export const useTestConnection = (options?: UseMutationOptions<{ valid: boolean; message?: string; message_key?: string; expires_at?: number }, Error, number>) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (accountId: number) => testConnectionAPI(accountId),

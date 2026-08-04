@@ -3580,6 +3580,8 @@ export const syncWhatsAppTemplatesAPI = async (): Promise<{
   updated?: number;
   linked?: number;
   imported?: number;
+  removed?: number;
+  waba_id?: string;
   total_meta?: number;
 }> => {
   return apiRequest('/integrations/templates/sync-whatsapp/', { method: 'POST' });

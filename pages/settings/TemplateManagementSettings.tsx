@@ -76,9 +76,15 @@ export const TemplateManagementSettings = () => {
     });
 
     const filteredTemplates = useMemo(() => {
-        if (!templateSearch.trim()) return templates;
+        // Hide WhatsApp templates that belong to a previous WABA / phone (NOT_ON_WABA after sync).
+        const visible = templates.filter((tpl) => {
+            if (!isWhatsAppTemplate(tpl.channel_type)) return true;
+            const meta = String((tpl as MessageTemplateType).meta_status || '').toUpperCase();
+            return meta !== 'NOT_ON_WABA';
+        });
+        if (!templateSearch.trim()) return visible;
         const q = templateSearch.trim().toLowerCase();
-        return templates.filter(
+        return visible.filter(
             (tpl) =>
                 (tpl.name || '').toLowerCase().includes(q) ||
                 ((tpl as any).language || '').toLowerCase().includes(q) ||
@@ -119,9 +125,12 @@ export const TemplateManagementSettings = () => {
                             await refetchTemplates();
                             const summary = t('templatesSyncedSummary')
                                 .replace('{imported}', String(res.imported ?? 0))
-                                .replace('{updated}', String(res.updated ?? 0));
+                                .replace('{updated}', String(res.updated ?? 0))
+                                .replace('{removed}', String(res.removed ?? 0));
                             showAlert(
-                                (res.imported ?? 0) > 0 || (res.updated ?? 0) > 0 ? summary : t('templatesSynced'),
+                                (res.imported ?? 0) > 0 || (res.updated ?? 0) > 0 || (res.removed ?? 0) > 0
+                                    ? summary
+                                    : t('templatesSynced'),
                                 'info',
                             );
                         } catch (e: any) {

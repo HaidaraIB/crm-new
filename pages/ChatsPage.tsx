@@ -186,6 +186,16 @@ export const ChatsPage: React.FC = () => {
   );
   const whatsappSendBlocked = !hasConnectedWhatsApp;
 
+  const currentWhatsAppPhoneNumberId = useMemo(() => {
+    const connected = accounts.find(
+      (a: any) =>
+        (!a.platform || a.platform === 'whatsapp') &&
+        a.status === 'Connected' &&
+        a.is_active !== false
+    );
+    return String(connected?.metadata?.phone_number_id || '').trim() || null;
+  }, [accounts]);
+
   const displayNameBlockedHint = useMemo(() => {
     const pending = accounts.some((a: any) => {
       if (a.status !== 'Connected') return false;
@@ -711,6 +721,12 @@ export const ChatsPage: React.FC = () => {
         if (delivery === 'failed') status = 'failed';
         else if (delivery === 'delivered') status = 'delivered';
         else if (delivery === 'read') status = 'read';
+        const msgPhoneId = String(wa.phone_number_id || '').trim();
+        const fromPreviousNumber = Boolean(
+          currentWhatsAppPhoneNumberId &&
+            msgPhoneId &&
+            msgPhoneId !== currentWhatsAppPhoneNumberId
+        );
         return {
           id: `api-${wa.id}`,
           body: wa.body,
@@ -729,6 +745,7 @@ export const ChatsPage: React.FC = () => {
           attachmentWidth: wa.attachment_width ?? null,
           attachmentHeight: wa.attachment_height ?? null,
           isVoiceNote: Boolean(wa.is_voice_note),
+          fromPreviousNumber,
         };
       })
       .reverse();
@@ -746,7 +763,13 @@ export const ChatsPage: React.FC = () => {
       isVoiceNote: m.isVoiceNote,
     }));
     return [...apiMsgs, ...optimistic];
-  }, [leadWhatsAppMessages, optimisticMessages, language, currentUser?.username]);
+  }, [
+    leadWhatsAppMessages,
+    optimisticMessages,
+    language,
+    currentUser?.username,
+    currentWhatsAppPhoneNumberId,
+  ]);
 
   const mediaAlbum = useMemo(
     () =>

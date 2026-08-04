@@ -6,6 +6,7 @@ import {
   localizeWhatsAppMessageBody,
 } from '../../utils/whatsappMessageBodyDisplay';
 import { localizeMetaDeliveryError } from '../../utils/whatsappMetaErrorDisplay';
+import { translations } from '../../constants';
 import { WA_BUBBLE_IN, WA_BUBBLE_OUT, WA_BUBBLE_OUT_FAILED, WA_TICK_READ } from './whatsappChatTheme';
 
 export type ChatBubbleMessage = {
@@ -23,6 +24,8 @@ export type ChatBubbleMessage = {
   attachmentWidth?: number | null;
   attachmentHeight?: number | null;
   isVoiceNote?: boolean;
+  /** True when this message used a different Meta phone_number_id than the currently connected one. */
+  fromPreviousNumber?: boolean;
 };
 
 const AUTO_DIR_CLASS = '[unicode-bidi:plaintext]';
@@ -147,6 +150,17 @@ export const ChatMessageBubble: React.FC<Props> = ({
             dir="auto"
             className={`text-sm whitespace-pre-wrap break-words ${AUTO_DIR_CLASS}`}
           />
+        ) : null}
+        {msg.fromPreviousNumber ? (
+          <span
+            className={`mt-1 inline-flex max-w-full rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${
+              isOut
+                ? 'bg-white/15 text-white/85'
+                : 'bg-amber-100 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200'
+            }`}
+          >
+            {t('whatsappViaPreviousNumber')}
+          </span>
         ) : null}
         <div className={`mt-0.5 flex items-center justify-end gap-1.5 ${metaMuted}`}>
           {isOut && senderName ? (

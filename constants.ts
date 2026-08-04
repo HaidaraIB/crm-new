@@ -1410,6 +1410,7 @@ export const translations = {
         "This phone number cannot receive WhatsApp messages (not on WhatsApp, wrong number, or not added as a Meta test recipient).",
     whatsapp_ecosystem_engagement_limit:
         "Meta blocked this message to limit marketing volume to this contact (error 131049). Wait at least 24 hours before sending another marketing template to the same person, or use a utility/authentication template / open session reply instead.",
+    whatsappViaPreviousNumber: "Via previous number",
     whatsapp_phone_numbers_not_synced:
         "WhatsApp is connected but your phone number could not be loaded from Meta. In Meta App Dashboard → App Review → Permissions, whatsapp_business_messaging must show assets > 0 (not just whatsapp_business_management). Add messaging to your Facebook Login for Business config, then disconnect and reconnect, or use Refresh phone numbers.",
     refreshWhatsAppPhoneNumbers: "Refresh phone numbers",
@@ -1419,7 +1420,7 @@ export const translations = {
     sync: "Sync",
     syncing: "Syncing…",
     templatesSynced: "Templates synced.",
-    templatesSyncedSummary: "Synced with Meta: {imported} imported, {updated} status updates.",
+    templatesSyncedSummary: "Synced with Meta: {imported} imported, {updated} status updates, {removed} removed (other WhatsApp account).",
     liveChatStatus: "Live chat status",
     noTemplates: "No templates yet. Create one with + Template.",
     enabled: "On",
@@ -3839,6 +3840,7 @@ export const translations = {
         "لا يمكن لهذا الرقم استلام رسائل واتساب (غير مسجل على واتساب، رقم خاطئ، أو غير مضاف كرقم اختبار في ميتا).",
     whatsapp_ecosystem_engagement_limit:
         "ميتا حظرت هذه الرسالة للحد من حجم الرسائل التسويقية لهذا الرقم (خطأ 131049). انتظر 24 ساعة على الأقل قبل إرسال قالب تسويقي آخر لنفس الشخص، أو استخدم قالب أدوات/مصادقة أو ردّاً داخل نافذة الجلسة.",
+    whatsappViaPreviousNumber: "عبر الرقم السابق",
     whatsapp_phone_numbers_not_synced:
         "واتساب متصل لكن لم يتم تحميل رقم الهاتف من ميتا. في لوحة ميتا → مراجعة التطبيق → الصلاحيات، يجب أن تظهر أصول لـ whatsapp_business_messaging (وليس الإدارة فقط). أضف الصلاحية إلى إعداد Login for Business ثم أعد الربط أو استخدم «تحديث أرقام الهاتف».",
     refreshWhatsAppPhoneNumbers: "تحديث أرقام الهاتف",
@@ -3848,7 +3850,7 @@ export const translations = {
     sync: "مزامنة",
     syncing: "جاري المزامنة…",
     templatesSynced: "تمت مزامنة القوالب.",
-    templatesSyncedSummary: "تمت المزامنة مع ميتا: {imported} مستورد، {updated} تحديث للحالة.",
+    templatesSyncedSummary: "تمت المزامنة مع ميتا: {imported} مستورد، {updated} تحديث للحالة، {removed} محذوف (حساب واتساب آخر).",
     liveChatStatus: "حالة الدردشة المباشرة",
     noTemplates: "لا توجد قوالب. أنشئ قالباً بزر + قالب.",
     enabled: "مفعّل",

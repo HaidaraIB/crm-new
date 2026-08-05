@@ -1,11 +1,13 @@
 import React from 'react';
 import { ChatBlobMedia } from '../chat/ChatBlobMedia';
+import { MapPinIcon } from '../icons';
 import { WhatsAppFormattedText } from '../../utils/whatsappFormatting';
 import {
   isWhatsAppTypeStubBody,
   localizeWhatsAppMessageBody,
 } from '../../utils/whatsappMessageBodyDisplay';
 import { localizeMetaDeliveryError } from '../../utils/whatsappMetaErrorDisplay';
+import { clientLocationMapsUrl } from '../../utils/leadLocation';
 import { translations } from '../../constants';
 import { WA_BUBBLE_IN, WA_BUBBLE_OUT, WA_BUBBLE_OUT_FAILED, WA_TICK_READ } from './whatsappChatTheme';
 
@@ -14,16 +16,22 @@ export type ChatBubbleMessage = {
   body: string;
   direction: 'in' | 'out';
   time: string;
+  /** ISO timestamp for status separators (day / conversation started). */
+  createdAt?: string;
   status?: 'sending' | 'sent' | 'delivered' | 'read' | 'failed';
   deliveryError?: string;
   createdByUsername?: string | null;
   apiId?: number;
-  attachmentKind?: 'image' | 'video' | 'audio' | 'document' | null;
+  attachmentKind?: 'image' | 'video' | 'audio' | 'document' | 'location' | null;
   attachmentUrl?: string | null;
   attachmentFilename?: string | null;
   attachmentWidth?: number | null;
   attachmentHeight?: number | null;
   isVoiceNote?: boolean;
+  locationLatitude?: number | null;
+  locationLongitude?: number | null;
+  locationName?: string | null;
+  locationAddress?: string | null;
   /** True when this message used a different Meta phone_number_id than the currently connected one. */
   fromPreviousNumber?: boolean;
 };
@@ -75,6 +83,74 @@ function DeliveryTicks({
   );
 }
 
+function LocationBubbleCard({
+  msg,
+  t,
+  isOut,
+}: {
+  msg: ChatBubbleMessage;
+  t: (key: keyof typeof translations.en) => string;
+  isOut: boolean;
+}) {
+  const lat = msg.locationLatitude;
+  const lng = msg.locationLongitude;
+  const hasCoords = lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
+  const mapsUrl = hasCoords ? clientLocationMapsUrl(`${lat},${lng}`) : null;
+  const title =
+    (msg.locationName || '').trim() ||
+    (msg.locationAddress || '').trim() ||
+    t('whatsappMediaLocationPlaceholder');
+  const subtitle = (msg.locationName || '').trim()
+    ? (msg.locationAddress || '').trim()
+    : '';
+  const coordsLabel = hasCoords ? `${Number(lat).toFixed(5)}, ${Number(lng).toFixed(5)}` : null;
+  const linkMuted = isOut ? 'text-white/90 hover:text-white' : 'text-primary hover:underline';
+  const subMuted = isOut ? 'text-white/70' : 'text-gray-500 dark:text-gray-400';
+
+  return (
+    <div className="mb-1 w-[min(70vw,16rem)] max-w-full">
+      <div
+        className={`flex gap-2 rounded-md px-2.5 py-2 ${
+          isOut ? 'bg-black/10' : 'bg-black/[0.04] dark:bg-white/5'
+        }`}
+      >
+        <span
+          className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${
+            isOut ? 'bg-white/20 text-white' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+          }`}
+        >
+          <MapPinIcon className="size-4" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className={`truncate text-sm font-medium ${AUTO_DIR_CLASS}`} dir="auto">
+            {title}
+          </p>
+          {subtitle ? (
+            <p className={`mt-0.5 truncate text-xs ${subMuted} ${AUTO_DIR_CLASS}`} dir="auto">
+              {subtitle}
+            </p>
+          ) : null}
+          {coordsLabel ? (
+            <p className={`mt-0.5 font-mono text-[10px] tabular-nums ${subMuted}`} dir="ltr">
+              {coordsLabel}
+            </p>
+          ) : null}
+          {mapsUrl ? (
+            <a
+              href={mapsUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`mt-1 inline-block text-xs font-medium ${linkMuted}`}
+            >
+              {t('openInMaps')}
+            </a>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type Props = {
   msg: ChatBubbleMessage;
   t: (key: keyof typeof translations.en) => string;
@@ -104,11 +180,23 @@ export const ChatMessageBubble: React.FC<Props> = ({
   const metaMuted = isOut
     ? 'text-white/50'
     : 'text-gray-500 dark:text-gray-400';
-  const hasMedia = Boolean(msg.attachmentKind && msg.attachmentUrl);
-  const displayBody = hasMedia
+  const hasLocation =
+    msg.attachmentKind === 'location' ||
+    (msg.locationLatitude != null &&
+      msg.locationLongitude != null &&
+      Number.isFinite(msg.locationLatitude) &&
+      Number.isFinite(msg.locationLongitude));
+  const hasFileMedia = Boolean(
+    msg.attachmentKind &&
+      msg.attachmentKind !== 'location' &&
+      msg.attachmentUrl
+  );
+  const displayBody = hasLocation || hasFileMedia
     ? isWhatsAppTypeStubBody(msg.body)
       ? ''
-      : msg.body
+      : hasLocation
+        ? ''
+        : msg.body
     : localizeWhatsAppMessageBody(msg.body, t);
 
   return (
@@ -118,7 +206,8 @@ export const ChatMessageBubble: React.FC<Props> = ({
           msg.status === 'sending' ? 'opacity-80' : ''
         }`}
       >
-        {hasMedia ? (
+        {hasLocation ? <LocationBubbleCard msg={msg} t={t} isOut={isOut} /> : null}
+        {hasFileMedia ? (
           <div
             className={
               msg.attachmentKind === 'audio'
@@ -128,7 +217,7 @@ export const ChatMessageBubble: React.FC<Props> = ({
           >
             <ChatBlobMedia
               url={msg.attachmentUrl!}
-              kind={msg.attachmentKind!}
+              kind={msg.attachmentKind as 'image' | 'video' | 'audio' | 'document'}
               mine={isOut}
               filename={msg.attachmentFilename}
               attachmentWidth={msg.attachmentWidth}

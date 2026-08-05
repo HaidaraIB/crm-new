@@ -22,6 +22,17 @@ export type CallSessionPhase =
   | 'ending'
   | 'error';
 
+const TERMINAL_CALL_STATUSES = new Set([
+  'ended',
+  'missed',
+  'rejected',
+  'no_answer',
+  'failed',
+]);
+
+const ACTIVE_STATUS_POLL_MS = 2_000;
+const ICE_DISCONNECT_GRACE_MS = 2_500;
+
 function preferOpus(sdp: string): string {
   // Keep Meta-friendly OPUS when possible; leave SDP mostly intact.
   return sdp;
@@ -61,6 +72,14 @@ export function useWhatsAppCallSession() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const timerRef = useRef<number | null>(null);
   const pollAnswerRef = useRef<number | null>(null);
+  const iceDisconnectTimerRef = useRef<number | null>(null);
+  const finalizingRef = useRef(false);
+  const activeCallRef = useRef<WhatsAppCallRecord | null>(null);
+  const phaseRef = useRef<CallSessionPhase>(phase);
+  const notesRef = useRef(notes);
+  activeCallRef.current = activeCall;
+  phaseRef.current = phase;
+  notesRef.current = notes;
 
   const cleanupMedia = useCallback(() => {
     if (timerRef.current) {
@@ -70,6 +89,10 @@ export function useWhatsAppCallSession() {
     if (pollAnswerRef.current) {
       window.clearInterval(pollAnswerRef.current);
       pollAnswerRef.current = null;
+    }
+    if (iceDisconnectTimerRef.current) {
+      window.clearTimeout(iceDisconnectTimerRef.current);
+      iceDisconnectTimerRef.current = null;
     }
     try {
       recorderRef.current?.stop();
@@ -159,6 +182,102 @@ export function useWhatsAppCallSession() {
     }
   };
 
+  /** Local teardown when the remote party (or Meta) already ended the call. */
+  const finalizeAfterRemoteHangup = useCallback(
+    async (callId: number) => {
+      if (finalizingRef.current) return;
+      const phaseNow = phaseRef.current;
+      if (phaseNow === 'idle' || phaseNow === 'ending' || phaseNow === 'error') return;
+      const current = activeCallRef.current;
+      if (current && current.id !== callId) return;
+
+      finalizingRef.current = true;
+      setPhase('ending');
+      const callNotes = notesRef.current;
+      try {
+        await flushRecording(callId, callNotes);
+      } catch {
+        /* */
+      }
+      cleanupMedia();
+      setActiveCall(null);
+      setPhase('idle');
+      setMuted(false);
+      setNotes('');
+      finalizingRef.current = false;
+    },
+    [cleanupMedia]
+  );
+
+  const attachRemoteEndWatchers = useCallback(
+    (pc: RTCPeerConnection, callId: number) => {
+      pc.onconnectionstatechange = () => {
+        const state = pc.connectionState;
+        if (state === 'failed' || state === 'closed') {
+          void finalizeAfterRemoteHangup(callId);
+          return;
+        }
+        if (state === 'disconnected') {
+          if (iceDisconnectTimerRef.current) {
+            window.clearTimeout(iceDisconnectTimerRef.current);
+          }
+          iceDisconnectTimerRef.current = window.setTimeout(() => {
+            iceDisconnectTimerRef.current = null;
+            const still =
+              pc.connectionState === 'disconnected' ||
+              pc.connectionState === 'failed' ||
+              pc.connectionState === 'closed';
+            if (still) void finalizeAfterRemoteHangup(callId);
+          }, ICE_DISCONNECT_GRACE_MS);
+          return;
+        }
+        if (
+          iceDisconnectTimerRef.current &&
+          (state === 'connected' || state === 'connecting')
+        ) {
+          window.clearTimeout(iceDisconnectTimerRef.current);
+          iceDisconnectTimerRef.current = null;
+        }
+      };
+      pc.oniceconnectionstatechange = () => {
+        const state = pc.iceConnectionState;
+        if (state === 'failed' || state === 'closed') {
+          void finalizeAfterRemoteHangup(callId);
+        }
+      };
+    },
+    [finalizeAfterRemoteHangup]
+  );
+
+  // Poll CRM call status while in-session so Meta terminate webhooks end the agent UI.
+  useEffect(() => {
+    if (phase !== 'active' && phase !== 'ringing' && phase !== 'connecting') return;
+    const callId = activeCall?.id;
+    if (!callId) return;
+
+    let cancelled = false;
+    const tick = async () => {
+      if (cancelled || finalizingRef.current) return;
+      try {
+        const detail = await getWhatsAppCallDetailAPI(callId);
+        if (cancelled) return;
+        setActiveCall(detail);
+        if (TERMINAL_CALL_STATUSES.has(String(detail.status || '').toLowerCase())) {
+          await finalizeAfterRemoteHangup(callId);
+        }
+      } catch {
+        /* ignore poll errors */
+      }
+    };
+
+    void tick();
+    const id = window.setInterval(tick, ACTIVE_STATUS_POLL_MS);
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [phase, activeCall?.id, finalizeAfterRemoteHangup]);
+
   const createPeer = async () => {
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -182,73 +301,87 @@ export function useWhatsAppCallSession() {
     return { pc, local, remote };
   };
 
-  const acceptInbound = useCallback(async (call: WhatsAppCallRecord) => {
-    setError(null);
-    setPhase('connecting');
-    setActiveCall(call);
-    setNotes('');
-    try {
-      if (!call.offer_sdp) {
-        const err: Error & { code?: string } = new Error('whatsappCallMissingOffer');
-        err.code = 'whatsappCallMissingOffer';
-        throw err;
-      }
-      const { pc, local, remote } = await createPeer();
-      await pc.setRemoteDescription({ type: 'offer', sdp: call.offer_sdp });
-      const answer = await pc.createAnswer();
-      const sdp = preferOpus(answer.sdp || '');
-      await pc.setLocalDescription({ type: 'answer', sdp });
-
-      // Wait briefly for ICE gather (non-trickle for Meta)
-      await new Promise<void>((resolve) => {
-        if (pc.iceGatheringState === 'complete') {
-          resolve();
-          return;
-        }
-        const t = window.setTimeout(resolve, 2500);
-        pc.onicegatheringstatechange = () => {
-          if (pc.iceGatheringState === 'complete') {
-            window.clearTimeout(t);
-            resolve();
-          }
-        };
-      });
-      const finalSdp = preferOpus(pc.localDescription?.sdp || sdp);
-
+  const acceptInbound = useCallback(
+    async (call: WhatsAppCallRecord) => {
+      setError(null);
+      setPhase('connecting');
+      setActiveCall(call);
+      setNotes('');
+      finalizingRef.current = false;
       try {
-        await whatsappCallPreAcceptAPI(call.id, finalSdp);
-      } catch {
-        /* pre_accept optional */
-      }
-      const updated = await whatsappCallAcceptAPI(call.id, finalSdp);
-      setActiveCall(updated);
-      setPhase('active');
-      startTimer();
-      await startRecording(local, remote);
-    } catch (e: any) {
-      setError(e?.code || e?.message || 'whatsappCallAcceptFailed');
-      setPhase('error');
-      cleanupMedia();
-      throw e;
-    }
-  }, [cleanupMedia]);
+        if (!call.offer_sdp) {
+          const err: Error & { code?: string } = new Error('whatsappCallMissingOffer');
+          err.code = 'whatsappCallMissingOffer';
+          throw err;
+        }
+        const { pc, local, remote } = await createPeer();
+        attachRemoteEndWatchers(pc, call.id);
+        await pc.setRemoteDescription({ type: 'offer', sdp: call.offer_sdp });
+        const answer = await pc.createAnswer();
+        const sdp = preferOpus(answer.sdp || '');
+        await pc.setLocalDescription({ type: 'answer', sdp });
 
-  const rejectInbound = useCallback(async (call: WhatsAppCallRecord) => {
-    try {
-      await whatsappCallRejectAPI(call.id);
-    } catch {
-      /* */
-    }
-    setActiveCall(null);
-    setPhase('idle');
-    cleanupMedia();
-  }, [cleanupMedia]);
+        // Wait briefly for ICE gather (non-trickle for Meta)
+        await new Promise<void>((resolve) => {
+          if (pc.iceGatheringState === 'complete') {
+            resolve();
+            return;
+          }
+          const t = window.setTimeout(resolve, 2500);
+          pc.onicegatheringstatechange = () => {
+            if (pc.iceGatheringState === 'complete') {
+              window.clearTimeout(t);
+              resolve();
+            }
+          };
+        });
+        const finalSdp = preferOpus(pc.localDescription?.sdp || sdp);
+
+        try {
+          await whatsappCallPreAcceptAPI(call.id, finalSdp);
+        } catch {
+          /* pre_accept optional */
+        }
+        const updated = await whatsappCallAcceptAPI(call.id, finalSdp);
+        setActiveCall(updated);
+        setPhase('active');
+        startTimer();
+        await startRecording(local, remote);
+      } catch (e: any) {
+        setError(e?.code || e?.message || 'whatsappCallAcceptFailed');
+        setPhase('error');
+        cleanupMedia();
+        throw e;
+      }
+    },
+    [attachRemoteEndWatchers, cleanupMedia]
+  );
+
+  const rejectInbound = useCallback(
+    async (call: WhatsAppCallRecord) => {
+      try {
+        await whatsappCallRejectAPI(call.id);
+      } catch {
+        /* */
+      }
+      // Only tear down WebRTC when rejecting the call that owns this session.
+      // A waiting second inbound must not kill an active call.
+      const current = activeCallRef.current;
+      if (!current || current.id === call.id) {
+        setActiveCall(null);
+        setPhase('idle');
+        cleanupMedia();
+      }
+    },
+    [cleanupMedia]
+  );
 
   const startOutbound = useCallback(
     async (opts: { to: string; clientId?: number; skipPermissionCheck?: boolean }) => {
       setError(null);
       setPhase('connecting');
       setNotes('');
+      finalizingRef.current = false;
       try {
         const { pc, local, remote } = await createPeer();
         const offer = await pc.createOffer();
@@ -275,6 +408,7 @@ export function useWhatsAppCallSession() {
           skip_permission_check: opts.skipPermissionCheck,
         });
         setActiveCall(created);
+        attachRemoteEndWatchers(pc, created.id);
         setPhase('ringing');
 
         // Poll for answer SDP from Meta connect webhook
@@ -297,17 +431,12 @@ export function useWhatsAppCallSession() {
                 }
               }
             }
-            if (
-              ['ended', 'missed', 'rejected', 'no_answer', 'failed'].includes(
-                detail.status
-              )
-            ) {
+            if (TERMINAL_CALL_STATUSES.has(String(detail.status || '').toLowerCase())) {
               if (pollAnswerRef.current) {
                 window.clearInterval(pollAnswerRef.current);
                 pollAnswerRef.current = null;
               }
-              setPhase('idle');
-              cleanupMedia();
+              await finalizeAfterRemoteHangup(created.id);
             }
           } catch {
             /* */
@@ -320,7 +449,7 @@ export function useWhatsAppCallSession() {
         throw e;
       }
     },
-    [cleanupMedia]
+    [attachRemoteEndWatchers, cleanupMedia, finalizeAfterRemoteHangup]
   );
 
   const endCall = useCallback(async () => {
@@ -330,6 +459,8 @@ export function useWhatsAppCallSession() {
       setPhase('idle');
       return;
     }
+    if (finalizingRef.current) return;
+    finalizingRef.current = true;
     setPhase('ending');
     const callNotes = notes;
     try {
@@ -347,6 +478,7 @@ export function useWhatsAppCallSession() {
     setPhase('idle');
     setMuted(false);
     setNotes('');
+    finalizingRef.current = false;
   }, [activeCall, notes, cleanupMedia]);
 
   const toggleMute = useCallback(() => {

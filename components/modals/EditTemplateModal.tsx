@@ -80,7 +80,7 @@ const HEADER_OPTIONS = [
 
 type TemplateButton = {
   id: string;
-  type: 'phone' | 'url' | 'reply' | 'flow';
+  type: 'phone' | 'url' | 'reply' | 'flow' | 'call_permission_request';
   buttonText: string;
   phone?: string;
   url?: string;
@@ -159,7 +159,10 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
         payload.buttons = args.buttons.map((b): TemplateButtonPayload => {
           const item: TemplateButtonPayload = {
             type: b.type as TemplateButtonPayload['type'],
-            button_text: b.buttonText.trim(),
+            button_text:
+              b.type === 'call_permission_request'
+                ? (b.buttonText.trim() || 'Call permission')
+                : b.buttonText.trim(),
           };
           if (b.type === 'phone' && b.phone) item.phone = b.phone.trim();
           if (b.type === 'url' && b.url) item.url = b.url.trim();
@@ -189,13 +192,22 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       const rawButtons = (template as any).buttons;
       let parsedButtons: TemplateButton[] = [];
       if (Array.isArray(rawButtons) && rawButtons.length > 0) {
-        parsedButtons = rawButtons.map((b: any, i: number) => ({
-          id: `btn-${i}-${Date.now()}`,
-          type: (b.type === 'phone' || b.type === 'url' || b.type === 'reply' ? b.type : 'reply') as 'phone' | 'url' | 'reply',
-          buttonText: b.button_text ?? b.buttonText ?? '',
-          ...(b.type === 'phone' && { phone: b.phone ?? '' }),
-          ...(b.type === 'url' && { url: b.url ?? '', dynamicUrl: false }),
-        }));
+        parsedButtons = rawButtons.map((b: any, i: number) => {
+          const rawType = String(b.type || '').toLowerCase().replace(/\s+/g, '_');
+          const type: TemplateButton['type'] =
+            rawType === 'call_permission_request' || rawType === 'call_permission'
+              ? 'call_permission_request'
+              : b.type === 'phone' || b.type === 'url' || b.type === 'reply'
+                ? b.type
+                : 'reply';
+          return {
+            id: `btn-${i}-${Date.now()}`,
+            type,
+            buttonText: b.button_text ?? b.buttonText ?? '',
+            ...(type === 'phone' && { phone: b.phone ?? '' }),
+            ...(type === 'url' && { url: b.url ?? '', dynamicUrl: false }),
+          };
+        });
         setButtons(parsedButtons);
       } else {
         setButtons([]);
@@ -555,7 +567,36 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
             {/* Buttons */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Buttons</label>
-              {buttons.map((btn) => (
+              {isWhatsApp && (
+                <label className="mb-3 flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-800 dark:bg-emerald-900/20 dark:text-emerald-100">
+                  <input
+                    type="checkbox"
+                    className="mt-0.5 rounded"
+                    checked={buttons.some((b) => b.type === 'call_permission_request')}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setButtons([
+                          {
+                            id: `btn-cpr-${Date.now()}`,
+                            type: 'call_permission_request',
+                            buttonText: '',
+                          },
+                        ]);
+                      } else {
+                        setButtons((prev) => prev.filter((b) => b.type !== 'call_permission_request'));
+                      }
+                    }}
+                  />
+                  <span>
+                    <span className="font-medium">{t('templateCallPermissionRequest') || 'Call permission request'}</span>
+                    <span className="mt-0.5 block text-xs opacity-80">
+                      {t('templateCallPermissionRequestHint') ||
+                        'Adds Meta’s call permission request (cannot be combined with other buttons).'}
+                    </span>
+                  </span>
+                </label>
+              )}
+              {buttons.filter((b) => b.type !== 'call_permission_request').map((btn) => (
                 <div key={btn.id} className="flex flex-wrap items-start gap-2 mb-3 p-3 rounded border border-gray-200 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/30">
                   <div className="flex-1 min-w-[120px]">
                     <span className="text-xs text-gray-500 dark:text-gray-400 block mb-1">{t('templateButtonText') || 'Button Text'}</span>
@@ -606,11 +647,13 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                   </div>
                 </div>
               ))}
-              <div className="flex flex-wrap gap-2">
-                <button type="button" onClick={() => addButton('phone')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('phoneButtonAdd')}</button>
-                <button type="button" onClick={() => addButton('url')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('urlButtonAdd')}</button>
-                <button type="button" onClick={() => addButton('reply')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('replyButtonAdd')}</button>
-              </div>
+              {!buttons.some((b) => b.type === 'call_permission_request') && (
+                <div className="flex flex-wrap gap-2">
+                  <button type="button" onClick={() => addButton('phone')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('phoneButtonAdd')}</button>
+                  <button type="button" onClick={() => addButton('url')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('urlButtonAdd')}</button>
+                  <button type="button" onClick={() => addButton('reply')} className="px-3 py-2 rounded border-2 border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-600 dark:text-gray-400 hover:border-primary hover:text-primary-700 dark:hover:text-primary-200">{t('replyButtonAdd')}</button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -652,6 +695,11 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                       {btn.type === 'reply' && (
                         <span className="inline-flex items-center w-full justify-center py-2 rounded-lg border-2 border-[#0084ff] text-[#0084ff] dark:border-[#53bdeb] dark:text-[#53bdeb] text-[13px] font-medium bg-transparent">
                           {btn.buttonText || (t('reply') || 'Reply')}
+                        </span>
+                      )}
+                      {btn.type === 'call_permission_request' && (
+                        <span className="inline-flex items-center gap-1.5 w-full justify-center py-2 rounded-lg bg-[#e7f3ff] dark:bg-[#1a3a52] text-[#0084ff] dark:text-[#53bdeb] text-[13px] font-medium border border-[#0084ff]/30">
+                          {t('templateCallPermissionRequest') || 'Call permission request'}
                         </span>
                       )}
                     </div>

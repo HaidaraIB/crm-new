@@ -9,6 +9,7 @@ import {
   type ChatMediaAlbumItem,
 } from '../components/chat/chatMediaAlbum';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
+import { ShareLocationModal } from '../components/modals/ShareLocationModal';
 import { WhatsAppChatLayout, type ChatBubbleMessage } from '../components/whatsapp/WhatsAppChatLayout';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { useAppContext } from '../context/AppContext';
@@ -20,6 +21,7 @@ import {
   getWhatsAppContactByPhoneAPI,
   getWhatsAppSessionWindowAPI,
   resolveLocalizedApiError,
+  sendWhatsAppLocationAPI,
   sendWhatsAppMediaAPI,
   sendWhatsAppMessageAPI,
   sendWhatsAppTemplateAPI,
@@ -104,6 +106,11 @@ export const ChatsPage: React.FC = () => {
   const [pendingIsVoiceNote, setPendingIsVoiceNote] = useState(false);
   const [compressingAttachment, setCompressingAttachment] = useState(false);
   const mediaResendFilesRef = useRef<Map<string, { file: File; isVoiceNote: boolean }>>(new Map());
+  const locationResendRef = useRef<
+    Map<string, { latitude: number; longitude: number; name?: string; address?: string }>
+  >(new Map());
+  const [shareLocationOpen, setShareLocationOpen] = useState(false);
+  const [shareLocationSending, setShareLocationSending] = useState(false);
   const [chatTemplateSendId, setChatTemplateSendId] = useState<number | ''>('');
   const [chatTemplateSending, setChatTemplateSending] = useState(false);
   const [isStartNewOpen, setIsStartNewOpen] = useState(false);
@@ -123,6 +130,8 @@ export const ChatsPage: React.FC = () => {
   /** Hydrate-safe tracker so opening a thread with history does not play sound. */
   const inboundSoundHydratedRef = useRef(false);
   const inboundSoundLatestIdRef = useRef<number | null>(null);
+  /** Persist unread divider across mark-read clearing is_read. */
+  const [newMessagesBeforeApiId, setNewMessagesBeforeApiId] = useState<number | null>(null);
 
   const markConversationRead = useMarkWhatsAppConversationRead();
 
@@ -183,7 +192,7 @@ export const ChatsPage: React.FC = () => {
 
   const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
     enabled: true,
-    refetchInterval: 8000,
+    refetchInterval: 3000,
   });
 
   const selectedChatLeadId =
@@ -268,17 +277,34 @@ export const ChatsPage: React.FC = () => {
     inboundSoundHydratedRef.current = false;
     inboundSoundLatestIdRef.current = null;
     lastInboundKeyRef.current = '';
+    setNewMessagesBeforeApiId(null);
   }, [selectedChatClient?.id, selectedChatPhone]);
 
+  // Capture first unread inbound once (before mark-read clears is_read).
+  useEffect(() => {
+    if (!selectedChatClient || newMessagesBeforeApiId != null) return;
+    const chronological = [...(leadWhatsAppMessages as any[])].sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+    const firstUnread = chronological.find(
+      (m) => m.direction === 'inbound' && m.is_read === false && typeof m.id === 'number'
+    );
+    if (firstUnread) {
+      setNewMessagesBeforeApiId(firstUnread.id as number);
+    }
+  }, [leadWhatsAppMessages, selectedChatClient, newMessagesBeforeApiId]);
+
   // Real WhatsApp–style: play notification_whatsapp when inbound arrives in the open thread.
+  // Never hydrate from a stale cache snapshot that will be replaced by an in-flight refetch —
+  // that falsely treats history as a brand-new inbound and plays sound on open.
   useEffect(() => {
     if (!selectedChatClient) {
       inboundSoundHydratedRef.current = false;
       inboundSoundLatestIdRef.current = null;
       return;
     }
-    // Wait for first fetch so history load does not count as a "new" inbound.
     if (!isChatMessagesFetched || !isChatMessagesSuccess) return;
+    if (isFetchingChatMessages && !inboundSoundHydratedRef.current) return;
 
     preloadIncomingWhatsAppSound();
 
@@ -305,6 +331,7 @@ export const ChatsPage: React.FC = () => {
     selectedChatPhone,
     isChatMessagesFetched,
     isChatMessagesSuccess,
+    isFetchingChatMessages,
   ]);
 
   useEffect(() => {
@@ -424,6 +451,7 @@ export const ChatsPage: React.FC = () => {
       },
       lastMessagePreview: c.last_message_preview || '',
       lastMessageAt: c.last_message_at || null,
+      unreadCount: Number(c.unread_count) > 0 ? Number(c.unread_count) : 0,
     }));
     const extra = extraConversations.filter((e) => {
       const ep = normalizeChatPhone(e.client);
@@ -432,7 +460,15 @@ export const ChatsPage: React.FC = () => {
         return a.client.id === e.client.id || (ep && ap === ep);
       });
     });
-    return [...fromApi, ...extra.map((e) => ({ client: e.client, lastMessagePreview: '', lastMessageAt: null }))];
+    return [
+      ...fromApi,
+      ...extra.map((e) => ({
+        client: e.client,
+        lastMessagePreview: '',
+        lastMessageAt: null,
+        unreadCount: 0,
+      })),
+    ];
   }, [conversationsList, extraConversations]);
 
   const formatChatTime = () =>
@@ -591,6 +627,13 @@ export const ChatsPage: React.FC = () => {
       | { kind: 'text'; body: string }
       | { kind: 'template'; templateId: number; previewBody: string }
       | { kind: 'media'; file: File; caption: string; isVoiceNote: boolean }
+      | {
+          kind: 'location';
+          latitude: number;
+          longitude: number;
+          name?: string;
+          address?: string;
+        }
   ) => {
     const to = normalizeChatPhone(client);
     if (!to) {
@@ -613,6 +656,16 @@ export const ChatsPage: React.FC = () => {
           is_voice_note: payload.isVoiceNote,
         });
         mediaResendFilesRef.current.delete(msgId);
+      } else if (payload.kind === 'location') {
+        await sendWhatsAppLocationAPI({
+          to,
+          latitude: payload.latitude,
+          longitude: payload.longitude,
+          name: payload.name,
+          address: payload.address,
+          client_id: typeof client.id === 'number' ? client.id : undefined,
+        });
+        locationResendRef.current.delete(msgId);
       } else {
         await sendWhatsAppMessageAPI({
           to,
@@ -636,6 +689,58 @@ export const ChatsPage: React.FC = () => {
         )
       );
       mapApiErrorToComposer(e);
+    }
+  };
+
+  const handleSendLocation = async (payload: {
+    latitude: number;
+    longitude: number;
+    name?: string;
+    address?: string;
+  }) => {
+    if (!selectedChatClient) return;
+    if (whatsappSendBlocked) {
+      showAlert(t('whatsappReconnectRequired') || 'WhatsApp disconnected', 'warning');
+      return;
+    }
+    if (blockFreeText) {
+      setComposerAlert({
+        variant: 'warning',
+        message:
+          t('whatsappOutsideSessionUseTemplate') ||
+          'Outside the 24-hour window. Send an approved template instead.',
+      });
+      return;
+    }
+    const preview =
+      payload.name && payload.address
+        ? `${payload.name} — ${payload.address}`
+        : payload.name || payload.address || t('whatsappMediaLocationPlaceholder');
+    const msgId = newChatMessageId();
+    locationResendRef.current.set(msgId, payload);
+    pushOptimistic(selectedChatClient, (prev) => [
+      ...prev,
+      {
+        id: msgId,
+        body: preview,
+        direction: 'out',
+        time: formatChatTime(),
+        status: 'sending',
+        sendKind: 'location',
+        createdByUsername: currentUser?.username,
+        attachmentKind: 'location',
+        locationLatitude: payload.latitude,
+        locationLongitude: payload.longitude,
+        locationName: payload.name || null,
+        locationAddress: payload.address || null,
+      },
+    ]);
+    setShareLocationSending(true);
+    try {
+      await sendOutbound(selectedChatClient, msgId, { kind: 'location', ...payload });
+      setShareLocationOpen(false);
+    } finally {
+      setShareLocationSending(false);
     }
   };
 
@@ -775,6 +880,7 @@ export const ChatsPage: React.FC = () => {
             language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
             withLatinDigits({ hour: '2-digit', minute: '2-digit' })
           ),
+          createdAt: wa.created_at,
           status,
           deliveryError: wa.delivery_error || undefined,
           createdByUsername: wa.created_by_username || null,
@@ -785,6 +891,16 @@ export const ChatsPage: React.FC = () => {
           attachmentWidth: wa.attachment_width ?? null,
           attachmentHeight: wa.attachment_height ?? null,
           isVoiceNote: Boolean(wa.is_voice_note),
+          locationLatitude:
+            wa.location_latitude != null && wa.location_latitude !== ''
+              ? Number(wa.location_latitude)
+              : null,
+          locationLongitude:
+            wa.location_longitude != null && wa.location_longitude !== ''
+              ? Number(wa.location_longitude)
+              : null,
+          locationName: wa.location_name || null,
+          locationAddress: wa.location_address || null,
           fromPreviousNumber,
         };
       })
@@ -794,6 +910,7 @@ export const ChatsPage: React.FC = () => {
       body: m.body,
       direction: m.direction,
       time: m.time,
+      createdAt: new Date().toISOString(),
       status: m.status,
       deliveryError: m.deliveryError,
       createdByUsername: m.createdByUsername || currentUser?.username,
@@ -801,6 +918,10 @@ export const ChatsPage: React.FC = () => {
       attachmentUrl: m.attachmentUrl,
       attachmentFilename: m.attachmentFilename,
       isVoiceNote: m.isVoiceNote,
+      locationLatitude: m.locationLatitude ?? null,
+      locationLongitude: m.locationLongitude ?? null,
+      locationName: m.locationName ?? null,
+      locationAddress: m.locationAddress ?? null,
     }));
     return [...apiMsgs, ...optimistic];
   }, [
@@ -882,6 +1003,7 @@ export const ChatsPage: React.FC = () => {
     setResendingMessageId(msg.id);
     try {
       const media = mediaResendFilesRef.current.get(msg.id);
+      const location = locationResendRef.current.get(msg.id);
       pushOptimistic(selectedChatClient, (prev) =>
         prev.map((m) =>
           m.id === msg.id ? { ...m, status: 'sending' as const, deliveryError: undefined } : m
@@ -893,6 +1015,11 @@ export const ChatsPage: React.FC = () => {
           file: media.file,
           caption: msg.body || '',
           isVoiceNote: media.isVoiceNote,
+        });
+      } else if (location) {
+        await sendOutbound(selectedChatClient, msg.id, {
+          kind: 'location',
+          ...location,
         });
       } else {
         await sendOutbound(selectedChatClient, msg.id, { kind: 'text', body: msg.body });
@@ -918,6 +1045,7 @@ export const ChatsPage: React.FC = () => {
           onStartNew={() => setIsStartNewOpen(true)}
           onDeleteConversation={handleDeleteConversation}
           messages={threadMessages}
+          newMessagesBeforeApiId={newMessagesBeforeApiId}
           isFetchingMessages={isFetchingChatMessages}
           onRefreshMessages={() => {
             void refetchLeadWhatsApp();
@@ -991,6 +1119,10 @@ export const ChatsPage: React.FC = () => {
             pendingIsVoiceNote,
             setPendingIsVoiceNote,
             compressingAttachment,
+            onShareLocation: () => {
+              if (whatsappSendBlocked || blockFreeText) return;
+              setShareLocationOpen(true);
+            },
             onOpenPendingMedia: (_url, kind) => {
               if (!pendingAttachment) return;
               const ownUrl = URL.createObjectURL(pendingAttachment);
@@ -1022,6 +1154,15 @@ export const ChatsPage: React.FC = () => {
         onSelectClient={(c) => {
           void addConversation(c);
         }}
+      />
+      <ShareLocationModal
+        isOpen={shareLocationOpen}
+        onClose={() => {
+          if (!shareLocationSending) setShareLocationOpen(false);
+        }}
+        onSend={handleSendLocation}
+        sending={shareLocationSending}
+        t={t}
       />
       {chatToast && (
         <ChatToast

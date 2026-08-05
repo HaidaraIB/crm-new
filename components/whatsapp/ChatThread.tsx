@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import { PhoneText, isPhoneLike, RefreshButton } from '../index';
 import { RefreshIcon, PhoneIcon, ListIcon } from '../icons';
 import {
@@ -7,6 +7,7 @@ import {
   getWhatsAppContactTitle,
 } from '../../utils/whatsappContactDisplay';
 import { ChatMessageBubble, type ChatBubbleMessage } from './ChatMessageBubble';
+import { ChatStatusSeparator } from './ChatStatusSeparator';
 import { ChatComposer, type SessionInfo } from './ChatComposer';
 import {
   WA_AVATAR,
@@ -16,11 +17,15 @@ import {
 } from './whatsappChatTheme';
 import type { MessageTemplateType } from '../../services/api';
 import { translations } from '../../constants';
+import { buildWhatsAppThreadItems } from '../../utils/whatsappThreadItems';
 
 type Props = {
   t: (key: keyof typeof translations.en) => string;
+  language: string;
   selectedClient: any | null;
   messages: ChatBubbleMessage[];
+  /** First unread inbound api id — inserts “New Messages” divider before it. */
+  newMessagesBeforeApiId?: number | null;
   isFetching?: boolean;
   onRefresh?: () => void;
   onWhatsAppCall?: () => void;
@@ -37,8 +42,10 @@ type Props = {
 
 export const ChatThread: React.FC<Props> = ({
   t,
+  language,
   selectedClient,
   messages,
+  newMessagesBeforeApiId = null,
   isFetching,
   onRefresh,
   onWhatsAppCall,
@@ -53,10 +60,35 @@ export const ChatThread: React.FC<Props> = ({
   emptyHint,
 }) => {
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const newDividerRef = useRef<HTMLDivElement | null>(null);
+  const scrolledToNewRef = useRef<string>('');
+  const chatKey = `${selectedClient?.id ?? ''}|${selectedClient?.phone_number ?? ''}|${selectedClient?.manual_phone ?? ''}`;
+
+  const threadItems = useMemo(
+    () =>
+      buildWhatsAppThreadItems(messages, {
+        language,
+        t: t as (key: string) => string,
+        newMessagesBeforeApiId,
+      }),
+    [messages, language, t, newMessagesBeforeApiId]
+  );
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length, selectedClient?.id]);
+    scrolledToNewRef.current = '';
+  }, [chatKey]);
+
+  useEffect(() => {
+    const newKey = `${chatKey}:${newMessagesBeforeApiId ?? ''}`;
+    if (newMessagesBeforeApiId && newDividerRef.current && scrolledToNewRef.current !== newKey) {
+      scrolledToNewRef.current = newKey;
+      newDividerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    if (!newMessagesBeforeApiId || scrolledToNewRef.current === newKey) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages.length, chatKey, newMessagesBeforeApiId, threadItems.length]);
 
   if (!selectedClient) {
     return (
@@ -137,18 +169,30 @@ export const ChatThread: React.FC<Props> = ({
         lang="und"
       >
         <div className="mt-auto flex flex-col space-y-2 px-3 py-2">
-          {messages.map((msg) => (
-            <ChatMessageBubble
-              key={msg.id}
-              msg={msg}
-              t={t}
-              onDelete={onDeleteMessage}
-              onResend={onResendMessage}
-              deleting={deletingMessageId === msg.id}
-              resending={resendingMessageId === msg.id}
-              onOpenMedia={onOpenMedia}
-            />
-          ))}
+          {threadItems.map((item) => {
+            if (item.kind === 'status') {
+              return (
+                <div
+                  key={item.id}
+                  ref={item.variant === 'new' ? newDividerRef : undefined}
+                >
+                  <ChatStatusSeparator variant={item.variant} label={item.label} />
+                </div>
+              );
+            }
+            return (
+              <ChatMessageBubble
+                key={item.msg.id}
+                msg={item.msg}
+                t={t}
+                onDelete={onDeleteMessage}
+                onResend={onResendMessage}
+                deleting={deletingMessageId === item.msg.id}
+                resending={resendingMessageId === item.msg.id}
+                onOpenMedia={onOpenMedia}
+              />
+            );
+          })}
           <div ref={bottomRef} />
         </div>
       </div>

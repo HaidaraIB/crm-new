@@ -3367,6 +3367,33 @@ export const sendWhatsAppMediaAPI = async (data: {
   });
 };
 
+/**
+ * POST /api/integrations/whatsapp/send-location/
+ * Body: to, latitude, longitude, optional name / address / client_id / phone_number_id
+ */
+export const sendWhatsAppLocationAPI = async (data: {
+  to: string;
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
+  client_id?: number;
+  phone_number_id?: string;
+}) => {
+  return apiRequest<any>('/integrations/whatsapp/send-location/', {
+    method: 'POST',
+    body: JSON.stringify({
+      to: data.to,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      ...(data.name ? { name: data.name } : {}),
+      ...(data.address ? { address: data.address } : {}),
+      ...(data.client_id != null && { client_id: data.client_id }),
+      ...(data.phone_number_id && { phone_number_id: data.phone_number_id }),
+    }),
+  });
+};
+
 /** Authenticated attachment download URL for a stored WhatsApp message. */
 export function getWhatsAppMessageAttachmentUrl(messageId: number): string {
   return `${BASE_URL}/integrations/whatsapp/messages/${messageId}/attachment/`;
@@ -3445,7 +3472,7 @@ export interface LeadWhatsAppMessageResponse {
   created_at: string;
   send_source?: 'manual' | 'campaign' | 'auto_welcome';
   is_read?: boolean;
-  attachment_kind?: 'image' | 'video' | 'audio' | 'document' | null;
+  attachment_kind?: 'image' | 'video' | 'audio' | 'document' | 'location' | null;
   attachment_mime?: string | null;
   attachment_size?: number | null;
   attachment_width?: number | null;
@@ -3454,6 +3481,10 @@ export interface LeadWhatsAppMessageResponse {
   attachment_url?: string | null;
   is_voice_note?: boolean;
   meta_media_id?: string | null;
+  location_latitude?: string | number | null;
+  location_longitude?: string | number | null;
+  location_name?: string | null;
+  location_address?: string | null;
 }
 
 /**
@@ -3573,7 +3604,7 @@ export const markWhatsAppConversationReadAPI = async (params: {
 };
 
 export type TemplateButtonPayload = {
-  type: 'phone' | 'url' | 'reply';
+  type: 'phone' | 'url' | 'reply' | 'call_permission_request';
   button_text: string;
   phone?: string;
   url?: string;

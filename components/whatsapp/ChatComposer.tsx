@@ -1,6 +1,6 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Button, Loader } from '../index';
-import { MicrophoneIcon, PaperclipIcon } from '../icons';
+import { MicrophoneIcon, PaperclipIcon, MapPinIcon } from '../icons';
 import { ChatPendingAttachmentChip } from '../chat/ChatPendingAttachmentChip';
 import { ChatVoiceRecordingBar } from '../chat/ChatVoiceRecordingBar';
 import { useChatVoiceRecorder } from '../../hooks/useChatVoiceRecorder';
@@ -37,6 +37,7 @@ type Props = {
   setPendingIsVoiceNote?: (v: boolean) => void;
   compressingAttachment?: boolean;
   onOpenPendingMedia?: (previewUrl: string, kind: 'image' | 'video') => void;
+  onShareLocation?: () => void;
 };
 
 const COMPOSER_MIN_H_PX = 32;
@@ -86,6 +87,7 @@ export const ChatComposer: React.FC<Props> = ({
   setPendingIsVoiceNote,
   compressingAttachment = false,
   onOpenPendingMedia,
+  onShareLocation,
 }) => {
   const { language } = useAppContext();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -297,6 +299,18 @@ export const ChatComposer: React.FC<Props> = ({
               >
                 <PaperclipIcon className="size-[1.2rem]" />
               </button>
+              {onShareLocation ? (
+                <button
+                  type="button"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/10"
+                  disabled={freeTextDisabled || compressingAttachment}
+                  onClick={onShareLocation}
+                  aria-label={t('whatsappShareLocation')}
+                  title={t('whatsappShareLocation')}
+                >
+                  <MapPinIcon className="size-[1.2rem]" />
+                </button>
+              ) : null}
               <textarea
                 ref={textareaRef}
                 rows={1}

@@ -20,6 +20,7 @@ export type ConversationRow = {
   client: any;
   lastMessagePreview?: string;
   lastMessageAt?: string | null;
+  unreadCount?: number;
 };
 
 type Props = {
@@ -94,9 +95,10 @@ export const ConversationList: React.FC<Props> = ({
         </div>
       </div>
       <ul className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
-        {filtered.map(({ client, lastMessagePreview, lastMessageAt }) => {
+        {filtered.map(({ client, lastMessagePreview, lastMessageAt, unreadCount = 0 }) => {
           const id = client.id;
           const active = selectedId != null && String(selectedId) === String(id);
+          const hasUnread = !active && unreadCount > 0;
           const title = getWhatsAppContactTitle(client);
           const rawPreview = lastMessagePreview || getWhatsAppContactSubtitle(client) || '';
           const subtitle = lastMessagePreview
@@ -115,25 +117,65 @@ export const ConversationList: React.FC<Props> = ({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center justify-between gap-2">
                     {isPhoneLike(title) ? (
-                      <PhoneText as="p" className="font-medium text-gray-900 dark:text-white truncate">
+                      <PhoneText
+                        as="p"
+                        className={`truncate text-gray-900 dark:text-white ${
+                          hasUnread ? 'font-semibold' : 'font-medium'
+                        }`}
+                      >
                         {title}
                       </PhoneText>
                     ) : (
-                      <p className="font-medium text-gray-900 dark:text-white truncate">{title}</p>
+                      <p
+                        className={`truncate text-gray-900 dark:text-white ${
+                          hasUnread ? 'font-semibold' : 'font-medium'
+                        }`}
+                      >
+                        {title}
+                      </p>
                     )}
-                    <span className="text-[10px] text-gray-500 shrink-0">
+                    <span
+                      className={`shrink-0 text-[10px] ${
+                        hasUnread
+                          ? 'font-semibold text-primary dark:text-primary-300'
+                          : 'text-gray-500'
+                      }`}
+                    >
                       {formatListTime(lastMessageAt, language)}
                     </span>
                   </div>
-                  {subtitle ? (
-                    isPhoneLike(subtitle) ? (
-                      <PhoneText className="text-xs text-gray-500 dark:text-gray-400 truncate block">
-                        {subtitle}
-                      </PhoneText>
-                    ) : (
-                      <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{subtitle}</p>
-                    )
-                  ) : null}
+                  <div className="mt-0.5 flex items-center gap-2">
+                    <div className="min-w-0 flex-1">
+                      {subtitle ? (
+                        isPhoneLike(subtitle) ? (
+                          <PhoneText
+                            className={`block truncate text-xs ${
+                              hasUnread
+                                ? 'font-semibold text-gray-700 dark:text-gray-200'
+                                : 'text-gray-500 dark:text-gray-400'
+                            }`}
+                          >
+                            {subtitle}
+                          </PhoneText>
+                        ) : (
+                          <p
+                            className={`truncate text-xs ${
+                              hasUnread
+                                ? 'font-semibold text-gray-700 dark:text-gray-200'
+                                : 'text-gray-500 dark:text-gray-400'
+                            }`}
+                          >
+                            {subtitle}
+                          </p>
+                        )
+                      ) : null}
+                    </div>
+                    {hasUnread ? (
+                      <span className="inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-white">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
               </button>
               {onDeleteConversation && (

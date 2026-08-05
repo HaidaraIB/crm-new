@@ -664,6 +664,7 @@ export const useWhatsAppChatMessages = (
     queryFn: () => getWhatsAppMessagesAPI({ clientId, phone }),
     enabled: canFetch,
     staleTime: 3 * 1000,
+    refetchOnMount: 'always',
     refetchOnWindowFocus: true,
     refetchInterval,
     ...options,

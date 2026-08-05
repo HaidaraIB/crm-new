@@ -15,6 +15,7 @@ type Props = {
   onStartNew: () => void;
   onDeleteConversation?: (client: any) => void;
   messages: ChatBubbleMessage[];
+  newMessagesBeforeApiId?: number | null;
   isFetchingMessages?: boolean;
   onRefreshMessages?: () => void;
   onWhatsAppCall?: () => void;
@@ -42,8 +43,10 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
       />
       <ChatThread
         t={props.t}
+        language={props.language}
         selectedClient={props.selectedClient}
         messages={props.messages}
+        newMessagesBeforeApiId={props.newMessagesBeforeApiId}
         isFetching={props.isFetchingMessages}
         onRefresh={props.onRefreshMessages}
         onWhatsAppCall={props.onWhatsAppCall}

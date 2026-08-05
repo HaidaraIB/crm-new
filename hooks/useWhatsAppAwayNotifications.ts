@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { useWhatsAppUnreadCount } from './useQueries';
+import { queryKeys, useWhatsAppUnreadCount } from './useQueries';
 import { playIncomingChatSound, preloadIncomingChatSound } from '../utils/chatIncomingSound';
 
 /**
@@ -10,6 +11,7 @@ import { playIncomingChatSound, preloadIncomingChatSound } from '../utils/chatIn
  */
 export function useWhatsAppAwayNotifications(): void {
   const { currentPage, isLoggedIn, canAccessPage, currentUser } = useAppContext();
+  const queryClient = useQueryClient();
   const enabled = Boolean(isLoggedIn && currentUser && canAccessPage('Chats'));
   const isOnChats = currentPage === 'Chats';
 
@@ -46,8 +48,10 @@ export function useWhatsAppAwayNotifications(): void {
     // open-thread inbound is handled in ChatsPage with WhatsApp sound.
     if (unreadBumped) {
       playIncomingChatSound();
+      // Keep conversation list badges/previews in sync with the faster unread poll.
+      void queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
     }
 
     prevUnreadTotalRef.current = total;
-  }, [unreadTotal, enabled, isOnChats]);
+  }, [unreadTotal, enabled, isOnChats, queryClient]);
 }

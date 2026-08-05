@@ -10,7 +10,7 @@ import type { LeadApiFilters } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
 import {
-  getLeadsAPI, getLeadAPI, getLeadStatusCountsAPI, getMissionBarSummaryAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
+  getLeadsAPI, getLeadAPI, getLeadStatusCountsAPI, getMissionBarSummaryAPI, getDashboardSummaryAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
@@ -57,7 +57,7 @@ import {
   dismissAIInsightAPI,
   runAIAnalysisAPI,
 } from '../services/api';
-import type { MissionBarSummary, ReportQueryParams, CallReportResponse } from '../services/api';
+import type { MissionBarSummary, DashboardSummary, ReportQueryParams, CallReportResponse } from '../services/api';
 
 // ==================== Query Keys ====================
 export const queryKeys = {
@@ -68,6 +68,8 @@ export const queryKeys = {
   lead: (id?: number) => ['lead', id] as const,
   leadStatusCounts: (filters?: LeadApiFilters) => ['leadStatusCounts', filters] as const,
   missionBarSummary: ['missionBarSummary'] as const,
+  dashboardSummary: (days?: number, source?: string, dailyTarget?: number) =>
+    ['dashboardSummary', days ?? 7, source ?? 'all', dailyTarget ?? 5] as const,
   employeeReport: (params?: ReportQueryParams) => ['employeeReport', params] as const,
   teamsReport: (params?: ReportQueryParams) => ['teamsReport', params] as const,
   marketingReport: (params?: ReportQueryParams) => ['marketingReport', params] as const,
@@ -207,6 +209,25 @@ export const useMissionBarSummary = (
     queryKey: queryKeys.missionBarSummary,
     queryFn: () => getMissionBarSummaryAPI(),
     staleTime: 1 * 60 * 1000,
+    ...options,
+  });
+};
+
+export const useDashboardSummary = (
+  params?: {
+    days?: 7 | 14 | 30;
+    source?: 'all' | 'meta_lead_form' | 'whatsapp' | 'manual';
+    daily_target?: number;
+  },
+  options?: Omit<UseQueryOptions<DashboardSummary, Error>, 'queryKey' | 'queryFn'>
+) => {
+  const days = params?.days ?? 7;
+  const source = params?.source ?? 'all';
+  const dailyTarget = params?.daily_target ?? 5;
+  return useQuery({
+    queryKey: queryKeys.dashboardSummary(days, source, dailyTarget),
+    queryFn: () => getDashboardSummaryAPI({ days, source, daily_target: dailyTarget }),
+    staleTime: 5 * 60 * 1000,
     ...options,
   });
 };
@@ -669,12 +690,12 @@ export const useWhatsAppConversations = (
 
 /** Sidebar badge: unread inbound WhatsApp messages in the caller's ACL scope. */
 export const useWhatsAppUnreadCount = (
-  options?: Omit<UseQueryOptions<{ unread_count: number }, Error>, 'queryKey' | 'queryFn'> & {
+  options?: Omit<UseQueryOptions<{ unread_count: number }, Error, number>, 'queryKey' | 'queryFn'> & {
     enabled?: boolean;
   }
 ) => {
   const { refetchInterval = 15_000, enabled = true, ...rest } = options || {};
-  return useQuery({
+  return useQuery<{ unread_count: number }, Error, number>({
     queryKey: queryKeys.whatsAppUnreadCount,
     queryFn: getWhatsAppUnreadCountAPI,
     staleTime: 5 * 1000,
@@ -719,6 +740,7 @@ export const useCreateLead = (options?: UseMutationOptions<any, Error, any>) => 
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
     },
     ...options,
   });
@@ -737,6 +759,7 @@ export const useUpdateLead = (options?: UseMutationOptions<any, Error, { id: num
       // Also invalidate client tasks since they might be related
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       // Return the updated data so components can use it
       return data;
     },
@@ -759,6 +782,7 @@ export const usePatchLead = (
       queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.id) });
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       return data;
     },
     ...options,
@@ -774,6 +798,7 @@ export const useDeleteLead = (options?: UseMutationOptions<void, Error, number>)
       queryClient.removeQueries({ queryKey: queryKeys.lead(id) });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
     },
     ...options,
   });
@@ -787,6 +812,7 @@ export const useAssignLeads = (options?: UseMutationOptions<any, Error, { client
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       // Invalidate events for all affected leads
       variables.clientIds.forEach(id => {
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(id) });
@@ -808,6 +834,7 @@ export const useAssignUnassignedClients = (options?: UseMutationOptions<any, Err
       await queryClient.invalidateQueries({ queryKey: ['leads'] });
       await queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       await queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       await queryClient.invalidateQueries({ queryKey: ['clientEvents'] });
       await queryClient.refetchQueries({ queryKey: ['leads'] });
       userOnSuccess?.(data, variables, onMutateResult, context);
@@ -1000,6 +1027,7 @@ export const useCreateClientTask = (options?: UseMutationOptions<any, Error, any
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
       // Also invalidate events for this lead if task creation triggers an event
@@ -1018,6 +1046,7 @@ export const useUpdateClientTask = (options?: UseMutationOptions<any, Error, { i
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
@@ -1032,6 +1061,7 @@ export const useDeleteClientTask = (options?: UseMutationOptions<void, Error, nu
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
@@ -1046,6 +1076,7 @@ export const useCompleteClientTaskReminder = (options?: UseMutationOptions<any, 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientTasks });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
@@ -1103,6 +1134,7 @@ export const useCompleteClientCallFollowUp = (options?: UseMutationOptions<any, 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
     },
@@ -1810,6 +1842,7 @@ export const useApproveAIInsight = (language?: string) => {
       queryClient.invalidateQueries({ queryKey: ['aiInsightsDashboard'] });
       queryClient.invalidateQueries({ queryKey: ['clientTasks'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
     },
   });
 };

@@ -23,7 +23,7 @@ export function formatStageName(stage: TaskStage | string | null | undefined): s
  * @param stage - The stage value
  * @param t - Optional translation function
  */
-export function getStageDisplayLabel(stage: TaskStage | string | null | undefined, t?: (key: string) => string): string {
+export function getStageDisplayLabel(stage: TaskStage | string | null | undefined, t?: (key: any) => string): string {
   if (!stage) return '';
   
   const stageStr = String(stage);

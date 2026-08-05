@@ -1,18 +1,25 @@
 
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll, PaymentResultBanner, RefreshButton } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { useLeads, useDeals, useTasks, useUsers, useClientTasks, useStages, useClientCalls, useClientVisits, useAIInsightsDashboard, useAIManagementReport, useGenerateAIManagementReport, useMissionBarSummary, dashboardHeavyListQueryOptions } from '../hooks/useQueries';
-import { useDashboardDerivedMetrics } from '../hooks/useDashboardDerivedMetrics';
+import {
+    useStages,
+    useAIInsightsDashboard,
+    useAIManagementReport,
+    useGenerateAIManagementReport,
+    useDashboardSummary,
+    dashboardHeavyListQueryOptions,
+} from '../hooks/useQueries';
 import { presetTodosFromMissionBar, todayDateInputValue } from '../utils/missionBarNavigation';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { AIInsightsCard } from '../components/dashboard/AIInsightsCard';
 import { ManagementReportCard } from '../components/dashboard/ManagementReportCard';
-import { normalizeRole, getRoleTranslation, isAssignedClinicalAppRole } from '../utils/roles';
+import { normalizeRole, getRoleTranslation } from '../utils/roles';
 import { MissionBar, MissionItem } from '../components/dashboard/MissionBar';
 import { SmartInsights } from '../components/dashboard/SmartInsights';
 import { HotLeadsCard, HotLeadItem } from '../components/dashboard/HotLeadsCard';
@@ -38,6 +45,9 @@ const formatLastSeenRelative = (
     return `${Math.floor(seconds / 86400)} ${t('daysAgo') || 'd ago'}`;
 };
 
+const avatarUrl = (name: string) =>
+    `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=random`;
+
 export const DashboardPage = () => {
     const {
         t,
@@ -49,463 +59,230 @@ export const DashboardPage = () => {
         setLeadFilters,
         setTodosPagePreset,
         theme,
-        setAlertMessage,
-        setAlertVariant,
-        setIsAlertModalOpen,
     } = useAppContext();
+    const queryClient = useQueryClient();
     const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
     const [chartDaysRange, setChartDaysRange] = useState<7 | 14 | 30>(7);
     const [leadSourceFilter, setLeadSourceFilter] = useState<'all' | 'meta_lead_form' | 'whatsapp' | 'manual'>('all');
     const [teamDailyTarget] = useState(5);
-    const [belowFoldEnabled, setBelowFoldEnabled] = useState(false);
 
-    useEffect(() => {
-        const frameId = requestAnimationFrame(() => setBelowFoldEnabled(true));
-        return () => cancelAnimationFrame(frameId);
-    }, []);
-
-    const { data: missionBarSummary } = useMissionBarSummary(dashboardHeavyListQueryOptions);
-
-    // Fetch all data using React Query (larger page_size via api.ts + fewer refetch bursts)
-    const { data: leadsResponse, isLoading: isLeadsLoading } = useLeads(
-        undefined,
-        undefined,
+    const {
+        data: summary,
+        isLoading: isSummaryLoading,
+        isFetching: isSummaryFetching,
+        refetch: refetchSummary,
+    } = useDashboardSummary(
+        { days: chartDaysRange, source: leadSourceFilter, daily_target: teamDailyTarget },
         dashboardHeavyListQueryOptions,
     );
-    const leads = leadsResponse?.results || [];
-
-    const { data: dealsResponse, isLoading: isDealsLoading } = useDeals(dashboardHeavyListQueryOptions);
-    const deals = dealsResponse?.results || [];
-
-    const { data: tasksResponse, isLoading: isTasksLoading } = useTasks(undefined, dashboardHeavyListQueryOptions);
-    const todos = tasksResponse?.results || [];
-
-    const { data: usersResponse, isLoading: isUsersLoading, isFetching: isUsersFetching, refetch: refetchUsers } =
-        useUsers(dashboardHeavyListQueryOptions);
-    const users = usersResponse?.results || [];
-    
-    const { data: clientTasksResponse, isLoading: isClientTasksLoading } = useClientTasks(dashboardHeavyListQueryOptions);
-    const clientTasks = clientTasksResponse?.results || [];
-    const { data: clientCallsResponse, isLoading: isClientCallsLoading } = useClientCalls({
-        ...dashboardHeavyListQueryOptions,
-        enabled: belowFoldEnabled,
-    });
-    const clientCalls = clientCallsResponse?.results || [];
-    const { data: clientVisitsResponse, isLoading: isClientVisitsLoading } = useClientVisits({
-        ...dashboardHeavyListQueryOptions,
-        enabled: belowFoldEnabled,
-    });
-    const clientVisits = clientVisitsResponse?.results || [];
-
-    const derivedMetrics = useDashboardDerivedMetrics(leads, clientTasks);
 
     const openViewLead = useCallback((leadId: number, lead?: any) => {
-        const leadObj = lead ?? leads.find((l: any) => l.id === leadId);
-        if (leadObj) setSelectedLead(leadObj);
+        if (lead) setSelectedLead(lead);
         window.history.pushState(
             {},
             '',
             getCompanyViewLeadRoute(currentUser?.company?.name, currentUser?.company?.domain, leadId),
         );
         setCurrentPage('ViewLead');
-    }, [currentUser?.company?.domain, currentUser?.company?.name, leads, setCurrentPage, setSelectedLead]);
+    }, [currentUser?.company?.domain, currentUser?.company?.name, setCurrentPage, setSelectedLead]);
 
-    const { data: stagesResponse, isLoading: isStagesLoading } = useStages(dashboardHeavyListQueryOptions);
-    const stages = Array.isArray(stagesResponse) 
-        ? stagesResponse 
+    const { data: stagesResponse } = useStages(dashboardHeavyListQueryOptions);
+    const stages = Array.isArray(stagesResponse)
+        ? stagesResponse
         : (stagesResponse?.results || []);
 
     const { data: aiInsightsData } = useAIInsightsDashboard(language);
     const showManagementReport = isAdmin && !!aiInsightsData?.ai_enabled;
     const { data: managementReport, isLoading: managementReportLoading } = useAIManagementReport(showManagementReport);
     const generateManagementReport = useGenerateAIManagementReport();
-    const isDashboardLoading =
-        isLeadsLoading ||
-        isDealsLoading ||
-        isTasksLoading ||
-        isUsersLoading ||
-        isClientTasksLoading ||
-        isStagesLoading ||
-        (belowFoldEnabled && (isClientCallsLoading || isClientVisitsLoading));
+    const isDashboardLoading = isSummaryLoading;
 
-    // Calculate statistics
+    const missionBar = summary?.mission_bar;
+    const s = summary?.stats;
+
     const stats = useMemo(() => {
-        const today = derivedMetrics.today;
-        const todayNewLeads = derivedMetrics.todayNewLeads;
-        
-        // Today's touched leads (created today AND status is not Untouched)
-        const todayTouchedLeads = leads.filter(lead => {
-            const createdAt = (lead as any).created_at || lead.createdAt;
-            if (!createdAt) return false;
-            const leadDate = new Date(createdAt);
-            leadDate.setHours(0, 0, 0, 0);
-            const statusName = (lead as any).status_name || lead.status || '';
-            return leadDate.getTime() === today.getTime() && statusName !== 'Untouched';
-        }).length;
-        
-        // Today's untouched leads (created today AND status is Untouched)
-        const todayUntouchedLeads = leads.filter(lead => {
-            const createdAt = (lead as any).created_at || lead.createdAt;
-            if (!createdAt) return false;
-            const leadDate = new Date(createdAt);
-            leadDate.setHours(0, 0, 0, 0);
-            const statusName = (lead as any).status_name || lead.status || '';
-            return leadDate.getTime() === today.getTime() && statusName === 'Untouched';
-        }).length;
-        
-        // Delayed leads (created more than 3 days ago, untouched, and not assigned)
-        const threeDaysAgo = new Date(today);
-        threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-        const delayedLeads = leads.filter(lead => {
-            const createdAt = (lead as any).created_at || lead.createdAt;
-            if (!createdAt) return false;
-            const leadDate = new Date(createdAt);
-            leadDate.setHours(0, 0, 0, 0);
-            const hasRecentActivity = clientTasks.some((ct: any) => {
-                const ctCreatedAt = ct.created_at || ct.createdAt;
-                if (!ctCreatedAt) return false;
-                const activityDate = new Date(ctCreatedAt);
-                activityDate.setHours(0, 0, 0, 0);
-                const clientId = ct.client || ct.clientId;
-                return clientId === lead.id && activityDate >= leadDate;
-            });
-            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
-            return leadDate < threeDaysAgo && !hasRecentActivity && (!assignedToId || assignedToId === 0);
-        }).length;
-        
-        // Total leads
-        const totalLeads = leads.length;
-        
-        // Total deals
-        const totalDeals = deals.length;
-        
-        // Active todos
-        const activeTodos = todos.length;
-        
-        // Completed deals (Won)
-        const completedDeals = deals.filter(deal => deal.status === 'Won').length;
-        
-        // Pipeline value (sum of deal.value for open deals, i.e. status !== 'Won')
-        const openDeals = deals.filter(deal => (deal as any).status !== 'Won');
-        const pipelineValueSum = openDeals.reduce((sum, d) => sum + (Number((d as any).value) || 0), 0);
-        const formatPipelineValue = (n: number) => n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(n);
-        
-        // Win rate (Won / total * 100)
-        const winRate = totalDeals > 0 ? Math.round((completedDeals / totalDeals) * 100) : 0;
-        
+        if (!s) return [];
         return [
-            { 
-                title: t('leadsToContactToday'), 
-                value: missionBarSummary?.contact_today ?? derivedMetrics.leadsToContactTodayCount, 
-                icon: <TargetIcon className="w-6 h-6"/>, 
+            {
+                title: t('leadsToContactToday'),
+                value: s.contact_today,
+                icon: <TargetIcon className="w-6 h-6"/>,
                 gradient: 'from-orange-500 to-red-500',
                 bgColor: 'bg-gradient-to-br from-orange-50 to-red-50 dark:from-orange-950/30 dark:to-red-950/30',
                 iconBg: 'bg-orange-100 dark:bg-orange-900/40',
                 textColor: 'text-orange-600 dark:text-orange-400'
             },
-            { 
-                title: t('todayNewLeads'), 
-                value: todayNewLeads, 
-                icon: <TargetIcon className="w-6 h-6"/>, 
+            {
+                title: t('todayNewLeads'),
+                value: s.today_new_leads,
+                icon: <TargetIcon className="w-6 h-6"/>,
                 gradient: 'from-red-500 to-pink-500',
                 bgColor: 'bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-950/30 dark:to-pink-950/30',
                 iconBg: 'bg-red-100 dark:bg-red-900/40',
                 textColor: 'text-red-600 dark:text-red-400'
             },
-            { 
-                title: t('todayTouchedLeads'), 
-                value: todayTouchedLeads, 
-                icon: <UsersIcon className="w-6 h-6"/>, 
+            {
+                title: t('todayTouchedLeads'),
+                value: s.today_touched_leads,
+                icon: <UsersIcon className="w-6 h-6"/>,
                 gradient: 'from-green-500 to-emerald-500',
                 bgColor: 'bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-950/30 dark:to-emerald-950/30',
                 iconBg: 'bg-green-100 dark:bg-green-900/40',
                 textColor: 'text-green-600 dark:text-green-400'
             },
-            { 
-                title: t('todayUntouchedLeads'), 
-                value: todayUntouchedLeads, 
-                icon: <UsersIcon className="w-6 h-6"/>, 
+            {
+                title: t('todayUntouchedLeads'),
+                value: s.today_untouched_leads,
+                icon: <UsersIcon className="w-6 h-6"/>,
                 gradient: 'from-amber-500 to-orange-500',
                 bgColor: 'bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30',
                 iconBg: 'bg-amber-100 dark:bg-amber-900/40',
                 textColor: 'text-amber-600 dark:text-amber-400'
             },
-            { 
-                title: t('delayedLeads'), 
-                value: delayedLeads, 
-                icon: <UsersIcon className="w-6 h-6"/>, 
+            {
+                title: t('delayedLeads'),
+                value: s.delayed_leads,
+                icon: <UsersIcon className="w-6 h-6"/>,
                 gradient: 'from-purple-500 to-indigo-500',
                 bgColor: 'bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-950/30 dark:to-indigo-950/30',
                 iconBg: 'bg-purple-100 dark:bg-purple-900/40',
                 textColor: 'text-purple-600 dark:text-purple-400'
             },
-            { 
-                title: t('totalLeads'), 
-                value: totalLeads, 
-                icon: <UsersIcon className="w-6 h-6"/>, 
+            {
+                title: t('totalLeads'),
+                value: s.total_leads,
+                icon: <UsersIcon className="w-6 h-6"/>,
                 gradient: 'from-blue-500 to-cyan-500',
                 bgColor: 'bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-950/30 dark:to-cyan-950/30',
                 iconBg: 'bg-blue-100 dark:bg-blue-900/40',
                 textColor: 'text-blue-600 dark:text-blue-400'
             },
-            { 
-                title: t('totalDeals'), 
-                value: totalDeals, 
-                icon: <DealIcon className="w-6 h-6"/>, 
+            {
+                title: t('totalDeals'),
+                value: s.total_deals,
+                icon: <DealIcon className="w-6 h-6"/>,
                 gradient: 'from-yellow-500 to-amber-500',
                 bgColor: 'bg-gradient-to-br from-yellow-50 to-amber-50 dark:from-yellow-950/30 dark:to-amber-950/30',
                 iconBg: 'bg-yellow-100 dark:bg-yellow-900/40',
                 textColor: 'text-yellow-600 dark:text-yellow-400'
             },
-            { 
-                title: t('activeTodos'), 
-                value: activeTodos, 
-                icon: <CheckIcon className="w-6 h-6"/>, 
+            {
+                title: t('activeTodos'),
+                value: s.active_todos,
+                icon: <CheckIcon className="w-6 h-6"/>,
                 gradient: 'from-sky-500 to-blue-500',
                 bgColor: 'bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/30 dark:to-blue-950/30',
                 iconBg: 'bg-sky-100 dark:bg-sky-900/40',
                 textColor: 'text-sky-600 dark:text-sky-400'
             },
-            { 
-                title: t('completedDeals'), 
-                value: completedDeals, 
-                icon: <DealIcon className="w-6 h-6"/>, 
+            {
+                title: t('completedDeals'),
+                value: s.completed_deals,
+                icon: <DealIcon className="w-6 h-6"/>,
                 gradient: 'from-emerald-500 to-teal-500',
                 bgColor: 'bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-950/30 dark:to-teal-950/30',
                 iconBg: 'bg-emerald-100 dark:bg-emerald-900/40',
                 textColor: 'text-emerald-600 dark:text-emerald-400'
             },
-            { 
-                title: t('pipelineValue'), 
-                value: formatPipelineValue(pipelineValueSum), 
-                icon: <DealIcon className="w-6 h-6"/>, 
+            {
+                title: t('pipelineValue'),
+                value: s.pipeline_value,
+                icon: <DealIcon className="w-6 h-6"/>,
                 gradient: 'from-indigo-500 to-violet-500',
                 bgColor: 'bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30',
                 iconBg: 'bg-indigo-100 dark:bg-indigo-900/40',
                 textColor: 'text-indigo-600 dark:text-indigo-400'
             },
-            { 
-                title: t('winRate'), 
-                value: `${winRate}%`, 
-                icon: <CheckIcon className="w-6 h-6"/>, 
+            {
+                title: t('winRate'),
+                value: `${s.win_rate}%`,
+                icon: <CheckIcon className="w-6 h-6"/>,
                 gradient: 'from-teal-500 to-cyan-500',
                 bgColor: 'bg-gradient-to-br from-teal-50 to-cyan-50 dark:from-teal-950/30 dark:to-cyan-950/30',
                 iconBg: 'bg-teal-100 dark:bg-teal-900/40',
                 textColor: 'text-teal-600 dark:text-teal-400'
             },
         ];
-    }, [leads, clientTasks, deals, todos, t, derivedMetrics, missionBarSummary]);
-    
-    // Stages report data - get from ClientTasks
+    }, [s, t]);
+
     const stagesReportData = useMemo(() => {
-        const stageCounts: { [key: string]: number } = {};
-        
-        // Count stages from ClientTasks
-        clientTasks.forEach((ct: any) => {
-            const stageName = ct.stage_name || ct.stage || 'Untouched';
-            stageCounts[stageName] = (stageCounts[stageName] || 0) + 1;
-        });
-        
-        // If no ClientTasks, count by status
-        if (Object.keys(stageCounts).length === 0) {
-            leads.forEach(lead => {
-                const statusName = (lead as any).status_name || lead.status || 'Untouched';
-                stageCounts[statusName] = (stageCounts[statusName] || 0) + 1;
-            });
-        }
-        
+        const stageCounts = summary?.stages || [];
         const fallbackColors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
-        
-        // Use colors from stages settings if available
-        return Object.entries(stageCounts).map(([name, value], index) => {
-            // Find stage config to get color
-            const stageConfig = stages.find(s => 
-                s.name.toLowerCase().replace(/\s+/g, '_') === name.toLowerCase().replace(/\s+/g, '_') ||
-                s.name === name
+        return stageCounts.map((row, index) => {
+            const stageConfig = stages.find((st: any) =>
+                st.name.toLowerCase().replace(/\s+/g, '_') === row.name.toLowerCase().replace(/\s+/g, '_') ||
+                st.name === row.name
             );
-            
             return {
-                name: getStageDisplayLabel(name.toLowerCase().replace(/\s+/g, '_') as any, t) || name,
-                value,
+                name: getStageDisplayLabel(row.name.toLowerCase().replace(/\s+/g, '_') as any, t) || row.name,
+                value: row.value,
                 fill: stageConfig?.color || fallbackColors[index % fallbackColors.length],
             };
         });
-    }, [leads, clientTasks, stages, t]);
-    
-    // Week leads chart data (last 7, 14, or 30 days)
-    const weekLeadsData = useMemo(() => {
-        const data: { name: string; "Leads Count": number }[] = [];
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const days = chartDaysRange;
-        
-        for (let i = days - 1; i >= 0; i--) {
-            const date = new Date(today);
-            date.setDate(date.getDate() - i);
-            const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
-            const dateStr = date.toLocaleDateString(locale, withLatinDigits({ month: 'short', day: 'numeric' }));
-            
-            const leadsCount = leads.filter(lead => {
-                const createdAt = (lead as any).created_at || lead.createdAt;
-                if (!createdAt) return false;
-                const leadDate = new Date(createdAt);
-                leadDate.setHours(0, 0, 0, 0);
-                return leadDate.getTime() === date.getTime();
-            }).length;
-            
-            data.push({ name: dateStr, "Leads Count": leadsCount });
-        }
-        
-        return data;
-    }, [leads, language, chartDaysRange]);
-    
-    // Top users (users with most activities) - only from the same company
-    const topUsers = useMemo(() => {
-        const currentCompanyId = currentUser?.company?.id || currentUser?.company_id || (currentUser?.company as any)?.id;
-        if (!currentCompanyId) return [];
-        
-        const userActivityCounts: { [userId: number]: number } = {};
-        // Count activities from ClientTasks
-        clientTasks.forEach((ct: any) => {
-            const createdById = ct.created_by || ct.createdBy;
-            if (createdById) {
-                userActivityCounts[createdById] = (userActivityCounts[createdById] || 0) + 1;
-            }
+    }, [stages, summary?.stages, t]);
+
+    const filteredWeekLeadsData = useMemo(() => {
+        const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
+        return (summary?.week_series || []).map((row) => {
+            const date = new Date(`${row.date}T12:00:00`);
+            return {
+                name: date.toLocaleDateString(locale, withLatinDigits({ month: 'short', day: 'numeric' })),
+                'Leads Count': row.leads_count,
+            };
         });
-        
-        // Filter users by company and map activity counts
-        const filteredUsers = users
-            .filter(user => {
-                const userCompanyId = user.company?.id || user.company_id || (user.company as any)?.id;
-                return userCompanyId === currentCompanyId;
-            })
-            .map(user => ({
-                ...user,
-                activityCount: userActivityCounts[user.id] || 0,
-            }))
-            .sort((a, b) => b.activityCount - a.activityCount)
-            .slice(0, 3);
-        
-        // If no users with activities, show all users from company (with 0 activities)
-        if (filteredUsers.length === 0) {
-            return users
-                .filter(user => {
-                    const userCompanyId = user.company?.id || user.company_id || (user.company as any)?.id;
-                    return userCompanyId === currentCompanyId;
-                })
-                .slice(0, 3)
-                .map(user => ({
-                    ...user,
-                    activityCount: 0,
-                }));
-        }
-        
-        return filteredUsers;
-    }, [users, clientTasks, currentUser]);
+    }, [language, summary?.week_series]);
 
-    const employeePresenceList = useMemo(() => {
-        const currentCompanyId = currentUser?.company?.id || currentUser?.company_id || (currentUser?.company as any)?.id;
-        if (!currentCompanyId) return [];
+    const topUsers = useMemo(() => {
+        return (summary?.top_users || []).map((user) => ({
+            id: user.id,
+            name: user.name || user.username,
+            username: user.username,
+            role: user.role || '',
+            activityCount: user.activity_count,
+            avatar: avatarUrl(user.name || user.username),
+        }));
+    }, [summary?.top_users]);
 
-        return users
-            .filter((user: any) => {
-                const userCompanyId = user.company?.id || user.company_id || (user.company as any)?.id;
-                const role = normalizeRole(user.role);
-                return userCompanyId === currentCompanyId && role !== 'Owner' && role !== 'Supervisor';
-            })
-            .sort((a: any, b: any) => {
-                const aOnline = Boolean(a.is_online);
-                const bOnline = Boolean(b.is_online);
-                if (aOnline !== bOnline) return aOnline ? -1 : 1;
-                const aSeen = a.last_seen_at ? new Date(a.last_seen_at).getTime() : 0;
-                const bSeen = b.last_seen_at ? new Date(b.last_seen_at).getTime() : 0;
-                return bSeen - aSeen;
-            })
-            .slice(0, 8);
-    }, [users, currentUser]);
-
+    const employeePresenceList = summary?.employee_presence || [];
     const onlineEmployeesCount = useMemo(
-        () => employeePresenceList.filter((u: any) => Boolean(u.is_online)).length,
+        () => employeePresenceList.filter((u) => Boolean(u.is_online)).length,
         [employeePresenceList],
     );
-    
-    // Latest feedbacks from API-computed latest client activity
+
     const latestFeedbacks = useMemo(() => {
-        return [...leads]
-            .filter((lead: any) => lead.last_feedback || lead.lastFeedback)
-            .sort((a: any, b: any) => {
-                const dateA = new Date(a.last_feedback_at || a.lastFeedbackAt || a.created_at || a.createdAt || 0).getTime();
-                const dateB = new Date(b.last_feedback_at || b.lastFeedbackAt || b.created_at || b.createdAt || 0).getTime();
-                return dateB - dateA;
-            })
-            .slice(0, 5)
-            .map((lead: any) => {
-                const createdAt = lead.last_feedback_at || lead.lastFeedbackAt || lead.created_at || lead.createdAt || '';
-                const assignedToId = lead.assigned_to || lead.assignedTo;
-                const user = users.find(u => u.id === assignedToId);
+        const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
+        return (summary?.latest_feedbacks || []).map((fb) => ({
+            id: fb.id,
+            date: fb.last_feedback_at
+                ? new Date(fb.last_feedback_at).toLocaleDateString(
+                      locale,
+                      withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }),
+                  )
+                : '',
+            user: fb.user || t('unknown'),
+            lead: fb.lead || '',
+            stage: fb.stage || '',
+            notes: fb.notes || '',
+            leadObj: { id: fb.id, name: fb.lead },
+        }));
+    }, [language, summary?.latest_feedbacks, t]);
 
-                return {
-                    id: lead.id,
-                    date: createdAt
-                        ? new Date(createdAt).toLocaleDateString(
-                              language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
-                              withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }),
-                          )
-                        : '',
-                    user: user?.name || lead.assigned_to_username || t('unknown'),
-                    lead: lead.name || '',
-                    stage: lead.last_stage || lead.lastStage || '',
-                    notes: lead.last_feedback || lead.lastFeedback || '',
-                    leadObj: lead ?? null,
-                };
-            });
-    }, [leads, users, t, language]);
-    
-    // Leads to contact today - detailed list
     const leadsToContactTodayList = useMemo(() => {
-        const today = derivedMetrics.today;
-
-        return derivedMetrics.leadsToContactToday.map(lead => {
-            const tasks = derivedMetrics.tasksByClient.get(lead.id) ?? [];
-            const task = tasks.find((ct: any) => {
-                const reminderDate = ct.reminder_date;
-                if (!reminderDate) return false;
-                const reminder = new Date(reminderDate);
-                reminder.setHours(0, 0, 0, 0);
-                return reminder.getTime() === today.getTime();
-            });
-            
-            const assignedToId = (lead as any).assigned_to || lead.assignedTo;
-            const assignedUser = users.find(u => u.id === assignedToId);
-            
-            return {
-                lead,
-                task,
-                assignedUser: assignedUser?.name || t('unknown'),
-                reminderDate: task?.reminder_date || null,
-                notes: task?.notes || '',
-                stage: task?.stage_name || task?.stage || '',
-            };
-        }).sort((a, b) => {
-            if (a.reminderDate && b.reminderDate) {
-                return new Date(a.reminderDate).getTime() - new Date(b.reminderDate).getTime();
-            }
-            return (a.lead.name || '').localeCompare(b.lead.name || '');
-        });
-    }, [derivedMetrics, users, t]);
-
-    const companyUserMap = useMemo(() => {
-        const map = new Map<number, any>();
-        users.forEach((u: any) => map.set(u.id, u));
-        return map;
-    }, [users]);
+        return (summary?.contact_today_leads || []).map((row) => ({
+            lead: { id: row.id, name: row.name },
+            assignedUser: row.assigned_user || t('unknown'),
+            reminderDate: row.reminder_date,
+            notes: row.notes || '',
+            stage: row.stage || '',
+        }));
+    }, [summary?.contact_today_leads, t]);
 
     const missionItems = useMemo<MissionItem[]>(() => {
-        const summary = missionBarSummary ?? {
-            contact_today: derivedMetrics.leadsToContactTodayCount,
-            overdue_follow_ups: derivedMetrics.overdueFollowUps,
-            today_new_leads: derivedMetrics.todayNewLeads,
-            unassigned_leads: derivedMetrics.unassignedLeads,
+        const mb = missionBar ?? {
+            contact_today: 0,
+            overdue_follow_ups: 0,
+            today_new_leads: 0,
+            unassigned_leads: 0,
         };
         const todayIso = todayDateInputValue();
 
@@ -513,7 +290,7 @@ export const DashboardPage = () => {
             {
                 id: 'contactToday',
                 label: t('leadsToContactToday'),
-                value: summary.contact_today,
+                value: mb.contact_today,
                 tone: 'orange',
                 onClick: () => {
                     presetTodosFromMissionBar('today');
@@ -524,7 +301,7 @@ export const DashboardPage = () => {
             {
                 id: 'overdue',
                 label: t('overdueFollowUps'),
-                value: summary.overdue_follow_ups,
+                value: mb.overdue_follow_ups,
                 tone: 'red',
                 onClick: () => {
                     presetTodosFromMissionBar('overdue');
@@ -535,7 +312,7 @@ export const DashboardPage = () => {
             {
                 id: 'today',
                 label: t('todayNewLeads'),
-                value: summary.today_new_leads,
+                value: mb.today_new_leads,
                 tone: 'blue',
                 onClick: () => {
                     setLeadFilters((prev) => ({
@@ -556,7 +333,7 @@ export const DashboardPage = () => {
             items.push({
                 id: 'unassigned',
                 label: t('unassignedLeads'),
-                value: summary.unassigned_leads,
+                value: mb.unassigned_leads,
                 tone: 'purple',
                 onClick: () => {
                     setLeadFilters((prev) => ({
@@ -570,103 +347,47 @@ export const DashboardPage = () => {
             });
         }
         return items;
-    }, [derivedMetrics, goToPage, isAdmin, missionBarSummary, setLeadFilters, setTodosPagePreset, t]);
+    }, [goToPage, isAdmin, missionBar, setLeadFilters, setTodosPagePreset, t]);
 
     const funnelData = useMemo(() => {
-        const touched = leads.filter((lead: any) => ((lead.status_name || lead.status || '') as string).toLowerCase() !== 'untouched').length;
-        const meeting = clientTasks.filter((ct: any) => {
-            const stage = String(ct.stage_name || ct.stage || '').toLowerCase();
-            return stage.includes('meeting');
-        }).length;
-        const won = deals.filter((d: any) => String(d.stage || d.status).toLowerCase() === 'won' || String(d.status) === 'Won').length;
+        const f = summary?.funnel;
         return [
-            { name: t('totalLeads'), value: leads.length },
-            { name: t('funnelTouched'), value: touched },
-            { name: t('funnelMeeting'), value: meeting },
-            { name: t('funnelWon'), value: won },
+            { name: t('totalLeads'), value: f?.total_leads ?? 0 },
+            { name: t('funnelTouched'), value: f?.touched ?? 0 },
+            { name: t('funnelMeeting'), value: f?.meeting ?? 0 },
+            { name: t('funnelWon'), value: f?.won ?? 0 },
         ];
-    }, [clientTasks, deals, leads, t]);
-
-    const mapAIInsight = (item: (typeof aiInsightsData)['priority'][0]) => {
-        const lead = leads.find((l: any) => l.id === item.client_id);
-        return {
-            ...item,
-            onView: lead
-                ? () => openViewLead(lead.id, lead)
-                : () => openViewLead(item.client_id),
-        };
-    };
+    }, [summary?.funnel, t]);
 
     const aiPriorityItems = useMemo(
-        () => (aiInsightsData?.priority || []).map(mapAIInsight),
-        [aiInsightsData?.priority, leads, openViewLead],
+        () =>
+            (aiInsightsData?.priority || []).map((item) => ({
+                ...item,
+                onView: () => openViewLead(item.client_id),
+            })),
+        [aiInsightsData?.priority, openViewLead],
     );
 
     const hotLeads = useMemo<HotLeadItem[]>(() => {
-        const now = Date.now();
-        const byLeadActivity = new Map<number, number>();
-        const pushActivity = (leadId: number, dateLike: any) => {
-            const ts = new Date(dateLike || 0).getTime();
-            if (!leadId || Number.isNaN(ts)) return;
-            byLeadActivity.set(leadId, Math.max(byLeadActivity.get(leadId) || 0, ts));
-        };
-        clientTasks.forEach((ct: any) => pushActivity(ct.client || ct.clientId, ct.created_at || ct.createdAt || ct.reminder_date));
-        clientCalls.forEach((c: any) => pushActivity(c.client || c.clientId, c.created_at || c.createdAt || c.call_datetime));
-        clientVisits.forEach((v: any) => pushActivity(v.client || v.clientId, v.created_at || v.createdAt || v.visit_datetime));
-
-        const visibleLeads = leads.filter((lead: any) => {
-            if (isAssignedClinicalAppRole(currentUser?.role)) {
-                return (lead.assigned_to || lead.assignedTo) === currentUser?.id;
-            }
-            return true;
+        return (summary?.hot_leads || []).map((lead) => {
+            const stageConfig = stages.find(
+                (st: any) =>
+                    st.name?.toLowerCase().replace(/\s+/g, '_') ===
+                    String(lead.stage).toLowerCase().replace(/\s+/g, '_'),
+            );
+            return {
+                id: lead.id,
+                name: lead.name,
+                assignedUser: lead.assigned_user || t('unknown'),
+                stage: getStageDisplayLabel(String(lead.stage), t),
+                score: lead.score,
+                bucket: lead.bucket,
+                notes: lead.notes || '',
+                stageColor: stageConfig?.color,
+                onView: () => openViewLead(lead.id, { id: lead.id, name: lead.name }),
+            };
         });
-
-        return visibleLeads
-            .map((lead: any) => {
-                let score = 0;
-                const leadType = String(lead.type || '').toLowerCase();
-                if (leadType === 'hot') score += 40;
-                else if (leadType === 'fresh') score += 8;
-                const priority = String(lead.priority || '').toLowerCase();
-                if (priority === 'high') score += 30;
-                else if (priority === 'medium') score += 15;
-                const stage = String(lead.last_stage || lead.lastStage || lead.status_name || lead.status || '').toLowerCase();
-                if (['following', 'meeting', 'done_meeting', 'follow_after_meeting'].includes(stage)) score += 25;
-                if (['not_interested', 'out_of_service', 'cancellation'].includes(stage)) score -= 20;
-                const lastActivity = byLeadActivity.get(lead.id) || 0;
-                if (lastActivity && now - lastActivity <= 3 * 24 * 60 * 60 * 1000) score += 15;
-                if (!lastActivity || now - lastActivity > 7 * 24 * 60 * 60 * 1000) score -= 15;
-                if (stage === 'untouched') score -= 10;
-                const reminderToday = clientTasks.some((ct: any) => {
-                    if ((ct.client || ct.clientId) !== lead.id || !ct.reminder_date) return false;
-                    const d = new Date(ct.reminder_date);
-                    const td = new Date();
-                    return d.toDateString() === td.toDateString();
-                });
-                if (reminderToday) score += 10;
-
-                const assignedToId = lead.assigned_to || lead.assignedTo;
-                const assignedUser = companyUserMap.get(assignedToId);
-                const stageName = lead.last_stage || lead.lastStage || lead.status_name || lead.status || t('noStage');
-                const stageConfig = stages.find((s: any) => s.name?.toLowerCase().replace(/\s+/g, '_') === String(stageName).toLowerCase().replace(/\s+/g, '_'));
-                let bucket: HotLeadItem['bucket'] = score >= 60 ? 'hot' : score >= 30 ? 'warm' : 'cold';
-                if (leadType === 'hot' && bucket !== 'hot') bucket = 'hot';
-                return {
-                    id: lead.id,
-                    name: lead.name || `${t('lead')} #${lead.id}`,
-                    assignedUser: assignedUser?.name || assignedUser?.username || t('unknown'),
-                    stage: getStageDisplayLabel(String(stageName), t),
-                    score,
-                    bucket,
-                    notes: lead.last_feedback || lead.lastFeedback || lead.notes || '',
-                    stageColor: stageConfig?.color,
-                    onView: () => openViewLead(lead.id, lead),
-                };
-            })
-            .filter((lead) => lead.bucket !== 'cold')
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 6);
-    }, [clientCalls, clientTasks, clientVisits, companyUserMap, currentUser?.id, currentUser?.role, leads, openViewLead, stages, t]);
+    }, [openViewLead, stages, summary?.hot_leads, t]);
 
     const smartInsights = useMemo(() => {
         const insights: string[] = [];
@@ -677,124 +398,52 @@ export const DashboardPage = () => {
         if (overdue > 0) {
             insights.push(`${overdue} ${t('overdueFollowUps')} - ${t('tipPaceUp')}`);
         }
-        const unassigned = missionBarSummary?.unassigned_leads
-            ?? missionItems.find((m) => m.id === 'unassigned')?.value
-            ?? 0;
+        const unassigned = missionBar?.unassigned_leads ?? 0;
         if (unassigned > 0) {
             insights.push(`${t('tipUnassignedReminder')}: ${unassigned}`);
         }
         return insights.slice(0, 2);
-    }, [hotLeads.length, missionBarSummary?.unassigned_leads, missionItems, t]);
+    }, [hotLeads.length, missionBar?.unassigned_leads, missionItems, t]);
 
-    const trendSeries = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const mkSeries = (getter: (d: Date) => number) =>
-            Array.from({ length: 7 }).map((_, i) => {
-                const date = new Date(today);
-                date.setDate(date.getDate() - (6 - i));
-                return getter(date);
-            });
-
-        const leadsSeries = mkSeries((date) =>
-            leads.filter((lead: any) => {
-                const createdAt = new Date((lead as any).created_at || lead.createdAt || 0);
-                createdAt.setHours(0, 0, 0, 0);
-                return createdAt.getTime() === date.getTime();
-            }).length,
-        );
-        const contactSeries = mkSeries((date) =>
-            clientTasks.filter((ct: any) => {
-                const r = ct.reminder_date ? new Date(ct.reminder_date) : null;
-                if (!r) return false;
-                r.setHours(0, 0, 0, 0);
-                return r.getTime() === date.getTime();
-            }).length,
-        );
-        return { leadsSeries, contactSeries };
-    }, [clientTasks, leads]);
+    const trendSeries = useMemo(
+        () => ({
+            leadsSeries: summary?.trend_series?.leads_series || [0, 0, 0, 0, 0, 0, 0],
+            contactSeries: summary?.trend_series?.contact_series || [0, 0, 0, 0, 0, 0, 0],
+        }),
+        [summary?.trend_series],
+    );
 
     const activityFeedItems = useMemo(() => {
-        const events: Array<{ id: string; title: string; subtitle: string; time: string; createdAt: number }> = [];
-        clientTasks.forEach((ct: any) => {
-            const user = companyUserMap.get(ct.created_by || ct.createdBy);
-            const lead = leads.find((l: any) => l.id === (ct.client || ct.clientId));
-            const date = new Date(ct.created_at || ct.createdAt || 0).getTime();
-            events.push({
-                id: `task-${ct.id}`,
-                title: `${user?.name || t('unknown')} · ${t('activities')}`,
-                subtitle: `${lead?.name || t('lead')} · ${getStageDisplayLabel(ct.stage || ct.stage_name || 'following', t)}`,
-                time: formatLastSeenRelative(new Date(date).toISOString(), t),
-                createdAt: date,
-            });
+        return (summary?.activity_feed || []).map((ev) => {
+            const kindLabel =
+                ev.kind === 'call'
+                    ? t('call') || 'Call'
+                    : ev.kind === 'visit'
+                      ? t('visit') || 'Visit'
+                      : t('activities');
+            const subtitle =
+                ev.kind === 'task'
+                    ? `${ev.lead_name || t('lead')} · ${getStageDisplayLabel(ev.stage_name || 'following', t)}`
+                    : ev.lead_name || t('lead');
+            return {
+                id: ev.id,
+                title: `${ev.actor_name || t('unknown')} · ${kindLabel}`,
+                subtitle,
+                time: formatLastSeenRelative(ev.created_at, t),
+            };
         });
-        clientCalls.forEach((c: any) => {
-            const user = companyUserMap.get(c.created_by || c.createdBy);
-            const lead = leads.find((l: any) => l.id === (c.client || c.clientId));
-            const date = new Date(c.created_at || c.createdAt || c.call_datetime || 0).getTime();
-            events.push({
-                id: `call-${c.id}`,
-                title: `${user?.name || t('unknown')} · ${t('call') || 'Call'}`,
-                subtitle: lead?.name || t('lead'),
-                time: formatLastSeenRelative(new Date(date).toISOString(), t),
-                createdAt: date,
-            });
-        });
-        clientVisits.forEach((v: any) => {
-            const user = companyUserMap.get(v.created_by || v.createdBy);
-            const lead = leads.find((l: any) => l.id === (v.client || v.clientId));
-            const date = new Date(v.created_at || v.createdAt || v.visit_datetime || 0).getTime();
-            events.push({
-                id: `visit-${v.id}`,
-                title: `${user?.name || t('unknown')} · ${t('visit') || 'Visit'}`,
-                subtitle: lead?.name || t('lead'),
-                time: formatLastSeenRelative(new Date(date).toISOString(), t),
-                createdAt: date,
-            });
-        });
+    }, [summary?.activity_feed, t]);
 
-        return events.sort((a, b) => b.createdAt - a.createdAt).slice(0, 15).map(({ id, title, subtitle, time }) => ({ id, title, subtitle, time }));
-    }, [clientCalls, clientVisits, clientTasks, companyUserMap, leads, t]);
-
-    const teamGoalsRows = useMemo(() => {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        return users
-            .filter((u: any) => {
-                const ur = normalizeRole(u.role);
-                return ur === 'Employee' || ur === 'Doctor' || ur === 'DataEntry';
-            })
-            .map((u: any) => {
-                const progress = clientTasks.filter((ct: any) => {
-                    const by = ct.created_by || ct.createdBy;
-                    const created = new Date(ct.created_at || ct.createdAt || 0);
-                    created.setHours(0, 0, 0, 0);
-                    return by === u.id && created.getTime() === today.getTime();
-                }).length;
-                return { id: u.id, name: u.name || u.username || u.email, progress, target: teamDailyTarget };
-            })
-            .sort((a, b) => b.progress - a.progress);
-    }, [clientTasks, teamDailyTarget, users]);
-
-    const filteredWeekLeadsData = useMemo(() => {
-        if (leadSourceFilter === 'all') return weekLeadsData;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const data: { name: string; 'Leads Count': number }[] = [];
-        for (let i = chartDaysRange - 1; i >= 0; i--) {
-            const date = new Date(today);
-            date.setDate(date.getDate() - i);
-            const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
-            const dateStr = date.toLocaleDateString(locale, withLatinDigits({ month: 'short', day: 'numeric' }));
-            const count = leads.filter((lead: any) => {
-                const createdAt = new Date((lead as any).created_at || lead.createdAt || 0);
-                createdAt.setHours(0, 0, 0, 0);
-                return createdAt.getTime() === date.getTime() && String(lead.source || 'manual') === leadSourceFilter;
-            }).length;
-            data.push({ name: dateStr, 'Leads Count': count });
-        }
-        return data;
-    }, [chartDaysRange, language, leadSourceFilter, leads, weekLeadsData]);
+    const teamGoalsRows = useMemo(
+        () =>
+            (summary?.team_goals || []).map((row) => ({
+                id: row.id,
+                name: row.name,
+                progress: row.progress,
+                target: row.target,
+            })),
+        [summary?.team_goals],
+    );
 
     const greeting = useMemo(() => {
         const hour = new Date().getHours();
@@ -915,6 +564,11 @@ export const DashboardPage = () => {
         [goToPage, t],
     );
 
+    const refreshPresence = useCallback(() => {
+        void refetchSummary();
+        void queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    }, [queryClient, refetchSummary]);
+
     return (
         <PageWrapper title={t('dashboard')}>
             <div className="mx-auto max-w-[1600px] w-full">
@@ -964,7 +618,7 @@ export const DashboardPage = () => {
             )}
             {/* Loading state */}
             {isDashboardLoading && (
-                <SectionLoadingState className="py-16 mb-6" label={t('loadingDashboard') || 'Loading dashboard'} />
+                <SectionLoadingState className="py-16 mb-6" label={t('loading') || 'Loading dashboard'} />
             )}
             
             <div className="space-y-6 mb-6">
@@ -1011,8 +665,7 @@ export const DashboardPage = () => {
                             language={language}
                             onRefresh={() => generateManagementReport.mutate()}
                             onViewLead={(clientId) => {
-                                const lead = leads.find((l: any) => l.id === clientId);
-                                openViewLead(clientId, lead);
+                                openViewLead(clientId);
                             }}
                         />
                     ) : null}
@@ -1119,7 +772,7 @@ export const DashboardPage = () => {
                      <div className="overflow-x-auto -mx-1 px-1">
                          <div className="min-w-[300px]">
                              <ResponsiveContainer width="100%" height={320}>
-                                <AreaChart data={filteredWeekLeadsData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }} isAnimationActive>
+                                <AreaChart data={filteredWeekLeadsData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
                                      <defs>
                                          <linearGradient id="colorLeads" x1="0" y1="0" x2="0" y2="1">
                                              <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.35}/>
@@ -1180,7 +833,7 @@ export const DashboardPage = () => {
                                   outerRadius={80}
                                   innerRadius={40}
                                   paddingAngle={2}
-                                  label={({ percent }) => `${(percent * 100).toFixed(0)}%`}
+                                  label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
                                   labelLine={false}
                                 >
                                   {stagesReportData.map((entry, index) => (
@@ -1298,7 +951,7 @@ export const DashboardPage = () => {
                                                     </td>
                                                     <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell text-center">
                                                         {item.stage ? (() => {
-                                                            const stageConfig = stages.find(s => 
+                                                            const stageConfig = stages.find((s: any) => 
                                                                 s.name.toLowerCase().replace(/\s+/g, '_') === item.stage.toLowerCase().replace(/\s+/g, '_') ||
                                                                 s.name === item.stage
                                                             );
@@ -1398,7 +1051,7 @@ export const DashboardPage = () => {
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
                     <StatCard title={t('pipelineValue')} value={stats[9]?.value || 0} icon={<DealIcon className="w-6 h-6" />} accent="indigo" deltaLabel={t('vsLastWeek')} trendData={trendSeries.leadsSeries} />
                     <StatCard title={t('winRate')} value={stats[10]?.value || 0} icon={<CheckIcon className="w-6 h-6" />} accent="teal" deltaLabel={t('vsLastWeek')} trendData={trendSeries.contactSeries} />
-                    <StatCard title={t('averageDealSize')} value={deals.length ? Math.round(deals.reduce((sum: number, d: any) => sum + (Number(d.value) || 0), 0) / deals.length) : 0} icon={<DealIcon className="w-6 h-6" />} accent="amber" deltaLabel={t('vsLastWeek')} trendData={trendSeries.contactSeries} />
+                    <StatCard title={t('averageDealSize')} value={s?.average_deal_size ?? 0} icon={<DealIcon className="w-6 h-6" />} accent="amber" deltaLabel={t('vsLastWeek')} trendData={trendSeries.contactSeries} />
                     <StatCard title={t('totalDeals')} value={stats[6]?.value || 0} icon={<DealIcon className="w-6 h-6" />} accent="violet" deltaLabel={t('vsLastWeek')} trendData={trendSeries.leadsSeries} />
                 </div>
             </div>
@@ -1481,8 +1134,8 @@ export const DashboardPage = () => {
                                 </p>
                             </div>
                             <RefreshButton
-                                onClick={() => refetchUsers()}
-                                loading={isUsersFetching && !isUsersLoading}
+                                onClick={() => refreshPresence()}
+                                loading={isSummaryFetching && !isSummaryLoading}
                                 hideLabelOnMobile={false}
                                 className="h-8 px-3 text-xs"
                             />
@@ -1563,7 +1216,7 @@ export const DashboardPage = () => {
                                                         <td className="px-4 py-4 whitespace-nowrap hidden sm:table-cell text-center">
                                                             {(() => {
                                                                 const stageName = feedback.stage;
-                                                                const stageConfig = stages.find(s => 
+                                                                const stageConfig = stages.find((s: any) => 
                                                                     s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
                                                                     s.name === stageName
                                                                 );

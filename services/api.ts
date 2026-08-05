@@ -2140,12 +2140,102 @@ export type MissionBarSummary = {
   unassigned_leads: number;
 };
 
+export type DashboardSummaryStats = {
+  contact_today: number;
+  today_new_leads: number;
+  today_touched_leads: number;
+  today_untouched_leads: number;
+  delayed_leads: number;
+  total_leads: number;
+  total_deals: number;
+  active_todos: number;
+  completed_deals: number;
+  pipeline_value: string;
+  pipeline_value_raw: number;
+  win_rate: number;
+  average_deal_size: number;
+  unassigned_leads: number;
+  overdue_follow_ups: number;
+};
+
+export type DashboardSummary = {
+  mission_bar: MissionBarSummary;
+  stats: DashboardSummaryStats;
+  week_series: Array<{ date: string; leads_count: number }>;
+  trend_series: { leads_series: number[]; contact_series: number[] };
+  funnel: { total_leads: number; touched: number; meeting: number; won: number };
+  stages: Array<{ name: string; value: number }>;
+  top_users: Array<{ id: number; name: string; username: string; role?: string; activity_count: number }>;
+  team_goals: Array<{ id: number; name: string; progress: number; target: number }>;
+  hot_leads: Array<{
+    id: number;
+    name: string;
+    assigned_user: string;
+    stage: string;
+    score: number;
+    bucket: 'hot' | 'warm' | 'cold';
+    notes: string;
+  }>;
+  activity_feed: Array<{
+    id: string;
+    kind: 'task' | 'call' | 'visit';
+    lead_id: number | null;
+    lead_name: string;
+    actor_name: string;
+    stage_name: string;
+    created_at: string | null;
+  }>;
+  latest_feedbacks: Array<{
+    id: number;
+    lead: string;
+    notes: string;
+    stage: string;
+    user: string;
+    last_feedback_at: string | null;
+  }>;
+  employee_presence: Array<{
+    id: number;
+    name: string;
+    username: string;
+    role: string;
+    is_online: boolean;
+    last_seen_at: string | null;
+  }>;
+  contact_today_leads: Array<{
+    id: number;
+    name: string;
+    assigned_user: string;
+    reminder_date: string | null;
+    notes: string;
+    stage: string;
+  }>;
+  days: number;
+  source: string;
+};
+
 /**
  * Dashboard mission bar counts (server-side aggregates).
  * GET /api/clients/mission-bar-summary/
  */
 export const getMissionBarSummaryAPI = async () => {
   return apiRequest<MissionBarSummary>('/clients/mission-bar-summary/');
+};
+
+/**
+ * Full dashboard aggregates (replaces full-list sync on DashboardPage).
+ * GET /api/clients/dashboard-summary/?days=&source=&daily_target=
+ */
+export const getDashboardSummaryAPI = async (params?: {
+  days?: 7 | 14 | 30;
+  source?: 'all' | 'meta_lead_form' | 'whatsapp' | 'manual';
+  daily_target?: number;
+}) => {
+  const qs = new URLSearchParams();
+  if (params?.days) qs.set('days', String(params.days));
+  if (params?.source) qs.set('source', params.source);
+  if (params?.daily_target != null) qs.set('daily_target', String(params.daily_target));
+  const query = qs.toString();
+  return apiRequest<DashboardSummary>(`/clients/dashboard-summary/${query ? `?${query}` : ''}`);
 };
 
 export type ReportQueryParams = {

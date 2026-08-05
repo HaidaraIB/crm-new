@@ -74,6 +74,9 @@ export function useWhatsAppCallSession() {
   const pollAnswerRef = useRef<number | null>(null);
   const iceDisconnectTimerRef = useRef<number | null>(null);
   const finalizingRef = useRef(false);
+  /** True only after the peer actually answered (inbound agent accept / outbound answer SDP). */
+  const callAnsweredRef = useRef(false);
+  const recordingStartedRef = useRef(false);
   const activeCallRef = useRef<WhatsAppCallRecord | null>(null);
   const phaseRef = useRef<CallSessionPhase>(phase);
   const notesRef = useRef(notes);
@@ -138,6 +141,8 @@ export function useWhatsAppCallSession() {
   };
 
   const startRecording = async (local: MediaStream, remote: MediaStream) => {
+    if (recordingStartedRef.current || recorderRef.current) return;
+    if (!callAnsweredRef.current) return;
     try {
       const { stream, ctx } = await mixStreamsForRecording(local, remote);
       audioCtxRef.current = ctx;
@@ -155,12 +160,24 @@ export function useWhatsAppCallSession() {
       };
       rec.start(1000);
       recorderRef.current = rec;
+      recordingStartedRef.current = true;
     } catch (e) {
       console.warn('WhatsApp call recording start failed', e);
     }
   };
 
   const flushRecording = async (callId: number, callNotes: string) => {
+    // Never upload audio for unanswered attempts — CRM keeps the call row only.
+    if (!callAnsweredRef.current || !recordingStartedRef.current) {
+      try {
+        recorderRef.current?.stop();
+      } catch {
+        /* */
+      }
+      recorderRef.current = null;
+      chunksRef.current = [];
+      return;
+    }
     const rec = recorderRef.current;
     if (!rec) return;
     await new Promise<void>((resolve) => {
@@ -174,6 +191,7 @@ export function useWhatsAppCallSession() {
     const blob = new Blob(chunksRef.current, { type: rec.mimeType || 'audio/webm' });
     chunksRef.current = [];
     recorderRef.current = null;
+    recordingStartedRef.current = false;
     if (blob.size < 64) return;
     try {
       await uploadWhatsAppCallRecordingAPI(callId, blob, callNotes || undefined);
@@ -204,6 +222,8 @@ export function useWhatsAppCallSession() {
       setPhase('idle');
       setMuted(false);
       setNotes('');
+      callAnsweredRef.current = false;
+      recordingStartedRef.current = false;
       finalizingRef.current = false;
     },
     [cleanupMedia]
@@ -308,6 +328,8 @@ export function useWhatsAppCallSession() {
       setActiveCall(call);
       setNotes('');
       finalizingRef.current = false;
+      callAnsweredRef.current = false;
+      recordingStartedRef.current = false;
       try {
         if (!call.offer_sdp) {
           const err: Error & { code?: string } = new Error('whatsappCallMissingOffer');
@@ -344,6 +366,8 @@ export function useWhatsAppCallSession() {
         }
         const updated = await whatsappCallAcceptAPI(call.id, finalSdp);
         setActiveCall(updated);
+        // Inbound: agent accept connects an already-ringing customer — treat as answered.
+        callAnsweredRef.current = true;
         setPhase('active');
         startTimer();
         await startRecording(local, remote);
@@ -370,6 +394,8 @@ export function useWhatsAppCallSession() {
       if (!current || current.id === call.id) {
         setActiveCall(null);
         setPhase('idle');
+        callAnsweredRef.current = false;
+        recordingStartedRef.current = false;
         cleanupMedia();
       }
     },
@@ -382,6 +408,8 @@ export function useWhatsAppCallSession() {
       setPhase('connecting');
       setNotes('');
       finalizingRef.current = false;
+      callAnsweredRef.current = false;
+      recordingStartedRef.current = false;
       try {
         const { pc, local, remote } = await createPeer();
         const offer = await pc.createOffer();
@@ -411,27 +439,34 @@ export function useWhatsAppCallSession() {
         attachRemoteEndWatchers(pc, created.id);
         setPhase('ringing');
 
-        // Poll for answer SDP from Meta connect webhook
+        // Poll until the customer answers (answer SDP + answered status).
         pollAnswerRef.current = window.setInterval(async () => {
           try {
             const detail = await getWhatsAppCallDetailAPI(created.id);
             setActiveCall(detail);
-            if (detail.answer_sdp && pc.signalingState !== 'closed') {
+            const status = String(detail.status || '').toLowerCase();
+            const customerAnswered =
+              Boolean(detail.answer_sdp) &&
+              (status === 'answered' || Boolean(detail.answered_at));
+            if (customerAnswered && pc.signalingState !== 'closed') {
               if (!pc.currentRemoteDescription) {
                 await pc.setRemoteDescription({
                   type: 'answer',
-                  sdp: detail.answer_sdp,
+                  sdp: detail.answer_sdp!,
                 });
+              }
+              if (!callAnsweredRef.current) {
+                callAnsweredRef.current = true;
                 setPhase('active');
                 startTimer();
                 await startRecording(local, remote);
-                if (pollAnswerRef.current) {
-                  window.clearInterval(pollAnswerRef.current);
-                  pollAnswerRef.current = null;
-                }
+              }
+              if (pollAnswerRef.current) {
+                window.clearInterval(pollAnswerRef.current);
+                pollAnswerRef.current = null;
               }
             }
-            if (TERMINAL_CALL_STATUSES.has(String(detail.status || '').toLowerCase())) {
+            if (TERMINAL_CALL_STATUSES.has(status)) {
               if (pollAnswerRef.current) {
                 window.clearInterval(pollAnswerRef.current);
                 pollAnswerRef.current = null;
@@ -478,6 +513,8 @@ export function useWhatsAppCallSession() {
     setPhase('idle');
     setMuted(false);
     setNotes('');
+    callAnsweredRef.current = false;
+    recordingStartedRef.current = false;
     finalizingRef.current = false;
   }, [activeCall, notes, cleanupMedia]);
 
@@ -493,6 +530,8 @@ export function useWhatsAppCallSession() {
     setError(null);
     setPhase('idle');
     setActiveCall(null);
+    callAnsweredRef.current = false;
+    recordingStartedRef.current = false;
     cleanupMedia();
   }, [cleanupMedia]);
 

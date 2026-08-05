@@ -74,6 +74,7 @@ export const ChatsPage: React.FC = () => {
     t,
     language,
     currentUser,
+    selectedLead,
     setAlertMessage,
     setAlertVariant,
     setIsAlertModalOpen,
@@ -478,6 +479,37 @@ export const ChatsPage: React.FC = () => {
       saveSelectedManualPhone(companyId, null);
     }
   };
+
+  const autoOpenedChatLeadRef = useRef<number | null>(null);
+  useEffect(() => {
+    return () => {
+      autoOpenedChatLeadRef.current = null;
+    };
+  }, []);
+
+  // Open a lead conversation when navigating from notifications / View Lead "Open in Chats".
+  useEffect(() => {
+    const leadId = selectedLead?.id;
+    if (typeof leadId !== 'number') return;
+    if (autoOpenedChatLeadRef.current === leadId) return;
+
+    const match = conversations.find((c) => c.client?.id === leadId);
+    const client =
+      match?.client ??
+      ({
+        id: selectedLead.id,
+        name: selectedLead.name,
+        phone_number:
+          selectedLead.phone ||
+          selectedLead.phoneNumbers?.find((p) => p.is_primary)?.phone_number ||
+          selectedLead.phoneNumbers?.[0]?.phone_number ||
+          '',
+        lead_company_name: selectedLead.leadCompanyName || '',
+      } as const);
+
+    autoOpenedChatLeadRef.current = leadId;
+    selectChatClient(client);
+  }, [selectedLead?.id, conversations, selectedLead]);
 
   const addConversation = async (client: any) => {
     // Manual phone: resolve via API (staff get not-found for foreign/unassigned)

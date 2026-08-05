@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { PageWrapper, Button, Loader, FilterButton, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Loader, FilterButton, RefreshButton, hasActiveFilters } from '../components/index';
 import { DEFAULT_MARKETING_REPORT_FILTERS } from '../components/drawers/MarketingReportFilterDrawer';
 import { useAppContext } from '../context/AppContext';
 import { MegaphoneIcon, TargetIcon, CheckIcon, ChartIcon } from '../components/icons';
@@ -25,7 +25,7 @@ export const MarketingReportPage = () => {
     [selectedCampaign, startDate, endDate],
   );
 
-  const { data, isLoading, isError } = useMarketingReport(reportParams);
+  const { data, isLoading, isFetching, isError, refetch } = useMarketingReport(reportParams);
 
   const campaignStats = useMemo(
     () => (data?.rows ?? []).map(mapApiMarketingReportRow),
@@ -89,6 +89,12 @@ export const MarketingReportPage = () => {
             hideLabelOnMobile={false}
             className="w-full sm:w-auto"
             hasActiveFilters={hasActiveFilters(marketingReportFilters, DEFAULT_MARKETING_REPORT_FILTERS)}
+          />
+          <RefreshButton
+            onClick={() => { void refetch(); }}
+            loading={isFetching && !isLoading}
+            hideLabelOnMobile={false}
+            className="w-full sm:w-auto"
           />
           <Button
             variant="secondary"

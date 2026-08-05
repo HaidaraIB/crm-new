@@ -20,7 +20,7 @@ import {
     parseLeadCoordinate,
 } from '../utils/leadLocation';
 import { BriefcaseIcon, MapPinIcon } from '../components/icons';
-import { Lead } from '../types';
+import { Lead, TimelineEntry } from '../types';
 import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
 import {
     formatTimelineEventValuePair,
@@ -30,10 +30,57 @@ import {
     resolveTimelineActor,
     timelineEventActorFallback,
 } from '../utils/timelineEvents';
+import { localizeWhatsAppMessageBody } from '../utils/whatsappMessageBodyDisplay';
 import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
 import { normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
+
+/** Collapse consecutive WhatsApp rows (after chronological sort) into thread cards. */
+function collapseConsecutiveWhatsAppThreads(
+    entries: TimelineEntry[],
+    t: (key: keyof typeof translations.en) => string,
+): TimelineEntry[] {
+    const sorted = [...entries].sort((a, b) => a.timestamp - b.timestamp);
+    const result: TimelineEntry[] = [];
+    let i = 0;
+    while (i < sorted.length) {
+        const entry = sorted[i];
+        if (entry.type !== 'whatsapp') {
+            result.push(entry);
+            i += 1;
+            continue;
+        }
+        const group: TimelineEntry[] = [entry];
+        i += 1;
+        while (i < sorted.length && sorted[i].type === 'whatsapp') {
+            group.push(sorted[i]);
+            i += 1;
+        }
+        const latest = group[group.length - 1];
+        const earliest = group[0];
+        result.push({
+            id: `wa-thread-${earliest.id}-${latest.id}`,
+            type: 'whatsapp_thread',
+            user: latest.user,
+            avatar: latest.avatar || '',
+            action: t('whatsappTimelineConversation'),
+            details: localizeWhatsAppMessageBody(latest.details || '', t),
+            date: latest.date,
+            timestamp: latest.timestamp,
+            stage: latest.stage || earliest.stage,
+            messages: group.map((g) => ({
+                id: g.id,
+                direction: g.direction === 'inbound' ? 'inbound' : 'outbound',
+                body: localizeWhatsAppMessageBody(g.details || '', t),
+                date: g.date,
+                timestamp: g.timestamp,
+                user: g.user,
+            })),
+        });
+    }
+    return result;
+}
 
 export const ViewLeadPage = () => {
     const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered } = useAppContext();
@@ -416,10 +463,11 @@ export const ViewLeadPage = () => {
         const lang = (language === 'ar' ? 'ar' : 'en') as 'en' | 'ar';
         const formatDetailDateTime = (dateString: string | null | undefined) =>
             formatTimelineDetailDateTime(dateString, lang);
-        const leadContactName = displayLead.name || displayLead.company_name || '';
+        const leadContactName = displayLead.name || displayLead.leadCompanyName || '';
         const leadContactPhone =
-            displayLead.phone_number ||
-            (displayLead as Lead & { phone?: string }).phone ||
+            displayLead.phone ||
+            displayLead.phoneNumbers?.find((p) => p.is_primary)?.phone_number ||
+            displayLead.phoneNumbers?.[0]?.phone_number ||
             '';
 
         // Format Actions (ClientTasks)
@@ -677,10 +725,20 @@ export const ViewLeadPage = () => {
                 date: formatTimelineDate(wa.created_at, lang),
                 timestamp: new Date(wa.created_at).getTime(),
                 stage: wa.phone_number,
+                direction: isInbound ? ('inbound' as const) : ('outbound' as const),
             };
         });
 
-        return [...actions, ...calls, ...visits, ...fieldVisits, ...events, ...smsEntries, ...waEntries];
+        const merged: TimelineEntry[] = [
+            ...actions,
+            ...calls,
+            ...visits,
+            ...fieldVisits,
+            ...events,
+            ...smsEntries,
+            ...waEntries,
+        ];
+        return collapseConsecutiveWhatsAppThreads(merged, t);
     }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, channels, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
 
     const isResolvingLead = Boolean(leadId) && !displayLead && (leadLoading || leadFetching) && !leadError;
@@ -1260,7 +1318,7 @@ export const ViewLeadPage = () => {
             </div>
 
             <div className="mt-6">
-                <Timeline history={timelineHistory} />
+                <Timeline history={timelineHistory} chatLead={displayLead} />
             </div>
             </div>
 

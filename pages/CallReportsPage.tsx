@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Input, Loader } from '../components/index';
+import { PageWrapper, Card, Button, Input, Loader, RefreshButton } from '../components/index';
 import { PhoneIcon, CheckIcon, ClockIcon, UsersIcon } from '../components/icons';
 import { useCallReport } from '../hooks/useQueries';
 import { withLatinDigits } from '../utils/dateUtils';
@@ -58,7 +58,7 @@ export const CallReportsPage = () => {
     [from, to],
   );
 
-  const { data, isLoading, isError, refetch } = useCallReport(reportParams);
+  const { data, isLoading, isFetching, isError, refetch } = useCallReport(reportParams);
 
   const pbxEnabled = !!data?.pbx?.enabled;
   const crmSummary = data?.crm?.summary;
@@ -303,9 +303,7 @@ export const CallReportsPage = () => {
             <FieldLabel>{t('toDate')}</FieldLabel>
             <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
           </div>
-          <Button variant="secondary" onClick={() => refetch()}>
-            {t('refresh')}
-          </Button>
+          <RefreshButton onClick={() => refetch()} loading={isFetching && !isLoading} hideLabelOnMobile={false} />
         </div>
 
         <div className="flex flex-wrap gap-2 mb-6">

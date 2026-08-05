@@ -99,8 +99,38 @@ export const LoginPage = () => {
         );
     };
 
-    const translateLoginError = (errorMessage: string): string => {
+    const translateLoginError = (errorMessage: string, error?: any): string => {
+        const code = normalizeErrorCode(error?.code || '');
+        if (code === 'ACCOUNT_LOCKED' || errorMessage.toLowerCase().includes('too many failed login')) {
+            let retrySeconds = 0;
+            const details =
+                error?.details ||
+                (error?.data && typeof error.data === 'object' && (error.data as any).error?.details);
+            if (details && typeof details === 'object' && !Array.isArray(details)) {
+                retrySeconds = Number((details as Record<string, unknown>).retry_after_seconds) || 0;
+            }
+            if (retrySeconds > 0) {
+                const minutes = Math.max(1, Math.ceil(retrySeconds / 60));
+                return (t('accountLockedWithMinutes') || 'Too many failed attempts. Try again in {minutes} minutes.').replace(
+                    '{minutes}',
+                    String(minutes)
+                );
+            }
+            return t('accountLocked') || 'Too many failed attempts. Please try again later.';
+        }
+
         const lowerMessage = errorMessage.toLowerCase();
+        if (code === 'THROTTLED' || lowerMessage.includes('throttled') || lowerMessage.includes('too many requests')) {
+            const match = errorMessage.match(/available in\s+(\d+)\s+seconds?/i);
+            const seconds = match ? Number(match[1]) : 0;
+            if (seconds > 0) {
+                return (t('loginThrottledWithSeconds') || 'Too many requests. Please try again in {seconds} seconds.').replace(
+                    '{seconds}',
+                    String(seconds)
+                );
+            }
+            return t('loginThrottled') || 'Too many requests. Please wait a moment and try again.';
+        }
 
         // Subscription / renew must be checked before broad "inactive" / "invalid" matches
         if (
@@ -125,7 +155,10 @@ export const LoginPage = () => {
             return t('loginErrorInvalidCredentials') || 'Invalid username or password';
         }
         
-        // Default fallback
+        // Prefer server message over a misleading "invalid credentials" default
+        if (errorMessage.trim()) {
+            return errorMessage.trim();
+        }
         return t('invalidCredentials') || 'Invalid username or password';
     };
 
@@ -248,7 +281,7 @@ export const LoginPage = () => {
                 });
                 setErrors({});
             } else {
-                const translatedError = translateLoginError(errorMessage);
+                const translatedError = translateLoginError(errorMessage, error);
                 console.error('❌ Translated error:', translatedError);
                 setErrors({ general: translatedError });
             }

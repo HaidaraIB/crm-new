@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, PlusIcon, EditIcon, TrashIcon, EyeIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode, PageLoadingState } from '../components/index';
+import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, PlusIcon, EditIcon, TrashIcon, EyeIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode, PageLoadingState, RefreshButton } from '../components/index';
 import { TodosKanbanView } from '../components/todos/TodosKanbanView';
 import type { TodoKanbanItem } from '../components/todos/TodoKanbanCard';
 import { TaskStage, Stage, Lead, Deal } from '../types';
@@ -188,7 +188,7 @@ export const TodosPage = () => {
     }, [activeTab]);
 
     // Fetch tasks using React Query
-    const { data: tasksResponse, isLoading: tasksLoading, error: tasksError } = useTasks();
+    const { data: tasksResponse, isLoading: tasksLoading, isFetching: tasksFetching, error: tasksError, refetch: refetchTasks } = useTasks();
     const allTasksRaw = tasksResponse?.results || [];
     
     // Fetch deals to get deal stage information (since deal_stage might not be in TaskSerializer)
@@ -196,10 +196,10 @@ export const TodosPage = () => {
     const allDeals = dealsResponse?.results || [];
     
     // Fetch client tasks and client calls
-    const { data: clientTasksResponse } = useClientTasks();
+    const { data: clientTasksResponse, isFetching: clientTasksFetching, refetch: refetchClientTasks } = useClientTasks();
     const allClientTasks = clientTasksResponse?.results || [];
     
-    const { data: clientCallsResponse } = useClientCalls();
+    const { data: clientCallsResponse, isFetching: clientCallsFetching, refetch: refetchClientCalls } = useClientCalls();
     const allClientCalls = clientCallsResponse?.results || [];
 
     // Format deal stage with translation
@@ -765,9 +765,19 @@ export const TodosPage = () => {
         <PageWrapper 
             title={t('todos')}
             actions={
-                <Button onClick={() => setIsAddTodoModalOpen(true)}>
-                    <PlusIcon className="w-4 h-4"/> {t('addTodo')}
-                </Button>
+                <div className="flex flex-wrap items-center gap-2">
+                    <RefreshButton
+                        onClick={() => {
+                            void refetchTasks();
+                            void refetchClientTasks();
+                            void refetchClientCalls();
+                        }}
+                        loading={(tasksFetching || clientTasksFetching || clientCallsFetching) && !tasksLoading}
+                    />
+                    <Button onClick={() => setIsAddTodoModalOpen(true)}>
+                        <PlusIcon className="w-4 h-4"/> {t('addTodo')}
+                    </Button>
+                </div>
             }
         >
             <div className="flex flex-col lg:flex-row gap-6 min-w-0">

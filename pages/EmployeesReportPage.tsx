@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { PageWrapper, Button, Loader, FilterButton, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Loader, FilterButton, RefreshButton, hasActiveFilters } from '../components/index';
 import { DEFAULT_EMPLOYEES_REPORT_FILTERS } from '../components/drawers/EmployeesReportFilterDrawer';
 import { useAppContext } from '../context/AppContext';
 import { PhoneIcon, CheckIcon, ClockIcon, UsersIcon } from '../components/icons';
@@ -44,7 +44,7 @@ export const EmployeesReportPage = () => {
     [leadType, startDate, endDate],
   );
 
-  const { data, isLoading, isError } = useEmployeeReport(reportParams);
+  const { data, isLoading, isFetching, isError, refetch } = useEmployeeReport(reportParams);
 
   const employeeStats = useMemo(
     () => (data?.rows ?? []).map(mapApiEmployeeReportRow),
@@ -93,6 +93,12 @@ export const EmployeesReportPage = () => {
             hideLabelOnMobile={false}
             className="w-full sm:w-auto"
             hasActiveFilters={hasActiveFilters(employeesReportFilters, DEFAULT_EMPLOYEES_REPORT_FILTERS)}
+          />
+          <RefreshButton
+            onClick={() => { void refetch(); }}
+            loading={isFetching && !isLoading}
+            hideLabelOnMobile={false}
+            className="w-full sm:w-auto"
           />
           <Button
             variant="secondary"

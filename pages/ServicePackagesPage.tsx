@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_SERVICE_PACKAGE_FILTERS } from '../components/drawers/ServicePackagesFilterDrawer';
 import { ServicePackage } from '../types';
 import { useServicePackages, useDeleteServicePackage } from '../hooks/useQueries';
@@ -118,7 +118,7 @@ export const ServicePackagesPage = () => {
     } = useAppContext();
 
     // Fetch service packages using React Query
-    const { data: packagesResponse, isLoading: packagesLoading, error: packagesError } = useServicePackages();
+    const { data: packagesResponse, isLoading: packagesLoading, isFetching: packagesFetching, error: packagesError, refetch: refetchPackages } = useServicePackages();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
     const allPackages = useMemo(() => {
@@ -251,6 +251,10 @@ export const ServicePackagesPage = () => {
                     <FilterButton
                         onClick={() => setIsServicePackageFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(servicePackageFilters, DEFAULT_SERVICE_PACKAGE_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchPackages(); }}
+                        loading={packagesFetching && !packagesLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddServicePackageModalOpen(true)}>

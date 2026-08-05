@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
@@ -157,13 +157,13 @@ export const LeadsPage = () => {
         return rest;
     }, [apiFilters]);
 
-    const { data: leadsResponse, isLoading: leadsLoading, error: leadsError } = useLeads(
+    const { data: leadsResponse, isLoading: leadsLoading, isFetching: leadsFetching, error: leadsError, refetch: refetchLeads } = useLeads(
         apiFilters,
         leadsPageNumber,
         { enabled: !isBoardView },
         leadsPageSize,
     );
-    const { data: statusCounts } = useLeadStatusCounts(statusCountsFilters);
+    const { data: statusCounts, isFetching: statusCountsFetching, refetch: refetchStatusCounts } = useLeadStatusCounts(statusCountsFilters);
     const allLeads = leadsResponse?.results || [];
     const totalLeadsCount = leadsResponse?.count || 0;
     const hasNextPage = Boolean(leadsResponse?.next);
@@ -545,6 +545,14 @@ export const LeadsPage = () => {
                         <FilterButton
                             onClick={() => setIsFilterDrawerOpen(true)}
                             hasActiveFilters={hasActiveFilters(leadFilters, DEFAULT_LEAD_FILTERS)}
+                            className="w-full sm:w-auto shrink-0"
+                        />
+                        <RefreshButton
+                            onClick={() => {
+                                void refetchLeads();
+                                void refetchStatusCounts();
+                            }}
+                            loading={(leadsFetching || statusCountsFetching) && !leadsLoading}
                             className="w-full sm:w-auto shrink-0"
                         />
                         {!isDataEntryUser && (

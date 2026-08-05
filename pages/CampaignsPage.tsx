@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterButton, EditIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterButton, RefreshButton, EditIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_CAMPAIGN_FILTERS } from '../components/drawers/CampaignsFilterDrawer';
 import { Campaign } from '../types';
 import { useCampaigns, useDeleteCampaign } from '../hooks/useQueries';
@@ -112,7 +112,7 @@ export const CampaignsPage = () => {
     const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
 
     // Fetch campaigns using React Query
-    const { data: campaignsResponse, isLoading: campaignsLoading, error: campaignsError } = useCampaigns();
+    const { data: campaignsResponse, isLoading: campaignsLoading, isFetching: campaignsFetching, error: campaignsError, refetch: refetchCampaigns } = useCampaigns();
     const allCampaignsRaw = campaignsResponse?.results || [];
     
     // Normalize API fields to frontend naming (created_at -> createdAt, is_active -> isActive)
@@ -245,6 +245,10 @@ export const CampaignsPage = () => {
                     <FilterButton
                         onClick={() => setIsCampaignsFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(campaignFilters, DEFAULT_CAMPAIGN_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchCampaigns(); }}
+                        loading={campaignsFetching && !campaignsLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddCampaignModalOpen(true)}>

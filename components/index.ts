@@ -2,6 +2,7 @@
 export * from './icons';
 export * from './Button';
 export * from './FilterButton';
+export * from './RefreshButton';
 export * from './Card';
 export * from './TableHorizontalScroll';
 export * from './Input';

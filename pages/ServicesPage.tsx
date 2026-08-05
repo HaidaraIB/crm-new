@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_SERVICE_FILTERS } from '../components/drawers/ServicesFilterDrawer';
 import { Service } from '../types';
 import { useServices, useDeleteService } from '../hooks/useQueries';
@@ -118,7 +118,7 @@ export const ServicesPage = () => {
     } = useAppContext();
 
     // Fetch services using React Query
-    const { data: servicesResponse, isLoading: servicesLoading, error: servicesError } = useServices();
+    const { data: servicesResponse, isLoading: servicesLoading, isFetching: servicesFetching, error: servicesError, refetch: refetchServices } = useServices();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
     const allServices = useMemo(() => {
@@ -250,6 +250,10 @@ export const ServicesPage = () => {
                     <FilterButton
                         onClick={() => setIsServiceFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(serviceFilters, DEFAULT_SERVICE_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchServices(); }}
+                        loading={servicesFetching && !servicesLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddServiceModalOpen(true)}>

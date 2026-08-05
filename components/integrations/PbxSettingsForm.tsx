@@ -13,7 +13,7 @@ import {
   downloadPbxConnectorPackageAPI,
   type PbxSettingsResponse,
 } from '../../services/api';
-import { Button, Card, Input, Loader, PageWrapper } from '../index';
+import { Button, Card, Input, Loader, PageWrapper, RefreshButton } from '../index';
 import { EditIcon, EyeIcon, EyeOffIcon, TrashIcon } from '../icons';
 import { formatDateTimeToLocal } from '../../utils/dateUtils';
 import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
@@ -465,14 +465,11 @@ export function PbxSettingsForm({
             ) : null}
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="secondary"
+            <RefreshButton
               onClick={() => void handleRefreshHealth()}
               loading={healthRefreshing}
-              disabled={healthRefreshing}
-            >
-              {healthRefreshing ? t('pbxRefreshing') : t('refresh')}
-            </Button>
+              hideLabelOnMobile={false}
+            />
             {healthRefreshNotice === 'success' ? (
               <span className="text-sm text-green-600 dark:text-green-400 animate-pulse">
                 {t('pbxRefreshed')}

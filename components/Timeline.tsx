@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { TimelineEntry as TimelineEntryType } from '../types';
+import { Lead, TimelineEntry as TimelineEntryType } from '../types';
 import { ClockIcon, PhoneIcon, MapPinIcon, WhatsappIcon, SmsIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
 import { translations } from '../constants';
@@ -10,6 +10,7 @@ import {
 import { ChatVoicePlayer } from './chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { PhoneText } from './PhoneText';
+import { navigateToCompanyRoute } from '../utils/routing';
 
 const TimelineRecordingPlayer: React.FC<{ url: string; t: (key: string) => string }> = ({
     url,
@@ -32,6 +33,8 @@ type TimelineSortOrder = 'desc' | 'asc';
 
 type TimelineProps = {
     history: TimelineEntryType[];
+    /** When set, WhatsApp thread cards can open this lead in Chats. */
+    chatLead?: Lead | null;
 };
 
 function readSortOrder(): TimelineSortOrder {
@@ -46,6 +49,7 @@ function getTypeChipLabel(
 ): string {
     switch (entry.type) {
         case 'whatsapp':
+        case 'whatsapp_thread':
             return t('whatsapp');
         case 'sms':
             return t('smsSent');
@@ -70,6 +74,7 @@ function getTypeChipLabel(
 function showActionSubtitle(entry: TimelineEntryType, chipLabel: string): boolean {
     if (!entry.action?.trim()) return false;
     if (entry.type === 'whatsapp') return true;
+    if (entry.type === 'whatsapp_thread') return false;
     if (entry.type === 'action') return false;
     if (entry.type === 'event' && (entry.oldValue || entry.newValue)) return false;
     if (entry.type === 'location_update') return false;
@@ -80,6 +85,7 @@ function TypeIcon({ type, className }: { type?: TimelineEntryType['type']; class
     const cn = className || 'w-4 h-4';
     switch (type) {
         case 'whatsapp':
+        case 'whatsapp_thread':
             return <WhatsappIcon className={cn} />;
         case 'sms':
             return <SmsIcon className={cn} />;
@@ -92,6 +98,92 @@ function TypeIcon({ type, className }: { type?: TimelineEntryType['type']; class
         default:
             return <ClockIcon className={cn} />;
     }
+}
+
+function WhatsAppThreadBody({
+    entry,
+    t,
+    onOpenChats,
+}: {
+    entry: TimelineEntryType;
+    t: (key: keyof typeof translations.en) => string;
+    onOpenChats?: () => void;
+}) {
+    const [expanded, setExpanded] = useState(false);
+    const messages = entry.messages || [];
+    const countLabel = t('whatsappTimelineMessagesCount').replace(
+        '{count}',
+        String(messages.length || 1)
+    );
+    const latestDirection = messages.length
+        ? messages[messages.length - 1].direction
+        : entry.direction;
+    const previewCue = latestDirection === 'inbound' ? '←' : '→';
+
+    return (
+        <div className="mt-2 space-y-2">
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {t('whatsappTimelineConversation')}
+                <span className="ms-2 text-xs font-medium text-gray-500 dark:text-gray-400 tabular-nums">
+                    {countLabel}
+                </span>
+            </p>
+            {entry.details && !expanded && (
+                <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                    <span className="text-gray-400 dark:text-gray-500 me-1.5" aria-hidden="true">
+                        {previewCue}
+                    </span>
+                    {entry.details}
+                </p>
+            )}
+            {expanded && messages.length > 0 && (
+                <ul className="space-y-1.5 rounded-lg border border-green-200/70 dark:border-green-800/50 bg-white/60 dark:bg-gray-900/40 px-2.5 py-2 max-h-64 overflow-y-auto">
+                    {messages.map((msg) => (
+                        <li
+                            key={msg.id}
+                            className="flex gap-2 text-sm text-gray-700 dark:text-gray-200 min-w-0"
+                        >
+                            <span
+                                className="shrink-0 text-gray-400 dark:text-gray-500 w-4 text-center"
+                                aria-hidden="true"
+                            >
+                                {msg.direction === 'inbound' ? '←' : '→'}
+                            </span>
+                            <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">
+                                {msg.body}
+                            </span>
+                            <time
+                                className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap self-start"
+                                dateTime={new Date(msg.timestamp).toISOString()}
+                            >
+                                {msg.date}
+                            </time>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                {messages.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => setExpanded((v) => !v)}
+                        className="text-xs font-medium text-green-700 hover:text-green-800 dark:text-green-300 dark:hover:text-green-200"
+                    >
+                        {expanded ? t('whatsappTimelineCollapse') : t('whatsappTimelineExpand')}
+                    </button>
+                )}
+                {onOpenChats && (
+                    <button
+                        type="button"
+                        onClick={onOpenChats}
+                        className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                    >
+                        {t('whatsappTimelineOpenChat')}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
 }
 
 function TimelineValueChange({
@@ -183,6 +275,7 @@ function TimelineFromToDates({
 function chipColorClass(type?: TimelineEntryType['type']): string {
     switch (type) {
         case 'whatsapp':
+        case 'whatsapp_thread':
             return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200';
         case 'sms':
             return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200';
@@ -202,9 +295,20 @@ function chipColorClass(type?: TimelineEntryType['type']): string {
     }
 }
 
-export const Timeline = ({ history }: TimelineProps) => {
-    const { t, language } = useAppContext();
+export const Timeline = ({ history, chatLead }: TimelineProps) => {
+    const { t, language, setCurrentPage, setSelectedLead, currentUser } = useAppContext();
     const [sortOrder, setSortOrder] = useState<TimelineSortOrder>(readSortOrder);
+
+    const openLeadInChats = () => {
+        if (!chatLead) {
+            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Chats');
+            setCurrentPage('Chats');
+            return;
+        }
+        setSelectedLead(chatLead);
+        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Chats');
+        setCurrentPage('Chats');
+    };
 
     const sortedHistory = useMemo(() => {
         const copy = [...history];
@@ -325,7 +429,9 @@ export const Timeline = ({ history }: TimelineProps) => {
                                                             : undefined
                                                     }
                                                 >
-                                                    {entry.type === 'sms' || entry.type === 'whatsapp' ? (
+                                                    {entry.type === 'sms' ||
+                                                    entry.type === 'whatsapp' ||
+                                                    entry.type === 'whatsapp_thread' ? (
                                                         <PhoneText>{entry.stage}</PhoneText>
                                                     ) : (
                                                         entry.stage
@@ -342,9 +448,11 @@ export const Timeline = ({ history }: TimelineProps) => {
                                         </time>
                                     </div>
 
-                                    <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                                        {entry.user}
-                                    </p>
+                                    {entry.type !== 'whatsapp_thread' && (
+                                        <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                                            {entry.user}
+                                        </p>
+                                    )}
 
                                     {entry.fieldLabel && (
                                         <p className="mt-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
@@ -356,6 +464,14 @@ export const Timeline = ({ history }: TimelineProps) => {
                                         <p className="mt-1 text-xs font-medium text-gray-600 dark:text-gray-400">
                                             {entry.action}
                                         </p>
+                                    )}
+
+                                    {entry.type === 'whatsapp_thread' && (
+                                        <WhatsAppThreadBody
+                                            entry={entry}
+                                            t={t}
+                                            onOpenChats={openLeadInChats}
+                                        />
                                     )}
 
                                     {entry.type === 'event' && (entry.oldValue || entry.newValue) && (
@@ -407,7 +523,9 @@ export const Timeline = ({ history }: TimelineProps) => {
                                         </div>
                                     )}
 
-                                    {entry.details && entry.type !== 'location_update' && (
+                                    {entry.details &&
+                                        entry.type !== 'location_update' &&
+                                        entry.type !== 'whatsapp_thread' && (
                                         <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words">
                                             {entry.details}
                                         </p>

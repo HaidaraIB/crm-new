@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Loader, FilterButton, SearchIcon, Input, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Card, Loader, FilterButton, RefreshButton, SearchIcon, Input, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_ACTIVITY_FILTERS } from '../components/drawers/ActivitiesFilterDrawer';
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 
@@ -29,10 +29,10 @@ export const ActivitiesPage = () => {
     } = useAppContext();
 
     // Fetch data using React Query
-    const { data: clientTasksResponse } = useClientTasks();
+    const { data: clientTasksResponse, isLoading: clientTasksLoading, isFetching: clientTasksFetching, refetch: refetchClientTasks } = useClientTasks();
     const clientTasks = clientTasksResponse?.results || [];
     
-    const { data: clientCallsResponse } = useClientCalls();
+    const { data: clientCallsResponse, isLoading: clientCallsLoading, isFetching: clientCallsFetching, refetch: refetchClientCalls } = useClientCalls();
     const clientCalls = clientCallsResponse?.results || [];
 
     const { data: usersResponse } = useUsers();
@@ -218,10 +218,19 @@ export const ActivitiesPage = () => {
             <PageWrapper
                 title={t('activities')}
                 actions={
-                    <FilterButton
-                        onClick={() => setIsActivitiesFilterDrawerOpen(true)}
-                        hasActiveFilters={hasActiveFilters(activityFilters, DEFAULT_ACTIVITY_FILTERS)}
-                    />
+                    <div className="flex flex-wrap items-center gap-2">
+                        <RefreshButton
+                            onClick={() => {
+                                void refetchClientTasks();
+                                void refetchClientCalls();
+                            }}
+                            loading={(clientTasksFetching || clientCallsFetching) && !clientTasksLoading && !clientCallsLoading}
+                        />
+                        <FilterButton
+                            onClick={() => setIsActivitiesFilterDrawerOpen(true)}
+                            hasActiveFilters={hasActiveFilters(activityFilters, DEFAULT_ACTIVITY_FILTERS)}
+                        />
+                    </div>
                 }
             >
                 <Card>

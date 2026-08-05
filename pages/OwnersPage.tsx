@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_OWNER_FILTERS } from '../components/drawers/OwnersFilterDrawer';
 import { Owner } from '../types';
 import { useOwners, useDeleteOwner } from '../hooks/useQueries';
@@ -77,7 +77,7 @@ export const OwnersPage = () => {
     } = useAppContext();
 
     // Fetch owners using React Query
-    const { data: ownersResponse, isLoading: ownersLoading, error: ownersError } = useOwners();
+    const { data: ownersResponse, isLoading: ownersLoading, isFetching: ownersFetching, error: ownersError, refetch: refetchOwners } = useOwners();
     const allOwners = ownersResponse?.results || [];
 
     // Delete owner mutation
@@ -180,6 +180,10 @@ export const OwnersPage = () => {
                     <FilterButton
                         onClick={() => setIsOwnerFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(ownerFilters, DEFAULT_OWNER_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchOwners(); }}
+                        loading={ownersFetching && !ownersLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddOwnerModalOpen(true)}>

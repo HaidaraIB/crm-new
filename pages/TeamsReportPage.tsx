@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { PageWrapper, Button, Loader, FilterButton, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Loader, FilterButton, RefreshButton, hasActiveFilters } from '../components/index';
 import { DEFAULT_TEAMS_REPORT_FILTERS } from '../components/drawers/TeamsReportFilterDrawer';
 import { useAppContext } from '../context/AppContext';
 import { UsersIcon, TargetIcon, CheckSquareIcon, DealIcon } from '../components/icons';
@@ -26,7 +26,7 @@ export const TeamsReportPage = () => {
     [leadType, selectedTeam, startDate, endDate],
   );
 
-  const { data, isLoading, isError } = useTeamsReport(reportParams);
+  const { data, isLoading, isFetching, isError, refetch } = useTeamsReport(reportParams);
 
   const teamStats = useMemo(() => (data?.rows ?? []).map(mapApiTeamReportRow), [data?.rows]);
 
@@ -88,6 +88,12 @@ export const TeamsReportPage = () => {
             hideLabelOnMobile={false}
             className="w-full sm:w-auto"
             hasActiveFilters={hasActiveFilters(teamsReportFilters, DEFAULT_TEAMS_REPORT_FILTERS)}
+          />
+          <RefreshButton
+            onClick={() => { void refetch(); }}
+            loading={isFetching && !isLoading}
+            hideLabelOnMobile={false}
+            className="w-full sm:w-auto"
           />
           <Button
             variant="secondary"

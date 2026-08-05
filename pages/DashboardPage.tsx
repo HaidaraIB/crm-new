@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll, PaymentResultBanner } from '../components/index';
+import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll, PaymentResultBanner, RefreshButton } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -1480,13 +1480,12 @@ export const DashboardPage = () => {
                                     {onlineEmployeesCount}/{employeePresenceList.length} {t('online') || 'Online'}
                                 </p>
                             </div>
-                            <button
+                            <RefreshButton
                                 onClick={() => refetchUsers()}
-                                disabled={isUsersFetching}
-                                className="px-3 py-1.5 text-xs font-medium rounded-md bg-gray-100 hover:bg-gray-200 disabled:opacity-60 dark:bg-gray-800 dark:hover:bg-gray-700"
-                            >
-                                {t('refresh') || 'Refresh'}
-                            </button>
+                                loading={isUsersFetching && !isUsersLoading}
+                                hideLabelOnMobile={false}
+                                className="h-8 px-3 text-xs"
+                            />
                         </div>
                         <div className="space-y-2">
                             {employeePresenceList.length > 0 ? (

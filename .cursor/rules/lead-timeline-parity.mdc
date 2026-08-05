@@ -1,0 +1,42 @@
+---
+description: Keep lead timeline UX/behavior in sync between CRM web and mobile
+globs:
+  - pages/ViewLeadPage.tsx
+  - components/Timeline.tsx
+  - types.ts
+  - utils/timeline*.ts
+  - **/timeline_builder.dart
+  - **/timeline_entry.dart
+  - **/lead_timeline.dart
+  - **/timeline_*.dart
+alwaysApply: false
+---
+
+# Lead timeline parity (web ↔ mobile)
+
+The lead **Timeline** on web (`CRM-project`) and mobile (`crm_mobile`) must stay behaviorally aligned. When you change timeline grouping, entry types, chips, or WhatsApp presentation on one client, update the other in the same change set (or immediately after).
+
+## Canonical sources
+
+| Concern | Web | Mobile |
+|---------|-----|--------|
+| Build + merge events | `pages/ViewLeadPage.tsx` (`timelineHistory`) | `lib/utils/timeline_builder.dart` (`buildLeadTimeline`) |
+| Entry model / types | `types.ts` (`TimelineEntry`) | `lib/models/timeline_entry.dart` |
+| Render | `components/Timeline.tsx` | `lib/widgets/lead_timeline.dart` |
+| Copy EN/AR | `constants.ts` | `lib/core/localization/app_localizations.dart` |
+
+## WhatsApp quieter timeline (required parity)
+
+- Map each WA message with `direction` (`inbound` / `outbound`).
+- After merging all sources, sort chronologically and **collapse consecutive** `whatsapp` rows into one `whatsapp_thread` / `whatsappThread` card (`collapseConsecutiveWhatsAppThreads`).
+- Non-WhatsApp events (call, visit, SMS, stage, etc.) **break** the group.
+- Thread card: green WhatsApp chip, conversation title + count, latest-message preview, expand/collapse compact `←`/`→` lines, phone once with LTR/BiDi-safe display.
+- Default **collapsed** (do not auto-expand all threads).
+- Web: **Open in Chats** when Messaging Center exists. Mobile: omit until an in-app WA chats screen exists (do not invent a divergent deep link).
+
+## Rules of thumb
+
+- Same event sources and sort key (`timestamp`); same SharedPreferences/localStorage sort preference name when possible (`leadTimelineSortOrder`).
+- Do not leave one platform on “one full card per WA message” while the other uses thread cards.
+- Prefer frontend-only grouping (no API change) unless both clients need new fields.
+- Phone display: web `PhoneText`; mobile `forceLtr` / `TextDirection.ltr` on phone chips.

@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_PRODUCT_CATEGORY_FILTERS } from '../components/drawers/ProductCategoriesFilterDrawer';
 import { ProductCategory } from '../types';
 import { useProductCategories, useDeleteProductCategory } from '../hooks/useQueries';
@@ -102,7 +102,7 @@ export const ProductCategoriesPage = () => {
     } = useAppContext();
 
     // Fetch product categories using React Query
-    const { data: categoriesResponse, isLoading: categoriesLoading, error: categoriesError } = useProductCategories();
+    const { data: categoriesResponse, isLoading: categoriesLoading, isFetching: categoriesFetching, error: categoriesError, refetch: refetchCategories } = useProductCategories();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
     const allCategories = useMemo(() => {
@@ -229,6 +229,10 @@ export const ProductCategoriesPage = () => {
                     <FilterButton
                         onClick={() => setIsProductCategoryFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(productCategoryFilters, DEFAULT_PRODUCT_CATEGORY_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchCategories(); }}
+                        loading={categoriesFetching && !categoriesLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddProductCategoryModalOpen(true)}>

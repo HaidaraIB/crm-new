@@ -9,13 +9,13 @@ import {
   PageWrapper,
   PhoneText,
   PhoneIcon,
+  RefreshButton,
   hasActiveFilters,
 } from '../components/index';
 import {
   ClockIcon,
   MicrophoneIcon,
   PbxDialIcon,
-  RefreshIcon,
   SearchIcon,
   XIcon,
 } from '../components/icons';
@@ -344,20 +344,14 @@ export const CallsPage: React.FC = () => {
               onClick={() => setIsCallFilterDrawerOpen(true)}
               hasActiveFilters={drawerActive}
             />
-            <Button
-              type="button"
-              variant="secondary"
+            <RefreshButton
               onClick={() => {
                 void refetch();
                 void refetchCounts();
               }}
               loading={(isFetching || isCountsFetching) && !isLoading}
-              className="h-10 shrink-0 rounded-xl"
-              title={t('refresh')}
-            >
-              <RefreshIcon className="size-4" />
-              <span className="hidden sm:inline">{t('refresh')}</span>
-            </Button>
+              className="h-10 rounded-xl"
+            />
           </div>
 
           {(callFilters.clientId ||

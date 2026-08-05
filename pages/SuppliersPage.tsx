@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_SUPPLIER_FILTERS } from '../components/drawers/SuppliersFilterDrawer';
 import { Supplier } from '../types';
 import { useSuppliers, useDeleteSupplier } from '../hooks/useQueries';
@@ -104,7 +104,7 @@ export const SuppliersPage = () => {
     } = useAppContext();
 
     // Fetch suppliers using React Query
-    const { data: suppliersResponse, isLoading: suppliersLoading, error: suppliersError } = useSuppliers();
+    const { data: suppliersResponse, isLoading: suppliersLoading, isFetching: suppliersFetching, error: suppliersError, refetch: refetchSuppliers } = useSuppliers();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
     const allSuppliers = useMemo(() => {
@@ -227,6 +227,10 @@ export const SuppliersPage = () => {
                     <FilterButton
                         onClick={() => setIsSupplierFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(supplierFilters, DEFAULT_SUPPLIER_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchSuppliers(); }}
+                        loading={suppliersFetching && !suppliersLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddSupplierModalOpen(true)}>

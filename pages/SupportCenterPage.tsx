@@ -1,8 +1,8 @@
 import React, { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Input, Button, Modal, TableHorizontalScroll } from '../components/index';
-import { EyeIcon, RefreshIcon } from '../components/icons';
+import { PageWrapper, Input, Button, Modal, TableHorizontalScroll, RefreshButton } from '../components/index';
+import { EyeIcon } from '../components/icons';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
 import { withLatinDigits } from '../utils/dateUtils';
 import { translations } from '../constants';
@@ -208,15 +208,11 @@ export const SupportCenterPage = () => {
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
               {t('myTickets') || 'My Tickets'}
             </h2>
-            <button
-              type="button"
+            <RefreshButton
               onClick={() => refetchTickets()}
-              disabled={ticketsFetching}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-md text-sm font-medium transition-colors bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50"
-            >
-              <RefreshIcon className="w-4 h-4" />
-              {t('refresh') || 'Refresh'}
-            </button>
+              loading={ticketsFetching && !ticketsLoading}
+              hideLabelOnMobile={false}
+            />
           </div>
           {ticketsLoading ? (
             <div className="p-6 text-gray-500 dark:text-gray-400 text-center">

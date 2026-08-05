@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_PRODUCT_FILTERS } from '../components/drawers/ProductsFilterDrawer';
 import { Product } from '../types';
 import { useProducts, useDeleteProduct } from '../hooks/useQueries';
@@ -127,7 +127,7 @@ export const ProductsPage = () => {
     } = useAppContext();
 
     // Fetch products using React Query
-    const { data: productsResponse, isLoading: productsLoading, error: productsError } = useProducts();
+    const { data: productsResponse, isLoading: productsLoading, isFetching: productsFetching, error: productsError, refetch: refetchProducts } = useProducts();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
     const allProducts = useMemo(() => {
@@ -303,6 +303,10 @@ export const ProductsPage = () => {
                     <FilterButton
                         onClick={() => setIsProductFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(productFilters, DEFAULT_PRODUCT_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchProducts(); }}
+                        loading={productsFetching && !productsLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddProductModalOpen(true)}>

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { PhoneText, isPhoneLike } from '../index';
+import { PhoneText, isPhoneLike, RefreshButton } from '../index';
 import { RefreshIcon, PhoneIcon, ListIcon } from '../icons';
 import {
   getWhatsAppContactAvatarLabel,
@@ -122,14 +122,12 @@ export const ChatThread: React.FC<Props> = ({
           </button>
         )}
         {onRefresh && (
-          <button
-            type="button"
+          <RefreshButton
+            iconOnly
             onClick={onRefresh}
-            className="rounded-full p-2 hover:bg-white/10"
-            aria-label={t('refresh')}
-          >
-            <RefreshIcon className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
-          </button>
+            loading={!!isFetching}
+            className="text-inherit"
+          />
         )}
       </div>
 

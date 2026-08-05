@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_SERVICE_PROVIDER_FILTERS } from '../components/drawers/ServiceProvidersFilterDrawer';
 import { ServiceProvider } from '../types';
 import { useServiceProviders, useDeleteServiceProvider } from '../hooks/useQueries';
@@ -113,7 +113,7 @@ export const ServiceProvidersPage = () => {
     } = useAppContext();
 
     // Fetch service providers using React Query
-    const { data: providersResponse, isLoading: providersLoading, error: providersError } = useServiceProviders();
+    const { data: providersResponse, isLoading: providersLoading, isFetching: providersFetching, error: providersError, refetch: refetchProviders } = useServiceProviders();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
     const allProviders = useMemo(() => {
@@ -232,6 +232,10 @@ export const ServiceProvidersPage = () => {
                     <FilterButton
                         onClick={() => setIsServiceProviderFilterDrawerOpen(true)}
                         hasActiveFilters={hasActiveFilters(serviceProviderFilters, DEFAULT_SERVICE_PROVIDER_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchProviders(); }}
+                        loading={providersFetching && !providersLoading}
                     />
                     {isAdmin && (
                         <Button onClick={() => setIsAddServiceProviderModalOpen(true)}>

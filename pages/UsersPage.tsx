@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText, RefreshButton } from '../components/index';
 import { User } from '../types';
 import { useUsers, useReactivateEmployee } from '../hooks/useQueries';
 import { getRoleTranslation, normalizeRole } from '../utils/roles';
@@ -311,14 +311,12 @@ export const UsersPage = () => {
             actions={
                 isAdmin && (
                     <div className="flex w-full sm:w-auto items-center gap-2">
-                        <Button
-                            variant="secondary"
+                        <RefreshButton
                             onClick={() => refetchUsers()}
-                            disabled={usersFetching}
+                            loading={usersFetching && !usersLoading}
                             className="w-full sm:w-auto"
-                        >
-                            {t('refresh') || 'Refresh'}
-                        </Button>
+                            hideLabelOnMobile={false}
+                        />
                         {filteredUsers.length > 0 && (
                             <Button
                                 onClick={() => setIsAddUserModalOpen(true)}

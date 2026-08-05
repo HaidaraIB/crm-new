@@ -129,6 +129,15 @@ export interface User {
   can_delete_clients?: boolean;
 }
 
+export interface TimelineWhatsAppThreadMessage {
+  id: string | number;
+  direction: 'inbound' | 'outbound';
+  body: string;
+  date: string;
+  timestamp: number;
+  user: string;
+}
+
 export interface TimelineEntry {
   id: string | number; // Support string IDs like 'action-1' or 'event-1'
   user: string;
@@ -137,7 +146,7 @@ export interface TimelineEntry {
   details: string;
   date: string;
   timestamp: number; // For sorting
-  type?: 'action' | 'event' | 'call' | 'visit' | 'field_visit' | 'location_update' | 'sms' | 'whatsapp';
+  type?: 'action' | 'event' | 'call' | 'visit' | 'field_visit' | 'location_update' | 'sms' | 'whatsapp' | 'whatsapp_thread';
   stage?: string; // Optional: formatted stage name for better display
   color?: string; // Optional: color for the stage or event
   oldValue?: string;
@@ -149,6 +158,10 @@ export interface TimelineEntry {
   locationPhotoUrl?: string; // Optional: client location photo for field visits
   recordingUrl?: string; // Optional: WhatsApp call recording playback URL
   recordingStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'skipped' | string;
+  /** Direction for individual WhatsApp timeline rows (before thread collapse). */
+  direction?: 'inbound' | 'outbound';
+  /** Messages inside a collapsed WhatsApp conversation block. */
+  messages?: TimelineWhatsAppThreadMessage[];
 }
 
 export interface ClientTask {

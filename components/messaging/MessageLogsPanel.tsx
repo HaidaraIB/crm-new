@@ -3,7 +3,7 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
 import { getMessageLogsAPI, type MessageLogEntry, type MessageLogFilters } from '../../services/api';
 import { IntegrationPlatformIcon } from '../integrations/IntegrationPlatformIcon';
-import { Button, Card, Loader, SectionLoadingState, PhoneText } from '../index';
+import { Button, Card, Loader, SectionLoadingState, PhoneText, RefreshButton } from '../index';
 import { SearchIcon, ClockIcon } from '../icons';
 import { getCompanyViewLeadRoute } from '../../utils/routing';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
@@ -265,9 +265,12 @@ export function MessageLogsPanel() {
                     <Button type="button" variant="secondary" onClick={() => setSearchApplied(searchDraft.trim())}>
                         {t('search')}
                     </Button>
-                    <Button type="button" variant="ghost" onClick={() => refetch()} disabled={isFetching}>
-                        {t('refresh')}
-                    </Button>
+                    <RefreshButton
+                        variant="ghost"
+                        onClick={() => refetch()}
+                        loading={isFetching && !isLoading}
+                        hideLabelOnMobile={false}
+                    />
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <select

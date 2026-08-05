@@ -2,7 +2,7 @@
 
 import React, { useMemo, useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll, hasActiveFilters, ViewModeToggle, useEntityViewMode } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll, hasActiveFilters, ViewModeToggle, useEntityViewMode } from '../components/index';
 import { DEFAULT_DEAL_FILTERS } from '../components/drawers/DealsFilterDrawer';
 import { DealsKanbanView } from '../components/deals/DealsKanbanView';
 import { Deal } from '../types';
@@ -247,7 +247,7 @@ export const DealsPage = () => {
     const isBoardView = viewMode === 'board';
 
     // Fetch deals using React Query (search is server-side)
-    const { data: dealsResponse, isLoading: dealsLoading, error: dealsError } = useDeals(
+    const { data: dealsResponse, isLoading: dealsLoading, isFetching: dealsFetching, error: dealsError, refetch: refetchDeals } = useDeals(
         dealsPageNumber,
         { enabled: !isBoardView },
         dealsPageSize,
@@ -529,6 +529,11 @@ export const DealsPage = () => {
                         onClick={() => setIsDealsFilterDrawerOpen(true)}
                         className="w-full sm:w-auto"
                         hasActiveFilters={hasActiveFilters(dealFilters, DEFAULT_DEAL_FILTERS)}
+                    />
+                    <RefreshButton
+                        onClick={() => { void refetchDeals(); }}
+                        loading={dealsFetching && !dealsLoading}
+                        className="w-full sm:w-auto"
                     />
                     <Button variant="secondary" onClick={handleExportDeals} className="w-full sm:w-auto" type="button" disabled={filteredDeals.length === 0 && !isBoardView}>
                         <span className="hidden sm:inline">{t('exportDeals') || 'Export to Excel'}</span>

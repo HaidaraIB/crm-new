@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_UNIT_FILTERS } from '../components/drawers/UnitsFilterDrawer';
 import { DEFAULT_PROJECT_FILTERS } from '../components/drawers/ProjectsFilterDrawer';
 import { DEFAULT_DEVELOPER_FILTERS } from '../components/drawers/DevelopersFilterDrawer';
@@ -257,13 +257,13 @@ export const PropertiesPage = () => {
     const [unitsPageSize, setUnitsPageSize] = useState(20);
 
     // Fetch data using React Query
-    const { data: developersResponse, isLoading: developersLoading } = useDevelopers(developersPageNumber, undefined, developersPageSize);
+    const { data: developersResponse, isLoading: developersLoading, isFetching: developersFetching, refetch: refetchDevelopers } = useDevelopers(developersPageNumber, undefined, developersPageSize);
     const developersRaw = developersResponse?.results || [];
     
     // Transform developers (already in correct format)
     const developers = developersRaw;
 
-    const { data: projectsResponse, isLoading: projectsLoading } = useProjects(projectsPageNumber, undefined, projectsPageSize);
+    const { data: projectsResponse, isLoading: projectsLoading, isFetching: projectsFetching, refetch: refetchProjects } = useProjects(projectsPageNumber, undefined, projectsPageSize);
     const projectsRaw = projectsResponse?.results || [];
     
     // Transform projects: convert developer from object/ID to string name, and normalize paymentMethod
@@ -290,7 +290,7 @@ export const PropertiesPage = () => {
         });
     }, [projectsRaw, developers]);
 
-    const { data: unitsResponse, isLoading: unitsLoading } = useUnits(unitFilters, unitsPageNumber, undefined, unitsPageSize);
+    const { data: unitsResponse, isLoading: unitsLoading, isFetching: unitsFetching, refetch: refetchUnits } = useUnits(unitFilters, unitsPageNumber, undefined, unitsPageSize);
     const unitsRaw = unitsResponse?.results || [];
     
     // Transform units: keep project name for display + projectId for filter matching
@@ -422,6 +422,20 @@ export const PropertiesPage = () => {
                         : activeTab === 'projects'
                           ? hasActiveFilters(projectFilters, DEFAULT_PROJECT_FILTERS)
                           : hasActiveFilters(developerFilters, DEFAULT_DEVELOPER_FILTERS)
+                }
+            />
+            <RefreshButton
+                onClick={() => {
+                    if (activeTab === 'units') void refetchUnits();
+                    else if (activeTab === 'projects') void refetchProjects();
+                    else void refetchDevelopers();
+                }}
+                loading={
+                    activeTab === 'units'
+                        ? unitsFetching && !unitsLoading
+                        : activeTab === 'projects'
+                          ? projectsFetching && !projectsLoading
+                          : developersFetching && !developersLoading
                 }
             />
             {isAdmin && (

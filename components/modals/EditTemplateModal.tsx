@@ -1,16 +1,16 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import {
+  MessagePlaceholderChips,
+  insertTextAtCaret,
+} from '../MessagePlaceholderChips';
 import type { MessageTemplateType, TemplateButtonPayload } from '../../services/api';
 import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTemplateAPI, resolveLocalizedApiError } from '../../services/api';
 import { SelectMediaModal } from './SelectMediaModal';
 import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
 import { clearFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
-import {
-  MESSAGE_PLACEHOLDER_CHIPS,
-  LEGACY_TEMPLATE_PLACEHOLDER_CHIPS,
-} from '../../utils/messagePlaceholders';
 
 const NAME_MAX = 200;
 const BODY_MAX = 1000;
@@ -20,8 +20,6 @@ const TEMPLATE_NAME_ENGLISH_REGEX = /^[a-zA-Z0-9_\s\-]+$/;
 const BUTTON_TEXT_MAX = 25;
 const PHONE_MAX = 20;
 const URL_MAX = 1000;
-
-const PLACEHOLDERS = [...MESSAGE_PLACEHOLDER_CHIPS, ...LEGACY_TEMPLATE_PLACEHOLDER_CHIPS];
 
 const LANGUAGE_OPTIONS = [
   { value: 'en', label: 'English', code: 'EN' },
@@ -118,6 +116,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const [showSelectMedia, setShowSelectMedia] = useState(false);
   const [headerMediaName, setHeaderMediaName] = useState<string | null>(null);
   const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
+  const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const isEdit = !!template?.id;
   const isWhatsApp = channelType === 'whatsapp_api';
@@ -230,8 +229,17 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   }, [template, isOpen, buildTemplatePayload]);
 
   const insertPlaceholder = (insert: string) => {
-    setContent((prev) => prev + insert);
+    const el = contentTextareaRef.current;
+    const { next, caret } = insertTextAtCaret(content, insert, el);
+    const capped = isWhatsApp ? next.slice(0, BODY_MAX) : next;
+    setContent(capped);
     clearFieldError(setErrors, 'content');
+    requestAnimationFrame(() => {
+      if (!el) return;
+      el.focus();
+      const pos = Math.min(caret, capped.length);
+      el.setSelectionRange(pos, pos);
+    });
   };
 
   const addButton = (type: TemplateButton['type']) => {
@@ -370,22 +378,15 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('messageContent')}</label>
-            <div className="flex flex-wrap gap-2 mb-2">
-              {PLACEHOLDERS.map((p) => {
-                const insert = language === 'ar' ? p.insertAr : p.insertEn;
-                return (
-                  <button
-                    key={p.key}
-                    type="button"
-                    onClick={() => insertPlaceholder(insert)}
-                    className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gray-600"
-                  >
-                    {t(p.key)}
-                  </button>
-                );
-              })}
-            </div>
+            <MessagePlaceholderChips
+              t={t}
+              language={language}
+              onInsert={insertPlaceholder}
+              includeLegacy
+              className="mb-2"
+            />
             <textarea
+              ref={contentTextareaRef}
               value={content}
               onChange={(e) => {
                 setContent(e.target.value);
@@ -511,23 +512,16 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
             {/* Body */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">* {t('templateBody') || t('messageContent')}</label>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {PLACEHOLDERS.map((p) => {
-                  const insert = language === 'ar' ? p.insertAr : p.insertEn;
-                  return (
-                    <button
-                      key={p.key}
-                      type="button"
-                      onClick={() => insertPlaceholder(insert)}
-                      className="px-3 py-1.5 rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm hover:bg-gray-200 dark:hover:bg-gray-600"
-                    >
-                      {t(p.key)}
-                    </button>
-                  );
-                })}
-                <span className="inline-flex items-center text-gray-400 dark:text-gray-500 text-sm" title={t('messageContent')}>&lt;/&gt;</span>
-              </div>
+              <MessagePlaceholderChips
+                t={t}
+                language={language}
+                onInsert={insertPlaceholder}
+                includeLegacy
+                showCodeHint
+                className="mb-2"
+              />
               <textarea
+                ref={contentTextareaRef}
                 value={content}
                 onChange={(e) => {
                   setContent(e.target.value.slice(0, BODY_MAX));

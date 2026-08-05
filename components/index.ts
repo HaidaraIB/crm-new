@@ -107,5 +107,6 @@ export * from './PaymentGatewaySelector';
 export * from './PaymentResultBanner';
 export * from './LeadContactPhone';
 export * from './LegalLinks';
+export * from './MessagePlaceholderChips';
 export * from './PlanEntitlementsSummary';
 export * from './kanban';

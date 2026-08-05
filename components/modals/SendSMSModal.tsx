@@ -30,7 +30,7 @@ type SendSMSModalProps = {
 };
 
 export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSent }: SendSMSModalProps) => {
-    const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { t, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -114,7 +114,7 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
         >
             <div className="space-y-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t('smsMessage')} → <PhoneText as="strong">{phoneNumber}</PhoneText>
+                    {t('smsMessage')} {language === 'ar' ? '←' : '→'} <PhoneText as="strong">{phoneNumber}</PhoneText>
                 </p>
                 <div>
                     {smsTemplates.length > 0 && (

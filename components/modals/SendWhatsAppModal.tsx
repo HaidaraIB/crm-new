@@ -28,7 +28,7 @@ type SendWhatsAppModalProps = {
 };
 
 export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSent }: SendWhatsAppModalProps) => {
-    const { t, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { t, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -137,7 +137,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
         >
             <div className="space-y-4">
                 <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {t('whatsappMessage') || 'WhatsApp message'} → <PhoneText as="strong">{phoneNumber}</PhoneText>
+                    {t('whatsappMessage') || 'WhatsApp message'} {language === 'ar' ? '←' : '→'} <PhoneText as="strong">{phoneNumber}</PhoneText>
                 </p>
                 {blockFreeText && (
                     <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded px-2 py-1.5">

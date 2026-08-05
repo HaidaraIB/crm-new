@@ -58,7 +58,7 @@ export const AlertModal = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={path} />
                         </svg>
                     </div>
-                    <div className="text-gray-700 dark:text-gray-300 text-base pt-0.5 flex-1">
+                    <div className="text-gray-700 dark:text-gray-300 text-base pt-0.5 flex-1 [unicode-bidi:plaintext]">
                         {alertMessage}
                     </div>
                 </div>

@@ -1,6 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Card, Button } from '../../components/index';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
+import {
+    MessagePlaceholderChips,
+    insertTextAtCaret,
+} from '../../components/MessagePlaceholderChips';
 import { useAppContext } from '../../context/AppContext';
 import {
     getTwilioSettingsAPI,
@@ -20,7 +24,7 @@ function isApprovedWhatsAppTemplate(tpl: MessageTemplateType): boolean {
 }
 
 export const NewLeadSmsSettings = () => {
-    const { t, setCurrentPage, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    const { t, language, setCurrentPage, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     const [enabled, setEnabled] = useState(false);
     const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
     const [waEnabled, setWaEnabled] = useState(false);
@@ -29,6 +33,7 @@ export const NewLeadSmsSettings = () => {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
+    const templateRef = useRef<HTMLTextAreaElement>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -122,6 +127,17 @@ export const NewLeadSmsSettings = () => {
         }
     };
 
+    const insertPlaceholder = (token: string) => {
+        const el = templateRef.current;
+        const { next, caret } = insertTextAtCaret(template, token, el);
+        handleTemplateChange(next);
+        requestAnimationFrame(() => {
+            if (!el) return;
+            el.focus();
+            el.setSelectionRange(caret, caret);
+        });
+    };
+
     const handleWaTemplateChange = (value: string) => {
         const id = value ? Number(value) : null;
         setWaTemplateId(Number.isFinite(id) ? id : null);
@@ -210,7 +226,17 @@ export const NewLeadSmsSettings = () => {
                         >
                             {t('newLeadSmsTemplate')}
                         </label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">
+                            {t('newLeadSmsPlaceholders')}
+                        </p>
+                        <MessagePlaceholderChips
+                            t={t}
+                            language={language}
+                            onInsert={insertPlaceholder}
+                            className="mb-2"
+                        />
                         <textarea
+                            ref={templateRef}
                             id="lead-sms-template"
                             rows={4}
                             value={template}
@@ -220,9 +246,6 @@ export const NewLeadSmsSettings = () => {
                         {errors.template && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.template}</p>
                         )}
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 whitespace-pre-line">
-                            {t('newLeadSmsPlaceholders')}
-                        </p>
                     </div>
                 </div>
 

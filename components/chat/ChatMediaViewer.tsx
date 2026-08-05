@@ -331,7 +331,7 @@ export const ChatMediaViewer: React.FC<Props> = ({ items, initialIndex, onClose,
             onClick={goPrev}
             aria-label={t('chatMediaPrevious')}
           >
-            <ArrowLeftIcon className="size-5 rtl:rotate-180" aria-hidden />
+            <ArrowLeftIcon className="size-5" aria-hidden />
           </button>
         ) : null}
         {canNext ? (
@@ -341,7 +341,7 @@ export const ChatMediaViewer: React.FC<Props> = ({ items, initialIndex, onClose,
             onClick={goNext}
             aria-label={t('chatMediaNext')}
           >
-            <ArrowLeftIcon className="size-5 rotate-180 rtl:rotate-0" aria-hidden />
+            <ArrowLeftIcon className="size-5 rotate-180" aria-hidden />
           </button>
         ) : null}
 

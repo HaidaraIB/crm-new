@@ -165,6 +165,10 @@ export function getApiErrorDetails(errorData: unknown): unknown {
  * User-facing string from a caught API error (never returns a raw object).
  * Supports legacy `error_key`, unified `error.code`, and Meta `error.details.error.message`.
  */
+/**
+ * Prefer translated business `code` / `error_key`, then API message.
+ * When Meta returns `error_user_msg` in details, append it after the localized base.
+ */
 export function resolveLocalizedApiError(
   e: { data?: unknown; message?: string; code?: string } | null | undefined,
   t?: (key: any) => string,
@@ -176,17 +180,22 @@ export function resolveLocalizedApiError(
       ? String((data as Record<string, unknown>).error_key)
       : undefined;
   const code = legacyKey || getApiErrorCode(data) || e?.code;
-  if (t && code) {
-    const translated = t(code);
-    if (translated && translated !== code) return translated;
-  }
   const details = getApiErrorDetails(data);
   let metaMsg = '';
   if (details && typeof details === 'object' && details !== null) {
     const nested = (details as Record<string, unknown>).error;
     if (nested && typeof nested === 'object' && nested !== null) {
       const m = (nested as Record<string, unknown>).error_user_msg ?? (nested as Record<string, unknown>).message;
-      if (m != null) metaMsg = String(m);
+      if (m != null) metaMsg = String(m).trim();
+    }
+  }
+  if (t && code) {
+    const translated = t(code);
+    if (translated && translated !== code) {
+      if (metaMsg && !translated.includes(metaMsg)) {
+        return `${translated} (${metaMsg})`;
+      }
+      return translated;
     }
   }
   const base =

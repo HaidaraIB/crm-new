@@ -466,6 +466,57 @@ export const DashboardPage = () => {
         itemStyle: tooltipItemStyle,
     } = getRechartsTooltipStyles(isDark);
 
+    // Recharts string labels inherit each slice fill — same-color text on the arc disappears.
+    // Use an explicit theme fill + outline, and skip tiny slices that collide.
+    const renderStagesPercentLabel = useCallback(
+        ({
+            cx,
+            cy,
+            midAngle,
+            outerRadius,
+            percent,
+        }: {
+            cx?: number;
+            cy?: number;
+            midAngle?: number;
+            outerRadius?: number;
+            percent?: number;
+        }) => {
+            if (
+                cx == null ||
+                cy == null ||
+                midAngle == null ||
+                outerRadius == null ||
+                percent == null ||
+                percent < 0.04
+            ) {
+                return null;
+            }
+            const RADIAN = Math.PI / 180;
+            const radius = outerRadius + 14;
+            const x = cx + radius * Math.cos(-midAngle * RADIAN);
+            const y = cy + radius * Math.sin(-midAngle * RADIAN);
+            return (
+                <text
+                    x={x}
+                    y={y}
+                    fill={isDark ? '#f3f4f6' : '#374151'}
+                    stroke={isDark ? '#111827' : '#ffffff'}
+                    strokeWidth={3}
+                    paintOrder="stroke"
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={11}
+                    fontWeight={600}
+                    style={{ pointerEvents: 'none' }}
+                >
+                    {`${Math.round(percent * 100)}%`}
+                </text>
+            );
+        },
+        [isDark],
+    );
+
     const showTeamGoalsSidebar = isAdmin || normalizeRole(currentUser?.role) === 'Supervisor';
 
     const dashboardMenuAriaLabel = t('actions');
@@ -821,26 +872,26 @@ export const DashboardPage = () => {
                     </div>
                     {stagesReportData.length > 0 ? (
                         <div className="space-y-4">
-                          <div className="h-[240px] min-h-[240px] w-full">
+                          <div className="h-[260px] min-h-[260px] w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                              <PieChart>
+                              <PieChart margin={{ top: 16, right: 16, bottom: 16, left: 16 }}>
                                 <Pie 
                                   data={stagesReportData} 
                                   dataKey="value" 
                                   nameKey="name" 
                                   cx="50%" 
                                   cy="50%" 
-                                  outerRadius={80}
+                                  outerRadius={72}
                                   innerRadius={40}
                                   paddingAngle={2}
-                                  label={({ percent }) => `${((percent ?? 0) * 100).toFixed(0)}%`}
+                                  label={renderStagesPercentLabel}
                                   labelLine={false}
                                 >
                                   {stagesReportData.map((entry, index) => (
                                       <Cell 
                                           key={`cell-${index}`} 
                                           fill={entry.fill}
-                                          stroke="#fff"
+                                          stroke={isDark ? '#111827' : '#ffffff'}
                                           strokeWidth={2}
                                       />
                                   ))}

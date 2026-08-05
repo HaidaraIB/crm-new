@@ -560,7 +560,7 @@ export interface ImportLeadsModalProps {
 }
 
 export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModalProps) => {
-  const { t, currentUser } = useAppContext();
+  const { t, language, currentUser } = useAppContext();
   const queryClient = useQueryClient();
   const [step, setStep] = useState<ImportStep>('upload');
   const [file, setFile] = useState<File | null>(null);
@@ -999,7 +999,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
               <div className="md:col-span-2 space-y-3">
                 <div className="grid grid-cols-[1fr,1fr] gap-x-4 gap-y-2 items-center text-sm">
                   <h4 className="font-semibold text-gray-700 dark:text-gray-300 col-span-2">
-                    {t('importLeadsColumnNames') || 'Column names'} → {t('importLeadsCustomFields') || 'System field'}
+                    {t('importLeadsColumnNames') || 'Column names'} {language === 'ar' ? '←' : '→'} {t('importLeadsCustomFields') || 'System field'}
                   </h4>
                   {headers.map((header) => {
                     const currentValue = columnMapping[header] ?? '';

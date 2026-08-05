@@ -35,7 +35,7 @@ export const SuccessModal = () => {
                         </svg>
                     </div>
                 </div>
-                <p className="text-center text-gray-700 dark:text-gray-300 text-base">
+                <p className="text-center text-gray-700 dark:text-gray-300 text-base [unicode-bidi:plaintext]">
                     {successMessage}
                 </p>
                 <div className="flex justify-center pt-2">

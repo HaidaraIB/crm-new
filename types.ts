@@ -4,7 +4,7 @@ export type Theme = 'light' | 'dark';
 export type Page = 
   | 'Dashboard' | 'Leads' | 'Activities' | 'Inventory' | 'Deals' 
   | 'Users' | 'Employees' | 'Marketing'   | 'Todos' | 'Team Chat' | 'Reports' | 'Integrations' 
-  | 'Billing' | 'Settings' | 'ViewLead' | 'CreateDeal' | 'EditDeal' | 'CreateLead' | 'EditLead' | 'Profile'
+  | 'Billing' | 'Settings' | 'Library' | 'ViewLead' | 'CreateDeal' | 'EditDeal' | 'CreateLead' | 'EditLead' | 'Profile'
   // Sub-pages
   | 'All Leads' | 'Fresh Leads' | 'Hot Leads' | 'Cold Leads' | 'My Leads' | 'Rotated Leads'
   | 'Properties' | 'Owners'

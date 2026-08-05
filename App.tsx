@@ -8,7 +8,7 @@ import { useWhatsAppAwayNotifications } from './hooks/useWhatsAppAwayNotificatio
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddLeadModal, EditLeadModal, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage } from './pages';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage } from './pages';
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
@@ -118,6 +118,8 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <SupportCenterPage />;
         case 'Settings':
             return <SettingsPage />;
+        case 'Library':
+            return <LibraryPage />;
         case 'Profile':
             return <ProfilePage />;
         default:
@@ -413,6 +415,7 @@ const TheApp = () => {
                 'support-center': 'Support Center',
                 'support': 'Support Center',
                 'settings': 'Settings',
+                'library': 'Library',
                 'profile': 'Profile',
             };
 
@@ -697,6 +700,7 @@ const TheApp = () => {
             'support-center': 'Support Center',
             'support': 'Support Center',
             'settings': 'Settings',
+            'library': 'Library',
             'profile': 'Profile',
         };
         

@@ -324,6 +324,10 @@ export const Sidebar = () => {
                     if (item.name === 'Reports' && normalizedCurrentRole !== 'Owner') {
                         return false;
                     }
+                    // Library management is owner-only
+                    if (item.name === 'Library' && normalizedCurrentRole !== 'Owner') {
+                        return false;
+                    }
                     // Hide Employees item for employee role
                     if (item.name === 'Employees' && (normalizedCurrentRole === 'Employee' || normalizedCurrentRole === 'Doctor')) {
                         return false;

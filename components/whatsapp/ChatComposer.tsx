@@ -6,9 +6,9 @@ import { ChatVoiceRecordingBar } from '../chat/ChatVoiceRecordingBar';
 import { useChatVoiceRecorder } from '../../hooks/useChatVoiceRecorder';
 import { useAppContext } from '../../context/AppContext';
 import { translations } from '../../constants';
+import { AttachmentSourceModal } from '../modals/AttachmentSourceModal';
 import { WA_ALERT_ERROR, WA_ALERT_INFO, WA_ALERT_WARN, WA_COMPOSER_BG, WA_INPUT_SHELL, WA_SEND_BTN } from './whatsappChatTheme';
 import type { MessageTemplateType } from '../../services/api';
-
 export type SessionInfo = {
   in_session: boolean;
   hours_remaining?: number | null;
@@ -91,6 +91,7 @@ export const ChatComposer: React.FC<Props> = ({
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [micError, setMicError] = useState<string | null>(null);
+  const [attachSourceOpen, setAttachSourceOpen] = useState(false);
   const freeTextDisabled = whatsappSendBlocked || blockFreeText;
   const [showTemplates, setShowTemplates] = useState(false);
   const isRtl = language === 'ar';
@@ -290,7 +291,7 @@ export const ChatComposer: React.FC<Props> = ({
                 type="button"
                 className="flex size-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/10"
                 disabled={freeTextDisabled || compressingAttachment}
-                onClick={() => fileInputRef.current?.click()}
+                onClick={() => setAttachSourceOpen(true)}
                 aria-label={t('teamChatAttach')}
                 title={t('teamChatAttach')}
               >
@@ -353,6 +354,16 @@ export const ChatComposer: React.FC<Props> = ({
           </Button>
         )}
       </div>
+      <AttachmentSourceModal
+        isOpen={attachSourceOpen}
+        onClose={() => setAttachSourceOpen(false)}
+        onPickDevice={() => fileInputRef.current?.click()}
+        onPickLibraryFile={(file) => {
+          setPendingAttachment(file);
+          setPendingIsVoiceNote?.(false);
+        }}
+        t={t}
+      />
     </div>
   );
 };

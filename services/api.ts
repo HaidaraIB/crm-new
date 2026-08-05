@@ -2209,6 +2209,15 @@ export type DashboardSummary = {
     notes: string;
     stage: string;
   }>;
+  overview?: {
+    total: number;
+    fresh: number;
+    cold: number;
+    untouched: number;
+    touched: number;
+    following: number;
+  };
+  lite?: boolean;
   days: number;
   source: string;
 };
@@ -5485,5 +5494,86 @@ export async function deleteAllNotificationsAPI(params?: { type?: string | strin
   return apiRequest<{ count?: number }>(`/notifications/delete_all/${q ? `?${q}` : ''}`, {
     method: 'DELETE',
   });
+}
+
+// --- Company file library ---
+
+export type CompanyLibraryFile = {
+  id: number;
+  original_filename: string;
+  mime_type: string;
+  size_bytes: number;
+  kind: 'image' | 'video' | 'audio' | 'document' | string;
+  uploaded_by: number | null;
+  uploaded_by_name: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CompanyLibraryQuota = {
+  used_bytes: number;
+  max_storage_bytes: number | null;
+  max_file_size_bytes: number | null;
+  remaining_bytes: number | null;
+  file_count: number;
+};
+
+export type CompanyLibraryListResponse = {
+  results: CompanyLibraryFile[];
+  count?: number;
+  next?: string | null;
+  previous?: string | null;
+  quota: CompanyLibraryQuota;
+};
+
+export async function listCompanyLibraryAPI(params?: { page?: number; search?: string; page_size?: number }) {
+  const search = new URLSearchParams();
+  if (params?.page != null) search.set('page', String(params.page));
+  if (params?.search) search.set('search', params.search);
+  search.set('page_size', String(params?.page_size ?? 200));
+  const q = search.toString();
+  return apiRequest<CompanyLibraryListResponse>(`/company-library/?${q}`);
+}
+
+export async function getCompanyLibraryQuotaAPI() {
+  return apiRequest<CompanyLibraryQuota>(`/company-library/quota/`);
+}
+
+export async function uploadCompanyLibraryFileAPI(file: File) {
+  const form = new FormData();
+  form.append('file', file);
+  return apiRequest<{ file: CompanyLibraryFile; quota: CompanyLibraryQuota }>(`/company-library/`, {
+    method: 'POST',
+    body: form,
+  });
+}
+
+export async function renameCompanyLibraryFileAPI(id: number, originalFilename: string) {
+  return apiRequest<CompanyLibraryFile>(`/company-library/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ original_filename: originalFilename }),
+  });
+}
+
+export async function deleteCompanyLibraryFileAPI(id: number) {
+  return apiRequest<{ quota: CompanyLibraryQuota }>(`/company-library/${id}/`, {
+    method: 'DELETE',
+  });
+}
+
+export function getCompanyLibraryDownloadUrl(id: number): string {
+  return `${BASE_URL}/company-library/${id}/download/`;
+}
+
+/** Download a library file as a browser File (for attaching in chats). */
+export async function downloadCompanyLibraryAsFileAPI(id: number, filename: string): Promise<File> {
+  const url = getCompanyLibraryDownloadUrl(id);
+  const response = await fetch(url, { headers: getAuthenticatedBinaryRequestHeaders() });
+  if (!response.ok) {
+    throw new Error(`library_download_failed_${response.status}`);
+  }
+  const blob = await response.blob();
+  const mime = blob.type || 'application/octet-stream';
+  return new File([blob], filename || 'file', { type: mime });
 }
 

@@ -23,8 +23,8 @@ import {
 } from '../components/chat/chatMediaAlbum';
 import { ChatPendingAttachmentChip } from '../components/chat/ChatPendingAttachmentChip';
 import { ChatVoiceRecordingBar } from '../components/chat/ChatVoiceRecordingBar';
-import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
-import {
+import { AttachmentSourceModal } from '../components/modals/AttachmentSourceModal';
+import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';import {
   getTenantChatConversationsAPI,
   getTenantChatEligibleUsersAPI,
   getTenantChatMessagesAPI,
@@ -320,6 +320,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
   const [compressingAttachment, setCompressingAttachment] = useState(false);
   const [micError, setMicError] = useState<string | null>(null);
+  const [attachSourceOpen, setAttachSourceOpen] = useState(false);
   /** True after a short quiet period while draft has text (typing indicator for peer). */
   const [draftTypingSignal, setDraftTypingSignal] = useState(false);
   const [mediaViewer, setMediaViewer] = useState<{
@@ -1763,7 +1764,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                           type="button"
                           className="flex size-10 shrink-0 items-center justify-center rounded-full text-gray-600 transition-colors hover:bg-gray-100 disabled:pointer-events-none disabled:opacity-40 dark:text-gray-300 dark:hover:bg-gray-700/80"
                           disabled={sendMutation.isPending || compressingAttachment}
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => setAttachSourceOpen(true)}
                           aria-label={t('teamChatAttach')}
                           title={t('teamChatAttach')}
                         >
@@ -2002,6 +2003,13 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
           <p className="mt-2 text-sm text-red-600 dark:text-red-400">{t('teamChatCouldNotSend')}</p>
         ) : null}
       </Modal>
+      <AttachmentSourceModal
+        isOpen={attachSourceOpen}
+        onClose={() => setAttachSourceOpen(false)}
+        onPickDevice={() => fileInputRef.current?.click()}
+        onPickLibraryFile={(file) => setPendingAttachment(file)}
+        t={t}
+      />
       {mediaViewer && mediaViewer.items.length > 0 ? (
         <ChatMediaViewer
           items={mediaViewer.items}

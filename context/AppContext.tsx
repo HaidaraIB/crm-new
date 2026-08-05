@@ -1243,7 +1243,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       }
     }
     if (role !== 'Supervisor') {
-      // Employee: allow Dashboard, Leads (all), Activities, Deals(?), Todos(?), Inventory (depends), etc. - keep existing sidebar logic
+      // Employee / Doctor: allow most pages; Library is owner-managed only.
+      if (page === 'Library') return false;
       return true;
     }
     // Supervisor: allow only by permission
@@ -1296,6 +1297,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         return p('can_manage_real_estate') || p('can_manage_products') || p('can_manage_services');
       case 'Settings':
         return p('can_manage_settings');
+      case 'Library':
+        return false;
       case 'Marketing':
       case 'Campaigns':
       case 'Integrations':

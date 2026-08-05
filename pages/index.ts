@@ -33,6 +33,7 @@ export * from './ChatsPage';
 export * from './CallsPage';
 export * from './CallReportsPage';
 export * from './SettingsPage';
+export * from './LibraryPage';
 export * from './SupportCenterPage';
 export * from './TeamChatPage';
 export * from './ProfilePage';

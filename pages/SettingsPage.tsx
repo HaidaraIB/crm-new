@@ -60,9 +60,10 @@ export const SettingsPage = () => {
     );
 
     const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
-        const savedTab = localStorage.getItem('settingsActiveTab') as SettingsTab;
-        return savedTab && ALL_SETTINGS_TAB_IDS.includes(savedTab)
-            ? savedTab
+        const savedTab = localStorage.getItem('settingsActiveTab');
+        if (savedTab === 'Library') return 'Channels';
+        return savedTab && ALL_SETTINGS_TAB_IDS.includes(savedTab as SettingsTab)
+            ? (savedTab as SettingsTab)
             : 'Channels';
     });
 

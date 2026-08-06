@@ -13,7 +13,13 @@ const WHATSAPP_BODY_PLACEHOLDER_KEYS: Record<string, keyof typeof translations.e
   '[location message]': 'whatsappMediaLocationPlaceholder',
   '[contacts message]': 'whatsappMediaContactsPlaceholder',
   '[interactive message]': 'whatsappMediaInteractivePlaceholder',
+  '[call permission request]': 'whatsappCallPermissionRequestLabel',
+  '[call permission accepted]': 'whatsappCallPermissionAcceptedLabel',
+  '[call permission rejected]': 'whatsappCallPermissionRejectedLabel',
+  '[call permission reply]': 'whatsappCallPermissionReplyLabel',
   '[button message]': 'whatsappMediaButtonPlaceholder',
+  '[button reply]': 'whatsappMediaButtonPlaceholder',
+  '[list reply]': 'whatsappMediaInteractivePlaceholder',
   '[reaction]': 'whatsappMediaReactionPlaceholder',
 };
 

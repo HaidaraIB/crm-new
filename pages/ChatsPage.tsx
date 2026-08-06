@@ -18,6 +18,7 @@ import {
   deleteWhatsAppConversationAPI,
   deleteWhatsAppMessageAPI,
   getMessageTemplatesAPI,
+  getWhatsAppCallsAPI,
   getWhatsAppContactByPhoneAPI,
   getWhatsAppSessionWindowAPI,
   resolveLocalizedApiError,
@@ -26,6 +27,7 @@ import {
   sendWhatsAppMessageAPI,
   sendWhatsAppTemplateAPI,
   type MessageTemplateType,
+  type WhatsAppCallRecord,
 } from '../services/api';
 import { compressImageForChat } from '../utils/compressImageForChat';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -215,6 +217,43 @@ export const ChatsPage: React.FC = () => {
     enabled: !!selectedChatClient,
     refetchInterval: selectedChatClient ? 5000 : false,
   });
+
+  const { data: threadCallsData, refetch: refetchThreadCalls } = useQuery({
+    queryKey: ['whatsappCalls', 'thread', selectedChatLeadId, selectedChatPhone],
+    queryFn: async () => {
+      if (typeof selectedChatLeadId === 'number') {
+        return getWhatsAppCallsAPI({
+          client: selectedChatLeadId,
+          ordering: 'started_at',
+          limit: 100,
+        });
+      }
+      const phone = selectedChatPhone.replace(/\D/g, '');
+      if (phone.length < 7) return { count: 0, results: [] as WhatsAppCallRecord[] };
+      return getWhatsAppCallsAPI({
+        search: phone,
+        ordering: 'started_at',
+        limit: 100,
+      });
+    },
+    enabled:
+      !!selectedChatClient &&
+      (typeof selectedChatLeadId === 'number' ||
+        (!!selectedChatPhone && selectedChatPhone.replace(/\D/g, '').length >= 7)),
+    refetchInterval: selectedChatClient ? 5000 : false,
+  });
+
+  const threadCalls = useMemo(() => {
+    const rows = threadCallsData?.results || [];
+    // For phone-only search, keep rows that match this peer closely.
+    if (typeof selectedChatLeadId === 'number') return rows;
+    const phone = selectedChatPhone.replace(/\D/g, '');
+    if (!phone) return rows;
+    return rows.filter((c) => {
+      const peer = String(c.peer_phone || '').replace(/\D/g, '');
+      return peer === phone || peer.endsWith(phone.slice(-10)) || phone.endsWith(peer.slice(-10));
+    });
+  }, [threadCallsData, selectedChatLeadId, selectedChatPhone]);
 
   const { data: waSessionApi, refetch: refetchWaSession } = useQuery({
     queryKey: ['whatsappSession', selectedChatLeadId, selectedChatPhone],
@@ -1045,11 +1084,13 @@ export const ChatsPage: React.FC = () => {
           onStartNew={() => setIsStartNewOpen(true)}
           onDeleteConversation={handleDeleteConversation}
           messages={threadMessages}
+          threadCalls={threadCalls}
           newMessagesBeforeApiId={newMessagesBeforeApiId}
           isFetchingMessages={isFetchingChatMessages}
           onRefreshMessages={() => {
             void refetchLeadWhatsApp();
             void refetchWaSession();
+            void refetchThreadCalls();
           }}
           onWhatsAppCall={() => {
             if (!selectedChatClient || !whatsappCalling) return;

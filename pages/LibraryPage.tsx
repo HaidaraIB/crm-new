@@ -259,6 +259,9 @@ export const LibraryPage = () => {
                   <th className="min-w-[100px] px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                     {t('preview') || 'Preview'}
                   </th>
+                  <th className="min-w-[180px] px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
+                    {t('libraryFileName') || 'Name'}
+                  </th>
                   <th className="min-w-[120px] px-6 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300">
                     {t('libraryFileType') || 'Type'}
                   </th>
@@ -281,6 +284,11 @@ export const LibraryPage = () => {
                   >
                     <td className="whitespace-nowrap px-6 py-4 text-center">
                       {renderPreviewCell(file)}
+                    </td>
+                    <td className="max-w-[240px] px-6 py-4 text-center text-sm font-medium text-gray-900 dark:text-gray-100">
+                      <span className="block truncate" title={file.original_filename}>
+                        {file.original_filename}
+                      </span>
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-center text-sm text-gray-700 dark:text-gray-300">
                       {kindLabel(file.kind, t)}

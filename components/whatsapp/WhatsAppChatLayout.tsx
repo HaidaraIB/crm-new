@@ -2,6 +2,7 @@ import React from 'react';
 import { ConversationList, type ConversationRow } from './ConversationList';
 import { ChatThread } from './ChatThread';
 import type { ChatBubbleMessage } from './ChatMessageBubble';
+import type { ChatThreadCall } from './ChatCallBubble';
 import type { SessionInfo } from './ChatComposer';
 import type { MessageTemplateType } from '../../services/api';
 import { translations } from '../../constants';
@@ -15,6 +16,7 @@ type Props = {
   onStartNew: () => void;
   onDeleteConversation?: (client: any) => void;
   messages: ChatBubbleMessage[];
+  threadCalls?: ChatThreadCall[];
   newMessagesBeforeApiId?: number | null;
   isFetchingMessages?: boolean;
   onRefreshMessages?: () => void;
@@ -46,6 +48,7 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         language={props.language}
         selectedClient={props.selectedClient}
         messages={props.messages}
+        threadCalls={props.threadCalls}
         newMessagesBeforeApiId={props.newMessagesBeforeApiId}
         isFetching={props.isFetchingMessages}
         onRefresh={props.onRefreshMessages}
@@ -63,4 +66,4 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
   );
 };
 
-export type { ConversationRow, ChatBubbleMessage, SessionInfo, MessageTemplateType };
+export type { ConversationRow, ChatBubbleMessage, SessionInfo, MessageTemplateType, ChatThreadCall };

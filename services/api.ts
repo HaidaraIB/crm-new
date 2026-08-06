@@ -4647,7 +4647,9 @@ export const getLeadApiConfigAPI = async () => {
 };
 
 /** Mujeb mini app: endpoint URL and shared Lead API keys. GET /integrations/accounts/mujeb-config/ */
-export type MujebConfig = LeadApiConfig;
+export type MujebConfig = LeadApiConfig & {
+  check_endpoint_url?: string;
+};
 
 export const getMujebConfigAPI = async () => {
   return apiRequest<MujebConfig>('/integrations/accounts/mujeb-config/');

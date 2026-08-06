@@ -1222,6 +1222,7 @@ export const IntegrationsPage = () => {
 
     if (currentPage === 'Mujeb') {
         const endpointUrl = mujebConfig?.endpoint_url || '';
+        const checkEndpointUrl = mujebConfig?.check_endpoint_url || '';
         const statusRaw = String(mujebConfig?.integration_status || 'disconnected');
         const mujebPolicy = integrationPolicyMap?.mujeb;
         const mujebDisabled = mujebPolicy?.enabled === false;
@@ -1321,6 +1322,28 @@ export const IntegrationsPage = () => {
                             <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
                         ) : (
                             <>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        {t('mujebCheckEndpoint')}
+                                    </label>
+                                    <p className="mb-2 text-xs text-gray-500 dark:text-gray-400">
+                                        {t('mujebCheckEndpointHint')}
+                                    </p>
+                                    <div className="flex gap-2">
+                                        <input
+                                            readOnly
+                                            value={checkEndpointUrl}
+                                            className="flex-1 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm font-mono"
+                                        />
+                                        <Button
+                                            variant="secondary"
+                                            disabled={mujebDisabled}
+                                            onClick={() => { if (checkEndpointUrl) navigator.clipboard.writeText(checkEndpointUrl); showAlert(t('copied') || 'Copied', 'info'); }}
+                                        >
+                                            {t('copy')}
+                                        </Button>
+                                    </div>
+                                </div>
                                 <div>
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                                         {t('mujebEndpoint')}

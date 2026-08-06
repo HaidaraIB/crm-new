@@ -7,6 +7,7 @@ import {
   getWhatsAppContactTitle,
 } from '../../utils/whatsappContactDisplay';
 import { ChatMessageBubble, type ChatBubbleMessage } from './ChatMessageBubble';
+import { ChatCallBubble, type ChatThreadCall } from './ChatCallBubble';
 import { ChatStatusSeparator } from './ChatStatusSeparator';
 import { ChatComposer, type SessionInfo } from './ChatComposer';
 import {
@@ -18,12 +19,14 @@ import {
 import type { MessageTemplateType } from '../../services/api';
 import { translations } from '../../constants';
 import { buildWhatsAppThreadItems } from '../../utils/whatsappThreadItems';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
 
 type Props = {
   t: (key: keyof typeof translations.en) => string;
   language: string;
   selectedClient: any | null;
   messages: ChatBubbleMessage[];
+  threadCalls?: ChatThreadCall[];
   /** First unread inbound api id — inserts “New Messages” divider before it. */
   newMessagesBeforeApiId?: number | null;
   isFetching?: boolean;
@@ -45,6 +48,7 @@ export const ChatThread: React.FC<Props> = ({
   language,
   selectedClient,
   messages,
+  threadCalls = [],
   newMessagesBeforeApiId = null,
   isFetching,
   onRefresh,
@@ -70,8 +74,9 @@ export const ChatThread: React.FC<Props> = ({
         language,
         t: t as (key: string) => string,
         newMessagesBeforeApiId,
+        calls: threadCalls,
       }),
-    [messages, language, t, newMessagesBeforeApiId]
+    [messages, threadCalls, language, t, newMessagesBeforeApiId]
   );
 
   useEffect(() => {
@@ -178,6 +183,23 @@ export const ChatThread: React.FC<Props> = ({
                 >
                   <ChatStatusSeparator variant={item.variant} label={item.label} />
                 </div>
+              );
+            }
+            if (item.kind === 'call') {
+              const timeLabel = item.createdAt
+                ? new Date(item.createdAt).toLocaleTimeString(
+                    language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+                    withLatinDigits({ hour: '2-digit', minute: '2-digit' })
+                  )
+                : '';
+              return (
+                <ChatCallBubble
+                  key={item.id}
+                  call={item.call}
+                  t={t}
+                  timeLabel={timeLabel}
+                  onCallback={onWhatsAppCall}
+                />
               );
             }
             return (

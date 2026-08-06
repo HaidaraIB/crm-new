@@ -52,7 +52,6 @@ export const LeadsPage = () => {
         currentPage,
         setCurrentPage, 
         setSelectedLead, 
-        setIsAddLeadModalOpen, 
         setIsAddActionModalOpen, 
         setIsAssignLeadModalOpen, 
         setIsFilterDrawerOpen,
@@ -907,7 +906,11 @@ export const LeadsPage = () => {
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-center">
                                                     {(() => {
                                                         const priority = lead.priority?.toLowerCase() || '';
+                                                        const urgent = Boolean(
+                                                            (lead as any).isUrgent ?? (lead as any).is_urgent
+                                                        );
                                                         return (
+                                                            <div className="inline-flex flex-wrap items-center justify-center gap-1">
                                                             <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${
                                                                 priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
                                                                 priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
@@ -918,6 +921,12 @@ export const LeadsPage = () => {
                                                                  priority === 'low' ? t('low') : 
                                                                  lead.priority || '-'}
                                                             </span>
+                                                            {urgent ? (
+                                                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                                                                    {t('urgent')}
+                                                                </span>
+                                                            ) : null}
+                                                            </div>
                                                         );
                                                     })()}
                                                 </td>

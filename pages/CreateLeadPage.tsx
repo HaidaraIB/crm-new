@@ -12,6 +12,7 @@ import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '..
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { buildLeadLocationApiBody } from '../utils/leadLocation';
 import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
+import { LeadUrgentToggle } from '../components/LeadUrgentToggle';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -30,7 +31,7 @@ const Select = ({ id, children, value, onChange, className, language }: { id: st
 };
 
 export const CreateLeadPage = () => {
-    const { t, setCurrentPage, currentUser } = useAppContext();
+    const { t, setCurrentPage, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const isDataEntryUser = isDataEntryOnlyRole(currentUser?.role);
     const postCreateNavigateToAllLeads =
         isDataEntryUser || normalizeRole(currentUser?.role) === 'Reception';
@@ -88,6 +89,7 @@ export const CreateLeadPage = () => {
         type: 'fresh' as 'fresh' | 'hot' | 'cold' | '',
         communicationWay: '',
         priority: 'medium' as 'low' | 'medium' | 'high' | '',
+        isUrgent: false,
         status: '',
         leadCompanyName: '',
         profession: '',
@@ -301,6 +303,7 @@ export const CreateLeadPage = () => {
                 type: typeValue,
                 communication_way: channelId,
                 priority: priorityValue,
+                is_urgent: Boolean(formState.isUrgent),
                 status: statusId,
                 company: currentUser?.company?.id || null,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
@@ -320,7 +323,14 @@ export const CreateLeadPage = () => {
                 leadData.phone_number = primaryPhone;
             }
             
-            await createLeadMutation.mutateAsync(leadData);
+            const created = await createLeadMutation.mutateAsync(leadData);
+            const urgentWarning =
+                created?.urgent_assignment_warning ||
+                (created?.data && created.data.urgent_assignment_warning);
+            if (urgentWarning) {
+                setSuccessMessage(t('urgentAssignmentFallback'));
+                setIsSuccessModalOpen(true);
+            }
             if (postCreateNavigateToAllLeads && currentUser?.company) {
                 const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads');
                 window.history.pushState({}, '', route);
@@ -363,7 +373,19 @@ export const CreateLeadPage = () => {
         >
             <form onSubmit={handleSubmit}>
                 <Card>
-                    <h3 className="text-lg font-semibold mb-6 border-b pb-3 dark:border-gray-700">{t('leadInformation') || 'Lead Information'}</h3>
+                    <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b pb-3 dark:border-gray-700">
+                        <h3 className="text-lg font-semibold">
+                            {t('leadInformation') || 'Lead Information'}
+                        </h3>
+                        <LeadUrgentToggle
+                            enabled={formState.isUrgent}
+                            setEnabled={(enabled) =>
+                                setFormState((prev) => ({ ...prev, isUrgent: enabled }))
+                            }
+                            candidateUsers={userOptions}
+                            companyTimeZone={companyTz}
+                        />
+                    </div>
                     {(errors.general || Object.keys(errors).filter(key => key !== 'general').length > 0) && (
                         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                             {errors.general && (
@@ -416,7 +438,7 @@ export const CreateLeadPage = () => {
                             />
                         </div>
                         {isMedicalCompany && (
-                            <div>
+                            <div className="md:col-span-2 lg:col-span-2">
                                 <Label htmlFor="residence">{t('residence')}</Label>
                                 <Input
                                     id="residence"

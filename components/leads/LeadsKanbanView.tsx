@@ -64,6 +64,7 @@ const toLeadCard = (
         }),
         type: normalized.type || '',
         priority: normalized.priority || '',
+        isUrgent: Boolean(normalized.isUrgent ?? normalized.is_urgent),
         assignedTo: normalized.assigned_to ?? normalized.assignedTo ?? 0,
         assigned_to: normalized.assigned_to,
         assigned_to_username: normalized.assigned_to_username,

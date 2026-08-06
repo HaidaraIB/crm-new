@@ -12,6 +12,7 @@ import { normalizeRoleForApi } from '../../utils/roles';
 import { validateEmailField, validatePhoneField, validatePasswordField, validateNameField } from '../../utils/formValidation';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { toHtmlTimeValue } from '../../utils/weekOff';
 
 const EDIT_USER_DOM_ID_MAP: Record<string, string> = {
     name: 'edit-user-name',
@@ -82,6 +83,10 @@ export const EditUserModal = () => {
         }
         if (roleToSend === 'employee' || roleToSend === 'doctor') {
             payload.can_delete_clients = state.canDeleteClients;
+            const start = state.workStartTime.trim();
+            const end = state.workEndTime.trim();
+            payload.work_start_time = start || null;
+            payload.work_end_time = end || null;
         }
 
         return payload;
@@ -94,6 +99,8 @@ export const EditUserModal = () => {
         password: '',
         role: 'employee' as string,
         weeklyDayOff: '' as string,
+        workStartTime: '' as string,
+        workEndTime: '' as string,
         canDeleteClients: false,
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -135,6 +142,8 @@ export const EditUserModal = () => {
                 : selectedUser.name || '';
             
             const wdo = (selectedUser as { weekly_day_off?: number | null }).weekly_day_off;
+            const workStart = toHtmlTimeValue(selectedUser.work_start_time);
+            const workEnd = toHtmlTimeValue(selectedUser.work_end_time);
             setFormState({
                 name: fullName,
                 phone: selectedUser.phone || '',
@@ -143,6 +152,8 @@ export const EditUserModal = () => {
                 role: roleForForm,
                 weeklyDayOff:
                     wdo !== undefined && wdo !== null ? String(wdo) : '',
+                workStartTime: workStart,
+                workEndTime: workEnd,
                 canDeleteClients: Boolean(selectedUser.can_delete_clients),
             });
             initialPayloadRef.current = buildPayload({
@@ -153,6 +164,8 @@ export const EditUserModal = () => {
                 role: roleForForm,
                 weeklyDayOff:
                     wdo !== undefined && wdo !== null ? String(wdo) : '',
+                workStartTime: workStart,
+                workEndTime: workEnd,
                 canDeleteClients: Boolean(selectedUser.can_delete_clients),
             }, selectedUser);
             setPasswordVisible(false);
@@ -176,6 +189,19 @@ export const EditUserModal = () => {
         // Password is optional on edit - only validate if provided
         const passwordError = validatePasswordField(formState.password, t, { required: false });
         if (passwordError) newErrors.password = passwordError;
+
+        if (formState.role === 'employee' || formState.role === 'doctor') {
+            const start = formState.workStartTime.trim();
+            const end = formState.workEndTime.trim();
+            if ((start && !end) || (!start && end)) {
+                newErrors.workEndTime =
+                    t('workingHoursHelp') ||
+                    'Both working hours are required together, or clear both.';
+            } else if (start && end && start === end) {
+                newErrors.workEndTime =
+                    t('workingHoursHelp') || 'End time must differ from start time.';
+            }
+        }
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
@@ -222,6 +248,8 @@ export const EditUserModal = () => {
             password: '',
             role: isMedicalCompany ? 'doctor' : 'employee',
             weeklyDayOff: '',
+            workStartTime: '',
+            workEndTime: '',
             canDeleteClients: false,
         });
         setErrors({});
@@ -409,6 +437,40 @@ export const EditUserModal = () => {
                             <option value="6">{t('dayOffSunday')}</option>
                         </Select>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
+                    </div>
+                )}
+                {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
+                    (formState.role === 'employee' || formState.role === 'doctor') && (
+                    <div>
+                        <Label htmlFor="edit-user-workStartTime">{t('workingHours')}</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label htmlFor="edit-user-workStartTime" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    {t('workingHoursFrom')}
+                                </label>
+                                <Input
+                                    id="edit-user-workStartTime"
+                                    type="time"
+                                    value={formState.workStartTime}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="edit-user-workEndTime" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    {t('workingHoursTo')}
+                                </label>
+                                <Input
+                                    id="edit-user-workEndTime"
+                                    type="time"
+                                    value={formState.workEndTime}
+                                    onChange={handleChange}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('workingHoursHelp')}</p>
+                        {errors.workEndTime && (
+                            <p className="text-red-500 text-xs mt-1">{errors.workEndTime}</p>
+                        )}
                     </div>
                 )}
                 {normalizeRoleForApi(selectedUser.role) !== 'admin' &&

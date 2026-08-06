@@ -1625,6 +1625,18 @@ export const translations = {
     weeklyDayOff: "Weekly day off",
     weeklyDayOffHelp:
       "That weekday is blocked for new lead or deal assignments (uses company timezone below).",
+    workingHours: "Working hours",
+    workingHoursHelp:
+      "Daily shift for urgent lead auto-assignment (company timezone). Leave both empty to exclude from urgent routing.",
+    workingHoursFrom: "From",
+    workingHoursTo: "To",
+    workingHoursNone: "Not set",
+    urgent: "Urgent",
+    urgentHelp: "When on, this lead is auto-assigned to someone currently within working hours.",
+    urgentNoOneOnShift:
+      "No employee is currently within working hours. Assignment will fall back to normal rules.",
+    urgentAssignmentFallback:
+      "No employee was within working hours; assigned via normal rules.",
     businessTimezone: "Company timezone (IANA)",
     businessTimezoneHelp: "Used to decide “today” for weekly day off. Pick the zone that matches where your team works.",
     savedTimezoneGroup: "Saved timezone (not in list)",
@@ -1778,7 +1790,7 @@ export const translations = {
     edit: "Edit",
     confirmDelete: "Are you sure you want to delete this item? This action cannot be undone.",
     confirmDeleteWarning: "This action cannot be undone.",
-    // AddLeadModal
+    // Lead form
     addNewLead: "Add New Lead",
     createNewLead: "Create New Lead",
     enterClientName: "Enter client name",
@@ -4156,6 +4168,18 @@ export const translations = {
     weeklyDayOff: "يوم العطلة الأسبوعي",
     weeklyDayOffHelp:
       "لا يمكن إسناد عملاء أو صفقات جديدة لهذا الموظف في هذا اليوم (حسب المنطقة الزمنية للشركة).",
+    workingHours: "ساعات العمل",
+    workingHoursHelp:
+      "الوردية اليومية لإسناد العملاء المستعجلين تلقائياً (حسب المنطقة الزمنية للشركة). اترك الحقلين فارغين لاستبعاده من الإسناد المستعجل.",
+    workingHoursFrom: "من",
+    workingHoursTo: "إلى",
+    workingHoursNone: "غير محدد",
+    urgent: "مستعجل",
+    urgentHelp: "عند التفعيل يُسند هذا العميل تلقائياً إلى موظف ضمن ساعات عمله الآن.",
+    urgentNoOneOnShift:
+      "لا يوجد موظف ضمن ساعات عمله الآن. سيتم الإسناد وفق القواعد العادية.",
+    urgentAssignmentFallback:
+      "لم يكن أي موظف ضمن ساعات العمل؛ تم الإسناد وفق القواعد العادية.",
     businessTimezone: "المنطقة الزمنية للشركة (IANA)",
     businessTimezoneHelp: "تُستخدم لتحديد «اليوم» ليوم العطلة الأسبوعي. اختر المنطقة التي يعمل بها فريقك.",
     savedTimezoneGroup: "منطقة محفوظة (غير مدرجة في القائمة)",
@@ -4314,7 +4338,7 @@ export const translations = {
     confirmDeleteLead: "هل أنت متأكد أنك تريد حذف",
     stageRequired: "المرحلة مطلوبة",
     stageNotFound: "المرحلة غير موجودة في الإعدادات. يرجى اختيار مرحلة صحيحة.",
-    // AddLeadModal
+    // Lead form
     addNewLead: "إضافة عميل جديد",
     createNewLead: "إنشاء عميل جديد",
     enterClientName: "أدخل اسم العميل",

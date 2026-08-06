@@ -106,10 +106,6 @@ export interface AppContextType {
   isUserDataReady: boolean;
   isSidebarOpen: boolean;
   setIsSidebarOpen: (isOpen: boolean) => void;
-  isAddLeadModalOpen: boolean;
-  setIsAddLeadModalOpen: (isOpen: boolean) => void;
-  isEditLeadModalOpen: boolean;
-  setIsEditLeadModalOpen: (isOpen: boolean) => void;
   editingLead: Lead | null;
   setEditingLead: React.Dispatch<React.SetStateAction<Lead | null>>;
   isAddActionModalOpen: boolean;
@@ -647,8 +643,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // Data states removed - now using React Query hooks in components
   
   // Modals and drawers state
-  const [isAddLeadModalOpen, setIsAddLeadModalOpen] = useState(false);
-  const [isEditLeadModalOpen, setIsEditLeadModalOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [isAddActionModalOpen, setIsAddActionModalOpen] = useState(false);
   const [isAddCallModalOpen, setIsAddCallModalOpen] = useState(false);
@@ -1473,8 +1467,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     hasSupervisorPermission,
     canAccessPage,
     isSidebarOpen, setIsSidebarOpen,
-    isAddLeadModalOpen, setIsAddLeadModalOpen,
-    isEditLeadModalOpen, setIsEditLeadModalOpen,
     editingLead, setEditingLead,
     isAddActionModalOpen, setIsAddActionModalOpen,
     isAddCallModalOpen, setIsAddCallModalOpen,

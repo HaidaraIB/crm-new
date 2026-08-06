@@ -11,6 +11,7 @@ export type LeadEditFormLike = {
   type: string;
   communicationWay: string;
   priority: string;
+  isUrgent: boolean;
   status: string;
   leadCompanyName: string;
   profession: string;
@@ -104,6 +105,7 @@ export function buildLeadUpdatePayload({
     type: typeValue,
     communication_way: channelId,
     priority: priorityValue,
+    is_urgent: Boolean(formState.isUrgent),
     status: statusId,
     company: companyId,
     lead_company_name: formState.leadCompanyName?.trim() || null,

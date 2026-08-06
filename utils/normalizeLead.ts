@@ -47,6 +47,8 @@ export function normalizeLead(lead: any): any {
     metaQualificationError: normalizeMetaQualificationError(
       lead.metaQualificationError ?? lead.meta_qualification_error ?? null
     ),
+    isUrgent: Boolean(lead.isUrgent ?? lead.is_urgent),
+    is_urgent: Boolean(lead.isUrgent ?? lead.is_urgent),
   };
 }
 
@@ -69,6 +71,7 @@ export function mapApiLeadToDisplayLead(apiLead: any): Lead {
     budgetMax: base.budgetMax,
     communicationWay: base.communication_way_name || base.communicationWay || '',
     priority: base.priority || '',
+    isUrgent: Boolean(base.isUrgent ?? base.is_urgent),
     createdAt: base.created_at || base.createdAt || '',
     lastFeedback: base.lastFeedback || '',
     notes: base.notes ?? '',

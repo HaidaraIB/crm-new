@@ -57,6 +57,8 @@ export const AddUserModal = () => {
         phone: '',
         role: 'employee',
         weeklyDayOff: '' as string,
+        workStartTime: '' as string,
+        workEndTime: '' as string,
         canDeleteClients: false,
     });
 
@@ -88,6 +90,19 @@ export const AddUserModal = () => {
         // Role validation
         if (!formData.role) {
             newErrors.role = t('roleRequired') || 'Role is required';
+        }
+
+        if (formData.role === 'employee' || formData.role === 'doctor') {
+            const start = formData.workStartTime.trim();
+            const end = formData.workEndTime.trim();
+            if ((start && !end) || (!start && end)) {
+                newErrors.workEndTime =
+                    t('workingHoursHelp') ||
+                    'Both working hours are required together, or clear both.';
+            } else if (start && end && start === end) {
+                newErrors.workEndTime =
+                    t('workingHoursHelp') || 'End time must differ from start time.';
+            }
         }
 
         setErrors(newErrors);
@@ -149,6 +164,10 @@ export const AddUserModal = () => {
             }
             if (formData.role === 'employee' || formData.role === 'doctor') {
                 userData.can_delete_clients = formData.canDeleteClients;
+                const start = formData.workStartTime.trim();
+                const end = formData.workEndTime.trim();
+                userData.work_start_time = start || null;
+                userData.work_end_time = end || null;
             }
 
             await createUserMutation.mutateAsync(userData);
@@ -162,6 +181,8 @@ export const AddUserModal = () => {
                 phone: '',
                 role: defaultStaffRole,
                 weeklyDayOff: '',
+                workStartTime: '',
+                workEndTime: '',
                 canDeleteClients: false,
             });
             setErrors({});
@@ -241,6 +262,8 @@ export const AddUserModal = () => {
             phone: '',
             role: defaultStaffRole,
             weeklyDayOff: '',
+            workStartTime: '',
+            workEndTime: '',
             canDeleteClients: false,
         });
         setErrors({});
@@ -355,6 +378,39 @@ export const AddUserModal = () => {
                             <option value="6">{t('dayOffSunday')}</option>
                         </Select>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
+                    </div>
+                )}
+                {(formData.role === 'employee' || formData.role === 'doctor') && (
+                    <div>
+                        <Label htmlFor="add-user-work-start">{t('workingHours')}</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label htmlFor="add-user-work-start" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    {t('workingHoursFrom')}
+                                </label>
+                                <Input
+                                    id="add-user-work-start"
+                                    type="time"
+                                    value={formData.workStartTime}
+                                    onChange={(e) => handleChange('workStartTime', e.target.value)}
+                                />
+                            </div>
+                            <div>
+                                <label htmlFor="add-user-work-end" className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                                    {t('workingHoursTo')}
+                                </label>
+                                <Input
+                                    id="add-user-work-end"
+                                    type="time"
+                                    value={formData.workEndTime}
+                                    onChange={(e) => handleChange('workEndTime', e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('workingHoursHelp')}</p>
+                        {(errors.workStartTime || errors.workEndTime) && (
+                            <p className="text-red-500 text-xs mt-1">{errors.workStartTime || errors.workEndTime}</p>
+                        )}
                     </div>
                 )}
                 {(formData.role === 'employee' || formData.role === 'doctor') && (

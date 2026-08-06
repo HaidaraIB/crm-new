@@ -225,6 +225,11 @@ export const LeadKanbanCard = ({
                         {t(String(lead.priority).toLowerCase() as any) || lead.priority}
                     </span>
                 ) : null}
+                {(lead.isUrgent || (lead as any).is_urgent) ? (
+                    <span className="inline-flex rounded-md bg-orange-100 px-1.5 py-0.5 text-[10px] font-medium text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                        {t('urgent')}
+                    </span>
+                ) : null}
             </div>
 
             {assigneeName ? (

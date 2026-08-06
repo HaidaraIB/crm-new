@@ -83,7 +83,7 @@ function collapseConsecutiveWhatsAppThreads(
 }
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setIsEditLeadModalOpen, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered } = useAppContext();
     
     const canPbxDial = usePbxDialEnabled();
     const whatsappCalling = useWhatsAppCallingOptional();
@@ -1132,6 +1132,11 @@ export const ViewLeadPage = () => {
                                         </span>
                                     );
                                 })()}
+                                {(displayLead.isUrgent || (displayLead as any).is_urgent) ? (
+                                    <span className="ms-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                                        {t('urgent')}
+                                    </span>
+                                ) : null}
                             </div>
                         </div>
                         <div>

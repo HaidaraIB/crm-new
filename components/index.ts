@@ -27,8 +27,6 @@ export * from './modals/AddVisitModal';
 export * from './modals/AddFieldVisitModal';
 export * from './LeadLocationMapPicker';
 export * from './LeadStatusDropdown';
-export * from './modals/AddLeadModal';
-export * from './modals/EditLeadModal';
 export * from './modals/AssignLeadModal';
 export * from './modals/ImportLeadsModal';
 export * from './drawers/FilterDrawer';

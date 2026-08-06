@@ -12,6 +12,7 @@ import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { parseLeadCoordinate } from '../utils/leadLocation';
 import { mapApiLeadToDisplayLead, normalizeLead } from '../utils/normalizeLead';
 import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
+import { LeadUrgentToggle } from '../components/LeadUrgentToggle';
 import { buildLeadUpdateDiff, buildLeadUpdatePayload } from '../utils/leadUpdatePayload';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -76,6 +77,7 @@ export const EditLeadPage = () => {
         type: '' as 'fresh' | 'hot' | 'cold' | '',
         communicationWay: '',
         priority: '' as 'low' | 'medium' | 'high' | '',
+        isUrgent: false,
         status: '',
         leadCompanyName: '',
         profession: '',
@@ -178,6 +180,9 @@ export const EditLeadPage = () => {
                 // Keep empty when lead has no channel/status — do not invent defaults on edit
                 communicationWay: channelId,
                 priority: priorityValue,
+                isUrgent: Boolean(
+                    (editingLead as Lead).isUrgent ?? (editingLead as any).is_urgent
+                ),
                 status: statusId,
                 leadCompanyName: editingLead.leadCompanyName ?? (editingLead as any).lead_company_name ?? '',
                 profession: editingLead.profession ?? (editingLead as any).profession ?? '',
@@ -427,7 +432,19 @@ export const EditLeadPage = () => {
         >
             <form onSubmit={handleSubmit}>
                 <Card>
-                    <h3 className="text-lg font-semibold mb-6 border-b pb-3 dark:border-gray-700">{t('leadInformation') || 'Lead Information'}</h3>
+                    <div className="mb-6 flex flex-wrap items-start justify-between gap-3 border-b pb-3 dark:border-gray-700">
+                        <h3 className="text-lg font-semibold">
+                            {t('leadInformation') || 'Lead Information'}
+                        </h3>
+                        <LeadUrgentToggle
+                            enabled={formState.isUrgent}
+                            setEnabled={(enabled) =>
+                                setFormState((prev) => ({ ...prev, isUrgent: enabled }))
+                            }
+                            candidateUsers={userOptions}
+                            companyTimeZone={companyTz}
+                        />
+                    </div>
                     {(errors.general || Object.keys(errors).filter(key => key !== 'general').length > 0) && (
                         <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
                             {errors.general && (

@@ -124,6 +124,9 @@ export interface User {
   is_online?: boolean;
   /** 0=Mon .. 6=Sun; null/undefined = no fixed weekly day off */
   weekly_day_off?: number | null;
+  /** Daily work window HH:MM:SS or HH:MM; both null = no shift for urgent routing */
+  work_start_time?: string | null;
+  work_end_time?: string | null;
   is_active?: boolean;
   /** When true, employee/supervisor may delete customers (clients) */
   can_delete_clients?: boolean;
@@ -199,6 +202,8 @@ export interface Lead {
   budgetMax?: number | null;
   communicationWay: string;
   priority: 'High' | 'Medium' | 'Low';
+  /** Prefer on-shift assignee when true (API: is_urgent) */
+  isUrgent?: boolean;
   createdAt: string;
   // Integration fields
   campaign?: number | null; // Campaign ID

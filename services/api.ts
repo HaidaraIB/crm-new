@@ -5215,8 +5215,28 @@ export const getSupportTicketsAPI = async (params?: { page?: number; page_size?:
   }>(`/support-tickets/${queryString ? `?${queryString}` : ''}`);
 };
 
+/** GET /api/public-content/guide-categories/ — categories with published articles */
+export const getPublicGuideCategoriesAPI = async () => {
+  return apiRequest<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: Array<{
+      id: number;
+      name_en: string;
+      name_ar: string;
+      slug: string;
+      sort_order: number;
+      created_at?: string;
+      updated_at?: string;
+    }>;
+  }>('/public-content/guide-categories/?page_size=200');
+};
+
 /** GET /api/public-content/guide-articles/ — published guide articles for tenants */
-export const getPublicGuideArticlesAPI = async () => {
+export const getPublicGuideArticlesAPI = async (params?: { category?: number }) => {
+  const qs = new URLSearchParams({ page_size: '200' });
+  if (params?.category != null) qs.set('category', String(params.category));
   return apiRequest<{
     count: number;
     next: string | null;
@@ -5226,13 +5246,22 @@ export const getPublicGuideArticlesAPI = async () => {
       title_en: string;
       title_ar: string;
       slug: string;
+      category?: {
+        id: number;
+        name_en: string;
+        name_ar: string;
+        slug: string;
+        sort_order: number;
+      } | null;
       sort_order: number;
       is_published: boolean;
+      youtube_url?: string;
+      youtube_embed_url?: string | null;
       cover_image_url?: string | null;
       created_at: string;
       updated_at: string;
     }>;
-  }>('/public-content/guide-articles/?page_size=200');
+  }>(`/public-content/guide-articles/?${qs.toString()}`);
 };
 
 /** GET /api/public-content/guide-articles/{id}/ */
@@ -5244,8 +5273,17 @@ export const getPublicGuideArticleAPI = async (id: number) => {
     body_en: string;
     body_ar: string;
     slug: string;
+    category?: {
+      id: number;
+      name_en: string;
+      name_ar: string;
+      slug: string;
+      sort_order: number;
+    } | null;
     sort_order: number;
     is_published: boolean;
+    youtube_url?: string;
+    youtube_embed_url?: string | null;
     cover_image_url?: string | null;
     created_at: string;
     updated_at: string;
@@ -5266,6 +5304,8 @@ export const getPublicNewsPostsAPI = async () => {
       summary_ar?: string;
       is_published: boolean;
       published_at?: string | null;
+      youtube_url?: string;
+      youtube_embed_url?: string | null;
       cover_image_url?: string | null;
       created_at: string;
       updated_at: string;
@@ -5298,10 +5338,29 @@ export const getPublicNewsPostAPI = async (id: number) => {
     body_ar: string;
     is_published: boolean;
     published_at?: string | null;
+    youtube_url?: string;
+    youtube_embed_url?: string | null;
     cover_image_url?: string | null;
     created_at: string;
     updated_at: string;
   }>(`/public-content/news-posts/${id}/`);
+};
+
+export type PublicPageHelpVideo = {
+  page_key: string;
+  youtube_url?: string;
+  youtube_embed_url?: string | null;
+  title_en?: string;
+  title_ar?: string;
+};
+
+/** GET /api/public-content/page-help-videos/{page_key}/ — null when none configured */
+export const getPublicPageHelpVideoAPI = async (
+  pageKey: string,
+): Promise<PublicPageHelpVideo | null> => {
+  return apiRequest<PublicPageHelpVideo | null>(
+    `/public-content/page-help-videos/${encodeURIComponent(pageKey)}/`,
+  );
 };
 
 /** POST /api/support-tickets/ - create a support ticket (optionally with screenshot files) */

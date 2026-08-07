@@ -673,7 +673,7 @@ export function PbxSettingsForm({
 
 export function PbxSettingsPage({ t, integrationPolicyMap }: { t(key: string): string; integrationPolicyMap?: Record<string, IntegrationPolicyEntry> }) {
   return (
-    <PageWrapper title={t('pbxIntegrationTitle')}>
+    <PageWrapper title={t('pbxIntegrationTitle')} helpVideoPageKey="pbx">
       <PbxSettingsForm t={t} integrationPolicyMap={integrationPolicyMap} />
     </PageWrapper>
   );

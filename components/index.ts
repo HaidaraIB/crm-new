@@ -108,3 +108,6 @@ export * from './LegalLinks';
 export * from './MessagePlaceholderChips';
 export * from './PlanEntitlementsSummary';
 export * from './kanban';
+export * from './YouTubeEmbed';
+export * from './PageHelpVideoButton';
+

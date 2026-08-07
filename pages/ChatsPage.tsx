@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IntegrationPlatformIcon } from '../components/integrations/IntegrationPlatformIcon';
+import { PageHelpVideoButton } from '../components/PageHelpVideoButton';
 import { ChatToast } from '../components/ChatToast';
 import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
 import {
@@ -1073,6 +1074,7 @@ export const ChatsPage: React.FC = () => {
       <div className="flex shrink-0 items-center gap-2 px-0.5">
         <IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" />
         <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">{t('chats')}</h1>
+        <PageHelpVideoButton pageKey="chats" />
       </div>
       <div className="min-h-0 flex-1">
         <WhatsAppChatLayout

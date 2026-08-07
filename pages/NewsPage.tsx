@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, RefreshButton, ArrowLeftIcon } from '../components/index';
+import { PageWrapper, RefreshButton, ArrowLeftIcon, YouTubeEmbed } from '../components/index';
 import { getPublicNewsPostsAPI, getPublicNewsPostAPI } from '../services/api';
 import { useMarkNewsRead } from '../hooks/useQueries';
 import { withLatinDigits } from '../utils/dateUtils';
@@ -19,6 +19,8 @@ type NewsListItem = {
 type NewsDetail = NewsListItem & {
   body_en: string;
   body_ar: string;
+  youtube_url?: string;
+  youtube_embed_url?: string | null;
 };
 
 export const NewsPage = () => {
@@ -119,6 +121,11 @@ export const NewsPage = () => {
                   </p>
                 )}
               </div>
+              <YouTubeEmbed
+                embedUrl={detail.youtube_embed_url}
+                url={detail.youtube_url}
+                title={pickTitle(detail)}
+              />
               <div className="text-gray-700 dark:text-gray-300 whitespace-pre-wrap leading-relaxed">
                 {pickBody(detail)}
               </div>

@@ -787,7 +787,7 @@ export const IntegrationsPage = () => {
 
     const companyId = currentUser?.company?.id as number | string | undefined;
 
-    const showAlert = (message: string, variant: 'info' | 'warning' | 'error' = 'info') => {
+    const showAlert = (message: React.ReactNode, variant: 'info' | 'warning' | 'error' = 'info') => {
         setAlertMessage(message);
         setAlertVariant(variant);
         setIsAlertModalOpen(true);
@@ -1192,7 +1192,7 @@ export const IntegrationsPage = () => {
     const replaceTwilio = (str: string) => (str || '').replace(/\{\{twilio\}\}/g, t('twilioWord') || 'Twilio');
     if (currentPage === 'Twilio') {
         return (
-            <PageWrapper title={t('twilioSmsIntegration') || 'SMS Notifications Integration'}>
+            <PageWrapper title={t('twilioSmsIntegration') || 'SMS Notifications Integration'} helpVideoPageKey="twilio">
                 {renderSmsProviderPolicyBanners()}
                 <TwilioSMSForm t={t} replaceTwilio={replaceTwilio} integrationPolicyMap={integrationPolicyMap} />
             </PageWrapper>
@@ -1206,7 +1206,7 @@ export const IntegrationsPage = () => {
     if (currentPage === 'AI') {
         const openaiPolicy = integrationPolicyMap?.openai;
         return (
-            <PageWrapper title={t('aiIntegration')}>
+            <PageWrapper title={t('aiIntegration')} helpVideoPageKey="ai">
                 {openaiPolicy?.enabled === false ? (
                     <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                         <div className="font-semibold">{t('integrationStatusDisabled')}</div>
@@ -1279,7 +1279,7 @@ export const IntegrationsPage = () => {
             }
         };
         return (
-            <PageWrapper title={t('mujebTitle')}>
+            <PageWrapper title={t('mujebTitle')} helpVideoPageKey="mujeb">
                 {renderPolicyBanner()}
                 <Card>
                     <div className="max-w-2xl space-y-6">
@@ -1623,7 +1623,7 @@ export const IntegrationsPage = () => {
             }
         };
         return (
-            <PageWrapper title={t('leadApiTitle')}>
+            <PageWrapper title={t('leadApiTitle')} helpVideoPageKey="lead_api">
                 {apiPolicy?.enabled === false ? (
                     <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                         <div className="font-semibold">{t('integrationStatusDisabled')}</div>
@@ -1947,7 +1947,7 @@ export const IntegrationsPage = () => {
             { step: 4, text: t('tiktokStep4') || 'Create a Lead Gen campaign with an Instant Form. New leads will appear as clients here automatically.' },
         ];
         return (
-            <PageWrapper title={`${t('tikTok')} ${t('integration')}`}>
+            <PageWrapper title={`${t('tikTok')} ${t('integration')}`} helpVideoPageKey="tiktok">
                 {renderPolicyBanner()}
                 <Card>
                     <div className="max-w-2xl space-y-6">
@@ -2028,6 +2028,12 @@ export const IntegrationsPage = () => {
     const { name } = platform;
     const integrationPlatform = integrationPlatformFromDataKey(dataKey);
     const pageTitle = `${name} ${t('integration')}`;
+    const helpVideoPageKey =
+        platformParam === 'openai'
+            ? 'ai'
+            : platformParam === 'api'
+              ? 'lead_api'
+              : platformParam || undefined;
 
     // Handlers for Connect / Edit / Disconnect (must be defined before any early return so WhatsApp "accounts" tab can use them)
     const disconnectAccountMutation = useDisconnectConnectedAccount();
@@ -2936,17 +2942,14 @@ export const IntegrationsPage = () => {
         if (isMessagingCenterPage) {
             return (
                 <PageWrapper
-                    title={
-                        <div>
-                            <div className="flex items-center gap-2">
-                                <span className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/12 dark:bg-primary/25 ring-1 ring-primary/25 dark:ring-primary/40 flex items-center justify-center">
-                                    <MegaphoneIcon className={`w-7 h-7 ${marketingAccentIconClass}`} />
-                                </span>
-                                <span>{t('messagingCenter')}</span>
-                            </div>
-                            <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('messagingCenterDesc')}</p>
-                        </div>
+                    title={t('messagingCenter')}
+                    subtitle={t('messagingCenterDesc')}
+                    titleIcon={
+                        <span className="flex-shrink-0 w-12 h-12 rounded-xl bg-primary/12 dark:bg-primary/25 ring-1 ring-primary/25 dark:ring-primary/40 flex items-center justify-center">
+                            <MegaphoneIcon className={`w-7 h-7 ${marketingAccentIconClass}`} />
+                        </span>
                     }
+                    helpVideoPageKey="messaging_center"
                 >
                     <div className="flex border-b border-gray-200 dark:border-gray-700 gap-1 mb-4">
                         <button
@@ -3045,17 +3048,31 @@ export const IntegrationsPage = () => {
         }
 
         // Integrations → WhatsApp: account settings only (chats are on ChatsPage)
+        const whatsAppTitleIcon = (
+            <IntegrationPlatformIcon platform="whatsapp" size="md" variant="inline" />
+        );
+        const whatsAppSubtitle = t('whatsAppIntegrationDesc');
+
+        // Avoid flashing the empty state while connected accounts are still loading.
+        if (loading) {
+            return (
+                <PageWrapper
+                    title={t('whatsApp')}
+                    subtitle={whatsAppSubtitle}
+                    titleIcon={whatsAppTitleIcon}
+                    helpVideoPageKey="whatsapp"
+                >
+                    <PageLoadingState label={t('loadingIntegrations')} />
+                </PageWrapper>
+            );
+        }
+
         return (
             <PageWrapper
-                title={
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <IntegrationPlatformIcon platform="whatsapp" size="md" variant="inline" />
-                            <span>{t('whatsApp')}</span>
-                        </div>
-                        <p className="text-sm font-normal text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppIntegrationDesc')}</p>
-                    </div>
-                }
+                title={t('whatsApp')}
+                subtitle={whatsAppSubtitle}
+                titleIcon={whatsAppTitleIcon}
+                helpVideoPageKey="whatsapp"
                 actions={
                     !isEmployee ? (
                         <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect || connectingAccountId != null}>
@@ -3176,7 +3193,7 @@ export const IntegrationsPage = () => {
 
     if (loading) {
         return (
-            <PageWrapper title={pageTitle}>
+            <PageWrapper title={pageTitle} helpVideoPageKey={helpVideoPageKey}>
                 <PageLoadingState label={t('loadingIntegrations')} />
             </PageWrapper>
         );
@@ -3185,6 +3202,7 @@ export const IntegrationsPage = () => {
     return (
         <PageWrapper
             title={pageTitle}
+            helpVideoPageKey={helpVideoPageKey}
             actions={
                 <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect || connectingAccountId != null}>
                     <PlusIcon className="w-4 h-4" /> {t('addNewAccount')}

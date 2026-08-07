@@ -161,7 +161,7 @@ export interface TimelineEntry {
   callDatetime?: string; // Optional: formatted call datetime for calls
   followUpDate?: string; // Optional: formatted follow-up date for calls
   locationPhotoUrl?: string; // Optional: client location photo for field visits
-  recordingUrl?: string; // Optional: WhatsApp call recording playback URL
+  recordingUrl?: string; // Optional: PBX / WhatsApp call recording playback URL
   recordingStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'skipped' | string;
   /** Direction for individual WhatsApp timeline rows (before thread collapse). */
   direction?: 'inbound' | 'outbound';

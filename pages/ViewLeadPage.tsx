@@ -507,10 +507,14 @@ export const ViewLeadPage = () => {
             const isWhatsAppCall = cc.source === 'whatsapp';
             const recordingUrl = isWhatsAppCall
                 ? ((cc.whatsapp_recording_url ?? cc.whatsappRecordingUrl) as string | undefined)
-                : undefined;
+                : isPbxCall
+                  ? ((cc.pbx_recording_url ?? cc.pbxRecordingUrl) as string | undefined)
+                  : undefined;
             const recordingStatus = isWhatsAppCall
                 ? ((cc.whatsapp_recording_status ?? cc.whatsappRecordingStatus) as string | undefined)
-                : undefined;
+                : isPbxCall
+                  ? ((cc.pbx_recording_status ?? cc.pbxRecordingStatus) as string | undefined)
+                  : undefined;
 
             return {
                 id: `call-${cc.id}`,

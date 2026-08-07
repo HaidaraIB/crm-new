@@ -5215,6 +5215,95 @@ export const getSupportTicketsAPI = async (params?: { page?: number; page_size?:
   }>(`/support-tickets/${queryString ? `?${queryString}` : ''}`);
 };
 
+/** GET /api/public-content/guide-articles/ — published guide articles for tenants */
+export const getPublicGuideArticlesAPI = async () => {
+  return apiRequest<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: Array<{
+      id: number;
+      title_en: string;
+      title_ar: string;
+      slug: string;
+      sort_order: number;
+      is_published: boolean;
+      cover_image_url?: string | null;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }>('/public-content/guide-articles/?page_size=200');
+};
+
+/** GET /api/public-content/guide-articles/{id}/ */
+export const getPublicGuideArticleAPI = async (id: number) => {
+  return apiRequest<{
+    id: number;
+    title_en: string;
+    title_ar: string;
+    body_en: string;
+    body_ar: string;
+    slug: string;
+    sort_order: number;
+    is_published: boolean;
+    cover_image_url?: string | null;
+    created_at: string;
+    updated_at: string;
+  }>(`/public-content/guide-articles/${id}/`);
+};
+
+/** GET /api/public-content/news-posts/ — published news for tenants */
+export const getPublicNewsPostsAPI = async () => {
+  return apiRequest<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: Array<{
+      id: number;
+      title_en: string;
+      title_ar: string;
+      summary_en?: string;
+      summary_ar?: string;
+      is_published: boolean;
+      published_at?: string | null;
+      cover_image_url?: string | null;
+      created_at: string;
+      updated_at: string;
+    }>;
+  }>('/public-content/news-posts/?page_size=200');
+};
+
+/** GET /api/public-content/news-posts/unread-count/ */
+export const getNewsUnreadCountAPI = async (): Promise<{ unread_count: number }> => {
+  return apiRequest<{ unread_count: number }>('/public-content/news-posts/unread-count/');
+};
+
+/** POST /api/public-content/news-posts/mark-read/ — clear News sidebar badge */
+export const markNewsReadAPI = async (): Promise<{ unread_count: number; last_read_at?: string }> => {
+  return apiRequest<{ unread_count: number; last_read_at?: string }>(
+    '/public-content/news-posts/mark-read/',
+    { method: 'POST', body: JSON.stringify({}) },
+  );
+};
+
+/** GET /api/public-content/news-posts/{id}/ */
+export const getPublicNewsPostAPI = async (id: number) => {
+  return apiRequest<{
+    id: number;
+    title_en: string;
+    title_ar: string;
+    summary_en?: string;
+    summary_ar?: string;
+    body_en: string;
+    body_ar: string;
+    is_published: boolean;
+    published_at?: string | null;
+    cover_image_url?: string | null;
+    created_at: string;
+    updated_at: string;
+  }>(`/public-content/news-posts/${id}/`);
+};
+
 /** POST /api/support-tickets/ - create a support ticket (optionally with screenshot files) */
 export const createSupportTicketAPI = async (payload: {
   title: string;

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Page, Lead, User, Deal, Todo, Campaign, TimelineEntry, Activity, Developer, Project, Unit, Owner, Channel, Stage, Status, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier } from './types';
-import { ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, LibraryIcon, MegaphoneIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon, WhatsappIcon, PhoneIcon } from './components/index';
+import { BookIcon, ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, LibraryIcon, MegaphoneIcon, NewspaperIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon, WhatsappIcon, PhoneIcon } from './components/index';
 
 export const SIDEBAR_ITEMS: {
   name: Page;
@@ -24,6 +24,8 @@ export const SIDEBAR_ITEMS: {
     { name: 'Integrations', icon: ChevronsUpDownIcon, subItems: ['Meta', 'TikTok', 'WhatsApp', 'Twilio', 'AI', 'Lead API', 'Mujeb', 'PBX'] },
     { name: 'Billing', icon: CreditCardIcon, subItems: ['Change Plan', 'Payment', 'Subscription'] },
     { name: 'Support Center', icon: HeadphonesIcon },
+    { name: 'User Guide', icon: BookIcon },
+    { name: 'News', icon: NewspaperIcon },
   ];
 
 export const SETTINGS_ITEM = { name: 'Settings', icon: SettingsIcon };
@@ -348,6 +350,12 @@ export const translations = {
     pleaseLogin: "Please login to view billing information",
     settings: "Settings",
     supportCenter: "Support Center",
+    userGuide: "User Guide",
+    news: "News & Updates",
+    userGuideEmpty: "No guide articles are available yet.",
+    newsEmpty: "No news or updates yet.",
+    userGuideBack: "Back to articles",
+    newsBack: "Back to news",
     supportTicketTitle: "Subject",
     supportTicketDescription: "Description",
     submitTicket: "Submit",
@@ -2939,6 +2947,12 @@ export const translations = {
     pleaseLogin: "يرجى تسجيل الدخول لعرض معلومات الفوترة",
     settings: "الإعدادات",
     supportCenter: "مركز الدعم",
+    userGuide: "دليل الاستخدام",
+    news: "الأخبار والتحديثات",
+    userGuideEmpty: "لا توجد مقالات في الدليل حالياً.",
+    newsEmpty: "لا توجد أخبار أو تحديثات حالياً.",
+    userGuideBack: "العودة إلى المقالات",
+    newsBack: "العودة إلى الأخبار",
     supportTicketTitle: "الموضوع",
     supportTicketDescription: "الوصف",
     submitTicket: "إرسال",

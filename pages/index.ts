@@ -35,6 +35,8 @@ export * from './CallReportsPage';
 export * from './SettingsPage';
 export * from './LibraryPage';
 export * from './SupportCenterPage';
+export * from './UserGuidePage';
+export * from './NewsPage';
 export * from './TeamChatPage';
 export * from './ProfilePage';
 export * from './ServicesInventoryPage';

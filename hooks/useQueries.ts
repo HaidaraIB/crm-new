@@ -19,6 +19,7 @@ import {
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
   getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI,
+  getNewsUnreadCountAPI, markNewsReadAPI,
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
@@ -107,6 +108,7 @@ export const queryKeys = {
     ['whatsappChatMessages', clientId ?? null, phone ?? ''] as const,
   whatsAppConversations: ['whatsAppConversations'] as const,
   whatsAppUnreadCount: ['whatsAppUnreadCount'] as const,
+  newsUnreadCount: ['newsUnreadCount'] as const,
 };
 
 /** Cuts refetch bursts on data-heavy views (aligns with API UserRateThrottle). */
@@ -715,6 +717,36 @@ export const useMarkWhatsAppConversationRead = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppUnreadCount });
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
+    },
+  });
+};
+
+/** Sidebar badge: published news newer than the user's last_read_at. */
+export const useNewsUnreadCount = (
+  options?: Omit<UseQueryOptions<{ unread_count: number }, Error, number>, 'queryKey' | 'queryFn'> & {
+    enabled?: boolean;
+  }
+) => {
+  const { refetchInterval = 60_000, enabled = true, ...rest } = options || {};
+  return useQuery<{ unread_count: number }, Error, number>({
+    queryKey: queryKeys.newsUnreadCount,
+    queryFn: getNewsUnreadCountAPI,
+    staleTime: 15 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
+    enabled,
+    select: (d) => d?.unread_count ?? 0,
+    ...rest,
+  });
+};
+
+export const useMarkNewsRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markNewsReadAPI,
+    onSuccess: () => {
+      queryClient.setQueryData(queryKeys.newsUnreadCount, { unread_count: 0 });
+      queryClient.invalidateQueries({ queryKey: queryKeys.newsUnreadCount });
     },
   });
 };

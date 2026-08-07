@@ -1215,6 +1215,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         case 'CreateLead':
         case 'Profile':
         case 'Support Center':
+        case 'User Guide':
+        case 'News':
         case 'Team Chat':
           return true;
         default:
@@ -1230,6 +1232,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         case 'Activities':
         case 'Profile':
         case 'Support Center':
+        case 'User Guide':
+        case 'News':
         case 'Team Chat':
           return true;
         default:
@@ -1247,6 +1251,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'Dashboard':
       case 'Profile':
       case 'Support Center':
+      case 'User Guide':
+      case 'News':
       case 'Team Chat':
         return true;
       case 'Leads':

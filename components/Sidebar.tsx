@@ -11,7 +11,7 @@ import { ChevronDownIcon, CodeBracketsIcon, XIcon } from './icons';
 import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
-import { useWhatsAppUnreadCount } from '../hooks/useQueries';
+import { useNewsUnreadCount, useWhatsAppUnreadCount } from '../hooks/useQueries';
 
 type IntegrationLogoConfig = {
     /** Brand image under /public. Mutually exclusive with `Icon`. */
@@ -153,6 +153,12 @@ export const Sidebar = () => {
     const { data: whatsappUnreadCount = 0 } = useWhatsAppUnreadCount({
         enabled: Boolean(currentUser?.company?.id) && chatsNavVisible,
         refetchInterval: 15_000,
+    });
+    const newsNavVisible =
+        normalizedCurrentRole !== 'Supervisor' || canAccessPage('News');
+    const { data: newsUnreadCount = 0 } = useNewsUnreadCount({
+        enabled: Boolean(currentUser?.company?.id) && newsNavVisible && !isDataEntryUser && !isReceptionUser,
+        refetchInterval: 60_000,
     });
 
     // Get logo path based on theme
@@ -361,11 +367,19 @@ export const Sidebar = () => {
                                 hasSubItems={!!subItems && subItems.length > 0}
                                 isOpen={isOpen}
                                 onClick={() => subItems && subItems.length ? handleToggleSubMenu(item.name) : void handleNavigation(item.name)}
-                                badgeCount={item.name === 'Chats' ? whatsappUnreadCount : undefined}
+                                badgeCount={
+                                    item.name === 'Chats'
+                                        ? whatsappUnreadCount
+                                        : item.name === 'News'
+                                          ? newsUnreadCount
+                                          : undefined
+                                }
                                 badgeAriaLabel={
                                     item.name === 'Chats' && whatsappUnreadCount > 0
                                         ? `${whatsappUnreadCount} unread`
-                                        : undefined
+                                        : item.name === 'News' && newsUnreadCount > 0
+                                          ? `${newsUnreadCount} unread`
+                                          : undefined
                                 }
                             />
                             {subItems && subItems.length > 0 && isOpen && (

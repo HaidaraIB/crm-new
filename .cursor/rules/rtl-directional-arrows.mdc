@@ -1,0 +1,48 @@
+---
+description: Mirror directional back/forward arrows under Arabic RTL; never hardcode ←/→ for navigation
+alwaysApply: true
+---
+
+# RTL directional arrows (back / forward)
+
+Arabic uses `dir="rtl"`. A literal `←` / `→` character does **not** flip, so “Back” looks reversed. The project already has the correct pattern.
+
+## Required pattern
+
+For **back** / **previous** navigation, use `ArrowLeftIcon` from `components/icons` (re-exported via `components/index`). It includes `rtl:rotate-180`:
+
+```tsx
+import { ArrowLeftIcon } from '../components/index';
+
+<button
+  type="button"
+  onClick={onBack}
+  className="inline-flex items-center gap-2 ..."
+>
+  <ArrowLeftIcon className="h-4 w-4 shrink-0" />
+  {t('back')}
+</button>
+```
+
+Same pattern as `ViewLeadPage`, `CreateLeadPage`, `EditLeadPage`, `CreateDealPage`, `EditDealPage`.
+
+## Anti-patterns
+
+- Do **not** hardcode `←`, `→`, `⬅`, or `➡` for back/forward UI chrome.
+- Do **not** invent a one-off SVG without `rtl:rotate-180` (or `rtl:-scale-x-100`) for horizontal direction.
+- Do **not** swap arrows with `language === 'ar' ? '→' : '←'` when `ArrowLeftIcon` already handles RTL.
+
+## Mapping arrows (non-navigation)
+
+For “maps A → B” copy (import column mapping, SMS preview), flipping the glyph by language is OK:
+
+```tsx
+{language === 'ar' ? '←' : '→'}
+```
+
+That is text semantics, not a back control.
+
+## Related
+
+- `ArrowLeftIcon`: [`components/icons.tsx`](components/icons.tsx) (`rtl:rotate-180`)
+- Phone BiDi: `phone-rtl-display` rule (separate concern)

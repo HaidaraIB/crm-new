@@ -19,6 +19,8 @@ export type Page =
   | 'Call Reports'
   | 'Change Plan' | 'Payment' | 'Subscription' | 'PaymentSuccess'
   | 'Support Center'
+  | 'User Guide'
+  | 'News'
   // Auth / onboarding pages
   | 'Login' | 'Register' | 'ForgotPassword' | 'ResetPassword'
   | 'VerifyEmail' | 'VerifyPhone' | 'TwoFactorAuth'

@@ -31,6 +31,7 @@ import { WhatsAppTeamCallStatusPanel } from '../components/whatsapp/WhatsAppTeam
 import { normalizeRole } from '../utils/roles';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { getCompanyViewLeadRoute } from '../utils/routing';
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import {
   DEFAULT_CALL_FILTERS,
   callFiltersFromSearchParams,
@@ -38,6 +39,8 @@ import {
   callFiltersToCountParams,
   replaceCallsUrlQuery,
 } from '../utils/callFilters';
+
+type CallsPageTab = 'history' | 'live' | 'team' | 'hours';
 
 const STATUS_FILTERS = [
   { key: 'all' },
@@ -185,6 +188,11 @@ export const CallsPage: React.FC = () => {
   const whatsappCalling = useWhatsAppCallingOptional();
   const [selected, setSelected] = useState<WhatsAppCallRecord | null>(null);
   const [searchDraft, setSearchDraft] = useState(callFilters.search);
+  const [activeTab, setActiveTab] = useState<CallsPageTab>('history');
+
+  const role = normalizeRole(currentUser?.role);
+  const canSeeTeam = role === 'Owner' || role === 'Supervisor';
+  const canManageHours = canSeeTeam;
 
   const { data: liveCalls = [], refetch: refetchLiveCalls, isFetching: isLiveFetching } =
     useWhatsAppLiveCalls({
@@ -192,6 +200,37 @@ export const CallsPage: React.FC = () => {
       refetchInterval: 2_000,
       includeAnswered: true,
     });
+
+  const liveCount = useMemo(() => {
+    const now = Date.now();
+    const localId = whatsappCalling?.activeCall?.id ?? null;
+    const showLocal =
+      Boolean(whatsappCalling?.activeCall) &&
+      ['active', 'ringing', 'connecting', 'ending'].includes(
+        whatsappCalling?.phase || ''
+      );
+    const others = liveCalls.filter((c) => {
+      if (c.id === localId) return false;
+      if (c.status === 'ringing') {
+        const created = c.created_at ? new Date(c.created_at).getTime() : now;
+        return !Number.isNaN(created) && now - created < 5 * 60 * 1000;
+      }
+      if (c.status === 'answered') {
+        const answered = c.answered_at
+          ? new Date(c.answered_at).getTime()
+          : c.updated_at
+            ? new Date(c.updated_at).getTime()
+            : now;
+        return !Number.isNaN(answered) && now - answered < 3 * 60 * 60 * 1000;
+      }
+      return false;
+    });
+    return others.length + (showLocal ? 1 : 0);
+  }, [liveCalls, whatsappCalling?.activeCall, whatsappCalling?.phase]);
+
+  useEffect(() => {
+    if (activeTab === 'team' && !canSeeTeam) setActiveTab('history');
+  }, [activeTab, canSeeTeam]);
 
   // Deep-link: /calls?client=123&status=missed&…
   useEffect(() => {
@@ -304,7 +343,58 @@ export const CallsPage: React.FC = () => {
         <WhatsAppAgentStatusControl t={t} />
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 border-b border-gray-200 dark:border-gray-700">
+        <nav
+          className="-mb-px flex gap-4 overflow-x-auto rtl:space-x-reverse"
+          aria-label="Tabs"
+        >
+          <button
+            type="button"
+            onClick={() => setActiveTab('history')}
+            className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+              activeTab === 'history' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+            }`}
+          >
+            {t('callsTabHistory')}
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('live')}
+            className={`inline-flex items-center gap-2 whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+              activeTab === 'live' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+            }`}
+          >
+            {t('callsTabLive')}
+            {liveCount > 0 ? (
+              <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[#25D366] px-1.5 py-0.5 text-[11px] font-bold text-white">
+                {liveCount > 99 ? '99+' : liveCount}
+              </span>
+            ) : null}
+          </button>
+          {canSeeTeam ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab('team')}
+              className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                activeTab === 'team' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+              }`}
+            >
+              {t('callsTabTeam')}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => setActiveTab('hours')}
+            className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+              activeTab === 'hours' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+            }`}
+          >
+            {t('callsTabHours')}
+          </button>
+        </nav>
+      </div>
+
+      {activeTab === 'live' ? (
         <WhatsAppLiveCallsPanel
           calls={liveCalls}
           busy={Boolean(whatsappCalling?.answeringBusy || whatsappCalling?.isStartingOutbound)}
@@ -320,26 +410,33 @@ export const CallsPage: React.FC = () => {
           localElapsedSec={whatsappCalling?.elapsedSec}
           localPhase={whatsappCalling?.phase}
         />
-      </div>
+      ) : null}
 
-      {(normalizeRole(currentUser?.role) === 'Owner' ||
-        normalizeRole(currentUser?.role) === 'Supervisor') && (
-        <div className="mb-4">
-          <WhatsAppTeamCallStatusPanel t={t} />
-        </div>
-      )}
+      {activeTab === 'team' && canSeeTeam ? <WhatsAppTeamCallStatusPanel t={t} /> : null}
 
-      <div className="mb-4">
-        <WhatsAppCallHoursPanel
-          t={t}
-          canManage={
-            normalizeRole(currentUser?.role) === 'Owner' ||
-            normalizeRole(currentUser?.role) === 'Supervisor'
-          }
-        />
-      </div>
+      {activeTab === 'hours' ? (
+        <WhatsAppCallHoursPanel t={t} canManage={canManageHours} />
+      ) : null}
 
-      <div className="flex min-h-[70vh] flex-col gap-4 lg:flex-row">
+      {activeTab === 'history' ? (
+        <>
+          {liveCount > 0 ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab('live')}
+              className="mb-4 flex w-full items-center justify-between gap-3 rounded-xl border border-emerald-200/80 bg-emerald-50/80 px-4 py-2.5 text-start transition hover:bg-emerald-50 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:hover:bg-emerald-950/45"
+            >
+              <span className="inline-flex items-center gap-2 text-sm font-medium text-emerald-900 dark:text-emerald-100">
+                <PhoneIcon className="h-4 w-4 shrink-0" />
+                {t('callsLiveBanner').replace('{n}', String(liveCount))}
+              </span>
+              <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                {t('callsViewLive')}
+              </span>
+            </button>
+          ) : null}
+
+          <div className="flex min-h-[70vh] flex-col gap-4 lg:flex-row">
         <aside className="w-full shrink-0 rounded-xl border border-gray-200/90 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/80 dark:shadow-none lg:w-56">
           <FilterSection label={t('status')}>
             {STATUS_FILTERS.map((f) => {
@@ -662,6 +759,8 @@ export const CallsPage: React.FC = () => {
           ) : null}
         </div>
       </div>
+        </>
+      ) : null}
     </PageWrapper>
   );
 };

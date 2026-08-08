@@ -207,8 +207,8 @@ export const WhatsAppLiveCallsPanel: React.FC<Props> = ({
       </div>
 
       {count === 0 ? (
-        <div className="flex flex-col items-center justify-center gap-2 py-8 text-center">
-          <PhoneIcon className="h-10 w-10 text-gray-300 dark:text-gray-600" />
+        <div className="flex flex-col items-center justify-center gap-2 py-6 text-center sm:py-8">
+          <PhoneIcon className="h-8 w-8 text-gray-300 dark:text-gray-600 sm:h-10 sm:w-10" />
           <p className="text-sm text-gray-500 dark:text-gray-400">{t('waitingForIncomingCalls')}</p>
         </div>
       ) : (

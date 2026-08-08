@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { RefreshButton } from '../index';
+import { Button, RefreshButton } from '../index';
 import {
   getWhatsAppCallHoursAPI,
   updateWhatsAppCallHoursAPI,
@@ -31,6 +31,13 @@ const COMMON_TIMEZONES = [
   'Europe/Istanbul',
   'UTC',
 ];
+
+/** Matches shared `Input` / settings form fields. */
+const fieldClass =
+  'w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
+
+const fieldClassSm =
+  'px-2.5 py-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 function dayLabel(day: string, t: (k: any) => string): string {
   const key = `weekday_${day}`;
@@ -121,11 +128,16 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
 
   if (!config) {
     return (
-      <section className="rounded-xl border border-gray-200 bg-white p-4 dark:border-gray-700 dark:bg-gray-900/80">
-        <div className="mb-1 flex items-start justify-between gap-3">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
-            {t('whatsappCallHoursTitle')}
-          </h2>
+      <div className="rounded-xl border border-gray-200/90 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900/80 dark:shadow-none">
+        <div className="mb-2 flex items-start justify-between gap-3">
+          <div>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">
+              {t('whatsappCallHoursTitle')}
+            </h2>
+            <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+              {error || (loading ? t('loading') : t('whatsappCallHoursLoadFailed'))}
+            </p>
+          </div>
           <RefreshButton
             iconOnly
             loading={refreshing || loading}
@@ -133,30 +145,27 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
             className="shrink-0 text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
           />
         </div>
-        <p className="text-sm text-gray-500 dark:text-gray-400">
-          {error || (loading ? t('loading') : t('whatsappCallHoursLoadFailed'))}
-        </p>
         {error ? (
-          <p className="mt-2 text-xs text-gray-400 dark:text-gray-500">
+          <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
             {t('whatsappCallHoursConnectHint')}
           </p>
         ) : null}
-      </section>
+      </div>
     );
   }
 
   return (
-    <section className="rounded-xl border border-gray-200 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/80">
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+    <div className="rounded-xl border border-gray-200/90 bg-white p-5 shadow-sm dark:border-gray-700 dark:bg-gray-900/80 dark:shadow-none">
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-50">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50">
             {t('whatsappCallHoursTitle')}
           </h2>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
             {t('whatsappCallHoursHint')}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
           <RefreshButton
             iconOnly
             loading={refreshing}
@@ -165,7 +174,7 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
             className="shrink-0 text-gray-500 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
           />
           <label className="inline-flex cursor-pointer items-center gap-2">
-            <span className="text-xs font-medium text-gray-600 dark:text-gray-300">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
               {config.enabled ? t('enabled') : t('disabled')}
             </span>
             <button
@@ -178,7 +187,7 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
                 setSaved(false);
               }}
               className={`relative h-6 w-11 rounded-full transition ${
-                config.enabled ? 'bg-sky-500' : 'bg-gray-300 dark:bg-gray-600'
+                config.enabled ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-600'
               } disabled:opacity-50`}
             >
               <span
@@ -191,8 +200,10 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
         </div>
       </div>
 
-      <label className="mb-3 block text-xs font-medium text-gray-600 dark:text-gray-300">
-        {t('timezone')}
+      <div className="mb-5 max-w-md">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+          {t('timezone')}
+        </label>
         <select
           disabled={!canManage || busy}
           value={config.timezone || 'UTC'}
@@ -200,7 +211,7 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
             setConfig((p) => (p ? { ...p, timezone: e.target.value } : p));
             setSaved(false);
           }}
-          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+          className={fieldClass}
         >
           {!COMMON_TIMEZONES.includes(config.timezone) && config.timezone ? (
             <option value={config.timezone}>{config.timezone}</option>
@@ -211,58 +222,71 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
             </option>
           ))}
         </select>
-      </label>
+      </div>
 
-      <ul className="space-y-2">
-        {DAYS.map((day) => {
-          const entry = config.weekly[day] || {
-            closed: true,
-            open: '09:00',
-            close: '17:00',
-          };
-          return (
-            <li
-              key={day}
-              className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-100 px-2 py-2 dark:border-gray-800"
-            >
-              <span className="w-24 shrink-0 text-sm font-medium text-gray-800 dark:text-gray-100">
-                {dayLabel(day, t)}
-              </span>
-              <select
-                disabled={!canManage || busy}
-                value={entry.closed ? 'closed' : 'open'}
-                onChange={(e) => updateDay(day, { closed: e.target.value === 'closed' })}
-                className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
+      <div className="overflow-hidden rounded-lg border border-gray-200 dark:border-gray-700">
+        <div className="hidden grid-cols-[minmax(7rem,1fr)_8rem_minmax(0,1fr)] gap-3 border-b border-gray-200 bg-gray-50 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:bg-gray-800/80 dark:text-gray-400 sm:grid">
+          <span>{t('whatsappCallHoursDayColumn')}</span>
+          <span>{t('status')}</span>
+          <span>{t('whatsappCallHoursTimeColumn')}</span>
+        </div>
+        <ul className="divide-y divide-gray-100 dark:divide-gray-700/80">
+          {DAYS.map((day) => {
+            const entry = config.weekly[day] || {
+              closed: true,
+              open: '09:00',
+              close: '17:00',
+            };
+            return (
+              <li
+                key={day}
+                className="flex flex-col gap-2 px-3 py-3 sm:grid sm:grid-cols-[minmax(7rem,1fr)_8rem_minmax(0,1fr)] sm:items-center sm:gap-3"
               >
-                <option value="closed">{t('whatsappCallHoursClosed')}</option>
-                <option value="open">{t('whatsappCallHoursOpen')}</option>
-              </select>
-              {!entry.closed ? (
-                <>
-                  <input
-                    type="time"
-                    disabled={!canManage || busy}
-                    value={entry.open}
-                    onChange={(e) => updateDay(day, { open: e.target.value })}
-                    className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
-                  />
-                  <span className="text-xs text-gray-400">–</span>
-                  <input
-                    type="time"
-                    disabled={!canManage || busy}
-                    value={entry.close}
-                    onChange={(e) => updateDay(day, { close: e.target.value })}
-                    className="rounded-md border border-gray-200 bg-white px-2 py-1.5 text-sm dark:border-gray-700 dark:bg-gray-950"
-                  />
-                </>
-              ) : null}
-            </li>
-          );
-        })}
-      </ul>
+                <span className="text-sm font-medium text-gray-800 dark:text-gray-100">
+                  {dayLabel(day, t)}
+                </span>
+                <select
+                  disabled={!canManage || busy}
+                  value={entry.closed ? 'closed' : 'open'}
+                  onChange={(e) => updateDay(day, { closed: e.target.value === 'closed' })}
+                  className={`${fieldClassSm} w-full sm:w-auto`}
+                >
+                  <option value="closed">{t('whatsappCallHoursClosed')}</option>
+                  <option value="open">{t('whatsappCallHoursOpen')}</option>
+                </select>
+                {!entry.closed ? (
+                  <div className="flex flex-wrap items-center gap-2">
+                    <input
+                      type="time"
+                      disabled={!canManage || busy}
+                      value={entry.open}
+                      onChange={(e) => updateDay(day, { open: e.target.value })}
+                      className={fieldClassSm}
+                    />
+                    <span className="text-xs text-gray-400" aria-hidden>
+                      –
+                    </span>
+                    <input
+                      type="time"
+                      disabled={!canManage || busy}
+                      value={entry.close}
+                      onChange={(e) => updateDay(day, { close: e.target.value })}
+                      className={fieldClassSm}
+                    />
+                  </div>
+                ) : (
+                  <span className="hidden text-sm text-gray-400 sm:inline">—</span>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
 
-      <label className="mt-4 block text-xs font-medium text-gray-600 dark:text-gray-300">
-        {t('whatsappOutOfHoursMessage')}
+      <div className="mt-5">
+        <label className="mb-1.5 block text-sm font-medium text-gray-700 dark:text-gray-200">
+          {t('whatsappOutOfHoursMessage')}
+        </label>
         <textarea
           disabled={!canManage || busy}
           rows={3}
@@ -272,29 +296,26 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
             setConfig((p) => (p ? { ...p, out_of_hours_message: e.target.value } : p));
             setSaved(false);
           }}
-          className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-gray-700 dark:bg-gray-950"
+          className={`${fieldClass} min-h-[5.5rem] resize-y`}
         />
-      </label>
+      </div>
 
-      {error ? <p className="mt-2 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
+      {error ? <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
       {saved && !error ? (
-        <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{t('saved')}</p>
+        <p className="mt-3 text-sm text-emerald-600 dark:text-emerald-400">{t('saved')}</p>
       ) : null}
 
       {canManage ? (
-        <div className="mt-3 flex justify-end">
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void save()}
-            className="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-500 disabled:opacity-50"
-          >
-            {busy ? t('saving') : t('save')}
-          </button>
+        <div className="mt-4 flex justify-end">
+          <Button type="button" disabled={busy} loading={busy} onClick={() => void save()}>
+            {t('save')}
+          </Button>
         </div>
       ) : (
-        <p className="mt-3 text-xs text-gray-500">{t('whatsappCallHoursReadOnly')}</p>
+        <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
+          {t('whatsappCallHoursReadOnly')}
+        </p>
       )}
-    </section>
+    </div>
   );
 };

@@ -18,8 +18,9 @@ import {
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
-  getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI,
+  getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI, getWhatsAppCallsPendingAPI, getWhatsAppCallsLiveAPI,
   getNewsUnreadCountAPI, markNewsReadAPI,
+  type WhatsAppCallRecord,
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
@@ -108,6 +109,8 @@ export const queryKeys = {
     ['whatsappChatMessages', clientId ?? null, phone ?? ''] as const,
   whatsAppConversations: ['whatsAppConversations'] as const,
   whatsAppUnreadCount: ['whatsAppUnreadCount'] as const,
+  /** Pending / live WhatsApp Cloud Calling rings (shared by Calls page, sidebar, toast). */
+  whatsappCallsLive: ['whatsappCalls', 'live'] as const,
   newsUnreadCount: ['newsUnreadCount'] as const,
 };
 
@@ -706,6 +709,82 @@ export const useWhatsAppUnreadCount = (
     refetchInterval,
     enabled,
     select: (d) => d?.unread_count ?? 0,
+    ...rest,
+  });
+};
+
+/** Inbound ringing calls the agent can answer (from pending endpoint). */
+export function selectAnswerableLiveCalls(
+  results: WhatsAppCallRecord[] | undefined
+): WhatsAppCallRecord[] {
+  return (results || []).filter(
+    (c) => c.direction === 'inbound' && c.status === 'ringing'
+  );
+}
+
+export function selectLiveCallsForPanel(
+  results: WhatsAppCallRecord[] | undefined
+): WhatsAppCallRecord[] {
+  return (results || []).filter(
+    (c) => c.status === 'ringing' || c.status === 'answered'
+  );
+}
+
+/**
+ * Shared poll for WhatsApp live/pending calls (~2s).
+ * Does not poll while the tab is in the background (`refetchIntervalInBackground: false`).
+ */
+export const useWhatsAppLiveCalls = (
+  options?: Omit<
+    UseQueryOptions<{ results: WhatsAppCallRecord[] }, Error, WhatsAppCallRecord[]>,
+    'queryKey' | 'queryFn'
+  > & { enabled?: boolean; /** Include answered in-progress (Calls page). */ includeAnswered?: boolean }
+) => {
+  const {
+    refetchInterval = 2_000,
+    enabled = true,
+    includeAnswered = false,
+    ...rest
+  } = options || {};
+  return useQuery<
+    { results: WhatsAppCallRecord[] },
+    Error,
+    WhatsAppCallRecord[]
+  >({
+    queryKey: includeAnswered
+      ? ([...queryKeys.whatsappCallsLive, 'withAnswered'] as const)
+      : queryKeys.whatsappCallsLive,
+    queryFn: includeAnswered ? getWhatsAppCallsLiveAPI : getWhatsAppCallsPendingAPI,
+    staleTime: 1_000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
+    refetchIntervalInBackground: false,
+    enabled,
+    select: (d) =>
+      includeAnswered
+        ? selectLiveCallsForPanel(d?.results)
+        : selectAnswerableLiveCalls(d?.results),
+    ...rest,
+  });
+};
+
+/** Sidebar badge: count of answerable inbound ringing WhatsApp calls. */
+export const useWhatsAppLiveCallsCount = (
+  options?: Omit<
+    UseQueryOptions<{ results: WhatsAppCallRecord[] }, Error, number>,
+    'queryKey' | 'queryFn'
+  > & { enabled?: boolean }
+) => {
+  const { refetchInterval = 2_000, enabled = true, ...rest } = options || {};
+  return useQuery<{ results: WhatsAppCallRecord[] }, Error, number>({
+    queryKey: queryKeys.whatsappCallsLive,
+    queryFn: getWhatsAppCallsPendingAPI,
+    staleTime: 1_000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
+    refetchIntervalInBackground: false,
+    enabled,
+    select: (d) => selectAnswerableLiveCalls(d?.results).length,
     ...rest,
   });
 };

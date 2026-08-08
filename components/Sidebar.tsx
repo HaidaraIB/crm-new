@@ -11,7 +11,7 @@ import { ChevronDownIcon, CodeBracketsIcon, XIcon } from './icons';
 import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
-import { useNewsUnreadCount, useWhatsAppUnreadCount } from '../hooks/useQueries';
+import { useNewsUnreadCount, useWhatsAppLiveCallsCount, useWhatsAppUnreadCount } from '../hooks/useQueries';
 
 type IntegrationLogoConfig = {
     /** Brand image under /public. Mutually exclusive with `Icon`. */
@@ -84,6 +84,8 @@ type SidebarItemProps = {
     /** Unread count badge (e.g. team chat). Hidden when 0 or undefined. */
     badgeCount?: number;
     badgeAriaLabel?: string;
+    /** `live` = WhatsApp green for ringing live calls. */
+    badgeTone?: 'default' | 'live';
 };
 
 // Helper function to convert "Page Name" to "pageName"
@@ -103,6 +105,7 @@ const SidebarItem = ({
     onClick,
     badgeCount,
     badgeAriaLabel,
+    badgeTone = 'default',
 }: SidebarItemProps) => {
     const { language } = useAppContext();
     const activeClass = isActive
@@ -113,6 +116,14 @@ const SidebarItem = ({
     
     const iconMargin = language === 'ar' ? 'ml-3' : 'mr-3';
     const showBadge = badgeCount != null && badgeCount > 0;
+    const badgeClass =
+        badgeTone === 'live'
+            ? isActive
+                ? 'bg-white text-[#128C7E]'
+                : 'bg-[#25D366] text-white'
+            : isActive
+              ? 'bg-white text-primary'
+              : 'bg-primary text-white dark:bg-primary-500';
     
     return (
         <a
@@ -124,11 +135,7 @@ const SidebarItem = ({
             <span className="min-w-0 flex-1 whitespace-nowrap">{name}</span>
             {showBadge ? (
                 <span
-                    className={`ms-2 inline-flex min-h-[1.25rem] min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums ${
-                        isActive
-                            ? 'bg-white text-primary'
-                            : 'bg-primary text-white dark:bg-primary-500'
-                    }`}
+                    className={`ms-2 inline-flex min-h-[1.25rem] min-w-[1.25rem] shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold tabular-nums ${badgeClass}`}
                     aria-label={badgeAriaLabel}
                 >
                     {badgeCount! > 99 ? '99+' : badgeCount}
@@ -153,6 +160,14 @@ export const Sidebar = () => {
     const { data: whatsappUnreadCount = 0 } = useWhatsAppUnreadCount({
         enabled: Boolean(currentUser?.company?.id) && chatsNavVisible,
         refetchInterval: 15_000,
+    });
+    const callsNavVisible =
+        !isDataEntryUser &&
+        !isReceptionUser &&
+        (normalizedCurrentRole !== 'Supervisor' || canAccessPage('Calls'));
+    const { data: liveCallsCount = 0 } = useWhatsAppLiveCallsCount({
+        enabled: Boolean(currentUser?.company?.id) && callsNavVisible,
+        refetchInterval: 2_000,
     });
     const newsNavVisible =
         normalizedCurrentRole !== 'Supervisor' || canAccessPage('News');
@@ -370,17 +385,25 @@ export const Sidebar = () => {
                                 badgeCount={
                                     item.name === 'Chats'
                                         ? whatsappUnreadCount
-                                        : item.name === 'News'
-                                          ? newsUnreadCount
-                                          : undefined
+                                        : item.name === 'Calls'
+                                          ? liveCallsCount
+                                          : item.name === 'News'
+                                            ? newsUnreadCount
+                                            : undefined
                                 }
                                 badgeAriaLabel={
                                     item.name === 'Chats' && whatsappUnreadCount > 0
                                         ? `${whatsappUnreadCount} unread`
-                                        : item.name === 'News' && newsUnreadCount > 0
-                                          ? `${newsUnreadCount} unread`
-                                          : undefined
+                                        : item.name === 'Calls' && liveCallsCount > 0
+                                          ? t('liveCallsBadgeAria').replace(
+                                                '{n}',
+                                                String(liveCallsCount)
+                                            )
+                                          : item.name === 'News' && newsUnreadCount > 0
+                                            ? `${newsUnreadCount} unread`
+                                            : undefined
                                 }
+                                badgeTone={item.name === 'Calls' ? 'live' : 'default'}
                             />
                             {subItems && subItems.length > 0 && isOpen && (
                                 <div className="pt-2 pb-1 space-y-1" style={{ [language === 'ar' ? 'paddingRight' : 'paddingLeft']: '1rem' }}>

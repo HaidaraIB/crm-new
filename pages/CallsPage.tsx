@@ -22,7 +22,13 @@ import {
 import { getWhatsAppCallsAPI, type WhatsAppCallRecord } from '../services/api';
 import { ChatVoicePlayer } from '../components/chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
-import { useLead } from '../hooks/useQueries';
+import { useLead, useWhatsAppLiveCalls } from '../hooks/useQueries';
+import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
+import { WhatsAppLiveCallsPanel } from '../components/whatsapp/WhatsAppLiveCallsPanel';
+import { WhatsAppAgentStatusControl } from '../components/whatsapp/WhatsAppAgentStatusControl';
+import { WhatsAppCallHoursPanel } from '../components/whatsapp/WhatsAppCallHoursPanel';
+import { WhatsAppTeamCallStatusPanel } from '../components/whatsapp/WhatsAppTeamCallStatusPanel';
+import { normalizeRole } from '../utils/roles';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import {
@@ -78,7 +84,7 @@ function directionIconWrapClass(direction: string): string {
     : 'bg-violet-100 text-violet-800 ring-1 ring-violet-200/80 dark:bg-violet-950/45 dark:text-violet-200 dark:ring-violet-800/50';
 }
 
-function statusLabel(status: string, t: (k: string) => string): string {
+function statusLabel(status: string, t: (k: any) => string): string {
   const key = `whatsappCallStatus_${status.toLowerCase()}`;
   const translated = t(key);
   return translated === key ? status.replace(/_/g, ' ') : translated;
@@ -91,7 +97,7 @@ function callTimestamp(call: WhatsAppCallRecord): string | null {
 function formatCallWhen(
   iso: string | null | undefined,
   language: string,
-  t: (k: string) => string
+  t: (k: any) => string
 ): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -143,7 +149,7 @@ function formatFullWhen(iso: string | null | undefined, language: string): strin
   );
 }
 
-const CallRecordingPlayer: React.FC<{ url: string; t: (k: string) => string }> = ({
+const CallRecordingPlayer: React.FC<{ url: string; t: (k: any) => string }> = ({
   url,
   t,
 }) => {
@@ -176,8 +182,16 @@ export const CallsPage: React.FC = () => {
     setCallFilters,
     setIsCallFilterDrawerOpen,
   } = useAppContext();
+  const whatsappCalling = useWhatsAppCallingOptional();
   const [selected, setSelected] = useState<WhatsAppCallRecord | null>(null);
   const [searchDraft, setSearchDraft] = useState(callFilters.search);
+
+  const { data: liveCalls = [], refetch: refetchLiveCalls, isFetching: isLiveFetching } =
+    useWhatsAppLiveCalls({
+      enabled: Boolean(currentUser),
+      refetchInterval: 2_000,
+      includeAnswered: true,
+    });
 
   // Deep-link: /calls?client=123&status=missed&…
   useEffect(() => {
@@ -285,7 +299,46 @@ export const CallsPage: React.FC = () => {
 
   return (
     <PageWrapper title={t('callsPageTitle')}>
-      <p className="mb-4 text-sm text-gray-500 dark:text-gray-400">{t('callsPageDescription')}</p>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-gray-500 dark:text-gray-400">{t('callsPageDescription')}</p>
+        <WhatsAppAgentStatusControl t={t} />
+      </div>
+
+      <div className="mb-4">
+        <WhatsAppLiveCallsPanel
+          calls={liveCalls}
+          busy={Boolean(whatsappCalling?.answeringBusy || whatsappCalling?.isStartingOutbound)}
+          t={t}
+          onAnswer={(call) => {
+            void whatsappCalling?.acceptIncoming(call);
+          }}
+          onRefresh={() => {
+            void refetchLiveCalls();
+          }}
+          refreshing={isLiveFetching}
+          localActiveCall={whatsappCalling?.activeCall}
+          localElapsedSec={whatsappCalling?.elapsedSec}
+          localPhase={whatsappCalling?.phase}
+        />
+      </div>
+
+      {(normalizeRole(currentUser?.role) === 'Owner' ||
+        normalizeRole(currentUser?.role) === 'Supervisor') && (
+        <div className="mb-4">
+          <WhatsAppTeamCallStatusPanel t={t} />
+        </div>
+      )}
+
+      <div className="mb-4">
+        <WhatsAppCallHoursPanel
+          t={t}
+          canManage={
+            normalizeRole(currentUser?.role) === 'Owner' ||
+            normalizeRole(currentUser?.role) === 'Supervisor'
+          }
+        />
+      </div>
+
       <div className="flex min-h-[70vh] flex-col gap-4 lg:flex-row">
         <aside className="w-full shrink-0 rounded-xl border border-gray-200/90 bg-white p-4 shadow-sm dark:border-gray-700 dark:bg-gray-900/80 dark:shadow-none lg:w-56">
           <FilterSection label={t('status')}>

@@ -7,7 +7,7 @@ import type { WhatsAppCallRecord } from '../../services/api';
 type Props = {
   call: WhatsAppCallRecord;
   busy?: boolean;
-  t: (key: string) => string;
+  t: (key: any) => string;
   onAccept: () => void;
   onReject: () => void;
 };

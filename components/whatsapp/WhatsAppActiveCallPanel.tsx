@@ -23,7 +23,7 @@ type Props = {
   elapsedSec: number;
   muted: boolean;
   notes: string;
-  t: (key: string) => string;
+  t: (key: any) => string;
   onNotesChange: (v: string) => void;
   onToggleMute: () => void;
   onEnd: () => void;

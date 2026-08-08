@@ -1,18 +1,31 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import React, {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
 import { useWhatsAppCallSession } from '../../hooks/useWhatsAppCallSession';
+import { queryKeys, useWhatsAppLiveCalls } from '../../hooks/useQueries';
 import {
-  getWhatsAppCallsPendingAPI,
   getWhatsAppCallPermissionsAPI,
   resolveLocalizedApiError,
   sendWhatsAppCallPermissionRequestAPI,
   type WhatsAppCallRecord,
 } from '../../services/api';
+import {
+  dismissLiveCallToast,
+  isLiveCallToastDismissed,
+  pruneLiveCallToastDismissed,
+} from '../../utils/whatsappLiveCallToastDismiss';
 import { Loader } from '../Loader';
-import { WhatsAppIncomingCallModal } from './WhatsAppIncomingCallModal';
 import { WhatsAppCallWaitingBanner } from './WhatsAppCallWaitingBanner';
 import { WhatsAppActiveCallPanel } from './WhatsAppActiveCallPanel';
+import { WhatsAppLiveCallToast } from './WhatsAppLiveCallToast';
 import {
   preloadWhatsAppIncomingCallRingtone,
   startWhatsAppIncomingCallRingtone,
@@ -21,7 +34,6 @@ import {
 
 /** Auto-reject unanswered inbound rings (matches typical phone ring window). */
 const INCOMING_CALL_TIMEOUT_MS = 30_000;
-const PENDING_POLL_MS = 2_000;
 
 type StartOutboundArgs = {
   to: string;
@@ -32,9 +44,13 @@ type StartOutboundArgs = {
 
 type WhatsAppCallingContextValue = {
   startOutboundCall: (args: StartOutboundArgs) => Promise<void>;
+  acceptIncoming: (call: WhatsAppCallRecord) => Promise<void>;
+  rejectIncoming: (call: WhatsAppCallRecord) => Promise<void>;
   phase: string;
   activeCall: WhatsAppCallRecord | null;
+  elapsedSec: number;
   isStartingOutbound: boolean;
+  answeringBusy: boolean;
 };
 
 const WhatsAppCallingContext = createContext<WhatsAppCallingContextValue | null>(null);
@@ -63,71 +79,163 @@ function isBusyPhase(phase: string): boolean {
 export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
   children,
 }) => {
-  const { t, currentUser, showAlert } = useAppContext();
+  const { t, currentUser, showAlert, currentPage, goToPage } = useAppContext();
   const queryClient = useQueryClient();
   const session = useWhatsAppCallSession();
-  const [incoming, setIncoming] = useState<WhatsAppCallRecord | null>(null);
+  const [toastCall, setToastCall] = useState<WhatsAppCallRecord | null>(null);
+  /** When busy on another call, the next inbound waiting for End & answer. */
+  const [waitingCall, setWaitingCall] = useState<WhatsAppCallRecord | null>(null);
   const [isStartingOutbound, setIsStartingOutbound] = useState(false);
   const [waitingActionBusy, setWaitingActionBusy] = useState(false);
-  const seenRef = useRef<Set<number>>(new Set());
+  const [answeringBusy, setAnsweringBusy] = useState(false);
+  const [dismissTick, setDismissTick] = useState(0);
   const acceptingRef = useRef(false);
   const activeCallIdRef = useRef<number | null>(null);
   activeCallIdRef.current = session.activeCall?.id ?? null;
 
+  const onCallsPage = currentPage === 'Calls';
+  const sessionBusy = isBusyPhase(session.phase);
+
   const invalidateLists = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['whatsappCalls'] });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.whatsappCallsLive });
     void queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
   }, [queryClient]);
+
+  const { data: liveInbound = [] } = useWhatsAppLiveCalls({
+    enabled: Boolean(currentUser),
+    refetchInterval: 2_000,
+  });
 
   useEffect(() => {
     if (!currentUser) return;
     preloadWhatsAppIncomingCallRingtone();
   }, [currentUser]);
 
-  const sessionBusy = isBusyPhase(session.phase);
-  const showIncomingModal =
-    Boolean(incoming) && session.phase === 'idle' && !isStartingOutbound;
-  const showCallWaiting =
-    Boolean(incoming) && sessionBusy && !isStartingOutbound;
+  // Keep toast dismiss storage pruned to currently ringing ids.
+  useEffect(() => {
+    pruneLiveCallToastDismissed(liveInbound.map((c) => c.id));
+  }, [liveInbound]);
+
+  // Pick toast / waiting surfaces from live list (no fullscreen modal stacking).
+  useEffect(() => {
+    const activeId = activeCallIdRef.current;
+    const candidates = liveInbound.filter((c) => activeId == null || c.id !== activeId);
+
+    setWaitingCall((prev) => {
+      if (!sessionBusy) return null;
+      if (prev && candidates.some((c) => c.id === prev.id)) {
+        return candidates.find((c) => c.id === prev.id) ?? null;
+      }
+      return candidates[0] ?? null;
+    });
+
+    if (onCallsPage || sessionBusy || isStartingOutbound) {
+      setToastCall(null);
+      return;
+    }
+
+    const undismissed = candidates.filter((c) => !isLiveCallToastDismissed(c.id));
+    setToastCall((prev) => {
+      if (prev && undismissed.some((c) => c.id === prev.id)) {
+        return undismissed.find((c) => c.id === prev.id) ?? undismissed[0] ?? null;
+      }
+      return undismissed[0] ?? null;
+    });
+  }, [liveInbound, onCallsPage, sessionBusy, isStartingOutbound, dismissTick]);
+
+  const showToast = Boolean(toastCall) && !onCallsPage && !sessionBusy && !isStartingOutbound;
+  const showCallWaiting = Boolean(waitingCall) && sessionBusy && !isStartingOutbound;
+  const hasAnswerableRing =
+    liveInbound.some((c) => activeCallIdRef.current == null || c.id !== activeCallIdRef.current) &&
+    !sessionBusy &&
+    !isStartingOutbound;
 
   useEffect(() => {
-    if (showIncomingModal || showCallWaiting) {
+    if (showToast || showCallWaiting || (hasAnswerableRing && onCallsPage)) {
       startWhatsAppIncomingCallRingtone();
       return () => stopWhatsAppIncomingCallRingtone();
     }
     stopWhatsAppIncomingCallRingtone();
-  }, [showIncomingModal, showCallWaiting]);
+  }, [showToast, showCallWaiting, hasAnswerableRing, onCallsPage]);
 
-  const rejectIncomingCall = useCallback(
+  const rejectIncoming = useCallback(
     async (call: WhatsAppCallRecord) => {
       if (acceptingRef.current) return;
       acceptingRef.current = true;
+      setAnsweringBusy(true);
       stopWhatsAppIncomingCallRingtone();
-      setIncoming(null);
+      setToastCall((prev) => (prev?.id === call.id ? null : prev));
+      setWaitingCall((prev) => (prev?.id === call.id ? null : prev));
       try {
         await session.rejectInbound(call);
       } catch (e: any) {
         showAlert(resolveLocalizedApiError(e, t, t('whatsappCallFailed')), 'error');
       }
       acceptingRef.current = false;
+      setAnsweringBusy(false);
       invalidateLists();
     },
     [invalidateLists, session, showAlert, t]
   );
-  const rejectIncomingCallRef = useRef(rejectIncomingCall);
-  rejectIncomingCallRef.current = rejectIncomingCall;
+  const rejectIncomingRef = useRef(rejectIncoming);
+  rejectIncomingRef.current = rejectIncoming;
 
+  const acceptIncoming = useCallback(
+    async (call: WhatsAppCallRecord) => {
+      if (acceptingRef.current) return;
+      if (sessionBusy && session.activeCall && session.activeCall.id !== call.id) {
+        acceptingRef.current = true;
+        setWaitingActionBusy(true);
+        setAnsweringBusy(true);
+        stopWhatsAppIncomingCallRingtone();
+        setToastCall(null);
+        setWaitingCall(null);
+        try {
+          await session.endCall();
+          await session.acceptInbound(call);
+        } catch (e: any) {
+          showAlert(
+            resolveLocalizedApiError(e, t, t('whatsappCallAcceptFailed')),
+            'error'
+          );
+        }
+        acceptingRef.current = false;
+        setWaitingActionBusy(false);
+        setAnsweringBusy(false);
+        invalidateLists();
+        return;
+      }
+      if (acceptingRef.current) return;
+      acceptingRef.current = true;
+      setAnsweringBusy(true);
+      stopWhatsAppIncomingCallRingtone();
+      setToastCall((prev) => (prev?.id === call.id ? null : prev));
+      setWaitingCall((prev) => (prev?.id === call.id ? null : prev));
+      try {
+        await session.acceptInbound(call);
+      } catch (e: any) {
+        showAlert(
+          resolveLocalizedApiError(e, t, t('whatsappCallAcceptFailed')),
+          'error'
+        );
+      }
+      acceptingRef.current = false;
+      setAnsweringBusy(false);
+      invalidateLists();
+    },
+    [invalidateLists, session, sessionBusy, showAlert, t]
+  );
+
+  // Auto-reject toast / waiting rings after timeout (same window as before).
   useEffect(() => {
-    if ((!showIncomingModal && !showCallWaiting) || !incoming) return;
-    const call = incoming;
+    const call = showToast ? toastCall : showCallWaiting ? waitingCall : null;
+    if (!call) return;
     const id = window.setTimeout(() => {
-      void rejectIncomingCallRef.current(call);
+      void rejectIncomingRef.current(call);
     }, INCOMING_CALL_TIMEOUT_MS);
     return () => window.clearTimeout(id);
-  }, [showIncomingModal, showCallWaiting, incoming?.id]);
-
-  // Poll for inbound rings on every page while logged in (idle or busy).
-  const shouldPollPending = Boolean(currentUser);
+  }, [showToast, showCallWaiting, toastCall?.id, waitingCall?.id]);
 
   const prevPhaseRef = useRef(session.phase);
   useEffect(() => {
@@ -138,75 +246,12 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
     }
   }, [session.phase, invalidateLists]);
 
-  useEffect(() => {
-    if (!shouldPollPending) return;
-
-    let cancelled = false;
-    const tick = async () => {
-      if (cancelled) return;
-      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') {
-        return;
-      }
-      try {
-        const res = await getWhatsAppCallsPendingAPI();
-        if (cancelled) return;
-        const activeId = activeCallIdRef.current;
-        const inbound = (res.results || []).filter(
-          (c) =>
-            c.direction === 'inbound' &&
-            c.status === 'ringing' &&
-            (activeId == null || c.id !== activeId)
-        );
-        const inboundIds = new Set(inbound.map((c) => c.id));
-        setIncoming((prev) => {
-          if (prev && !inboundIds.has(prev.id)) return null;
-          return prev;
-        });
-        for (const call of inbound) {
-          if (seenRef.current.has(call.id)) continue;
-          seenRef.current.add(call.id);
-          setIncoming((prev) => prev ?? call);
-          break;
-        }
-      } catch {
-        /* ignore poll errors */
-      }
-    };
-
-    void tick();
-    const id = window.setInterval(tick, PENDING_POLL_MS);
-    const onVisibility = () => {
-      if (document.visibilityState === 'visible') void tick();
-    };
-    document.addEventListener('visibilitychange', onVisibility);
-    return () => {
-      cancelled = true;
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisibility);
-    };
-  }, [shouldPollPending]);
-
   const endAndAnswerWaiting = useCallback(
     async (waiting: WhatsAppCallRecord) => {
       if (acceptingRef.current || waitingActionBusy) return;
-      acceptingRef.current = true;
-      setWaitingActionBusy(true);
-      stopWhatsAppIncomingCallRingtone();
-      setIncoming(null);
-      try {
-        await session.endCall();
-        await session.acceptInbound(waiting);
-      } catch (e: any) {
-        showAlert(
-          resolveLocalizedApiError(e, t, t('whatsappCallAcceptFailed')),
-          'error'
-        );
-      }
-      acceptingRef.current = false;
-      setWaitingActionBusy(false);
-      invalidateLists();
+      await acceptIncoming(waiting);
     },
-    [invalidateLists, session, showAlert, t, waitingActionBusy]
+    [acceptIncoming, waitingActionBusy]
   );
 
   const startOutboundCall = useCallback(
@@ -216,7 +261,12 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
         showAlert(t('sms_error_invalid_to_number'), 'warning');
         return;
       }
-      if (isStartingOutbound || session.phase === 'connecting' || session.phase === 'ringing' || session.phase === 'active') {
+      if (
+        isStartingOutbound ||
+        session.phase === 'connecting' ||
+        session.phase === 'ringing' ||
+        session.phase === 'active'
+      ) {
         return;
       }
 
@@ -289,14 +339,36 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
     [invalidateLists, isStartingOutbound, session, showAlert, t]
   );
 
+  const handleDismissToast = useCallback(() => {
+    if (!toastCall) return;
+    dismissLiveCallToast(toastCall.id);
+    setToastCall(null);
+    setDismissTick((n) => n + 1);
+    stopWhatsAppIncomingCallRingtone();
+  }, [toastCall]);
+
   const value = useMemo(
     () => ({
       startOutboundCall,
+      acceptIncoming,
+      rejectIncoming,
       phase: session.phase,
       activeCall: session.activeCall,
+      elapsedSec: session.elapsedSec,
       isStartingOutbound,
+      answeringBusy: answeringBusy || waitingActionBusy || acceptingRef.current,
     }),
-    [startOutboundCall, session.phase, session.activeCall, isStartingOutbound]
+    [
+      startOutboundCall,
+      acceptIncoming,
+      rejectIncoming,
+      session.phase,
+      session.activeCall,
+      session.elapsedSec,
+      isStartingOutbound,
+      answeringBusy,
+      waitingActionBusy,
+    ]
   );
 
   const showStartingOverlay =
@@ -324,43 +396,34 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
           </div>
         </div>
       ) : null}
-      {showIncomingModal && incoming ? (
-        <WhatsAppIncomingCallModal
-          call={incoming}
-          busy={acceptingRef.current}
+      {showToast && toastCall ? (
+        <WhatsAppLiveCallToast
+          call={toastCall}
+          busy={answeringBusy || acceptingRef.current}
           t={t}
-          onReject={() => {
-            void rejectIncomingCall(incoming);
-          }}
-          onAccept={async () => {
-            if (acceptingRef.current) return;
-            acceptingRef.current = true;
+          onDismiss={handleDismissToast}
+          onOpenCalls={() => {
+            dismissLiveCallToast(toastCall.id);
+            setToastCall(null);
+            setDismissTick((n) => n + 1);
             stopWhatsAppIncomingCallRingtone();
-            const call = incoming;
-            setIncoming(null);
-            try {
-              await session.acceptInbound(call);
-            } catch (e: any) {
-              showAlert(
-                resolveLocalizedApiError(e, t, t('whatsappCallAcceptFailed')),
-                'error'
-              );
-            }
-            acceptingRef.current = false;
-            invalidateLists();
+            goToPage('Calls');
+          }}
+          onAnswer={() => {
+            void acceptIncoming(toastCall);
           }}
         />
       ) : null}
-      {showCallWaiting && incoming ? (
+      {showCallWaiting && waitingCall ? (
         <WhatsAppCallWaitingBanner
-          call={incoming}
+          call={waitingCall}
           busy={waitingActionBusy || acceptingRef.current}
           t={t}
           onReject={() => {
-            void rejectIncomingCall(incoming);
+            void rejectIncoming(waitingCall);
           }}
           onEndAndAnswer={() => {
-            void endAndAnswerWaiting(incoming);
+            void endAndAnswerWaiting(waitingCall);
           }}
         />
       ) : null}

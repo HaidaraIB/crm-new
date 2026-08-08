@@ -3807,6 +3807,13 @@ export const getWhatsAppCallsPendingAPI = async (): Promise<{
   return apiRequest('/integrations/whatsapp/calls/pending/');
 };
 
+export const getWhatsAppCallsLiveAPI = async (): Promise<{
+  results: WhatsAppCallRecord[];
+  count?: number;
+}> => {
+  return apiRequest('/integrations/whatsapp/calls/live/');
+};
+
 export const getWhatsAppCallDetailAPI = async (id: number): Promise<WhatsAppCallRecord> => {
   return apiRequest(`/integrations/whatsapp/calls/${id}/`);
 };
@@ -3818,10 +3825,10 @@ export const whatsappCallPreAcceptAPI = async (id: number, sdp: string) => {
   });
 };
 
-export const whatsappCallAcceptAPI = async (id: number, sdp: string) => {
+export const whatsappCallAcceptAPI = async (id: number, sdp?: string) => {
   return apiRequest<WhatsAppCallRecord>(`/integrations/whatsapp/calls/${id}/accept/`, {
     method: 'POST',
-    body: JSON.stringify({ sdp }),
+    body: JSON.stringify(sdp ? { sdp } : {}),
   });
 };
 
@@ -3841,7 +3848,7 @@ export const whatsappCallTerminateAPI = async (id: number, notes?: string) => {
 
 export const whatsappCallInitiateAPI = async (data: {
   to: string;
-  sdp: string;
+  sdp?: string;
   client_id?: number;
   whatsapp_account_id?: number;
   skip_permission_check?: boolean;
@@ -3850,13 +3857,90 @@ export const whatsappCallInitiateAPI = async (data: {
     method: 'POST',
     body: JSON.stringify({
       to: data.to,
-      sdp: data.sdp,
+      ...(data.sdp ? { sdp: data.sdp } : {}),
       ...(data.client_id != null && { client: data.client_id }),
       ...(data.whatsapp_account_id != null && {
         whatsapp_account_id: data.whatsapp_account_id,
       }),
       ...(data.skip_permission_check && { skip_permission_check: true }),
     }),
+  });
+};
+
+export type WhatsAppAgentCallStatus = {
+  status: 'ready' | 'away';
+  away_until?: string | null;
+  away_durations_minutes?: number[];
+};
+
+export const getWhatsAppCallAgentStatusAPI = async () => {
+  return apiRequest<WhatsAppAgentCallStatus>('/integrations/whatsapp/calls/agent-status/');
+};
+
+export const setWhatsAppCallAgentStatusAPI = async (data: {
+  status: 'ready' | 'away';
+  duration_minutes?: number;
+}) => {
+  return apiRequest<WhatsAppAgentCallStatus>('/integrations/whatsapp/calls/agent-status/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export type WhatsAppTeamAgentCallStatus = {
+  id: number;
+  username: string;
+  first_name?: string;
+  last_name?: string;
+  role?: string;
+  status: 'ready' | 'away';
+  away_until?: string | null;
+};
+
+export const getWhatsAppCallAgentStatusTeamAPI = async () => {
+  return apiRequest<{ results: WhatsAppTeamAgentCallStatus[] }>(
+    '/integrations/whatsapp/calls/agent-status/team/'
+  );
+};
+
+export type WhatsAppCallHoursDay = {
+  closed: boolean;
+  open: string;
+  close: string;
+};
+
+export type WhatsAppCallHoursConfig = {
+  whatsapp_account_id: number;
+  enabled: boolean;
+  timezone: string;
+  weekly: Record<string, WhatsAppCallHoursDay>;
+  out_of_hours_message: string;
+  default_out_of_hours_message?: string;
+  within_hours_now?: boolean;
+  meta_sync_error?: string;
+};
+
+export const getWhatsAppCallHoursAPI = async (whatsappAccountId?: number) => {
+  const q =
+    whatsappAccountId != null
+      ? `?whatsapp_account_id=${encodeURIComponent(String(whatsappAccountId))}`
+      : '';
+  return apiRequest<WhatsAppCallHoursConfig>(`/integrations/whatsapp/calls/hours/${q}`);
+};
+
+export const updateWhatsAppCallHoursAPI = async (
+  data: Partial<WhatsAppCallHoursConfig> & {
+    enabled?: boolean;
+    timezone?: string;
+    weekly?: Record<string, WhatsAppCallHoursDay>;
+    out_of_hours_message?: string;
+    sync_meta?: boolean;
+    whatsapp_account_id?: number;
+  }
+) => {
+  return apiRequest<WhatsAppCallHoursConfig>('/integrations/whatsapp/calls/hours/', {
+    method: 'PUT',
+    body: JSON.stringify(data),
   });
 };
 

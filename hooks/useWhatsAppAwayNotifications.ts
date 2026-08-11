@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { queryKeys, useWhatsAppUnreadCount } from './useQueries';
+import { useWhatsAppChatsAllowed } from './useWhatsAppChatsAllowed';
 import { playIncomingChatSound, preloadIncomingChatSound } from '../utils/chatIncomingSound';
 
 /**
@@ -12,7 +13,10 @@ import { playIncomingChatSound, preloadIncomingChatSound } from '../utils/chatIn
 export function useWhatsAppAwayNotifications(): void {
   const { currentPage, isLoggedIn, canAccessPage, currentUser } = useAppContext();
   const queryClient = useQueryClient();
-  const enabled = Boolean(isLoggedIn && currentUser && canAccessPage('Chats'));
+  const chatsAllowed = useWhatsAppChatsAllowed();
+  // `canAccessPage('Chats')` is true for an employee whose WhatsApp access the owner
+  // switched off — polling every 2s then 403s forever, so check real access too.
+  const enabled = Boolean(isLoggedIn && currentUser && canAccessPage('Chats') && chatsAllowed);
   const isOnChats = currentPage === 'Chats';
 
   const { data: unreadTotal = 0 } = useWhatsAppUnreadCount({

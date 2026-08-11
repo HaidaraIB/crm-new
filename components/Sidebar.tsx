@@ -12,6 +12,7 @@ import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { useNewsUnreadCount, useWhatsAppLiveCallsCount, useWhatsAppUnreadCount } from '../hooks/useQueries';
+import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
 
 type IntegrationLogoConfig = {
     /** Brand image under /public. Mutually exclusive with `Icon`. */
@@ -153,13 +154,7 @@ export const Sidebar = () => {
     const normalizedCurrentRole = normalizeRole(currentUser?.role);
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
     const isReceptionUser = normalizedCurrentRole === 'Reception';
-    const chatsNavVisible =
-        !isDataEntryUser &&
-        !isReceptionUser &&
-        (normalizedCurrentRole !== 'Supervisor' || canAccessPage('Chats')) &&
-        (normalizedCurrentRole === 'Supervisor'
-            ? hasSupervisorPermission('can_manage_whatsapp_chats')
-            : currentUser?.whatsapp_chat_enabled !== false);
+    const chatsNavVisible = useWhatsAppChatsAllowed();
     const { data: whatsappUnreadCount = 0 } = useWhatsAppUnreadCount({
         enabled: Boolean(currentUser?.company?.id) && chatsNavVisible,
         refetchInterval: 15_000,

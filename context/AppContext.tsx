@@ -1245,6 +1245,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       // Messaging Center (bulk campaigns + template management) is not staff-facing —
       // they use Chats for WhatsApp, same as the Integrations settings rule.
       if (page === 'Library' || page === 'Messaging Center') return false;
+      // WhatsApp access is a per-user toggle the owner controls; without it the
+      // Chats page can only 403 (and poll the server doing so).
+      if (page === 'Chats') return currentUser.whatsapp_chat_enabled !== false;
       return true;
     }
     // Supervisor: allow only by permission

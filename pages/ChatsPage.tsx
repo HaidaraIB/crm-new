@@ -15,6 +15,7 @@ import { WhatsAppChatLayout, type ChatBubbleMessage } from '../components/whatsa
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { useAppContext } from '../context/AppContext';
 import { useConnectedAccounts, useMarkWhatsAppConversationRead, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
+import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
 import {
   deleteWhatsAppConversationAPI,
   deleteWhatsAppMessageAPI,
@@ -89,6 +90,7 @@ export const ChatsPage: React.FC = () => {
     hasSupervisorPermission,
   } = useAppContext();
   const whatsappCalling = useWhatsAppCallingOptional();
+  const chatsAllowed = useWhatsAppChatsAllowed();
   const queryClient = useQueryClient();
   const companyId = currentUser?.company?.id as number | string | undefined;
   const companyName = currentUser?.company?.name || '';
@@ -198,9 +200,10 @@ export const ChatsPage: React.FC = () => {
     }
   }, [displayNameBlockedHint, composerAlert, t]);
 
+  // Never poll for a user whose WhatsApp access is off — every 3s tick would 403.
   const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
-    enabled: true,
-    refetchInterval: 3000,
+    enabled: chatsAllowed,
+    refetchInterval: chatsAllowed ? 3000 : false,
   });
 
   const selectedChatLeadId =

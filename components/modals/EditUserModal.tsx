@@ -83,6 +83,8 @@ export const EditUserModal = () => {
         }
         if (roleToSend === 'employee' || roleToSend === 'doctor') {
             payload.can_delete_clients = state.canDeleteClients;
+            payload.whatsapp_chat_enabled = state.whatsappChatEnabled;
+            payload.whatsapp_call_enabled = state.whatsappCallEnabled;
             const start = state.workStartTime.trim();
             const end = state.workEndTime.trim();
             payload.work_start_time = start || null;
@@ -102,6 +104,8 @@ export const EditUserModal = () => {
         workStartTime: '' as string,
         workEndTime: '' as string,
         canDeleteClients: false,
+        whatsappChatEnabled: true,
+        whatsappCallEnabled: true,
     });
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [passwordVisible, setPasswordVisible] = useState(false);
@@ -155,6 +159,16 @@ export const EditUserModal = () => {
                 workStartTime: workStart,
                 workEndTime: workEnd,
                 canDeleteClients: Boolean(selectedUser.can_delete_clients),
+                whatsappChatEnabled:
+                    selectedUser.whatsapp_chat_enabled === undefined ||
+                    selectedUser.whatsapp_chat_enabled === null
+                        ? true
+                        : Boolean(selectedUser.whatsapp_chat_enabled),
+                whatsappCallEnabled:
+                    selectedUser.whatsapp_call_enabled === undefined ||
+                    selectedUser.whatsapp_call_enabled === null
+                        ? true
+                        : Boolean(selectedUser.whatsapp_call_enabled),
             });
             initialPayloadRef.current = buildPayload({
                 name: fullName,
@@ -167,6 +181,16 @@ export const EditUserModal = () => {
                 workStartTime: workStart,
                 workEndTime: workEnd,
                 canDeleteClients: Boolean(selectedUser.can_delete_clients),
+                whatsappChatEnabled:
+                    selectedUser.whatsapp_chat_enabled === undefined ||
+                    selectedUser.whatsapp_chat_enabled === null
+                        ? true
+                        : Boolean(selectedUser.whatsapp_chat_enabled),
+                whatsappCallEnabled:
+                    selectedUser.whatsapp_call_enabled === undefined ||
+                    selectedUser.whatsapp_call_enabled === null
+                        ? true
+                        : Boolean(selectedUser.whatsapp_call_enabled),
             }, selectedUser);
             setPasswordVisible(false);
         } else {
@@ -496,8 +520,54 @@ export const EditUserModal = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('canDeleteClientsHelp')}</p>
                     </div>
                 )}
+                {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
+                    (formState.role === 'employee' || formState.role === 'doctor') && (
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="edit-user-whatsappChatEnabled"
+                                type="checkbox"
+                                checked={formState.whatsappChatEnabled}
+                                onChange={(e) =>
+                                    setFormState((prev) => ({ ...prev, whatsappChatEnabled: e.target.checked }))
+                                }
+                                className="rounded"
+                            />
+                            <label
+                                htmlFor="edit-user-whatsappChatEnabled"
+                                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
+                                {t('whatsappChatEnabled')}
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('whatsappChatEnabledHelp')}</p>
+                    </div>
+                )}
+                {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
+                    (formState.role === 'employee' || formState.role === 'doctor') && (
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="edit-user-whatsappCallEnabled"
+                                type="checkbox"
+                                checked={formState.whatsappCallEnabled}
+                                onChange={(e) =>
+                                    setFormState((prev) => ({ ...prev, whatsappCallEnabled: e.target.checked }))
+                                }
+                                className="rounded"
+                            />
+                            <label
+                                htmlFor="edit-user-whatsappCallEnabled"
+                                className="text-sm font-medium text-gray-700 dark:text-gray-300"
+                            >
+                                {t('whatsappCallEnabled')}
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('whatsappCallEnabledHelp')}</p>
+                    </div>
+                )}
                 <div className="flex justify-end gap-2">
-                    <Button 
+                    <Button
                         type="button" 
                         variant="secondary" 
                         onClick={handleClose} 

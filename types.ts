@@ -72,6 +72,8 @@ export interface SupervisorPermissionsMap {
   can_manage_services: boolean;
   can_manage_real_estate: boolean;
   can_manage_settings: boolean;
+  can_manage_whatsapp_chats: boolean;
+  can_manage_whatsapp_calls: boolean;
 }
 
 export interface SupervisorPermissionPayload {
@@ -99,6 +101,8 @@ export interface Supervisor {
   can_manage_settings: boolean;
   /** Stored on User; grantable by company owner */
   can_delete_clients?: boolean;
+  can_manage_whatsapp_chats?: boolean;
+  can_manage_whatsapp_calls?: boolean;
 }
 
 export interface User {
@@ -132,6 +136,10 @@ export interface User {
   is_active?: boolean;
   /** When true, employee/supervisor may delete customers (clients) */
   can_delete_clients?: boolean;
+  /** When false, this user is blocked from using WhatsApp Chats (default true) */
+  whatsapp_chat_enabled?: boolean;
+  /** When false, this user is blocked from using WhatsApp Calling (default true) */
+  whatsapp_call_enabled?: boolean;
 }
 
 export interface TimelineWhatsAppThreadMessage {

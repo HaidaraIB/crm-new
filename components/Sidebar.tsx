@@ -148,7 +148,7 @@ const SidebarItem = ({
 
 
 export const Sidebar = () => {
-    const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme, canAccessPage, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
+    const { currentPage, setCurrentPage, isSidebarOpen, setIsSidebarOpen, t, currentUser, language, theme, canAccessPage, hasSupervisorPermission, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
     const normalizedCurrentRole = normalizeRole(currentUser?.role);
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
@@ -156,7 +156,10 @@ export const Sidebar = () => {
     const chatsNavVisible =
         !isDataEntryUser &&
         !isReceptionUser &&
-        (normalizedCurrentRole !== 'Supervisor' || canAccessPage('Chats'));
+        (normalizedCurrentRole !== 'Supervisor' || canAccessPage('Chats')) &&
+        (normalizedCurrentRole === 'Supervisor'
+            ? hasSupervisorPermission('can_manage_whatsapp_chats')
+            : currentUser?.whatsapp_chat_enabled !== false);
     const { data: whatsappUnreadCount = 0 } = useWhatsAppUnreadCount({
         enabled: Boolean(currentUser?.company?.id) && chatsNavVisible,
         refetchInterval: 15_000,

@@ -86,6 +86,7 @@ export const ChatsPage: React.FC = () => {
     setConfirmDeleteConfig,
     setIsConfirmDeleteModalOpen,
     openCallsFiltered,
+    hasSupervisorPermission,
   } = useAppContext();
   const whatsappCalling = useWhatsAppCallingOptional();
   const queryClient = useQueryClient();
@@ -93,6 +94,10 @@ export const ChatsPage: React.FC = () => {
   const companyName = currentUser?.company?.name || '';
   const role = normalizeRole(currentUser?.role);
   const isStaff = role === 'Employee' || role === 'Doctor';
+  const chatAccessAllowed =
+    role === 'Supervisor'
+      ? hasSupervisorPermission('can_manage_whatsapp_chats')
+      : currentUser?.whatsapp_chat_enabled !== false;
 
   const showAlert = (message: string, variant: 'info' | 'warning' | 'error' = 'info') => {
     setAlertMessage(message);
@@ -1068,6 +1073,18 @@ export const ChatsPage: React.FC = () => {
       setResendingMessageId(null);
     }
   };
+
+  if (!chatAccessAllowed) {
+    return (
+      <div className="flex h-full min-h-0 flex-col items-center justify-center gap-2 p-6 text-center">
+        <IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" />
+        <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">{t('chats')}</h1>
+        <p className="max-w-md text-sm text-gray-500 dark:text-gray-400">
+          {t('whatsappChatAccessDisabled') || 'You do not have access to WhatsApp Chats.'}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-2 sm:p-3 md:p-4">

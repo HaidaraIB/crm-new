@@ -39,6 +39,8 @@ export interface SupervisorFormData {
   can_manage_real_estate: boolean;
   can_manage_settings: boolean;
   can_delete_clients: boolean;
+  can_manage_whatsapp_chats: boolean;
+  can_manage_whatsapp_calls: boolean;
 }
 
 const PERMISSION_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'password' | 'first_name' | 'last_name' | 'phone' | 'is_active'>)[] = [
@@ -51,6 +53,8 @@ const PERMISSION_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'p
   'can_manage_services',
   'can_manage_real_estate',
   'can_manage_settings',
+  'can_manage_whatsapp_chats',
+  'can_manage_whatsapp_calls',
 ];
 
 const INVENTORY_PERM_KEYS: (keyof SupervisorFormData)[] = ['can_manage_products', 'can_manage_services', 'can_manage_real_estate'];
@@ -112,6 +116,8 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     can_manage_real_estate: false,
     can_manage_settings: false,
     can_delete_clients: false,
+    can_manage_whatsapp_chats: true,
+    can_manage_whatsapp_calls: true,
   });
 
   useEffect(() => {
@@ -137,6 +143,16 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         can_delete_clients: Boolean(
           editingSupervisor.can_delete_clients ?? editingSupervisor.user?.can_delete_clients
         ),
+        can_manage_whatsapp_chats:
+          editingSupervisor.can_manage_whatsapp_chats === undefined ||
+          editingSupervisor.can_manage_whatsapp_chats === null
+            ? true
+            : Boolean(editingSupervisor.can_manage_whatsapp_chats),
+        can_manage_whatsapp_calls:
+          editingSupervisor.can_manage_whatsapp_calls === undefined ||
+          editingSupervisor.can_manage_whatsapp_calls === null
+            ? true
+            : Boolean(editingSupervisor.can_manage_whatsapp_calls),
       });
     } else {
       setFormData({
@@ -157,6 +173,8 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         can_manage_real_estate: false,
         can_manage_settings: false,
         can_delete_clients: false,
+        can_manage_whatsapp_chats: true,
+        can_manage_whatsapp_calls: true,
       });
     }
   }, [editingSupervisor, isOpen]);
@@ -240,6 +258,8 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     can_manage_services: 'supervisorsPermCanManageServices',
     can_manage_real_estate: 'supervisorsPermCanManageRealEstate',
     can_manage_settings: 'supervisorsPermCanManageSettings',
+    can_manage_whatsapp_chats: 'supervisorsPermCanManageWhatsappChats',
+    can_manage_whatsapp_calls: 'supervisorsPermCanManageWhatsappCalls',
   };
 
   const formDir = language === 'ar' ? 'rtl' : 'ltr';

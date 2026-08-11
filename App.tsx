@@ -1140,14 +1140,32 @@ const TheApp = () => {
     };
 
 
+// Gate the WhatsApp call listener/mounting per the current user's permission —
+// employees/doctors/reception/data_entry can be individually disabled
+// (whatsapp_call_enabled === false), supervisors are gated by can_manage_whatsapp_calls.
+// Backend already rejects disabled users with 403; this just avoids mounting dead call UI.
+const WhatsAppCallGate: React.FC<{ children?: React.ReactNode }> = ({ children }) => {
+    const { currentUser, hasSupervisorPermission } = useAppContext();
+    const role = currentUser?.role;
+    const isSupervisor = role === 'Supervisor';
+    const callingAllowed = isSupervisor
+        ? hasSupervisorPermission('can_manage_whatsapp_calls')
+        : currentUser?.whatsapp_call_enabled !== false;
+
+    if (!callingAllowed) {
+        return <>{children}</>;
+    }
+    return <WhatsAppCallListener>{children}</WhatsAppCallListener>;
+};
+
 function App() {
   return (
     // FIX: The AppProvider component requires children.
     <AppProvider>
       <ImpersonationSessionGuard>
-        <WhatsAppCallListener>
+        <WhatsAppCallGate>
           <TheApp />
-        </WhatsAppCallListener>
+        </WhatsAppCallGate>
       </ImpersonationSessionGuard>
     </AppProvider>
   );

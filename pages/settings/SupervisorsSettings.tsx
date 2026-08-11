@@ -96,6 +96,8 @@ export const SupervisorsSettings = () => {
             can_manage_real_estate: data.can_manage_real_estate,
             can_manage_settings: data.can_manage_settings,
             can_delete_clients: data.can_delete_clients,
+            can_manage_whatsapp_chats: data.can_manage_whatsapp_chats,
+            can_manage_whatsapp_calls: data.can_manage_whatsapp_calls,
           }),
         ]);
       } else {
@@ -117,6 +119,8 @@ export const SupervisorsSettings = () => {
           can_manage_real_estate: data.can_manage_real_estate,
           can_manage_settings: data.can_manage_settings,
           can_delete_clients: data.can_delete_clients,
+          can_manage_whatsapp_chats: data.can_manage_whatsapp_chats,
+          can_manage_whatsapp_calls: data.can_manage_whatsapp_calls,
           });
       }
       await loadSupervisors();
@@ -201,6 +205,8 @@ export const SupervisorsSettings = () => {
     can_manage_services: t('supervisorsPermCanManageServices'),
     can_manage_real_estate: t('supervisorsPermCanManageRealEstate'),
     can_manage_settings: t('supervisorsPermCanManageSettings'),
+    can_manage_whatsapp_chats: t('supervisorsPermCanManageWhatsappChats'),
+    can_manage_whatsapp_calls: t('supervisorsPermCanManageWhatsappCalls'),
   };
 
   const inventoryPermKeys: (keyof Supervisor)[] = ['can_manage_products', 'can_manage_services', 'can_manage_real_estate'];

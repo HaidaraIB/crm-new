@@ -60,6 +60,8 @@ export const AddUserModal = () => {
         workStartTime: '' as string,
         workEndTime: '' as string,
         canDeleteClients: false,
+        whatsappChatEnabled: true,
+        whatsappCallEnabled: true,
     });
 
     useEffect(() => {
@@ -164,6 +166,8 @@ export const AddUserModal = () => {
             }
             if (formData.role === 'employee' || formData.role === 'doctor') {
                 userData.can_delete_clients = formData.canDeleteClients;
+                userData.whatsapp_chat_enabled = formData.whatsappChatEnabled;
+                userData.whatsapp_call_enabled = formData.whatsappCallEnabled;
                 const start = formData.workStartTime.trim();
                 const end = formData.workEndTime.trim();
                 userData.work_start_time = start || null;
@@ -184,6 +188,8 @@ export const AddUserModal = () => {
                 workStartTime: '',
                 workEndTime: '',
                 canDeleteClients: false,
+                whatsappChatEnabled: true,
+                whatsappCallEnabled: true,
             });
             setErrors({});
             
@@ -265,6 +271,8 @@ export const AddUserModal = () => {
             workStartTime: '',
             workEndTime: '',
             canDeleteClients: false,
+            whatsappChatEnabled: true,
+            whatsappCallEnabled: true,
         });
         setErrors({});
     };
@@ -430,8 +438,42 @@ export const AddUserModal = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('canDeleteClientsHelp')}</p>
                     </div>
                 )}
+                {(formData.role === 'employee' || formData.role === 'doctor') && (
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="add-user-whatsapp-chat-enabled"
+                                type="checkbox"
+                                checked={formData.whatsappChatEnabled}
+                                onChange={(e) => handleChange('whatsappChatEnabled', e.target.checked)}
+                                className="rounded"
+                            />
+                            <label htmlFor="add-user-whatsapp-chat-enabled" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {t('whatsappChatEnabled')}
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('whatsappChatEnabledHelp')}</p>
+                    </div>
+                )}
+                {(formData.role === 'employee' || formData.role === 'doctor') && (
+                    <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <input
+                                id="add-user-whatsapp-call-enabled"
+                                type="checkbox"
+                                checked={formData.whatsappCallEnabled}
+                                onChange={(e) => handleChange('whatsappCallEnabled', e.target.checked)}
+                                className="rounded"
+                            />
+                            <label htmlFor="add-user-whatsapp-call-enabled" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                                {t('whatsappCallEnabled')}
+                            </label>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('whatsappCallEnabledHelp')}</p>
+                    </div>
+                )}
                 <div className="flex justify-end gap-2 pt-2">
-                    <Button 
+                    <Button
                         variant="secondary" 
                         onClick={() => {
                             setIsAddUserModalOpen(false);

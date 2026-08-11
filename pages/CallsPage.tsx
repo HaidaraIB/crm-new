@@ -191,12 +191,14 @@ export const CallsPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<CallsPageTab>('history');
 
   const role = normalizeRole(currentUser?.role);
-  const canSeeTeam = role === 'Owner' || role === 'Supervisor';
-  const canManageHours = canSeeTeam;
+  // Live / Team / Call hours are supervisory views: employees with WhatsApp
+  // calling permissions only get their own call History.
+  const canSeeSupervisorTabs = role === 'Owner' || role === 'Supervisor';
+  const canManageHours = canSeeSupervisorTabs;
 
   const { data: liveCalls = [], refetch: refetchLiveCalls, isFetching: isLiveFetching } =
     useWhatsAppLiveCalls({
-      enabled: Boolean(currentUser),
+      enabled: Boolean(currentUser) && canSeeSupervisorTabs,
       refetchInterval: 2_000,
       includeAnswered: true,
     });
@@ -229,8 +231,8 @@ export const CallsPage: React.FC = () => {
   }, [liveCalls, whatsappCalling?.activeCall, whatsappCalling?.phase]);
 
   useEffect(() => {
-    if (activeTab === 'team' && !canSeeTeam) setActiveTab('history');
-  }, [activeTab, canSeeTeam]);
+    if (activeTab !== 'history' && !canSeeSupervisorTabs) setActiveTab('history');
+  }, [activeTab, canSeeSupervisorTabs]);
 
   // Deep-link: /calls?client=123&status=missed&…
   useEffect(() => {
@@ -357,44 +359,46 @@ export const CallsPage: React.FC = () => {
           >
             {t('callsTabHistory')}
           </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('live')}
-            className={`inline-flex items-center gap-2 whitespace-nowrap py-3 px-1 text-sm transition-colors ${
-              activeTab === 'live' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
-            }`}
-          >
-            {t('callsTabLive')}
-            {liveCount > 0 ? (
-              <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[#25D366] px-1.5 py-0.5 text-[11px] font-bold text-white">
-                {liveCount > 99 ? '99+' : liveCount}
-              </span>
-            ) : null}
-          </button>
-          {canSeeTeam ? (
-            <button
-              type="button"
-              onClick={() => setActiveTab('team')}
-              className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
-                activeTab === 'team' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
-              }`}
-            >
-              {t('callsTabTeam')}
-            </button>
+          {canSeeSupervisorTabs ? (
+            <>
+              <button
+                type="button"
+                onClick={() => setActiveTab('live')}
+                className={`inline-flex items-center gap-2 whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                  activeTab === 'live' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                }`}
+              >
+                {t('callsTabLive')}
+                {liveCount > 0 ? (
+                  <span className="inline-flex min-w-[1.25rem] items-center justify-center rounded-full bg-[#25D366] px-1.5 py-0.5 text-[11px] font-bold text-white">
+                    {liveCount > 99 ? '99+' : liveCount}
+                  </span>
+                ) : null}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('team')}
+                className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                  activeTab === 'team' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                }`}
+              >
+                {t('callsTabTeam')}
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('hours')}
+                className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                  activeTab === 'hours' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                }`}
+              >
+                {t('callsTabHours')}
+              </button>
+            </>
           ) : null}
-          <button
-            type="button"
-            onClick={() => setActiveTab('hours')}
-            className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
-              activeTab === 'hours' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
-            }`}
-          >
-            {t('callsTabHours')}
-          </button>
         </nav>
       </div>
 
-      {activeTab === 'live' ? (
+      {activeTab === 'live' && canSeeSupervisorTabs ? (
         <WhatsAppLiveCallsPanel
           calls={liveCalls}
           busy={Boolean(whatsappCalling?.answeringBusy || whatsappCalling?.isStartingOutbound)}
@@ -412,15 +416,15 @@ export const CallsPage: React.FC = () => {
         />
       ) : null}
 
-      {activeTab === 'team' && canSeeTeam ? <WhatsAppTeamCallStatusPanel t={t} /> : null}
+      {activeTab === 'team' && canSeeSupervisorTabs ? <WhatsAppTeamCallStatusPanel t={t} /> : null}
 
-      {activeTab === 'hours' ? (
+      {activeTab === 'hours' && canSeeSupervisorTabs ? (
         <WhatsAppCallHoursPanel t={t} canManage={canManageHours} />
       ) : null}
 
       {activeTab === 'history' ? (
         <>
-          {liveCount > 0 ? (
+          {liveCount > 0 && canSeeSupervisorTabs ? (
             <button
               type="button"
               onClick={() => setActiveTab('live')}

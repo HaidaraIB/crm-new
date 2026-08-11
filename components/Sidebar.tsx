@@ -372,8 +372,14 @@ export const Sidebar = () => {
                     if (isReceptionUser && item.name === 'Leads') {
                         subItems = ['All Leads', 'CreateLead'];
                     }
-                    // Supervisor: filter sub-items by permission
-                    if (normalizedCurrentRole === 'Supervisor' && subItems) {
+                    // Supervisor: filter sub-items by permission.
+                    // Employee / Doctor: drop staff-restricted sub-items (Messaging Center).
+                    if (
+                        subItems &&
+                        (normalizedCurrentRole === 'Supervisor' ||
+                            normalizedCurrentRole === 'Employee' ||
+                            normalizedCurrentRole === 'Doctor')
+                    ) {
                         subItems = subItems.filter((sub) => canAccessPage(sub));
                     }
                     return (

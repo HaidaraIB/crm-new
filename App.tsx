@@ -23,6 +23,7 @@ import {
     isGatewayPaymentReturnSearch,
     isPaymentSuccessPath,
 } from './utils/paymentSession';
+import { normalizeRole } from './utils/roles';
 
 /** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
 function CurrentPageContent({ currentPage }: { currentPage: Page }) {
@@ -507,9 +508,12 @@ const TheApp = () => {
         };
     }, [isLoggedIn, currentPage, setCurrentPage, currentUser, selectedLead, setIsTeamChatDialogOpen]);
 
-    // Supervisor: redirect to Dashboard if they try to access a page they don't have permission for
+    // Supervisor / Employee / Doctor: redirect to Dashboard if they try to access a page
+    // they don't have permission for (typed URL, stale tab, bookmark).
     React.useEffect(() => {
-        if (!isLoggedIn || !currentUser || currentUser.role !== 'Supervisor') return;
+        if (!isLoggedIn || !currentUser) return;
+        const role = normalizeRole(currentUser.role);
+        if (role !== 'Supervisor' && role !== 'Employee' && role !== 'Doctor') return;
         if (!canAccessPage(currentPage)) {
             setCurrentPage('Dashboard');
             if (currentUser?.company) {

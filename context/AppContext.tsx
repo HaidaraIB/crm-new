@@ -1241,8 +1241,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       }
     }
     if (role !== 'Supervisor') {
-      // Employee / Doctor: allow most pages; Library is owner-managed only.
-      if (page === 'Library') return false;
+      // Employee / Doctor: allow most pages; Library is owner-managed only, and the
+      // Messaging Center (bulk campaigns + template management) is not staff-facing —
+      // they use Chats for WhatsApp, same as the Integrations settings rule.
+      if (page === 'Library' || page === 'Messaging Center') return false;
       return true;
     }
     // Supervisor: allow only by permission

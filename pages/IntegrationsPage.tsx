@@ -2477,6 +2477,7 @@ export const IntegrationsPage = () => {
                 let preview = selectedChatClient
                     ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient, {
                           tenantCompanyName: currentUser?.company?.name || '',
+                          variableMap: tpl.meta_variable_map?.body ?? undefined,
                       })
                     : (tpl.content || '');
                 preview = preview.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();
@@ -2679,6 +2680,7 @@ export const IntegrationsPage = () => {
             let body = selectedChatClient
                 ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient, {
                       tenantCompanyName: currentUser?.company?.name || '',
+                      variableMap: tpl.meta_variable_map?.body ?? undefined,
                   })
                 : (tpl.content || '');
             body = body.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();

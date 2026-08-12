@@ -3625,6 +3625,8 @@ export interface MessageTemplateType {
   buttons?: TemplateButtonPayload[] | null;
   meta_template_id?: string | null;
   meta_status?: string | null;
+  /** Which CRM variable each Meta {{n}} stands for, recorded at submit time. */
+  meta_variable_map?: { body?: string[]; header?: string[] } | null;
   created_at: string;
   updated_at: string;
 }

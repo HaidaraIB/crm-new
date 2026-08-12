@@ -165,6 +165,13 @@ export type PlaceholderContextOptions = {
   tenantCompanyName?: string;
   employeeName?: string;
   timeZone?: string;
+  /**
+   * `meta_variable_map.body` from the template row: which CRM variable each Meta
+   * {{n}} stands for, in order. Meta freezes that numbering at approval, so this is
+   * the only reliable source — the fallback below is a guess that silently swaps
+   * fields whenever a template's order differs from it.
+   */
+  variableMap?: string[];
 };
 
 function resolveCustomerName(lead: PlaceholderLeadLike): string {
@@ -323,25 +330,35 @@ export function replaceTemplatePlaceholders(
   const values = buildMessagePlaceholderValues(lead, opts);
   let out = renderMessagePlaceholders(text || '', values);
 
-  // Meta-style {{1}}, {{2}}, … — fill from lead context pool
-  const positionalPool = [
-    values.customer_name,
-    values.company_name,
-    values.phone,
-    values.employee_name,
-    values.current_date,
-    values.current_time,
-    values.status,
-    values.stage,
-    values.channel,
-    values.visit_type,
-    values.profession,
-    values.lead_company_name,
-  ].map((v) => (v || '').trim());
+  // Meta-style {{1}}, {{2}}, … — from the template's recorded variable order when we
+  // have it, otherwise a best-effort guess by position.
+  const positionalPool = (
+    opts.variableMap?.length
+      ? opts.variableMap.map((key) => values[key])
+      : [
+          values.customer_name,
+          values.company_name,
+          values.phone,
+          values.employee_name,
+          values.current_date,
+          values.current_time,
+          values.status,
+          values.stage,
+          values.channel,
+          values.visit_type,
+          values.profession,
+          values.lead_company_name,
+        ]
+  ).map((v) => (v || '').trim());
 
+  const hasVariableMap = Boolean(opts.variableMap?.length);
   out = out.replace(/\{\{\s*(\d+)\s*\}\}/g, (_match, numStr: string) => {
     const idx = Math.max(0, parseInt(numStr, 10) - 1);
-    const value = positionalPool[idx] || positionalPool.find((v) => v) || '';
+    // With a known map an empty value stays a dash — borrowing a neighbouring
+    // field here is what made {{1}} render the customer instead of the employee.
+    const value = hasVariableMap
+      ? positionalPool[idx]
+      : positionalPool[idx] || positionalPool.find((v) => v) || '';
     return value || '-';
   });
 

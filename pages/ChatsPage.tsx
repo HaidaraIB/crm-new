@@ -880,7 +880,10 @@ export const ChatsPage: React.FC = () => {
     const tpl = approvedWaTemplates.find((x) => x.id === chatTemplateSendId);
     if (!tpl) return;
     setChatTemplateSending(true);
-    const preview = replaceTemplatePlaceholders(tpl.content || tpl.name, selectedChatClient, companyName);
+    const preview = replaceTemplatePlaceholders(tpl.content || tpl.name, selectedChatClient, {
+      tenantCompanyName: companyName,
+      variableMap: tpl.meta_variable_map?.body ?? undefined,
+    });
     const msgId = newChatMessageId();
     pushOptimistic(selectedChatClient, (prev) => [
       ...prev,
@@ -1203,7 +1206,13 @@ export const ChatsPage: React.FC = () => {
             },
             onInsertQuickTemplate: (content, templateId) => {
               if (blockFreeText || whatsappSendBlocked) return;
-              const resolved = replaceTemplatePlaceholders(content, selectedChatClient, companyName);
+              const tpl = templateId
+                ? approvedWaTemplates.find((x) => x.id === templateId)
+                : undefined;
+              const resolved = replaceTemplatePlaceholders(content, selectedChatClient, {
+                tenantCompanyName: companyName,
+                variableMap: tpl?.meta_variable_map?.body ?? undefined,
+              });
               setMessageInput((prev) => (prev ? `${prev}\n${resolved}` : resolved));
               if (templateId) setChatTemplateSendId(templateId);
             },

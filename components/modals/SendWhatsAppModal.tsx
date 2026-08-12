@@ -199,7 +199,11 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                                     type="button"
                                     onClick={() => {
                                         const content = tpl.content || '';
-                                        const resolved = lead ? replaceTemplatePlaceholders(content, lead) : content;
+                                        const resolved = lead
+                                            ? replaceTemplatePlaceholders(content, lead, {
+                                                  variableMap: tpl.meta_variable_map?.body ?? undefined,
+                                              })
+                                            : content;
                                         setBody((prev) => (prev ? prev + '\n' + resolved : resolved));
                                         clearFieldError(setErrors, 'body');
                                     }}

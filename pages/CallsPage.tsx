@@ -28,6 +28,7 @@ import { WhatsAppLiveCallsPanel } from '../components/whatsapp/WhatsAppLiveCalls
 import { WhatsAppAgentStatusControl } from '../components/whatsapp/WhatsAppAgentStatusControl';
 import { WhatsAppCallHoursPanel } from '../components/whatsapp/WhatsAppCallHoursPanel';
 import { WhatsAppTeamCallStatusPanel } from '../components/whatsapp/WhatsAppTeamCallStatusPanel';
+import { CallErrorLogsPanel } from '../components/messaging/CallErrorLogsPanel';
 import { normalizeRole } from '../utils/roles';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { getCompanyViewLeadRoute } from '../utils/routing';
@@ -40,7 +41,7 @@ import {
   replaceCallsUrlQuery,
 } from '../utils/callFilters';
 
-type CallsPageTab = 'history' | 'live' | 'team' | 'hours';
+type CallsPageTab = 'history' | 'live' | 'team' | 'hours' | 'error-logs';
 
 const STATUS_FILTERS = [
   { key: 'all' },
@@ -194,6 +195,7 @@ export const CallsPage: React.FC = () => {
   // Live / Team / Call hours are supervisory views: employees with WhatsApp
   // calling permissions only get their own call History.
   const canSeeSupervisorTabs = role === 'Owner' || role === 'Supervisor';
+  const canSeeCallErrorLogs = role === 'Owner';
   const canManageHours = canSeeSupervisorTabs;
 
   const { data: liveCalls = [], refetch: refetchLiveCalls, isFetching: isLiveFetching } =
@@ -231,8 +233,18 @@ export const CallsPage: React.FC = () => {
   }, [liveCalls, whatsappCalling?.activeCall, whatsappCalling?.phase]);
 
   useEffect(() => {
-    if (activeTab !== 'history' && !canSeeSupervisorTabs) setActiveTab('history');
-  }, [activeTab, canSeeSupervisorTabs]);
+    if (activeTab === 'error-logs' && !canSeeCallErrorLogs) {
+      setActiveTab('history');
+      return;
+    }
+    if (
+      activeTab !== 'history' &&
+      activeTab !== 'error-logs' &&
+      !canSeeSupervisorTabs
+    ) {
+      setActiveTab('history');
+    }
+  }, [activeTab, canSeeSupervisorTabs, canSeeCallErrorLogs]);
 
   // Deep-link: /calls?client=123&status=missed&…
   useEffect(() => {
@@ -395,6 +407,17 @@ export const CallsPage: React.FC = () => {
               </button>
             </>
           ) : null}
+          {canSeeCallErrorLogs ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab('error-logs')}
+              className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                activeTab === 'error-logs' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+              }`}
+            >
+              {t('callsTabErrorLogs')}
+            </button>
+          ) : null}
         </nav>
       </div>
 
@@ -421,6 +444,8 @@ export const CallsPage: React.FC = () => {
       {activeTab === 'hours' && canSeeSupervisorTabs ? (
         <WhatsAppCallHoursPanel t={t} canManage={canManageHours} />
       ) : null}
+
+      {activeTab === 'error-logs' && canSeeCallErrorLogs ? <CallErrorLogsPanel /> : null}
 
       {activeTab === 'history' ? (
         <>

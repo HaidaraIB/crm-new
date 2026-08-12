@@ -1244,6 +1244,7 @@ export const translations = {
     callsTabLive: "Live",
     callsTabTeam: "Team",
     callsTabHours: "Call hours",
+    callsTabErrorLogs: "Error logs",
     callsLiveBanner: "{n} live call(s) — open Live to answer",
     callsViewLive: "View",
     liveCallsTitle: "Live calls",
@@ -1509,7 +1510,7 @@ export const translations = {
     messageLogShowingCount: "Showing {shown} of {total}",
     callErrorLogs: "Call Error Logs",
     callErrorLogsDesc:
-      "WhatsApp Cloud Calling failures — initiate, permission request, microphone, and Meta webhook errors. Visible to the company owner only.",
+      "WhatsApp Cloud Calling failures — initiate, permission request, microphone, and Meta webhook errors. Owner-only on the Calls page.",
     callErrorLogsEmpty: "No WhatsApp call errors match your filters yet.",
     callErrorLogSearchPlaceholder: "Search by name, phone, agent, or error…",
     callErrorLogFilterSource: "Error source",
@@ -3894,6 +3895,7 @@ export const translations = {
     callsTabLive: "مباشر",
     callsTabTeam: "الفريق",
     callsTabHours: "ساعات الاتصال",
+    callsTabErrorLogs: "سجل الأخطاء",
     callsLiveBanner: "{n} مكالمة نشطة — افتح مباشر للرد",
     callsViewLive: "عرض",
     liveCallsTitle: "المكالمات النشطة",
@@ -4160,7 +4162,7 @@ export const translations = {
     messageLogShowingCount: "عرض {shown} من {total}",
     callErrorLogs: "سجل أخطاء المكالمات",
     callErrorLogsDesc:
-      "إخفاقات مكالمات واتساب السحابية — بدء المكالمة وطلب الإذن والميكروفون وأخطاء ويب هوك ميتا. يظهر لمالك الشركة فقط.",
+      "إخفاقات مكالمات واتساب السحابية — بدء المكالمة وطلب الإذن والميكروفون وأخطاء ويب هوك ميتا. للمالك فقط في صفحة المكالمات.",
     callErrorLogsEmpty: "لا توجد أخطاء مكالمات واتساب مطابقة للفلاتر بعد.",
     callErrorLogSearchPlaceholder: "بحث بالاسم أو الهاتف أو الموظف أو الخطأ…",
     callErrorLogFilterSource: "مصدر الخطأ",

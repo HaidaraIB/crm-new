@@ -34,7 +34,6 @@ import {
 } from '../utils/whatsappContactDisplay';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { MessageLogsPanel } from '../components/messaging/MessageLogsPanel';
-import { CallErrorLogsPanel } from '../components/messaging/CallErrorLogsPanel';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
@@ -1062,14 +1061,14 @@ export const IntegrationsPage = () => {
     const [metaPixelDrafts, setMetaPixelDrafts] = useState<Record<number, string>>({});
     const [metaPixelSavingId, setMetaPixelSavingId] = useState<number | null>(null);
     const [metaPixelSavedId, setMetaPixelSavedId] = useState<number | null>(null);
-    const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template' | 'logs' | 'call-logs'>(() => {
+    const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template' | 'logs'>(() => {
         try {
             const s = localStorage.getItem('messaging_center_tab');
-            if (s === 'campaign' || s === 'template' || s === 'logs' || s === 'call-logs') return s;
+            if (s === 'campaign' || s === 'template' || s === 'logs') return s;
         } catch (_) {}
         return 'campaign';
     });
-    const setMessagingCenterTabPersisted = (tab: 'campaign' | 'template' | 'logs' | 'call-logs') => {
+    const setMessagingCenterTabPersisted = (tab: 'campaign' | 'template' | 'logs') => {
         setMessagingCenterTab(tab);
         try {
             localStorage.setItem('messaging_center_tab', tab);
@@ -2980,20 +2979,11 @@ export const IntegrationsPage = () => {
                         >
                             <ClockIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'logs' ? 'text-white' : marketingAccentIconClass}`} /> {t('messageLogs')}
                         </button>
-                        <button
-                            type="button"
-                            onClick={() => setMessagingCenterTabPersisted('call-logs')}
-                            className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${messagingCenterTab === 'call-logs' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
-                        >
-                            <ClockIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'call-logs' ? 'text-white' : marketingAccentIconClass}`} /> {t('callErrorLogs')}
-                        </button>
                     </div>
                     {messagingCenterTab === 'template' ? (
                         <TemplateManagementSettings />
                     ) : messagingCenterTab === 'logs' ? (
                         <MessageLogsPanel />
-                    ) : messagingCenterTab === 'call-logs' ? (
-                        <CallErrorLogsPanel />
                     ) : (
                     <div className="space-y-4">
                         <Card className="overflow-hidden">

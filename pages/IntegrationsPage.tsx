@@ -6,7 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input, PhoneText, isPhoneLike } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { CheckIcon, EyeIcon, EyeOffIcon } from '../components/icons';
-import { Page } from '../types';
+import { Page, getUserDisplayName } from '../types';
 import { connectIntegrationAccountAPI, completeWhatsAppEmbeddedSignupAPI, syncWhatsAppPhoneNumbersAPI, getConnectedAccountsAPI, getConnectedAccountAPI, syncMetaPagesAPI, getTikTokLeadgenConfigAPI, getLeadApiConfigAPI, getMujebConfigAPI, createLeadApiKeyAPI, rotateLeadApiKeyAPI, revokeLeadApiKeyAPI, getTwilioSettingsAPI, updateTwilioSettingsAPI, getOpenAISettingsAPI, updateOpenAISettingsAPI, testOpenAISettingsAPI, runAIAnalysisAPI, getMessageTemplatesAPI, sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, sendLeadSMSAPI, deleteMessageTemplateAPI, deleteWhatsAppMessageAPI, deleteWhatsAppConversationAPI, getLeadsAPI, submitMessageTemplateToWhatsAppAPI, getWhatsAppLimitsAPI, syncWhatsAppTemplatesAPI, getIntegrationPolicyAPI, getMetaHealthAPI, updateConnectedAccountAPI, resolveLocalizedApiError, getWhatsAppContactByPhoneAPI, createCampaignBatchAPI, completeCampaignBatchAPI, recordCampaignFailureAPI, enableWhatsAppCallingAPI, type MetaHealthResponse } from '../services/api';
 import { obtainWhatsAppEmbeddedSignupCode } from '../utils/whatsappEmbeddedSignup';
 import {
@@ -34,6 +34,7 @@ import {
 } from '../utils/whatsappContactDisplay';
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { MessageLogsPanel } from '../components/messaging/MessageLogsPanel';
+import { CallErrorLogsPanel } from '../components/messaging/CallErrorLogsPanel';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
@@ -786,6 +787,8 @@ export const IntegrationsPage = () => {
     } = useAppContext();
 
     const companyId = currentUser?.company?.id as number | string | undefined;
+    /** { اسم الموظف } signs with the sender — matches the API's send-time rule. */
+    const senderName = currentUser ? getUserDisplayName(currentUser) : '';
 
     const showAlert = (message: React.ReactNode, variant: 'info' | 'warning' | 'error' = 'info') => {
         setAlertMessage(message);
@@ -1059,14 +1062,14 @@ export const IntegrationsPage = () => {
     const [metaPixelDrafts, setMetaPixelDrafts] = useState<Record<number, string>>({});
     const [metaPixelSavingId, setMetaPixelSavingId] = useState<number | null>(null);
     const [metaPixelSavedId, setMetaPixelSavedId] = useState<number | null>(null);
-    const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template' | 'logs'>(() => {
+    const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template' | 'logs' | 'call-logs'>(() => {
         try {
             const s = localStorage.getItem('messaging_center_tab');
-            if (s === 'campaign' || s === 'template' || s === 'logs') return s;
+            if (s === 'campaign' || s === 'template' || s === 'logs' || s === 'call-logs') return s;
         } catch (_) {}
         return 'campaign';
     });
-    const setMessagingCenterTabPersisted = (tab: 'campaign' | 'template' | 'logs') => {
+    const setMessagingCenterTabPersisted = (tab: 'campaign' | 'template' | 'logs' | 'call-logs') => {
         setMessagingCenterTab(tab);
         try {
             localStorage.setItem('messaging_center_tab', tab);
@@ -2478,6 +2481,7 @@ export const IntegrationsPage = () => {
                     ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient, {
                           tenantCompanyName: currentUser?.company?.name || '',
                           variableMap: tpl.meta_variable_map?.body ?? undefined,
+                          senderName,
                       })
                     : (tpl.content || '');
                 preview = preview.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();
@@ -2681,6 +2685,7 @@ export const IntegrationsPage = () => {
                 ? replaceTemplatePlaceholders(tpl.content || '', selectedChatClient, {
                       tenantCompanyName: currentUser?.company?.name || '',
                       variableMap: tpl.meta_variable_map?.body ?? undefined,
+                      senderName,
                   })
                 : (tpl.content || '');
             body = body.replace(/^\(Imported from Meta:[^)]+\)\s*/i, '').trim();
@@ -2975,11 +2980,20 @@ export const IntegrationsPage = () => {
                         >
                             <ClockIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'logs' ? 'text-white' : marketingAccentIconClass}`} /> {t('messageLogs')}
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setMessagingCenterTabPersisted('call-logs')}
+                            className={`px-4 py-2 rounded-t flex items-center gap-2 text-sm font-medium ${messagingCenterTab === 'call-logs' ? 'bg-primary text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'}`}
+                        >
+                            <ClockIcon className={`w-4 h-4 shrink-0 ${messagingCenterTab === 'call-logs' ? 'text-white' : marketingAccentIconClass}`} /> {t('callErrorLogs')}
+                        </button>
                     </div>
                     {messagingCenterTab === 'template' ? (
                         <TemplateManagementSettings />
                     ) : messagingCenterTab === 'logs' ? (
                         <MessageLogsPanel />
+                    ) : messagingCenterTab === 'call-logs' ? (
+                        <CallErrorLogsPanel />
                     ) : (
                     <div className="space-y-4">
                         <Card className="overflow-hidden">

@@ -8,6 +8,7 @@ import { PhoneText } from '../PhoneText';
 import { sendWhatsAppMessageAPI, sendWhatsAppTemplateAPI, getWhatsAppSessionWindowAPI, getMessageTemplatesAPI, resolveLocalizedApiError } from '../../services/api';
 import { clearFieldError } from '../../utils/formFieldErrors';
 import { replaceTemplatePlaceholders } from '../../utils/messagePlaceholders';
+import { getUserDisplayName } from '../../types';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -28,7 +29,9 @@ type SendWhatsAppModalProps = {
 };
 
 export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSent }: SendWhatsAppModalProps) => {
-    const { t, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    /** { اسم الموظف } signs with the sender — matches the API's send-time rule. */
+    const senderName = currentUser ? getUserDisplayName(currentUser) : '';
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -202,6 +205,7 @@ export const SendWhatsAppModal = ({ isOpen, onClose, leadId, phoneNumber, lead, 
                                         const resolved = lead
                                             ? replaceTemplatePlaceholders(content, lead, {
                                                   variableMap: tpl.meta_variable_map?.body ?? undefined,
+                                                  senderName,
                                               })
                                             : content;
                                         setBody((prev) => (prev ? prev + '\n' + resolved : resolved));

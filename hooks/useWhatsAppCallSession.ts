@@ -12,6 +12,7 @@ import {
   whatsappCallRejectAPI,
   whatsappCallTerminateAPI,
   getWhatsAppCallDetailAPI,
+  detectMicPermissionErrorCode,
 } from '../services/api';
 
 export type CallSessionPhase =
@@ -302,10 +303,20 @@ export function useWhatsAppCallSession() {
     const pc = new RTCPeerConnection({
       iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
     });
-    const local = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: false,
-    });
+    let local: MediaStream;
+    try {
+      local = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: false,
+      });
+    } catch (mediaErr: any) {
+      const err: Error & { code?: string; name?: string } = new Error(
+        mediaErr?.message || 'whatsapp_mic_permission_denied'
+      );
+      err.name = mediaErr?.name || 'NotAllowedError';
+      err.code = 'whatsapp_mic_permission_denied';
+      throw err;
+    }
     localStreamRef.current = local;
     local.getTracks().forEach((track) => pc.addTrack(track, local));
 
@@ -372,7 +383,8 @@ export function useWhatsAppCallSession() {
         startTimer();
         await startRecording(local, remote);
       } catch (e: any) {
-        setError(e?.code || e?.message || 'whatsappCallAcceptFailed');
+        const code = e?.code || detectMicPermissionErrorCode(e) || e?.message || 'whatsappCallAcceptFailed';
+        setError(code);
         setPhase('error');
         cleanupMedia();
         throw e;
@@ -478,7 +490,8 @@ export function useWhatsAppCallSession() {
           }
         }, 1000);
       } catch (e: any) {
-        setError(e?.code || e?.message || 'whatsappCallStartFailed');
+        const code = e?.code || detectMicPermissionErrorCode(e) || e?.message || 'whatsappCallStartFailed';
+        setError(code);
         setPhase('error');
         cleanupMedia();
         throw e;

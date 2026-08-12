@@ -31,6 +31,7 @@ import {
   type MessageTemplateType,
   type WhatsAppCallRecord,
 } from '../services/api';
+import { getUserDisplayName } from '../types';
 import { compressImageForChat } from '../utils/compressImageForChat';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole } from '../utils/roles';
@@ -94,6 +95,8 @@ export const ChatsPage: React.FC = () => {
   const queryClient = useQueryClient();
   const companyId = currentUser?.company?.id as number | string | undefined;
   const companyName = currentUser?.company?.name || '';
+  /** { اسم الموظف } signs with the sender — matches the API's send-time rule. */
+  const senderName = currentUser ? getUserDisplayName(currentUser) : '';
   const role = normalizeRole(currentUser?.role);
   const isStaff = role === 'Employee' || role === 'Doctor';
   const chatAccessAllowed =
@@ -883,6 +886,7 @@ export const ChatsPage: React.FC = () => {
     const preview = replaceTemplatePlaceholders(tpl.content || tpl.name, selectedChatClient, {
       tenantCompanyName: companyName,
       variableMap: tpl.meta_variable_map?.body ?? undefined,
+      senderName,
     });
     const msgId = newChatMessageId();
     pushOptimistic(selectedChatClient, (prev) => [
@@ -1212,6 +1216,7 @@ export const ChatsPage: React.FC = () => {
               const resolved = replaceTemplatePlaceholders(content, selectedChatClient, {
                 tenantCompanyName: companyName,
                 variableMap: tpl?.meta_variable_map?.body ?? undefined,
+                senderName,
               });
               setMessageInput((prev) => (prev ? `${prev}\n${resolved}` : resolved));
               if (templateId) setChatTemplateSendId(templateId);

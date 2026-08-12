@@ -172,6 +172,12 @@ export type PlaceholderContextOptions = {
    * fields whenever a template's order differs from it.
    */
   variableMap?: string[];
+  /**
+   * Whoever is sending. { اسم الموظف } signs the message with them in preference to
+   * the lead's assignee, mirroring the API's send-time rule so the composer preview
+   * matches the message that actually goes out.
+   */
+  senderName?: string;
 };
 
 function resolveCustomerName(lead: PlaceholderLeadLike): string {
@@ -227,7 +233,7 @@ export function buildMessagePlaceholderValues(
       customer_name: '',
       first_name: '',
       phone: '',
-      employee_name: pickStr(options.employeeName),
+      employee_name: pickStr(options.senderName, options.employeeName),
       company_name: pickStr(options.tenantCompanyName),
       current_date: date,
       current_time: time,
@@ -274,7 +280,8 @@ export function buildMessagePlaceholderValues(
     customer_name: customerName,
     first_name: firstNameFrom(customerName) || customerName,
     phone: resolvePhone(lead),
-    employee_name: resolveEmployeeName(lead, options.employeeName),
+    employee_name:
+      pickStr(options.senderName) || resolveEmployeeName(lead, options.employeeName),
     company_name: company,
     current_date: date,
     current_time: time,

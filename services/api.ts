@@ -167,10 +167,10 @@ export function getApiErrorDetails(errorData: unknown): unknown {
  */
 /**
  * Prefer translated business `code` / `error_key`, then API message.
- * When Meta returns `error_user_msg` in details, append it after the localized base.
+ * When a code maps to i18n, do not append raw Meta/browser English text.
  */
 export function resolveLocalizedApiError(
-  e: { data?: unknown; message?: string; code?: string } | null | undefined,
+  e: { data?: unknown; message?: string; code?: string; name?: string } | null | undefined,
   t?: (key: any) => string,
   fallback = 'Something went wrong'
 ): string {
@@ -179,7 +179,9 @@ export function resolveLocalizedApiError(
     data && typeof data === 'object' && 'error_key' in data
       ? String((data as Record<string, unknown>).error_key)
       : undefined;
-  const code = legacyKey || getApiErrorCode(data) || e?.code;
+  const rawCode = legacyKey || getApiErrorCode(data) || e?.code;
+  const micCode = detectMicPermissionErrorCode(e);
+  const code = micCode || rawCode;
   const details = getApiErrorDetails(data);
   let metaMsg = '';
   if (details && typeof details === 'object' && details !== null) {
@@ -192,9 +194,6 @@ export function resolveLocalizedApiError(
   if (t && code) {
     const translated = t(code);
     if (translated && translated !== code) {
-      if (metaMsg && !translated.includes(metaMsg)) {
-        return `${translated} (${metaMsg})`;
-      }
       return translated;
     }
   }
@@ -202,10 +201,48 @@ export function resolveLocalizedApiError(
     (typeof e?.message === 'string' && e.message) ||
     getApiErrorMessage(data, '') ||
     fallback;
-  if (metaMsg && !base.includes(metaMsg)) {
+  // Prefer CRM fallback over raw browser/Meta English when we have a better fallback.
+  if (micCode && t) {
+    const micTranslated = t(micCode);
+    if (micTranslated && micTranslated !== micCode) return micTranslated;
+  }
+  if (metaMsg && !base.includes(metaMsg) && !looksLikeBrowserPermissionMessage(metaMsg)) {
     return `${base}: ${metaMsg}`;
   }
+  if (looksLikeBrowserPermissionMessage(base) && t) {
+    const micTranslated = t('whatsapp_mic_permission_denied');
+    if (micTranslated && micTranslated !== 'whatsapp_mic_permission_denied') return micTranslated;
+  }
   return base || fallback;
+}
+
+export function detectMicPermissionErrorCode(
+  e: { name?: string; message?: string; code?: string } | null | undefined
+): string | undefined {
+  if (!e) return undefined;
+  const name = String(e.name || '');
+  const message = String(e.message || '');
+  const code = String(e.code || '');
+  if (code === 'whatsapp_mic_permission_denied') return code;
+  if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+    return 'whatsapp_mic_permission_denied';
+  }
+  if (looksLikeBrowserPermissionMessage(message)) {
+    return 'whatsapp_mic_permission_denied';
+  }
+  return undefined;
+}
+
+function looksLikeBrowserPermissionMessage(text: string): boolean {
+  const m = (text || '').trim().toLowerCase();
+  if (!m) return false;
+  return (
+    m === 'permission denied by system' ||
+    m === 'permission denied' ||
+    m.includes('permission denied by system') ||
+    m.includes('notallowederror') ||
+    (m.includes('permission') && m.includes('denied') && m.includes('microphone'))
+  );
 }
 
 function attachErrorFields(
@@ -4600,6 +4637,86 @@ export const getMessageLogsAPI = async (filters?: MessageLogFilters): Promise<Me
   if (filters?.batch) params.append('batch', String(filters.batch));
   const qs = params.toString();
   return apiRequest<MessageLogsResponse>(`/integrations/message-logs/${qs ? `?${qs}` : ''}`);
+};
+
+export type CallErrorLogEntry = {
+  id: number;
+  source: string;
+  error_code: string;
+  error_message: string;
+  peer_phone: string;
+  client_id: number | null;
+  client_name: string;
+  agent_id: number | null;
+  agent_username: string;
+  whatsapp_account_id: number | null;
+  whatsapp_call_id: number | null;
+  meta_details: Record<string, unknown>;
+  created_at: string;
+};
+
+export type CallErrorLogSummary = {
+  total: number;
+  by_source?: Record<string, number>;
+  initiate?: number;
+  permission_request?: number;
+  mic?: number;
+  webhook?: number;
+  out_of_hours?: number;
+};
+
+export type CallErrorLogFilters = {
+  page?: number;
+  page_size?: number;
+  source?: 'all' | 'initiate' | 'permission_request' | 'accept' | 'mic' | 'webhook' | 'out_of_hours' | 'webrtc';
+  search?: string;
+  error_code?: string;
+  date_from?: string;
+  date_to?: string;
+};
+
+export type CallErrorLogsResponse = {
+  count: number;
+  page: number;
+  page_size: number;
+  summary: CallErrorLogSummary;
+  results: CallErrorLogEntry[];
+};
+
+/**
+ * GET /api/integrations/whatsapp/call-error-logs/ (owner-only)
+ */
+export const getWhatsAppCallErrorLogsAPI = async (
+  filters?: CallErrorLogFilters
+): Promise<CallErrorLogsResponse> => {
+  const params = new URLSearchParams();
+  if (filters?.page) params.append('page', String(filters.page));
+  if (filters?.page_size) params.append('page_size', String(filters.page_size));
+  if (filters?.source && filters.source !== 'all') params.append('source', filters.source);
+  if (filters?.search) params.append('search', filters.search);
+  if (filters?.error_code) params.append('error_code', filters.error_code);
+  if (filters?.date_from) params.append('date_from', filters.date_from);
+  if (filters?.date_to) params.append('date_to', filters.date_to);
+  const qs = params.toString();
+  return apiRequest<CallErrorLogsResponse>(
+    `/integrations/whatsapp/call-error-logs/${qs ? `?${qs}` : ''}`
+  );
+};
+
+/**
+ * POST /api/integrations/whatsapp/calls/client-errors/
+ */
+export const reportWhatsAppCallClientErrorAPI = async (data: {
+  error_code?: string;
+  error_message?: string;
+  source?: 'mic' | 'webrtc';
+  to?: string;
+  client?: number;
+}): Promise<{ id: number | null }> => {
+  return apiRequest<{ id: number | null }>('/integrations/whatsapp/calls/client-errors/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
 };
 
 export type CampaignBatchResponse = {

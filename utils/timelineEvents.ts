@@ -1,4 +1,5 @@
 import { translations } from '../constants';
+import { localizeWhatsAppMessageBody } from './whatsappMessageBodyDisplay';
 
 type TFn = (key: keyof typeof translations.en) => string;
 
@@ -38,6 +39,22 @@ const EVENT_TYPE_ACTION_KEYS: Record<string, keyof typeof translations.en> = {
     edit: 'leadEdited',
     re_assignment: 'leadReAssigned',
     created: 'timelineEventCreated',
+    whatsapp_message: 'whatsappReceived',
+};
+
+const WA_MESSAGE_TYPE_KEYS: Record<string, keyof typeof translations.en> = {
+    text: 'whatsappMessageType_text',
+    image: 'whatsappMessageType_image',
+    video: 'whatsappMessageType_video',
+    audio: 'whatsappMessageType_audio',
+    document: 'whatsappMessageType_document',
+    sticker: 'whatsappMessageType_sticker',
+    location: 'whatsappMessageType_location',
+    contacts: 'whatsappMessageType_contacts',
+    interactive: 'whatsappMessageType_interactive',
+    button: 'whatsappMessageType_button',
+    reaction: 'whatsappMessageType_reaction',
+    unknown: 'whatsappMessageType_unknown',
 };
 
 const SOURCE_VALUE_KEYS: Record<string, keyof typeof translations.en> = {
@@ -234,6 +251,26 @@ export function localizeTimelineEventNotes(
         }
     }
 
+    const receivedMatch = trimmed.match(/^WhatsApp message received:\s*(.+)$/i);
+    if (receivedMatch || eventType === 'whatsapp_message') {
+        if (/coexistence echo/i.test(trimmed) || /WhatsApp Business app message/i.test(trimmed)) {
+            return t('timelineWhatsAppCoexistenceEcho');
+        }
+        if (receivedMatch) {
+            const typeRaw = receivedMatch[1].trim().toLowerCase();
+            const typeKey = WA_MESSAGE_TYPE_KEYS[typeRaw];
+            const typeLabel = typeKey ? t(typeKey) : receivedMatch[1].trim();
+            return `${t('timelineWhatsAppMessageReceived')}: ${typeLabel}`;
+        }
+        if (/^Client created for WhatsApp conversation$/i.test(trimmed)) {
+            return t('timelineLeadFromWhatsapp');
+        }
+    }
+
+    if (/^Client created for WhatsApp conversation$/i.test(trimmed)) {
+        return t('timelineLeadFromWhatsapp');
+    }
+
     return trimmed;
 }
 
@@ -316,8 +353,16 @@ export function formatTimelineEventValuePair(
     if (eventType === 'created') hint = 'generic';
     if (eventType === 'edit') hint = inferValueHintFromEditNotes(notes);
 
+    const formatOne = (value: string | null | undefined): string | undefined => {
+        if (value == null || value === '') return undefined;
+        if (eventType === 'whatsapp_message') {
+            return localizeWhatsAppMessageBody(value, ctx.t);
+        }
+        return formatTimelineEventValue(value, ctx, hint);
+    };
+
     return {
-        oldFormatted: oldValue != null && oldValue !== '' ? formatTimelineEventValue(oldValue, ctx, hint) : undefined,
-        newFormatted: newValue != null && newValue !== '' ? formatTimelineEventValue(newValue, ctx, hint) : undefined,
+        oldFormatted: formatOne(oldValue),
+        newFormatted: formatOne(newValue),
     };
 }

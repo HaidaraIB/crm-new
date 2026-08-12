@@ -14,6 +14,8 @@ import { queryKeys, useWhatsAppLiveCalls } from '../../hooks/useQueries';
 import {
   getWhatsAppCallPermissionsAPI,
   resolveLocalizedApiError,
+  detectMicPermissionErrorCode,
+  reportWhatsAppCallClientErrorAPI,
   sendWhatsAppCallPermissionRequestAPI,
   type WhatsAppCallRecord,
 } from '../../services/api';
@@ -195,6 +197,16 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
           await session.endCall();
           await session.acceptInbound(call);
         } catch (e: any) {
+          const micCode = detectMicPermissionErrorCode(e) || e?.code;
+          if (micCode === 'whatsapp_mic_permission_denied') {
+            void reportWhatsAppCallClientErrorAPI({
+              error_code: 'whatsapp_mic_permission_denied',
+              error_message: String(e?.message || micCode),
+              source: 'mic',
+              to: call.peer_phone,
+              client: call.client ?? undefined,
+            }).catch(() => undefined);
+          }
           showAlert(
             resolveLocalizedApiError(e, t, t('whatsappCallAcceptFailed')),
             'error'
@@ -215,6 +227,16 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
       try {
         await session.acceptInbound(call);
       } catch (e: any) {
+        const micCode = detectMicPermissionErrorCode(e) || e?.code;
+        if (micCode === 'whatsapp_mic_permission_denied') {
+          void reportWhatsAppCallClientErrorAPI({
+            error_code: 'whatsapp_mic_permission_denied',
+            error_message: String(e?.message || micCode),
+            source: 'mic',
+            to: call.peer_phone,
+            client: call.client ?? undefined,
+          }).catch(() => undefined);
+        }
         showAlert(
           resolveLocalizedApiError(e, t, t('whatsappCallAcceptFailed')),
           'error'
@@ -329,6 +351,16 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
             }
           }
           return;
+        }
+        const micCode = detectMicPermissionErrorCode(e) || (code === 'whatsapp_mic_permission_denied' ? code : undefined);
+        if (micCode) {
+          void reportWhatsAppCallClientErrorAPI({
+            error_code: micCode,
+            error_message: String(e?.message || micCode),
+            source: 'mic',
+            to,
+            client: args.clientId,
+          }).catch(() => undefined);
         }
         session.dismissError();
         showAlert(resolveLocalizedApiError(e, t, t('whatsappCallStartFailed')), 'error');

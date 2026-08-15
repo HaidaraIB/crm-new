@@ -1174,6 +1174,44 @@ export const createQicardPaymentSessionAPI = async (
 
 
 /**
+ * إنشاء جلسة دفع Al Qaseh
+ * POST /api/payments/create-alqaseh-session/
+ * Body: { subscription_id: number, plan_id?: number, billing_cycle?: 'monthly' | 'yearly' }
+ * Response: { payment_id: number, redirect_url: string, tran_ref: string, order_id: string }
+ */
+export const createAlqasehPaymentSessionAPI = async (
+  subscriptionId: number,
+  planId?: number,
+  billingCycle?: 'monthly' | 'yearly'
+) => {
+  // Use direct fetch instead of apiRequest to avoid token requirement
+  const token = localStorage.getItem('accessToken');
+  const body: any = { subscription_id: subscriptionId };
+  if (planId) {
+    body.plan_id = planId;
+  }
+  if (billingCycle) {
+    body.billing_cycle = billingCycle;
+  }
+  const response = await fetch(`${BASE_URL}/payments/create-alqaseh-session/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      ...(token && { Authorization: `Bearer ${token}` }),
+    }),
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to create payment session');
+  }
+
+  return parseSuccessJsonResponse<CreatePaymentSessionResult>(response);
+};
+
+
+/**
  * Create FIB (First Iraqi Bank) payment session - returns QR code and app links, no redirect
  * POST /api/payments/create-fib-session/
  */
@@ -1235,6 +1273,13 @@ export const createPaymentSessionAPI = async (
     return await createQicardPaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else if (gatewayName.includes('fib') || gatewayName.includes('first iraqi')) {
     return await createFibPaymentSessionAPI(subscriptionId, planId, billingCycle);
+  } else if (
+    gatewayName.includes('alqaseh') ||
+    gatewayName.includes('al qaseh') ||
+    gatewayName.includes('al-qaseh') ||
+    gatewayName.includes('qaseh')
+  ) {
+    return await createAlqasehPaymentSessionAPI(subscriptionId, planId, billingCycle);
   } else {
     throw new Error(`Payment gateway "${gateway.name}" is not yet supported`);
   }

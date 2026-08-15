@@ -107,11 +107,13 @@ export const PaymentPage = () => {
         }
     }, [t]);
 
-    // When we have subscriptionId + selectedGateway and came with gateway_id, auto-proceed to payment
-    const hasAutoProceeded = useRef(false);
+    // When we have subscriptionId + selectedGateway and came with gateway_id, auto-proceed to payment.
+    // The ref guards *any* attempt, not just the auto one: handleProceedToPayment clears
+    // showGatewaySelection before awaiting, which re-satisfies this effect's condition and would
+    // otherwise open a second gateway session while the first request is still in flight.
+    const paymentAttemptStarted = useRef(false);
     useEffect(() => {
-        if (!subscriptionId || !selectedGateway || showGatewaySelection || hasAutoProceeded.current) return;
-        hasAutoProceeded.current = true;
+        if (!subscriptionId || !selectedGateway || showGatewaySelection || paymentAttemptStarted.current) return;
         handleProceedToPayment();
     }, [subscriptionId, selectedGateway, showGatewaySelection]);
 
@@ -167,6 +169,10 @@ export const PaymentPage = () => {
             setErrors((prev) => ({ ...prev, gateway: t('paymentGatewayRequired') || 'Please select a payment method' }));
             return;
         }
+        // One gateway session per attempt. Released again on every path that returns the
+        // user to gateway selection, so a recoverable failure can still be retried.
+        if (paymentAttemptStarted.current) return;
+        paymentAttemptStarted.current = true;
 
         try {
             setShowGatewaySelection(false);
@@ -176,6 +182,7 @@ export const PaymentPage = () => {
             if (!hydratePaymentAccessToken()) {
                 setError(t('paymentAuthRequired'));
                 setIsLoading(false);
+                paymentAttemptStarted.current = false;
                 setShowGatewaySelection(true);
                 return;
             }
@@ -201,6 +208,7 @@ export const PaymentPage = () => {
             } else {
                 setError(t('paymentRedirectError') || 'Failed to get payment URL');
                 setIsLoading(false);
+                paymentAttemptStarted.current = false;
                 setShowGatewaySelection(true);
             }
         } catch (err: any) {
@@ -212,6 +220,7 @@ export const PaymentPage = () => {
             if (err.code === 'phone_verification_required') {
                 setError(t('phoneVerificationRequiredPayment'));
                 setIsLoading(false);
+                paymentAttemptStarted.current = false;
                 setShowGatewaySelection(true);
                 return;
             }
@@ -222,6 +231,7 @@ export const PaymentPage = () => {
             ) {
                 setError(t('paymentAuthRequired'));
                 setIsLoading(false);
+                paymentAttemptStarted.current = false;
                 setShowGatewaySelection(true);
                 window.setTimeout(() => {
                     window.location.href = paymentLoginUrl(subscriptionId);
@@ -231,6 +241,7 @@ export const PaymentPage = () => {
 
             setError(err.message || t('paymentInitError') || 'Failed to initialize payment');
             setIsLoading(false);
+            paymentAttemptStarted.current = false;
             setShowGatewaySelection(true);
         }
     };

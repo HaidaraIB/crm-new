@@ -1016,8 +1016,8 @@ const TheApp = () => {
                             </svg>
                             <p className="text-sm font-medium">
                                 {language === 'ar' 
-                                    ? 'البريد الإلكتروني غير مؤكد. يرجى تأكيد بريدك الإلكتروني للاستمرار.'
-                                    : 'Your email is not verified. Please verify your email to continue.'}
+                                    ? 'البريد الإلكتروني غير مؤكد.'
+                                    : 'Your email is not verified.'}
                             </p>
                         </div>
                         <button

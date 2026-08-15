@@ -14,6 +14,27 @@ interface PaymentGatewaySelectorProps {
   className?: string;
 }
 
+/**
+ * The interchangeable card processors, by the same aliases the backend adapters
+ * use to resolve operator-typed gateway names.
+ *
+ * Only one of them can be enabled at a time - the API enforces that when the
+ * platform operator activates a gateway - so they collapse into a single
+ * "Card Payment" tile here and the tenant never sees which one is behind it.
+ */
+const CARD_GATEWAY_ALIASES = [
+  'paytabs',
+  'pay tabs',
+  'stripe',
+  'alqaseh',
+  'al qaseh',
+  'al-qaseh',
+  'qaseh',
+];
+
+const isCardGatewayName = (nameLower: string) =>
+  CARD_GATEWAY_ALIASES.some(alias => nameLower.includes(alias));
+
 export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
   selectedGateway,
   onSelect,
@@ -31,37 +52,18 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
         const data = await getPublicPaymentGatewaysAPI();
         const allGateways = Array.isArray(data) ? data : [];
         
-        // Find Paytabs and Stripe gateways
-        const paytabsGateway = allGateways.find(g => g.name.toLowerCase().includes('paytabs'));
-        const stripeGateway = allGateways.find(g => g.name.toLowerCase().includes('stripe'));
-        
-        // Filter out Paytabs and Stripe from the list (keep QiCard and Zain Cash as separate options)
-        const otherGateways = allGateways.filter(g => {
-          const nameLower = g.name.toLowerCase();
-          return !nameLower.includes('paytabs') && !nameLower.includes('stripe');
-        });
-        
-        // Determine which card payment gateway to use
-        let cardPaymentGateway: PaymentGateway | null = null;
-        
-        if (paytabsGateway && stripeGateway) {
-          // Both active - prioritize Paytabs (shouldn't happen, but handle it)
-          cardPaymentGateway = paytabsGateway;
-        } else if (paytabsGateway) {
-          // Only Paytabs active
-          cardPaymentGateway = paytabsGateway;
-        } else if (stripeGateway) {
-          // Only Stripe active
-          cardPaymentGateway = stripeGateway;
-        }
-        // If neither is active, cardPaymentGateway remains null
-        
-        // Combine card payment (if exists) with other gateways
-        const processedGateways = cardPaymentGateway 
-          ? [cardPaymentGateway, ...otherGateways]
-          : otherGateways;
-        
-        setGateways(processedGateways);
+        // The card processors share one tile; the wallets (QiCard, Zain Cash,
+        // FIB) each keep their own. At most one card gateway comes back enabled,
+        // so taking the first is a formality rather than a tie-break.
+        const cardPaymentGateway =
+          allGateways.find(g => isCardGatewayName(g.name.toLowerCase())) || null;
+        const otherGateways = allGateways.filter(
+          g => !isCardGatewayName(g.name.toLowerCase())
+        );
+
+        setGateways(
+          cardPaymentGateway ? [cardPaymentGateway, ...otherGateways] : otherGateways
+        );
       } catch (err: any) {
         console.error('Error loading payment gateways:', err);
         setError(err.message || 'Failed to load payment gateways');
@@ -75,9 +77,7 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
 
   const getGatewayLogo = (gatewayName: string) => {
     const nameLower = gatewayName.toLowerCase();
-    if (nameLower.includes('paytabs')) {
-      return <img src="/visa_master_logo.png" alt="Card Payment" className="h-10 w-auto object-contain" />;
-    } else if (nameLower.includes('stripe')) {
+    if (isCardGatewayName(nameLower)) {
       return <img src="/visa_master_logo.png" alt="Card Payment" className="h-10 w-auto object-contain" />;
     } else if (nameLower.includes('zaincash') || nameLower.includes('zain cash')) {
       return <img src="/zain_cash_logo.png" alt="Zain Cash" className="h-10 w-auto object-contain" />;
@@ -91,8 +91,8 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
 
   const getGatewayDisplayName = (gatewayName: string) => {
     const nameLower = gatewayName.toLowerCase();
-    if (nameLower.includes('paytabs') || nameLower.includes('stripe')) {
-      return language === 'ar' 
+    if (isCardGatewayName(nameLower)) {
+      return language === 'ar'
         ? 'بطاقة الدفع'
         : 'Card Payment';
     }
@@ -100,15 +100,6 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
       return language === 'ar' ? 'FIB (البنك العراقي الأول)' : 'FIB (First Iraqi Bank)';
     }
     return gatewayName;
-  };
-
-  const getGatewayDescription = (gatewayName: string) => {
-    const nameLower = gatewayName.toLowerCase();
-    // Don't show description if it's the same as display name
-    if (nameLower.includes('paytabs') || nameLower.includes('stripe')) {
-      return null;
-    }
-    return null;
   };
 
   if (loading) {

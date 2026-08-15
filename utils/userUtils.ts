@@ -40,6 +40,9 @@ export const normalizeUser = (userData: any): User => {
         : 'least_busy',
       re_assign_enabled: typeof userData.company === 'object' ? (userData.company.re_assign_enabled ?? false) : false,
       re_assign_hours: typeof userData.company === 'object' ? (userData.company.re_assign_hours ?? 24) : 24,
+      no_follow_up_enabled: typeof userData.company === 'object' ? (userData.company.no_follow_up_enabled ?? true) : true,
+      no_follow_up_hours: typeof userData.company === 'object' ? (userData.company.no_follow_up_hours ?? 10) : 10,
+      no_follow_up_digest_hour: typeof userData.company === 'object' ? (userData.company.no_follow_up_digest_hour ?? 9) : 9,
       field_visit_enabled: typeof userData.company === 'object'
         ? (userData.company.field_visit_enabled ?? true)
         : true,

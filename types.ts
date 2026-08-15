@@ -52,6 +52,12 @@ export interface Company {
   auto_assign_algorithm?: AutoAssignAlgorithm;
   re_assign_enabled?: boolean;
   re_assign_hours?: number;
+  /** Alert the assignee when a lead goes without follow-up. */
+  no_follow_up_enabled?: boolean;
+  /** Hours without follow-up before the first alert (escalates at 2x and 3x). */
+  no_follow_up_hours?: number;
+  /** Local hour (0-23) at which the owner receives the daily overdue digest. */
+  no_follow_up_digest_hour?: number;
   field_visit_enabled?: boolean;
   field_visit_allowed?: boolean;
   field_visit_admin_allowed?: boolean;

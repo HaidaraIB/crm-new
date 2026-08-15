@@ -27,6 +27,9 @@ export const LeadAssignmentSettings = () => {
     const [autoAssignAlgorithm, setAutoAssignAlgorithm] = useState<AutoAssignAlgorithm>('least_busy');
     const [reAssignEnabled, setReAssignEnabled] = useState(false);
     const [reAssignHours, setReAssignHours] = useState(24);
+    const [noFollowUpEnabled, setNoFollowUpEnabled] = useState(true);
+    const [noFollowUpHours, setNoFollowUpHours] = useState(10);
+    const [noFollowUpDigestHour, setNoFollowUpDigestHour] = useState(9);
     const [businessTimezone, setBusinessTimezone] = useState('UTC');
     const [isSaving, setIsSaving] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
@@ -38,6 +41,9 @@ export const LeadAssignmentSettings = () => {
             setAutoAssignAlgorithm(company.auto_assign_algorithm || 'least_busy');
             setReAssignEnabled(company.re_assign_enabled || false);
             setReAssignHours(company.re_assign_hours || 24);
+            setNoFollowUpEnabled(company.no_follow_up_enabled ?? true);
+            setNoFollowUpHours(company.no_follow_up_hours || 10);
+            setNoFollowUpDigestHour(company.no_follow_up_digest_hour ?? 9);
             setBusinessTimezone((company.timezone || 'UTC').trim() || 'UTC');
         }
     }, [company]);
@@ -62,10 +68,20 @@ export const LeadAssignmentSettings = () => {
             newErrors.reAssignHours = t('invalidReminderDelayTime') || 'Please enter a valid number of hours (1 or more)';
         }
 
+        if (
+            noFollowUpEnabled &&
+            (!Number.isFinite(noFollowUpHours) || noFollowUpHours < 1 || noFollowUpHours > 168)
+        ) {
+            newErrors.noFollowUpHours = t('invalidNoFollowUpHours') || 'Please enter a valid number of hours (1 to 168)';
+        }
+
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
             requestAnimationFrame(() =>
-                scrollToFirstFieldError(newErrors, { reAssignHours: 're-assign-hours' })
+                scrollToFirstFieldError(newErrors, {
+                    reAssignHours: 're-assign-hours',
+                    noFollowUpHours: 'no-follow-up-hours',
+                })
             );
             return false;
         }
@@ -91,6 +107,9 @@ export const LeadAssignmentSettings = () => {
                 auto_assign_algorithm: autoAssignAlgorithm,
                 re_assign_enabled: reAssignEnabled,
                 re_assign_hours: reAssignHours,
+                no_follow_up_enabled: noFollowUpEnabled,
+                no_follow_up_hours: noFollowUpHours,
+                no_follow_up_digest_hour: noFollowUpDigestHour,
                 timezone: businessTimezone.trim() || 'UTC',
             });
 
@@ -242,6 +261,91 @@ export const LeadAssignmentSettings = () => {
                                     {t('reminderDelayTimeDesc')}
                                 </p>
                             </div>
+                        )}
+                    </div>
+
+                    {/* No-follow-up alerts */}
+                    <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+                        <div className="flex items-center justify-between mb-4">
+                            <div className="flex-1">
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-1">
+                                    {t('noFollowUpEnabled')}
+                                </h3>
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                    {t('noFollowUpDesc')}
+                                </p>
+                            </div>
+                            <div className="ml-4 rtl:ml-0 rtl:mr-4">
+                                <ToggleSwitch
+                                    enabled={noFollowUpEnabled}
+                                    setEnabled={setNoFollowUpEnabled}
+                                />
+                            </div>
+                        </div>
+
+                        {noFollowUpEnabled && (
+                            <>
+                                <div className="mt-4">
+                                    <Label htmlFor="no-follow-up-hours">
+                                        {t('noFollowUpHours')}
+                                    </Label>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <NumberInput
+                                            id="no-follow-up-hours"
+                                            min={1}
+                                            max={168}
+                                            value={noFollowUpHours.toString()}
+                                            onChange={(e) => {
+                                                const value = parseInt(e.target.value, 10);
+                                                if (!isNaN(value) && value >= 1) {
+                                                    setNoFollowUpHours(value);
+                                                } else if (e.target.value === '') {
+                                                    setNoFollowUpHours(1);
+                                                }
+                                                if (errors.noFollowUpHours) {
+                                                    setErrors((prev) => {
+                                                        const next = { ...prev };
+                                                        delete next.noFollowUpHours;
+                                                        return next;
+                                                    });
+                                                }
+                                            }}
+                                            className={`w-32 ${errors.noFollowUpHours ? 'border-red-500' : ''}`}
+                                        />
+                                        <span className="text-sm text-gray-500 dark:text-gray-400">
+                                            {t('hours')}
+                                        </span>
+                                    </div>
+                                    {errors.noFollowUpHours && (
+                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.noFollowUpHours}</p>
+                                    )}
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {t('noFollowUpHoursDesc')}
+                                    </p>
+                                </div>
+
+                                <div className="mt-4">
+                                    <Label htmlFor="no-follow-up-digest-hour">
+                                        {t('noFollowUpDigestHour')}
+                                    </Label>
+                                    <select
+                                        id="no-follow-up-digest-hour"
+                                        value={noFollowUpDigestHour}
+                                        onChange={(e) => setNoFollowUpDigestHour(parseInt(e.target.value, 10))}
+                                        dir="ltr"
+                                        className="mt-1 w-32 px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                                    >
+                                        {Array.from({ length: 24 }, (_, hour) => (
+                                            <option key={hour} value={hour}>
+                                                {`${hour.toString().padStart(2, '0')}:00`}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                        {t('noFollowUpDigestHourDesc')}
+                                    </p>
+                                </div>
+                            </>
                         )}
                     </div>
 

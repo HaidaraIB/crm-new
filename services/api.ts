@@ -5355,6 +5355,9 @@ export const updateCompanyAssignmentSettingsAPI = async (
     auto_assign_algorithm?: 'least_busy' | 'round_robin';
     re_assign_enabled?: boolean;
     re_assign_hours?: number;
+    no_follow_up_enabled?: boolean;
+    no_follow_up_hours?: number;
+    no_follow_up_digest_hour?: number;
     timezone?: string;
   }
 ) => {

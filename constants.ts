@@ -1727,12 +1727,23 @@ export const translations = {
     autoAssignAlgorithmRoundRobinDesc:
       "Assigns new leads in rotation, one after another, regardless of how many leads each employee already has.",
     reminderDelayTime: "No-contact window before re-assign (hours)",
+    invalidReminderDelayTime: "Please enter a valid number of hours",
     reminderDelayTimeDesc:
       "How long an assigned lead may go without contact before it can be moved to another employee (only when re-assign inactive clients is enabled).",
     reAssignEnabled: "Re-assign inactive clients",
     reAssignDesc:
       "When enabled, the system can periodically move assigned leads to another employee after they go without contact for the hours set above.",
     hours: "hours",
+    noFollowUpEnabled: "No-follow-up alerts",
+    noFollowUpDesc:
+      "Alert the assigned employee when a lead goes without follow-up. Each lead is timed from its own last contact, so alerts arrive when that lead is actually overdue instead of all at once.",
+    noFollowUpHours: "Hours without follow-up before alerting",
+    noFollowUpHoursDesc:
+      "The first alert is sent this long after a lead's last contact, then repeats twice more (at double and triple this time) before going quiet until the lead is contacted again.",
+    noFollowUpDigestHour: "Daily summary time for the owner",
+    noFollowUpDigestHourDesc:
+      "The owner receives one daily summary of all overdue leads at this hour, in the company timezone, instead of a separate notification for every lead.",
+    invalidNoFollowUpHours: "Please enter a valid number of hours (1 to 168)",
     weeklyDayOff: "Weekly day off",
     weeklyDayOffHelp:
       "That weekday is blocked for new lead or deal assignments (uses company timezone below).",
@@ -4379,12 +4390,23 @@ export const translations = {
     autoAssignAlgorithmRoundRobinDesc:
       "يُسند العملاء الجدد بالتناوب واحداً تلو الآخر بغض النظر عن عدد العملاء المسندين لكل موظف.",
     reminderDelayTime: "مدة عدم التواصل قبل إعادة الإسناد (ساعات)",
+    invalidReminderDelayTime: "الرجاء إدخال عدد ساعات صحيح",
     reminderDelayTimeDesc:
       "مدة بقاء العميل مسنداً دون تواصل قبل أن يصبح مؤهلاً لإعادة الإسناد التلقائي (عند تفعيل إعادة تعيين غير النشطين).",
     reAssignEnabled: "إعادة تعيين العملاء غير النشطين",
     reAssignDesc:
       "عند التمكين، قد يعيد النظام دورياً إسناد العملاء المسندين إلى موظف آخر بعد مرور عدد الساعات أعلاه دون أي تواصل.",
     hours: "ساعة",
+    noFollowUpEnabled: "تنبيهات تأخر المتابعة",
+    noFollowUpDesc:
+      "تنبيه الموظف المسؤول عند تأخر متابعة العميل المحتمل. يُحتسب الوقت لكل عميل من آخر تواصل معه، لذا يصل التنبيه عند تأخر ذلك العميل تحديداً بدلاً من وصول جميع التنبيهات دفعة واحدة.",
+    noFollowUpHours: "عدد الساعات بدون متابعة قبل التنبيه",
+    noFollowUpHoursDesc:
+      "يُرسل التنبيه الأول بعد هذه المدة من آخر تواصل، ثم يتكرر مرتين فقط (عند ضعف ثم ثلاثة أضعاف المدة) وبعدها يتوقف حتى يتم التواصل مع العميل مجدداً.",
+    noFollowUpDigestHour: "وقت الملخص اليومي للمالك",
+    noFollowUpDigestHourDesc:
+      "يصل المالك ملخص واحد يومياً بجميع العملاء المتأخرين في هذه الساعة بتوقيت الشركة، بدلاً من إشعار منفصل لكل عميل.",
+    invalidNoFollowUpHours: "الرجاء إدخال عدد ساعات صحيح (من 1 إلى 168)",
     weeklyDayOff: "يوم العطلة الأسبوعي",
     weeklyDayOffHelp:
       "لا يمكن إسناد عملاء أو صفقات جديدة لهذا الموظف في هذا اليوم (حسب المنطقة الزمنية للشركة).",

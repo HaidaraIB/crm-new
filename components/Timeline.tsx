@@ -10,7 +10,6 @@ import {
 import { ChatVoicePlayer } from './chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { PhoneText } from './PhoneText';
-import { navigateToCompanyRoute } from '../utils/routing';
 
 const TimelineRecordingPlayer: React.FC<{ url: string; t: (key: string) => string }> = ({
     url,
@@ -296,18 +295,15 @@ function chipColorClass(type?: TimelineEntryType['type']): string {
 }
 
 export const Timeline = ({ history, chatLead }: TimelineProps) => {
-    const { t, language, setCurrentPage, setSelectedLead, currentUser } = useAppContext();
+    const { t, language, goToPage, openLeadInChats: openLeadInChatsPage } = useAppContext();
     const [sortOrder, setSortOrder] = useState<TimelineSortOrder>(readSortOrder);
 
     const openLeadInChats = () => {
         if (!chatLead) {
-            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Chats');
-            setCurrentPage('Chats');
+            goToPage('Chats');
             return;
         }
-        setSelectedLead(chatLead);
-        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Chats');
-        setCurrentPage('Chats');
+        openLeadInChatsPage(chatLead);
     };
 
     const sortedHistory = useMemo(() => {

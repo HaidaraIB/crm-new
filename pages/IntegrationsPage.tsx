@@ -19,6 +19,7 @@ import {
 import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useCreateConnectedAccount, useDisconnectConnectedAccount, useTestConnection } from '../hooks/useQueries';
+import { useWhatsAppConnected } from '../hooks/useWhatsAppConnected';
 import { useQuery } from '@tanstack/react-query';
 import { SelectLeadFormModal } from '../components/modals/SelectLeadFormModal';
 import { EditTemplateModal } from '../components/modals/EditTemplateModal';
@@ -1129,6 +1130,9 @@ export const IntegrationsPage = () => {
             is_active: acc.is_active !== false,
         }));
     }, [accountsResponse]);
+
+    // Tenant-level WhatsApp connectivity — independent of which platform tab is open.
+    const { isConnected: hasConnectedWhatsApp } = useWhatsAppConnected();
 
     // Get platform details (memoized)
     const platform = useMemo(() => {
@@ -2696,10 +2700,6 @@ export const IntegrationsPage = () => {
             waSession != null &&
             !waSession.in_session;
 
-        const hasConnectedWhatsApp = accounts.some(
-            (a: { status?: string; platform?: string; is_active?: boolean }) =>
-                a.platform === 'whatsapp' && a.status === 'Connected' && a.is_active !== false
-        );
         const whatsappSendBlocked = !hasConnectedWhatsApp;
 
         const handleSendMessage = async () => {

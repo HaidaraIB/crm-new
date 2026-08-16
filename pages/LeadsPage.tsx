@@ -7,11 +7,11 @@ import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
 import SendSMSModal from '../components/modals/SendSMSModal';
-import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { Lead, LeadApiFilters, Status, User } from '../types';
 import { useLeads, useLeadStatusCounts, useDeleteLead, usePatchLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { pbxDialAPI, getPbxDialStatusAPI, getLeadsAPI } from '../services/api';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
+import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { exportToExcel } from '../utils/exportToExcel';
 import { normalizeLead } from '../utils/normalizeLead';
@@ -72,6 +72,7 @@ export const LeadsPage = () => {
         setIsAlertModalOpen,
     } = useAppContext();
     const canPbxDial = usePbxDialEnabled();
+    const openWhatsApp = useWhatsAppLeadAction();
     const isDataEntryUser = normalizeRole(currentUser?.role) === 'DataEntry';
     const isMedicalCompany = useMemo(
         () => String(currentUser?.company?.specialization || '').toLowerCase() === 'medical',
@@ -241,8 +242,6 @@ export const LeadsPage = () => {
     const [updatingLeadId, setUpdatingLeadId] = useState<number | null>(null);
     // Send SMS modal: { leadId, phone, lead? }
     const [sendSMSModal, setSendSMSModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
-    // Send WhatsApp modal (opens from table like lead details page)
-    const [sendWhatsAppModal, setSendWhatsAppModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
 
     const pollPbxDialStatus = async (commandId: number) => {
         for (let i = 0; i < 40; i += 1) {
@@ -710,9 +709,7 @@ export const LeadsPage = () => {
                         enabled={isBoardView}
                         showPhoneActions={!isDataEntryUser}
                         onSms={(lead, phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
-                        onWhatsApp={(lead, phone) =>
-                            setSendWhatsAppModal({ leadId: lead.id, phone, lead })
-                        }
+                        onWhatsApp={(lead, phone) => openWhatsApp(lead as Lead, phone)}
                     />
                 </div>
             ) : (
@@ -815,7 +812,7 @@ export const LeadsPage = () => {
                                                             fallbackPhone={lead.phone}
                                                             pbxEnabled={canPbxDial}
                                                             onSms={(phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
-                                                            onWhatsApp={(phone) => setSendWhatsAppModal({ leadId: lead.id, phone, lead })}
+                                                            onWhatsApp={(phone) => openWhatsApp(lead, phone)}
                                                             onPbxDial={(phone) => handlePbxDial(lead.id, phone)}
                                                             t={(key: string) => t(key as Parameters<typeof t>[0])}
                                                         />
@@ -1120,15 +1117,6 @@ export const LeadsPage = () => {
                 leadId={sendSMSModal.leadId}
                 phoneNumber={sendSMSModal.phone}
                 lead={sendSMSModal.lead}
-            />
-        )}
-        {sendWhatsAppModal && (
-            <SendWhatsAppModal
-                isOpen={true}
-                onClose={() => setSendWhatsAppModal(null)}
-                leadId={sendWhatsAppModal.leadId}
-                phoneNumber={sendWhatsAppModal.phone}
-                lead={sendWhatsAppModal.lead}
             />
         )}
         </>

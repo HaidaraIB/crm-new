@@ -5,6 +5,7 @@ import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader
 import { User } from '../types';
 import { useUsers, useReactivateEmployee } from '../hooks/useQueries';
 import { getRoleTranslation, normalizeRole } from '../utils/roles';
+import { buildWaMeUrl } from '../utils/whatsappLaunch';
 
 const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
@@ -227,7 +228,7 @@ const UserCard = ({ user }: { user: User }) => {
                             <PhoneIcon className="w-5 h-5"/>
                         </a>
                         <a 
-                            href={`https://wa.me/${user.phone.replace(/\D/g, '')}`} 
+                            href={buildWaMeUrl(user.phone) || '#'}
                             target="_blank" 
                             rel="noopener noreferrer" 
                             className="inline-flex items-center justify-center w-8 h-8 text-green-600 dark:text-green-400 hover:opacity-80 transition-opacity"

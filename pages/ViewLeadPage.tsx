@@ -4,7 +4,6 @@ import React, { useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadContactPhoneList } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
-import SendWhatsAppModal from '../components/modals/SendWhatsAppModal';
 import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels } from '../hooks/useQueries';
@@ -13,6 +12,7 @@ import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../serv
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
+import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import {
@@ -87,11 +87,11 @@ export const ViewLeadPage = () => {
     
     const canPbxDial = usePbxDialEnabled();
     const whatsappCalling = useWhatsAppCallingOptional();
+    const openWhatsApp = useWhatsAppLeadAction();
     const deleteLeadMutation = useDeleteLead();
 
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
     const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
-    const [sendWhatsAppModal, setSendWhatsAppModal] = React.useState<{ phone: string } | null>(null);
     const [updatingMetaQualification, setUpdatingMetaQualification] = React.useState(false);
 
     // Get leadId from URL
@@ -133,7 +133,7 @@ export const ViewLeadPage = () => {
     const clientEvents = clientEventsResponse?.results || [];
     
     const { data: leadSMSMessages = [], refetch: refetchLeadSMS } = useLeadSMSMessages(leadId ?? undefined);
-    const { data: leadWhatsAppMessages = [], refetch: refetchLeadWhatsApp } = useLeadWhatsAppMessages(leadId ?? undefined);
+    const { data: leadWhatsAppMessages = [] } = useLeadWhatsAppMessages(leadId ?? undefined);
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
@@ -947,7 +947,7 @@ export const ViewLeadPage = () => {
                                     fallbackPhone={displayLead.phone}
                                     pbxEnabled={canPbxDial}
                                     onSms={(phone) => setSendSMSModal({ phone })}
-                                    onWhatsApp={(phone) => setSendWhatsAppModal({ phone })}
+                                    onWhatsApp={(phone) => openWhatsApp(displayLead, phone)}
                                     onPbxDial={handlePbxDial}
                                     t={t}
                                 />
@@ -1339,16 +1339,6 @@ export const ViewLeadPage = () => {
                     phoneNumber={sendSMSModal.phone}
                     lead={displayLead}
                     onSent={() => refetchLeadSMS()}
-                />
-            )}
-            {sendWhatsAppModal && displayLead && (
-                <SendWhatsAppModal
-                    isOpen={!!sendWhatsAppModal}
-                    onClose={() => setSendWhatsAppModal(null)}
-                    leadId={displayLead.id}
-                    phoneNumber={sendWhatsAppModal.phone}
-                    lead={displayLead}
-                    onSent={() => { refetchLeadWhatsApp(); refetchLeadSMS(); }}
                 />
             )}
         </PageWrapper>

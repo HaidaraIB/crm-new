@@ -96,6 +96,15 @@ export interface AppContextType {
   t: (key: keyof typeof translations.en) => string;
   selectedLead: Lead | null;
   setSelectedLead: (lead: Lead | null) => void;
+  /**
+   * Phone number the Chats page should open for `selectedLead`, when the user
+   * arrived from a specific number (a lead can have several). Consumed and
+   * cleared by ChatsPage; null means "use the lead's primary number".
+   */
+  pendingChatPhone: string | null;
+  setPendingChatPhone: (phone: string | null) => void;
+  /** Open a lead's WhatsApp conversation in Chats, optionally on a given number. */
+  openLeadInChats: (lead: Lead, phone?: string) => void;
   selectedLeadForDeal: number | null;
   setSelectedLeadForDeal: (leadId: number | null) => void;
   selectedUser: User | null;
@@ -469,6 +478,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isTeamChatDialogOpen, setIsTeamChatDialogOpen] = useState(false);
   const [isNotificationsDialogOpen, setIsNotificationsDialogOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [pendingChatPhone, setPendingChatPhone] = useState<string | null>(null);
   const [leadFilters, setLeadFilters] = useState<LeadFilters>({
     status: 'All',
     type: 'All',
@@ -1455,6 +1465,15 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     setCurrentPage(page);
   }, [currentUser?.company?.name, currentUser?.company?.domain]);
 
+  const openLeadInChats = useCallback(
+    (lead: Lead, phone?: string) => {
+      setSelectedLead(lead);
+      setPendingChatPhone(phone?.trim() || null);
+      goToPage('Chats');
+    },
+    [goToPage]
+  );
+
   const openCallsFiltered = useCallback(
     (partial: Partial<CallFilters>) => {
       const next = { ...DEFAULT_CALL_FILTERS, ...partial };
@@ -1474,6 +1493,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isNotificationsDialogOpen, setIsNotificationsDialogOpen,
     t, 
     selectedLead, setSelectedLead,
+    pendingChatPhone, setPendingChatPhone,
+    openLeadInChats,
     selectedLeadForDeal, setSelectedLeadForDeal,
     selectedUser, setSelectedUser,
     currentUser, setCurrentUser,

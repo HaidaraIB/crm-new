@@ -16,6 +16,7 @@ import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallL
 import { useAppContext } from '../context/AppContext';
 import { useConnectedAccounts, useMarkWhatsAppConversationRead, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
 import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
+import { useWhatsAppConnected } from '../hooks/useWhatsAppConnected';
 import {
   deleteWhatsAppConversationAPI,
   deleteWhatsAppMessageAPI,
@@ -82,6 +83,8 @@ export const ChatsPage: React.FC = () => {
     language,
     currentUser,
     selectedLead,
+    pendingChatPhone,
+    setPendingChatPhone,
     setAlertMessage,
     setAlertVariant,
     setIsAlertModalOpen,
@@ -163,23 +166,9 @@ export const ChatsPage: React.FC = () => {
     }));
   }, [accountsResponse]);
 
-  const hasConnectedWhatsApp = accounts.some(
-    (a: any) =>
-      (!a.platform || a.platform === 'whatsapp') &&
-      a.status === 'Connected' &&
-      a.is_active !== false
-  );
+  const { isConnected: hasConnectedWhatsApp, phoneNumberId: currentWhatsAppPhoneNumberId } =
+    useWhatsAppConnected();
   const whatsappSendBlocked = !hasConnectedWhatsApp;
-
-  const currentWhatsAppPhoneNumberId = useMemo(() => {
-    const connected = accounts.find(
-      (a: any) =>
-        (!a.platform || a.platform === 'whatsapp') &&
-        a.status === 'Connected' &&
-        a.is_active !== false
-    );
-    return String(connected?.metadata?.phone_number_id || '').trim() || null;
-  }, [accounts]);
 
   const displayNameBlockedHint = useMemo(() => {
     const pending = accounts.some((a: any) => {
@@ -574,14 +563,17 @@ export const ChatsPage: React.FC = () => {
     };
   }, []);
 
-  // Open a lead conversation when navigating from notifications / View Lead "Open in Chats".
+  // Open a lead conversation when navigating from notifications / View Lead "Open in Chats"
+  // / the WhatsApp button on a phone number. `pendingChatPhone` is set when the caller
+  // picked a specific number, so a lead with several numbers opens the right thread —
+  // and it always re-opens, even for the lead already showing.
   useEffect(() => {
     const leadId = selectedLead?.id;
     if (typeof leadId !== 'number') return;
-    if (autoOpenedChatLeadRef.current === leadId) return;
+    if (!pendingChatPhone && autoOpenedChatLeadRef.current === leadId) return;
 
     const match = conversations.find((c) => c.client?.id === leadId);
-    const client =
+    const base =
       match?.client ??
       ({
         id: selectedLead.id,
@@ -593,10 +585,12 @@ export const ChatsPage: React.FC = () => {
           '',
         lead_company_name: selectedLead.leadCompanyName || '',
       } as const);
+    const client = pendingChatPhone ? { ...base, phone_number: pendingChatPhone } : base;
 
     autoOpenedChatLeadRef.current = leadId;
     selectChatClient(client);
-  }, [selectedLead?.id, conversations, selectedLead]);
+    if (pendingChatPhone) setPendingChatPhone(null);
+  }, [selectedLead?.id, pendingChatPhone, conversations, selectedLead]);
 
   const addConversation = async (client: any) => {
     // Manual phone: resolve via API (staff get not-found for foreign/unassigned)

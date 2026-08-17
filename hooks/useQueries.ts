@@ -20,6 +20,8 @@ import {
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
   getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI, getWhatsAppCallsPendingAPI, getWhatsAppCallsLiveAPI,
   getNewsUnreadCountAPI, markNewsReadAPI,
+  getSyncDigestAPI,
+  type SyncDigest,
   type WhatsAppCallRecord,
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
@@ -114,6 +116,7 @@ export const queryKeys = {
   /** Pending / live WhatsApp Cloud Calling rings (shared by Calls page, sidebar, toast). */
   whatsappCallsLive: ['whatsappCalls', 'live'] as const,
   newsUnreadCount: ['newsUnreadCount'] as const,
+  syncDigest: ['syncDigest'] as const,
 };
 
 /** Cuts refetch bursts on data-heavy views (aligns with API UserRateThrottle). */
@@ -705,6 +708,23 @@ export const useWhatsAppConversations = (
   });
 };
 
+export const useSyncDigest = (
+  options?: Omit<UseQueryOptions<SyncDigest, Error>, 'queryKey' | 'queryFn'> & {
+    enabled?: boolean;
+  }
+) => {
+  const { refetchInterval = 5_000, enabled = true, ...rest } = options || {};
+  return useQuery<SyncDigest, Error>({
+    queryKey: queryKeys.syncDigest,
+    queryFn: getSyncDigestAPI,
+    staleTime: 4_000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
+    enabled,
+    ...rest,
+  });
+};
+
 /** Sidebar badge: unread inbound WhatsApp messages in the caller's ACL scope. */
 export const useWhatsAppUnreadCount = (
   options?: Omit<UseQueryOptions<{ unread_count: number }, Error, number>, 'queryKey' | 'queryFn'> & {
@@ -806,6 +826,7 @@ export const useMarkWhatsAppConversationRead = () => {
     mutationFn: markWhatsAppConversationReadAPI,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppUnreadCount });
+      queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
     },
   });
@@ -837,6 +858,7 @@ export const useMarkNewsRead = () => {
     onSuccess: () => {
       queryClient.setQueryData(queryKeys.newsUnreadCount, { unread_count: 0 });
       queryClient.invalidateQueries({ queryKey: queryKeys.newsUnreadCount });
+      queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
     },
   });
 };

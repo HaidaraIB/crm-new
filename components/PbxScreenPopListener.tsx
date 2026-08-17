@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { getNotificationsAPI, getPbxSettingsAPI, markNotificationReadAPI, type AppNotification } from '../services/api';
+import { getPbxSettingsAPI, markNotificationReadAPI, getNotificationByIdAPI, type AppNotification } from '../services/api';
 import { getNotificationDisplay } from '../utils/notificationDisplay';
 import { Button } from './Button';
 import { PhoneIcon } from './icons';
 import { PhoneText } from './PhoneText';
+import { queryKeys, useSyncDigest } from '../hooks/useQueries';
 
 const AUTO_DISMISS_MS = 45_000;
 const PBX_POP_TYPES = new Set(['pbx_incoming_call', 'pbx_call_missed']);
@@ -25,7 +26,6 @@ function loadShownIds(): Set<number> {
 
 function persistShownIds(ids: Set<number>) {
   try {
-    // Cap size so sessionStorage does not grow forever
     const list = Array.from(ids).slice(-200);
     sessionStorage.setItem(SHOWN_STORAGE_KEY, JSON.stringify(list));
   } catch {
@@ -37,7 +37,7 @@ function isPbxScreenPop(n: AppNotification) {
   return PBX_POP_TYPES.has(n.type);
 }
 
-/** Polls for PBX incoming-call notifications and shows a non-blocking screen-pop toast. */
+/** Shows a non-blocking PBX screen-pop toast from the sync digest. */
 export const PbxScreenPopListener = () => {
   const { setCurrentPage, setSelectedLead, t, language } = useAppContext();
   const queryClient = useQueryClient();
@@ -56,13 +56,18 @@ export const PbxScreenPopListener = () => {
   const screenPopActive =
     !!pbxSettings?.is_enabled && pbxSettings.screen_pop_enabled !== false;
 
-  const queryKey = ['notifications', 'pbx-screen-pop'] as const;
-
-  const { data } = useQuery({
-    queryKey,
-    queryFn: () => getNotificationsAPI({ page: 1, page_size: 50 }),
-    refetchInterval: screenPopActive ? 8000 : false,
+  const { data: digest } = useSyncDigest({
     enabled: screenPopActive,
+    refetchInterval: false,
+  });
+  const popId = digest?.pbx_screen_pop?.notification_id;
+  const shouldFetchPop =
+    screenPopActive && typeof popId === 'number' && !shownRef.current.has(popId);
+
+  const { data: popNotification } = useQuery({
+    queryKey: ['notifications', 'pbx-screen-pop', popId],
+    queryFn: () => getNotificationByIdAPI(popId!),
+    enabled: shouldFetchPop,
   });
 
   const markShown = useCallback((ids: number[]) => {
@@ -76,94 +81,31 @@ export const PbxScreenPopListener = () => {
     if (changed) persistShownIds(shownRef.current);
   }, []);
 
-  // One-shot: if a backlog of unread PBX pops accumulated (e.g. webhook retries),
-  // keep only the newest for display and mark the rest read so dismiss isn't a loop.
-  const prunedRef = useRef(false);
-  useEffect(() => {
-    if (!data?.results || prunedRef.current || dismissingRef.current) return;
-    const unread = (data.results as AppNotification[])
-      .filter((n) => isPbxScreenPop(n) && !n.read && !shownRef.current.has(n.id))
-      .sort((a, b) => b.id - a.id);
-    if (unread.length <= 1) {
-      if (unread.length === 1 || (data.results as AppNotification[]).some(isPbxScreenPop)) {
-        prunedRef.current = true;
-      }
-      return;
-    }
-    prunedRef.current = true;
-    const [, ...stale] = unread;
-    const staleIds = stale.map((n) => n.id);
-    markShown(staleIds);
-    queryClient.setQueryData(queryKey, (prev: typeof data) => {
-      if (!prev?.results) return prev;
-      const cleared = new Set(staleIds);
-      return {
-        ...prev,
-        results: prev.results.map((n) =>
-          cleared.has(n.id) ? { ...n, read: true } : n
-        ),
-      };
-    });
-    void Promise.all(staleIds.map((id) => markNotificationReadAPI(id).catch(() => null)));
-  }, [data, markShown, queryClient]);
-
   const dismissBacklog = useCallback(
     async (primary: AppNotification | null) => {
       if (dismissingRef.current) return;
       dismissingRef.current = true;
       try {
-        const items = data?.results ?? [];
-        const pending = items.filter(
-          (n) => isPbxScreenPop(n) && !n.read && !shownRef.current.has(n.id)
-        );
-        const toClear = new Map<number, AppNotification>();
-        if (primary) toClear.set(primary.id, primary);
-        for (const n of pending) toClear.set(n.id, n);
-        // Also clear any other unread PBX pops already marked shown but still unread
-        for (const n of items) {
-          if (isPbxScreenPop(n) && !n.read) toClear.set(n.id, n);
-        }
-
-        const ids = Array.from(toClear.keys());
+        const ids = primary ? [primary.id] : popId ? [popId] : [];
         markShown(ids);
         setActive(null);
-
-        queryClient.setQueryData(queryKey, (prev: typeof data) => {
-          if (!prev?.results) return prev;
-          const cleared = new Set(ids);
-          return {
-            ...prev,
-            results: prev.results.map((n) =>
-              cleared.has(n.id) ? { ...n, read: true } : n
-            ),
-          };
-        });
-
-        await Promise.all(
-          ids.map((id) => markNotificationReadAPI(id).catch(() => null))
-        );
-        queryClient.invalidateQueries({ queryKey: ['notifications'] });
+        await Promise.all(ids.map((id) => markNotificationReadAPI(id).catch(() => null)));
+        void queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
+        void queryClient.invalidateQueries({ queryKey: ['notifications'] });
       } finally {
         dismissingRef.current = false;
       }
     },
-    [data, markShown, queryClient]
+    [markShown, popId, queryClient]
   );
 
   useEffect(() => {
-    if (!data || dismissingRef.current || activeRef.current) return;
-    const items = data.results ?? [];
-    // Newest first if API returns oldest-first
-    const incoming = [...items]
-      .filter(
-        (n) => isPbxScreenPop(n) && !n.read && !shownRef.current.has(n.id)
-      )
-      .sort((a, b) => b.id - a.id)[0];
-    if (incoming) {
-      markShown([incoming.id]);
-      setActive(incoming);
-    }
-  }, [data, markShown]);
+    if (!popNotification || dismissingRef.current || activeRef.current) return;
+    if (!isPbxScreenPop(popNotification) || popNotification.read) return;
+    if (shownRef.current.has(popNotification.id)) return;
+    markShown([popNotification.id]);
+    setActive(popNotification);
+  }, [popNotification, markShown]);
 
   const dismiss = useCallback(() => {
     void dismissBacklog(activeRef.current);

@@ -7,7 +7,6 @@ import {
   deleteAllNotificationsAPI,
   deleteNotificationAPI,
   getNotificationsAPI,
-  getNotificationsUnreadCountAPI,
   markAllNotificationsReadAPI,
   markNotificationReadAPI,
   type AppNotification,
@@ -16,9 +15,9 @@ import { formatDateTimeToLocal } from '../utils/dateUtils';
 import { getNotificationDisplay } from '../utils/notificationDisplay';
 import { getCompanyViewLeadRoute, navigateToCompanyRoute } from '../utils/routing';
 import { PhoneText, isPhoneLike } from './PhoneText';
+import { queryKeys, useSyncDigest } from '../hooks/useQueries';
 
 const NOTIFICATIONS_QK = ['notifications', 'list'] as const;
-const NOTIFICATIONS_UNREAD_QK = ['notifications', 'unread-count'] as const;
 
 function isTenantChatEcho(n: AppNotification): boolean {
   const k = n.data?.kind;
@@ -64,7 +63,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
 
   const invalidateInbox = () => {
     void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_QK });
-    void queryClient.invalidateQueries({ queryKey: NOTIFICATIONS_UNREAD_QK });
+    void queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
     void queryClient.invalidateQueries({ queryKey: ['notifications'] });
   };
 
@@ -448,11 +447,6 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
 };
 
 export function useNotificationsUnreadCount(enabled: boolean) {
-  return useQuery({
-    queryKey: NOTIFICATIONS_UNREAD_QK,
-    queryFn: () => getNotificationsUnreadCountAPI(),
-    enabled,
-    select: (d) => d.unread_count ?? 0,
-    refetchInterval: 30_000,
-  });
+  const { data } = useSyncDigest({ enabled, refetchInterval: false });
+  return { data: data?.notifications_unread ?? 0 };
 }

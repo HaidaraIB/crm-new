@@ -5919,6 +5919,20 @@ export type AppNotification = {
   data?: Record<string, unknown> | null;
 };
 
+export type SyncDigest = {
+  whatsapp_unread: number | null;
+  whatsapp_calls_pending: number | null;
+  tenant_chat_unread: number;
+  notifications_unread: number;
+  news_unread: number;
+  pbx_screen_pop: { notification_id: number; client_id: number | null } | null;
+  version: string;
+};
+
+export async function getSyncDigestAPI(): Promise<SyncDigest> {
+  return apiRequest<SyncDigest>('/sync/digest/', { cache: 'no-store' });
+}
+
 export async function getNotificationsAPI(params?: { page?: number; page_size?: number; read?: boolean }) {
   const search = new URLSearchParams();
   if (params?.page != null) search.set('page', String(params.page));
@@ -5928,6 +5942,10 @@ export async function getNotificationsAPI(params?: { page?: number; page_size?: 
   return apiRequest<{ count: number; next: string | null; previous: string | null; results: AppNotification[] }>(
     `/notifications/${q ? `?${q}` : ''}`
   );
+}
+
+export async function getNotificationByIdAPI(id: number) {
+  return apiRequest<AppNotification>(`/notifications/${id}/`);
 }
 
 export async function getNotificationsUnreadCountAPI() {

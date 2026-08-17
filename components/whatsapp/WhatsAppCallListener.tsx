@@ -10,7 +10,7 @@ import React, {
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
 import { useWhatsAppCallSession } from '../../hooks/useWhatsAppCallSession';
-import { queryKeys, useWhatsAppLiveCalls } from '../../hooks/useQueries';
+import { queryKeys, useSyncDigest, useWhatsAppLiveCalls } from '../../hooks/useQueries';
 import {
   getWhatsAppCallPermissionsAPI,
   resolveLocalizedApiError,
@@ -104,8 +104,14 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
     void queryClient.invalidateQueries({ queryKey: ['clientCalls'] });
   }, [queryClient]);
 
-  const { data: liveInbound = [] } = useWhatsAppLiveCalls({
+  const { data: digest } = useSyncDigest({
     enabled: Boolean(currentUser),
+    refetchInterval: false,
+  });
+  const pendingHint = (digest?.whatsapp_calls_pending ?? 0) > 0;
+
+  const { data: liveInbound = [] } = useWhatsAppLiveCalls({
+    enabled: Boolean(currentUser) && (pendingHint || sessionBusy || Boolean(toastCall) || Boolean(waitingCall)),
     refetchInterval: 2_000,
   });
 

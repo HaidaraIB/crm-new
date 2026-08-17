@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { queryKeys, useWhatsAppUnreadCount } from './useQueries';
+import { queryKeys, useSyncDigest } from './useQueries';
 import { useWhatsAppChatsAllowed } from './useWhatsAppChatsAllowed';
 import { playIncomingChatSound, preloadIncomingChatSound } from '../utils/chatIncomingSound';
 
@@ -14,19 +14,11 @@ export function useWhatsAppAwayNotifications(): void {
   const { currentPage, isLoggedIn, canAccessPage, currentUser } = useAppContext();
   const queryClient = useQueryClient();
   const chatsAllowed = useWhatsAppChatsAllowed();
-  // `canAccessPage('Chats')` is true for an employee whose WhatsApp access the owner
-  // switched off — polling every 2s then 403s forever, so check real access too.
   const enabled = Boolean(isLoggedIn && currentUser && canAccessPage('Chats') && chatsAllowed);
   const isOnChats = currentPage === 'Chats';
 
-  const { data: unreadTotal = 0 } = useWhatsAppUnreadCount({
-    enabled,
-    refetchInterval: () => {
-      if (typeof document !== 'undefined' && document.hidden) return 10_000;
-      // Keep polling on Chats so other conversations can ding with chat.wav.
-      return 2000;
-    },
-  });
+  const { data } = useSyncDigest({ enabled });
+  const unreadTotal = typeof data?.whatsapp_unread === 'number' ? data.whatsapp_unread : 0;
 
   const prevUnreadTotalRef = useRef<number | null>(null);
   const hydratedRef = useRef(false);
@@ -38,7 +30,7 @@ export function useWhatsAppAwayNotifications(): void {
 
   useEffect(() => {
     if (!enabled) return;
-    const total = typeof unreadTotal === 'number' ? unreadTotal : 0;
+    const total = unreadTotal;
 
     if (!hydratedRef.current) {
       prevUnreadTotalRef.current = total;
@@ -48,11 +40,8 @@ export function useWhatsAppAwayNotifications(): void {
 
     const unreadBumped = total > (prevUnreadTotalRef.current ?? 0);
 
-    // Away: chat.wav. On Chats: chat.wav for unread bumps (other threads);
-    // open-thread inbound is handled in ChatsPage with WhatsApp sound.
     if (unreadBumped) {
       playIncomingChatSound();
-      // Keep conversation list badges/previews in sync with the faster unread poll.
       void queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
     }
 

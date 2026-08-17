@@ -1,16 +1,13 @@
 
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './Button';
 import { MoonIcon, SunIcon, MenuIcon, ChevronDownIcon, ChatBubbleIcon, BellIcon } from './icons';
 import { Dropdown, DropdownItem } from './Dropdown';
 import { navigateToCompanyRoute } from '../utils/routing';
-import { getTenantChatConversationsAPI } from '../services/api';
-import { useNotificationsUnreadCount } from './NotificationsDialog';
-import { useCurrentUser } from '../hooks/useQueries';
+import { useCurrentUser, useSyncDigest } from '../hooks/useQueries';
 
 type HeaderProps = {
     isInternetOnline: boolean;
@@ -23,23 +20,12 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
     const [isLogoutConfirmOpen, setIsLogoutConfirmOpen] = useState(false);
 
     const teamChatEnabled = Boolean(effectiveUser && canAccessPage('Team Chat'));
-    const tenantChatUnreadQuery = useQuery({
-        queryKey: ['tenant-chat-conversations'],
-        queryFn: () => getTenantChatConversationsAPI(),
-        enabled: teamChatEnabled,
-        refetchInterval: 8000,
+    const { data: digest } = useSyncDigest({
+        enabled: Boolean(effectiveUser),
+        refetchInterval: false,
     });
-    const teamChatUnreadTotal = useMemo(
-        () =>
-            (tenantChatUnreadQuery.data?.results ?? []).reduce(
-                (sum, c) => sum + (c.unread_count ?? 0),
-                0
-            ),
-        [tenantChatUnreadQuery.data]
-    );
-
-    const notificationsUnreadQuery = useNotificationsUnreadCount(Boolean(effectiveUser));
-    const notificationsUnreadTotal = notificationsUnreadQuery.data ?? 0;
+    const teamChatUnreadTotal = teamChatEnabled ? (digest?.tenant_chat_unread ?? 0) : 0;
+    const notificationsUnreadTotal = digest?.notifications_unread ?? 0;
 
     if (!effectiveUser) return null;
 

@@ -16,7 +16,6 @@ import {
     textLooksWhatsAppFormatted,
     type WhatsAppFormatKind,
 } from '../utils/whatsappFormatting';
-import { useWhatsAppConversations, useWhatsAppChatMessages } from '../hooks/useQueries';
 import type { MessageTemplateType } from '../services/api';
 import { useConnectedAccounts, useCreateConnectedAccount, useDisconnectConnectedAccount, useTestConnection } from '../hooks/useQueries';
 import { useWhatsAppConnected } from '../hooks/useWhatsAppConnected';
@@ -923,24 +922,15 @@ export const IntegrationsPage = () => {
     }, [isEmployee, currentPage, currentUser?.company?.name, currentUser?.company?.domain, setCurrentPage]);
 
     const isChatsPage = currentPage === 'Chats';
-    const isChatPollingPage = isChatsPage;
-    const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
-        enabled: isChatPollingPage,
-        refetchInterval: isChatPollingPage ? 8000 : false,
-    });
+    const isChatPollingPage = false;
+    const conversationsList: any[] = [];
+    const refetchConversations = async () => {};
+    const leadWhatsAppMessages: any[] = [];
+    const refetchLeadWhatsApp = async () => {};
+    const isFetchingChatMessages = false;
     const selectedChatLeadId =
         selectedChatClient && typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined;
     const selectedChatPhone = selectedChatClient ? normalizeChatPhone(selectedChatClient) : '';
-    const {
-        data: leadWhatsAppMessages = [],
-        refetch: refetchLeadWhatsApp,
-        isFetching: isFetchingChatMessages,
-    } = useWhatsAppChatMessages({
-        clientId: selectedChatLeadId,
-        phone: selectedChatPhone || undefined,
-        enabled: isChatPollingPage && !!selectedChatClient,
-        refetchInterval: isChatPollingPage && !!selectedChatClient ? 5000 : false,
-    });
 
     // Link manual-number chat to CRM lead once Meta/webhook created or matched a client
     useEffect(() => {

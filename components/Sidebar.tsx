@@ -11,7 +11,7 @@ import { ChevronDownIcon, CodeBracketsIcon, XIcon } from './icons';
 import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
-import { useNewsUnreadCount, useWhatsAppLiveCallsCount, useWhatsAppUnreadCount } from '../hooks/useQueries';
+import { useSyncDigest } from '../hooks/useQueries';
 import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
 
 type IntegrationLogoConfig = {
@@ -155,24 +155,20 @@ export const Sidebar = () => {
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
     const isReceptionUser = normalizedCurrentRole === 'Reception';
     const chatsNavVisible = useWhatsAppChatsAllowed();
-    const { data: whatsappUnreadCount = 0 } = useWhatsAppUnreadCount({
-        enabled: Boolean(currentUser?.company?.id) && chatsNavVisible,
-        refetchInterval: 15_000,
+    const { data: digest } = useSyncDigest({
+        enabled: Boolean(currentUser?.company?.id),
+        refetchInterval: false,
     });
+    const whatsappUnreadCount = chatsNavVisible ? (digest?.whatsapp_unread ?? 0) : 0;
     const callsNavVisible =
         !isDataEntryUser &&
         !isReceptionUser &&
         (normalizedCurrentRole !== 'Supervisor' || canAccessPage('Calls'));
-    const { data: liveCallsCount = 0 } = useWhatsAppLiveCallsCount({
-        enabled: Boolean(currentUser?.company?.id) && callsNavVisible,
-        refetchInterval: 2_000,
-    });
+    const liveCallsCount = callsNavVisible ? (digest?.whatsapp_calls_pending ?? 0) : 0;
     const newsNavVisible =
         normalizedCurrentRole !== 'Supervisor' || canAccessPage('News');
-    const { data: newsUnreadCount = 0 } = useNewsUnreadCount({
-        enabled: Boolean(currentUser?.company?.id) && newsNavVisible && !isDataEntryUser && !isReceptionUser,
-        refetchInterval: 60_000,
-    });
+    const newsUnreadCount =
+        newsNavVisible && !isDataEntryUser && !isReceptionUser ? (digest?.news_unread ?? 0) : 0;
 
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';

@@ -282,6 +282,7 @@ export const CallsPage: React.FC = () => {
         limit: 100,
       }),
     refetchInterval: 8000,
+    enabled: Boolean(currentUser),
   });
 
   const {
@@ -297,6 +298,7 @@ export const CallsPage: React.FC = () => {
         limit: 1,
       }),
     refetchInterval: 8000,
+    enabled: Boolean(currentUser),
   });
 
   const results = data?.results || [];

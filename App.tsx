@@ -5,6 +5,7 @@ import { AppProvider, useAppContext } from './context/AppContext';
 import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotifications';
 import { useWhatsAppAwayNotifications } from './hooks/useWhatsAppAwayNotifications';
+import { useSyncDigest } from './hooks/useQueries';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
@@ -141,6 +142,7 @@ const TheApp = () => {
     const fieldVisitsAllowed = useFieldVisitAllowed();
     useTeamChatAwayNotifications();
     useWhatsAppAwayNotifications();
+    useSyncDigest({ enabled: Boolean(isLoggedIn && currentUser) });
     React.useEffect(() => {
         if (!isLoggedIn || currentPage !== 'Team Chat') return;
         setIsTeamChatDialogOpen(true);
@@ -172,7 +174,6 @@ const TheApp = () => {
     const [isMaintenanceMode, setIsMaintenanceMode] = React.useState(false);
     const [maintenanceMessage, setMaintenanceMessage] = React.useState('');
     const previousInternetStatusRef = React.useRef<boolean>(isInternetOnline);
-    const probeInFlightRef = React.useRef(false);
     
     React.useEffect(() => {
         const checkPaymentSuccess = () => {
@@ -217,69 +218,13 @@ const TheApp = () => {
     }, [checkMaintenanceStatus]);
 
     React.useEffect(() => {
-        const checkUrl = async (url: string): Promise<boolean> => {
-            const controller = new AbortController();
-            const timeoutId = window.setTimeout(() => controller.abort(), 5000);
-            try {
-                await fetch(url, {
-                    method: 'GET',
-                    cache: 'no-store',
-                    mode: 'no-cors',
-                    signal: controller.signal,
-                });
-                return true;
-            } catch {
-                return false;
-            } finally {
-                window.clearTimeout(timeoutId);
-            }
-        };
-
-        const runConnectivityProbe = async () => {
-            if (probeInFlightRef.current) return;
-            probeInFlightRef.current = true;
-            try {
-                if (!navigator.onLine) {
-                    setIsInternetOnline(false);
-                    return;
-                }
-                const ts = Date.now();
-                const probeTargets = [
-                    `https://www.gstatic.com/generate_204?ts=${ts}`,
-                    `https://cp.cloudflare.com/generate_204?ts=${ts}`,
-                    `https://www.msftconnecttest.com/connecttest.txt?ts=${ts}`,
-                ];
-                const results = await Promise.all(probeTargets.map((url) => checkUrl(url)));
-                setIsInternetOnline(results.some(Boolean));
-            } finally {
-                probeInFlightRef.current = false;
-            }
-        };
-
-        const handleOnline = () => {
-            void runConnectivityProbe();
-        };
-        const handleOffline = () => setIsInternetOnline(false);
-        const handleVisible = () => {
-            if (document.visibilityState === 'visible') {
-                void runConnectivityProbe();
-            }
-        };
-
-        window.addEventListener('online', handleOnline);
-        window.addEventListener('offline', handleOffline);
-        document.addEventListener('visibilitychange', handleVisible);
-
-        void runConnectivityProbe();
-        const intervalId = window.setInterval(() => {
-            void runConnectivityProbe();
-        }, 15000);
-
+        const syncOnline = () => setIsInternetOnline(navigator.onLine);
+        window.addEventListener('online', syncOnline);
+        window.addEventListener('offline', syncOnline);
+        syncOnline();
         return () => {
-            window.removeEventListener('online', handleOnline);
-            window.removeEventListener('offline', handleOffline);
-            document.removeEventListener('visibilitychange', handleVisible);
-            window.clearInterval(intervalId);
+            window.removeEventListener('online', syncOnline);
+            window.removeEventListener('offline', syncOnline);
         };
     }, []);
 

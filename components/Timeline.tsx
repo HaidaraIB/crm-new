@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
-import { Lead, TimelineEntry as TimelineEntryType } from '../types';
+import { Lead, TimelineEntry as TimelineEntryType, TimelineTagRef } from '../types';
+import { getStatusSurfaceStyles } from './LeadStatusDropdown';
 import { ClockIcon, PhoneIcon, MapPinIcon, WhatsappIcon, SmsIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
 import { translations } from '../constants';
@@ -271,6 +272,57 @@ function TimelineFromToDates({
     );
 }
 
+const DEFAULT_TAG_COLOR = '#94a3b8';
+
+/** Added/removed tag chips, colored from the tag's own hex like everywhere else. */
+function TimelineTagChanges({
+    tagChanges,
+    t,
+}: {
+    tagChanges: NonNullable<TimelineEntryType['tagChanges']>;
+    t: (key: keyof typeof translations.en) => string;
+}) {
+    const { theme } = useAppContext();
+    const { added, removed } = tagChanges;
+    if (added.length === 0 && removed.length === 0) return null;
+
+    const row = (label: string, tags: TimelineTagRef[], struck: boolean) => (
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 shrink-0">
+                {label}
+            </span>
+            {tags.map((tag) => {
+                const color = tag.color || DEFAULT_TAG_COLOR;
+                return (
+                    <span
+                        key={`${label}-${tag.name}`}
+                        className={`inline-flex max-w-[12rem] items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium ${
+                            struck ? 'opacity-70' : ''
+                        }`}
+                        style={getStatusSurfaceStyles(color, theme)}
+                    >
+                        <span
+                            className="h-1.5 w-1.5 shrink-0 rounded-full"
+                            style={{ backgroundColor: color }}
+                            aria-hidden
+                        />
+                        <span className={`truncate ${struck ? 'line-through' : ''}`}>
+                            {tag.name}
+                        </span>
+                    </span>
+                );
+            })}
+        </div>
+    );
+
+    return (
+        <div className="mt-2 space-y-1.5">
+            {added.length > 0 && row(t('timelineTagsAdded'), added, false)}
+            {removed.length > 0 && row(t('timelineTagsRemoved'), removed, true)}
+        </div>
+    );
+}
+
 function chipColorClass(type?: TimelineEntryType['type']): string {
     switch (type) {
         case 'whatsapp':
@@ -519,7 +571,12 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                         </div>
                                     )}
 
+                                    {entry.tagChanges && (
+                                        <TimelineTagChanges tagChanges={entry.tagChanges} t={t} />
+                                    )}
+
                                     {entry.details &&
+                                        !entry.tagChanges &&
                                         entry.type !== 'location_update' &&
                                         entry.type !== 'whatsapp_thread' && (
                                         <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words">

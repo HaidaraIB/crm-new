@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
-import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, LeadFilters, CallFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
+import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
 import {
   isMedicalSpecialization,
@@ -422,6 +422,12 @@ export interface AppContextType {
   setIsEditStatusModalOpen: (isOpen: boolean) => void;
   editingStatus: Status | null;
   setEditingStatus: React.Dispatch<React.SetStateAction<Status | null>>;
+  isAddTagModalOpen: boolean;
+  setIsAddTagModalOpen: (isOpen: boolean) => void;
+  isEditTagModalOpen: boolean;
+  setIsEditTagModalOpen: (isOpen: boolean) => void;
+  editingTag: Tag | null;
+  setEditingTag: React.Dispatch<React.SetStateAction<Tag | null>>;
   channelTypes: string[]; // Derived from channels (will be computed from React Query data)
   isCompanySubscriptionInactive: boolean;
   setIsCompanySubscriptionInactive: (isInactive: boolean) => void;
@@ -485,6 +491,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     priority: 'All',
     assignedTo: 'All',
     communicationWay: 'All',
+    tags: [],
     budgetMin: '',
     budgetMax: '',
     createdAtFrom: '',
@@ -762,6 +769,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [editingVisitType, setEditingVisitType] = useState<{ id: number; name: string; description?: string; color: string; is_active: boolean } | null>(null);
   const [isEditStatusModalOpen, setIsEditStatusModalOpen] = useState(false);
   const [editingStatus, setEditingStatus] = useState<Status | null>(null);
+  const [isAddTagModalOpen, setIsAddTagModalOpen] = useState(false);
+  const [isEditTagModalOpen, setIsEditTagModalOpen] = useState(false);
+  const [editingTag, setEditingTag] = useState<Tag | null>(null);
 
   // Integrations state
   const [isManageIntegrationAccountModalOpen, setIsManageIntegrationAccountModalOpen] = useState(false);
@@ -1623,6 +1633,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isAddStatusModalOpen, setIsAddStatusModalOpen,
     isEditStatusModalOpen, setIsEditStatusModalOpen,
     editingStatus, setEditingStatus,
+    isAddTagModalOpen, setIsAddTagModalOpen,
+    isEditTagModalOpen, setIsEditTagModalOpen,
+    editingTag, setEditingTag,
     isAddCallMethodModalOpen, setIsAddCallMethodModalOpen,
     isEditCallMethodModalOpen, setIsEditCallMethodModalOpen,
     editingCallMethod, setEditingCallMethod,

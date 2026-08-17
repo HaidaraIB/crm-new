@@ -50,7 +50,16 @@ export function hasActiveFilters<T extends FilterRecord>(
 export function areFiltersEqual<T extends FilterRecord>(a: T, b: T): boolean {
   const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
   for (const key of keys) {
-    if ((a as Record<string, unknown>)[key] !== (b as Record<string, unknown>)[key]) return false;
+    const av = (a as Record<string, unknown>)[key];
+    const bv = (b as Record<string, unknown>)[key];
+    // Multi-select fields hold arrays; compare by contents, not reference
+    if (Array.isArray(av) || Array.isArray(bv)) {
+      if (!Array.isArray(av) || !Array.isArray(bv)) return false;
+      if (av.length !== bv.length) return false;
+      if (av.some((item, i) => item !== bv[i])) return false;
+      continue;
+    }
+    if (av !== bv) return false;
   }
   return true;
 }

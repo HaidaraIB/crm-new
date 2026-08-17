@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
-import { useChannels, useStatuses, useUsers } from '../../hooks/useQueries';
+import { useChannels, useStatuses, useTags, useUsers } from '../../hooks/useQueries';
 import { getLeadsAPI } from '../../services/api';
 import type { LeadApiFilters } from '../../types';
 import { getUserDisplayName, User } from '../../types';
 import { usersForOperationalEmployeeLists } from '../../utils/roles';
 import { leadHasPhone, resolveLeadPhoneRaw } from '../../utils/smsSendHelpers';
 import { Button, Loader, PhoneText } from '../index';
+import { getStatusSurfaceStyles } from '../LeadStatusDropdown';
 import { SearchIcon } from '../icons';
 
 const LEAD_TYPES = ['fresh', 'hot', 'cold'] as const;
@@ -20,6 +21,8 @@ export interface CampaignLeadFilters {
     priorities: string[];
     assignees: string[];
     channels: string[];
+    /** Tag ids; matched OR-wise server-side (a lead with any selected tag qualifies) */
+    tags: string[];
     assignedToMe: boolean;
     createdAtFrom: string;
     createdAtTo: string;
@@ -32,6 +35,7 @@ const EMPTY_FILTERS: CampaignLeadFilters = {
     priorities: [],
     assignees: [],
     channels: [],
+    tags: [],
     assignedToMe: false,
     createdAtFrom: '',
     createdAtTo: '',
@@ -123,6 +127,7 @@ function filtersToApi(filters: CampaignLeadFilters): LeadApiFilters {
         assignedToMe: filters.assignedToMe || undefined,
         assignedTo: !filters.assignedToMe && filters.assignees.length ? filters.assignees : undefined,
         communicationWay: filters.channels.length ? filters.channels : undefined,
+        tags: filters.tags.length ? filters.tags : undefined,
         createdAtFrom: filters.createdAtFrom || undefined,
         createdAtTo: filters.createdAtTo || undefined,
     };
@@ -136,6 +141,7 @@ function hasActiveFilters(filters: CampaignLeadFilters, searchApplied: string): 
         filters.priorities.length > 0 ||
         filters.assignees.length > 0 ||
         filters.channels.length > 0 ||
+        filters.tags.length > 0 ||
         filters.assignedToMe ||
         !!filters.createdAtFrom ||
         !!filters.createdAtTo ||
@@ -153,8 +159,9 @@ function dropdownBtnClass(active: boolean, open: boolean): string {
     return `${dropdownBtnBase} border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:border-primary/40 hover:bg-gray-50 dark:hover:bg-gray-700/50`;
 }
 
-const selectedChipClass =
-    'inline-flex items-center gap-1 rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary dark:bg-primary/20 dark:text-primary-100';
+const selectedChipBase =
+    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium';
+const selectedChipClass = `${selectedChipBase} border border-primary/40 bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary-100`;
 
 function useClickOutside(ref: React.RefObject<HTMLElement | null>, onClose: () => void, enabled: boolean) {
     useEffect(() => {
@@ -265,9 +272,31 @@ function MultiSelectDropdown({
     );
 }
 
-function SelectedChip({ label, onRemove, removeLabel }: { label: string; onRemove: () => void; removeLabel: string }) {
+function SelectedChip({
+    label,
+    onRemove,
+    removeLabel,
+    color,
+}: {
+    label: string;
+    onRemove: () => void;
+    removeLabel: string;
+    /** Hex color of the underlying entity (tags); falls back to the primary chip style. */
+    color?: string;
+}) {
+    const { theme } = useAppContext();
     return (
-        <span className={selectedChipClass}>
+        <span
+            className={color ? `${selectedChipBase} border` : selectedChipClass}
+            style={color ? getStatusSurfaceStyles(color, theme) : undefined}
+        >
+            {color && (
+                <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{ backgroundColor: color }}
+                    aria-hidden
+                />
+            )}
             {label}
             <button
                 type="button"
@@ -281,7 +310,7 @@ function SelectedChip({ label, onRemove, removeLabel }: { label: string; onRemov
     );
 }
 
-type ChipItem = { key: string; label: string; onRemove: () => void };
+type ChipItem = { key: string; label: string; onRemove: () => void; color?: string };
 type ChipGroup = { id: string; label: string; chips: ChipItem[] };
 
 function FilterChipGroupRow({
@@ -301,7 +330,13 @@ function FilterChipGroupRow({
             <span className="text-xs font-medium text-gray-500 dark:text-gray-400 shrink-0">{label}</span>
             <div className="flex flex-wrap items-center gap-1.5 flex-1 min-w-0">
                 {chips.map((chip) => (
-                    <SelectedChip key={chip.key} label={chip.label} onRemove={chip.onRemove} removeLabel={removeLabel} />
+                    <SelectedChip
+                        key={chip.key}
+                        label={chip.label}
+                        onRemove={chip.onRemove}
+                        removeLabel={removeLabel}
+                        color={chip.color}
+                    />
                 ))}
             </div>
             {trailing}
@@ -326,6 +361,7 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
     const { data: statusesResponse } = useStatuses({ enabled });
     const { data: usersResponse } = useUsers({ enabled });
     const { data: channelsResponse } = useChannels({ enabled });
+    const { data: tagsResponse } = useTags({ enabled });
 
     const statuses = Array.isArray(statusesResponse) ? statusesResponse : (statusesResponse?.results || []);
     const usersArray = Array.isArray(usersResponse) ? usersResponse : (usersResponse?.results || []);
@@ -334,6 +370,7 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
         [usersArray, currentUser],
     );
     const channels = Array.isArray(channelsResponse) ? channelsResponse : (channelsResponse?.results || []);
+    const tags = Array.isArray(tagsResponse) ? tagsResponse : (tagsResponse?.results || []);
 
     const statusOptions = useMemo(
         () => statuses.filter((s: { isHidden?: boolean }) => !s.isHidden),
@@ -360,6 +397,15 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
     const channelOptions = useMemo(
         () => channels.map((c: { id: number; name: string }) => ({ value: String(c.id), label: c.name })),
         [channels],
+    );
+    const tagOptions = useMemo(
+        () =>
+            tags.map((tag: { id: number; name: string; color?: string }) => ({
+                value: String(tag.id),
+                label: tag.name,
+                colorDot: tag.color,
+            })),
+        [tags],
     );
     const assigneeOptions = useMemo(() => {
         const opts: FilterOption[] = [{ value: 'unassigned', label: t('unassigned') }];
@@ -484,6 +530,19 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
             });
         }
 
+        if (filters.tags.length > 0) {
+            groups.push({
+                id: 'tags',
+                label: t('tags'),
+                chips: filters.tags.map((tagId) => ({
+                    key: `tag-${tagId}`,
+                    label: tagOptions.find((o) => o.value === tagId)?.label ?? tagId,
+                    color: tagOptions.find((o) => o.value === tagId)?.colorDot,
+                    onRemove: () => setFilter('tags', filters.tags.filter((v) => v !== tagId)),
+                })),
+            });
+        }
+
         const assigneeChips: ChipItem[] = [];
         if (filters.assignedToMe) {
             assigneeChips.push({
@@ -535,7 +594,7 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
         }
 
         return groups;
-    }, [filters, t, channelOptions, assigneeLabel, dateActive, dateLabel]);
+    }, [filters, t, channelOptions, tagOptions, assigneeLabel, dateActive, dateLabel]);
 
     const filtersActive = hasActiveFilters(filters, searchApplied);
     const clearFiltersButton = filtersActive ? (
@@ -617,6 +676,19 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
                             open={openDropdown === 'channel'}
                             onOpenChange={(open) => setOpenDropdown(open ? 'channel' : null)}
                             language={language}
+                        />
+                    )}
+                    {tagOptions.length > 0 && (
+                        <MultiSelectDropdown
+                            label={t('tags')}
+                            options={tagOptions}
+                            selected={filters.tags}
+                            onChange={(nextTags) => setFilter('tags', nextTags)}
+                            open={openDropdown === 'tags'}
+                            onOpenChange={(open) => setOpenDropdown(open ? 'tags' : null)}
+                            language={language}
+                            searchable={tagOptions.length > 6}
+                            searchPlaceholder={t('search')}
                         />
                     )}
                     <MultiSelectDropdown

@@ -157,6 +157,12 @@ export interface TimelineWhatsAppThreadMessage {
   user: string;
 }
 
+/** A tag as referenced from a timeline entry; color falls back when the tag was deleted. */
+export interface TimelineTagRef {
+  name: string;
+  color?: string;
+}
+
 export interface TimelineEntry {
   id: string | number; // Support string IDs like 'action-1' or 'event-1'
   user: string;
@@ -172,6 +178,8 @@ export interface TimelineEntry {
   newValue?: string;
   /** Localized label for which field changed (edit events). */
   fieldLabel?: string;
+  /** Resolved tags added/removed by a tags_change event, for colored chips. */
+  tagChanges?: { added: TimelineTagRef[]; removed: TimelineTagRef[] };
   callDatetime?: string; // Optional: formatted call datetime for calls
   followUpDate?: string; // Optional: formatted follow-up date for calls
   locationPhotoUrl?: string; // Optional: client location photo for field visits
@@ -217,6 +225,10 @@ export interface Lead {
   /** Upper budget bound when stored as a range (API: budget_max); omit or null for a single amount */
   budgetMax?: number | null;
   communicationWay: string;
+  /** Secondary classification tag ids (API: tags) */
+  tags?: number[];
+  /** Expanded tag records for display (API: tags_detail) */
+  tagsDetail?: Tag[];
   priority: 'High' | 'Medium' | 'Low';
   /** Prefer on-shift assignee when true (API: is_urgent) */
   isUrgent?: boolean;
@@ -268,6 +280,7 @@ export interface LeadFilters {
   priority: string; // 'All' or specific priority
   assignedTo: string; // 'All' or user ID
   communicationWay: string; // 'All' or specific way
+  tags: string[]; // Tag ids; empty array means no tag filter (OR / match-any)
   budgetMin: string; // Minimum budget
   budgetMax: string; // Maximum budget
   createdAtFrom: string; // Date from
@@ -305,6 +318,8 @@ export interface LeadApiFilters {
   assignedTo?: string | string[];
   assignedToMe?: boolean;
   communicationWay?: string | string[];
+  /** Tag ids or names; matched OR-wise server-side */
+  tags?: string | string[];
   budgetMin?: string;
   budgetMax?: string;
   createdAtFrom?: string;
@@ -643,6 +658,15 @@ export interface Channel {
     priority: 'High' | 'Medium' | 'Low';
     isDefault?: boolean;
     is_default?: boolean;
+}
+
+/** Per-tenant secondary lead classification; a lead may carry many (API: /settings/tags/) */
+export interface Tag {
+    id: number;
+    name: string;
+    description?: string | null;
+    color: string;
+    is_active?: boolean;
 }
 
 export interface Stage {

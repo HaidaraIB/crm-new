@@ -34,6 +34,7 @@ const EDIT_NOTE_FIELD_KEYS: Record<string, keyof typeof translations.en> = {
 
 const EVENT_TYPE_ACTION_KEYS: Record<string, keyof typeof translations.en> = {
     status_change: 'statusUpdated',
+    tags_change: 'timelineTagsUpdated',
     assignment: 'leadAssigned',
     location_update: 'timeline',
     edit: 'leadEdited',
@@ -113,6 +114,20 @@ export function timelineEventActorFallback(
         return 'system';
     }
     return 'system';
+}
+
+/**
+ * Split the API's machine key for a tag change — `tags_updated:+VIP,Hot|-Cold`
+ * (either side may be empty). Returns null when the notes are not that shape.
+ */
+export function parseTagsChangeNotes(
+    notes: string | null | undefined
+): { added: string[]; removed: string[] } | null {
+    const match = (notes || '').trim().match(/^tags_updated:\+(.*)\|-(.*)$/);
+    if (!match) return null;
+    const split = (raw: string) =>
+        raw.split(',').map((v) => v.trim()).filter(Boolean);
+    return { added: split(match[1]), removed: split(match[2]) };
 }
 
 export function parseEditFieldKeyFromNotes(notes: string | null | undefined): keyof typeof translations.en | null {
@@ -215,6 +230,21 @@ export function localizeTimelineEventNotes(
         const statusMatch = trimmed.match(/status changed from (.+) to (.+)/i);
         if (statusMatch) {
             return `${t('statusChangedFrom')} ${formatTimelineEventValue(statusMatch[1], { t, users: [], statuses: [], channels: [] })} ${t('statusChangedTo')} ${formatTimelineEventValue(statusMatch[2], { t, users: [], statuses: [], channels: [] })}`;
+        }
+    }
+
+    if (eventType === 'tags_change') {
+        const parsed = parseTagsChangeNotes(trimmed);
+        if (parsed) {
+            const parts: string[] = [];
+            if (parsed.added.length) {
+                parts.push(`${t('timelineTagsAdded')}: ${parsed.added.join(', ')}`);
+            }
+            if (parsed.removed.length) {
+                parts.push(`${t('timelineTagsRemoved')}: ${parsed.removed.join(', ')}`);
+            }
+            if (parts.length) return parts.join(' · ');
+            return t('timelineTagsUpdated');
         }
     }
 

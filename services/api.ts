@@ -2173,6 +2173,7 @@ function appendLeadApiFilters(queryParams: URLSearchParams, filters?: LeadApiFil
   if (filters.assignedToMe) queryParams.append('assigned_to_me', 'true');
   else appendCsvFilter(queryParams, 'assigned_to', filters.assignedTo);
   appendCsvFilter(queryParams, 'communication_way', filters.communicationWay);
+  appendCsvFilter(queryParams, 'tags', filters.tags);
   if (filters.budgetMin) queryParams.append('budget_min', filters.budgetMin);
   if (filters.budgetMax) queryParams.append('budget_max', filters.budgetMax);
   if (filters.createdAtFrom) queryParams.append('created_at_from', filters.createdAtFrom);
@@ -5330,6 +5331,34 @@ export const updateStatusAPI = async (statusId: number, statusData: any) => {
 
 export const deleteStatusAPI = async (statusId: number) => {
   return apiRequest<void>(`/settings/statuses/${statusId}/`, {
+    method: 'DELETE',
+  });
+};
+
+/**
+ * Tags APIs — per-tenant secondary lead classification (many per lead)
+ * GET /settings/tags
+ */
+export const getTagsAPI = async () => {
+  return apiRequest<any[]>('/settings/tags/');
+};
+
+export const createTagAPI = async (tagData: any) => {
+  return apiRequest<any>('/settings/tags/', {
+    method: 'POST',
+    body: JSON.stringify(tagData),
+  });
+};
+
+export const updateTagAPI = async (tagId: number, tagData: any) => {
+  return apiRequest<any>(`/settings/tags/${tagId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(tagData),
+  });
+};
+
+export const deleteTagAPI = async (tagId: number) => {
+  return apiRequest<void>(`/settings/tags/${tagId}/`, {
     method: 'DELETE',
   });
 };

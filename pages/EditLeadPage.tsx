@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
-import { Lead, PhoneNumber } from '../types';
+import { Lead, PhoneNumber, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
-import { useUsers, useStatuses, useChannels, usePatchLead } from '../hooks/useQueries';
+import { useUsers, useStatuses, useChannels, useTags, usePatchLead } from '../hooks/useQueries';
+import { TagMultiSelect } from '../components/leads/TagMultiSelect';
 import { isUserOnWeeklyDayOff } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../utils/roles';
 import { LeadInterestInventoryFields } from '../components/LeadInterestInventoryFields';
@@ -58,9 +59,13 @@ export const EditLeadPage = () => {
     
     const { data: channelsData } = useChannels();
     // Handle both array response and object with results property
-    const channels = Array.isArray(channelsData) 
-        ? channelsData 
+    const channels = Array.isArray(channelsData)
+        ? channelsData
         : (channelsData?.results || []);
+
+    const { data: tagsData } = useTags();
+    const tags: Tag[] = Array.isArray(tagsData) ? tagsData : (tagsData?.results || []);
+    const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
     
     // Sparse PATCH so only real field changes hit the API / timeline
     const updateLeadMutation = usePatchLead();
@@ -240,6 +245,11 @@ export const EditLeadPage = () => {
             }
             setPhoneNumbers(nextPhones);
 
+            const nextTagIds: number[] = Array.isArray((editingLead as Lead).tags)
+                ? ((editingLead as Lead).tags as number[])
+                : ((editingLead as Lead).tagsDetail ?? []).map((tag) => tag.id);
+            setSelectedTagIds(nextTagIds);
+
             const companyId = currentUser?.company?.id;
             if (companyId) {
                 initialPayloadRef.current = buildLeadUpdatePayload({
@@ -247,6 +257,7 @@ export const EditLeadPage = () => {
                     phoneNumbers: nextPhones,
                     channels,
                     statuses,
+                    tagIds: nextTagIds,
                     companyId,
                     specialization: currentUser?.company?.specialization,
                 });
@@ -340,6 +351,7 @@ export const EditLeadPage = () => {
                 phoneNumbers: finalPhoneNumbers,
                 channels,
                 statuses,
+                tagIds: selectedTagIds,
                 companyId,
                 specialization: currentUser?.company?.specialization,
             });
@@ -741,6 +753,17 @@ export const EditLeadPage = () => {
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.status}</p>
                             )}
                         </div>
+                        {tags.length > 0 && (
+                            <div>
+                                <Label htmlFor="tags">{t('tags')}</Label>
+                                <TagMultiSelect
+                                    id="tags"
+                                    tags={tags}
+                                    value={selectedTagIds}
+                                    onChange={setSelectedTagIds}
+                                />
+                            </div>
+                        )}
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => {

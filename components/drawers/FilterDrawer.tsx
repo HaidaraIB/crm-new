@@ -4,6 +4,7 @@ import { NumberInput } from '../NumberInput';
 import {
   useChannels,
   useStatuses,
+  useTags,
   useCampaigns,
   useUsers,
   useDevelopers,
@@ -16,7 +17,8 @@ import {
   FilterSelect,
   FilterInput,
 } from '../filters';
-import type { LeadFilters } from '../../types';
+import { TagMultiSelect } from '../leads/TagMultiSelect';
+import type { LeadFilters, Tag } from '../../types';
 import { getUserDisplayName } from '../../types';
 import { usersForOperationalEmployeeLists } from '../../utils/roles';
 
@@ -26,6 +28,7 @@ export const DEFAULT_LEAD_FILTERS: LeadFilters = {
   priority: 'All',
   assignedTo: 'All',
   communicationWay: 'All',
+  tags: [],
   budgetMin: '',
   budgetMax: '',
   createdAtFrom: '',
@@ -92,6 +95,11 @@ export const FilterDrawer = () => {
   const statuses = Array.isArray(statusesResponse)
     ? statusesResponse
     : statusesResponse?.results || [];
+
+  const { data: tagsResponse } = useTags();
+  const tags: Tag[] = Array.isArray(tagsResponse)
+    ? tagsResponse
+    : tagsResponse?.results || [];
 
   const { data: campaignsResponse } = useCampaigns();
   const campaigns = Array.isArray(campaignsResponse)
@@ -217,6 +225,22 @@ export const FilterDrawer = () => {
               ))}
             </FilterSelect>
           </div>
+
+          {tags.length > 0 && (
+            <div>
+              <FilterLabel htmlFor="leads-filter-tags">{t('tags')}</FilterLabel>
+              <TagMultiSelect
+                id="leads-filter-tags"
+                tags={tags}
+                value={localFilters.tags.map(Number).filter((n) => !Number.isNaN(n))}
+                onChange={(next) =>
+                  setLocalFilters((prev) => ({ ...prev, tags: next.map(String) }))
+                }
+                placeholder={t('all')}
+              />
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('tagsFilterAnyHint')}</p>
+            </div>
+          )}
 
           <div>
             <FilterLabel htmlFor="leads-filter-type">{t('type')}</FilterLabel>

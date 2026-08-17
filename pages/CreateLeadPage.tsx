@@ -2,9 +2,10 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
-import { Lead, PhoneNumber } from '../types';
+import { Lead, PhoneNumber, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
-import { useUsers, useStatuses, useChannels, useCreateLead } from '../hooks/useQueries';
+import { TagMultiSelect } from '../components/leads/TagMultiSelect';
+import { useUsers, useStatuses, useChannels, useTags, useCreateLead } from '../hooks/useQueries';
 import { getCompanyRoute } from '../utils/routing';
 import { isUserOnWeeklyDayOff } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole, normalizeRole } from '../utils/roles';
@@ -58,6 +59,10 @@ export const CreateLeadPage = () => {
     const channels = Array.isArray(channelsData)
         ? channelsData
         : (channelsData?.results || []);
+
+    const { data: tagsData } = useTags();
+    const tags: Tag[] = Array.isArray(tagsData) ? tagsData : (tagsData?.results || []);
+    const [selectedTagIds, setSelectedTagIds] = useState<number[]>([]);
 
     const createLeadMutation = useCreateLead();
     const isSubmitting = createLeadMutation.isPending;
@@ -305,6 +310,7 @@ export const CreateLeadPage = () => {
                 priority: priorityValue,
                 is_urgent: Boolean(formState.isUrgent),
                 status: statusId,
+                tags: selectedTagIds,
                 company: currentUser?.company?.id || null,
                 lead_company_name: formState.leadCompanyName?.trim() || null,
                 profession: formState.profession?.trim() || null,
@@ -643,6 +649,20 @@ export const CreateLeadPage = () => {
                                 )}
                             </Select>
                         </div>
+                        {tags.length > 0 && (
+                            <div>
+                                <Label htmlFor="tags">{t('tags')}</Label>
+                                <TagMultiSelect
+                                    id="tags"
+                                    tags={tags}
+                                    value={selectedTagIds}
+                                    onChange={(next) => {
+                                        hasUserInteracted.current = true;
+                                        setSelectedTagIds(next);
+                                    }}
+                                />
+                            </div>
+                        )}
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => {

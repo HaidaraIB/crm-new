@@ -2,11 +2,11 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadContactPhoneList } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TagMultiSelect, LeadContactPhoneList } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
-import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels } from '../hooks/useQueries';
+import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels, useTags } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
@@ -20,13 +20,14 @@ import {
     parseLeadCoordinate,
 } from '../utils/leadLocation';
 import { BriefcaseIcon, MapPinIcon } from '../components/icons';
-import { Lead, TimelineEntry } from '../types';
+import { Lead, TimelineEntry, Tag } from '../types';
 import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
 import {
     formatTimelineEventValuePair,
     getEditFieldLabel,
     getTimelineEventAction,
     localizeTimelineEventNotes,
+    parseTagsChangeNotes,
     resolveTimelineActor,
     timelineEventActorFallback,
 } from '../utils/timelineEvents';
@@ -91,6 +92,7 @@ export const ViewLeadPage = () => {
     const deleteLeadMutation = useDeleteLead();
 
     const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
+    const [isUpdatingTags, setIsUpdatingTags] = React.useState(false);
     const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
     const [updatingMetaQualification, setUpdatingMetaQualification] = React.useState(false);
 
@@ -145,7 +147,10 @@ export const ViewLeadPage = () => {
     const channels = Array.isArray(channelsData)
         ? channelsData
         : (channelsData?.results || []);
-    
+
+    const { data: tagsData } = useTags();
+    const tags: Tag[] = Array.isArray(tagsData) ? tagsData : (tagsData?.results || []);
+
     const { data: stagesData } = useStages();
     const stages = Array.isArray(stagesData) 
         ? stagesData 
@@ -226,6 +231,24 @@ export const ViewLeadPage = () => {
             alert(t('errorUpdatingLeadStatus') || 'Failed to update lead status. Please try again.');
         } finally {
             setUpdatingLeadId(null);
+        }
+    };
+
+    /** Inline tag edit — patches immediately so users never open the Edit page for a tag. */
+    const handleTagsChange = async (nextTagIds: number[]) => {
+        if (!displayLead) return;
+        setIsUpdatingTags(true);
+        try {
+            await patchLeadMutation.mutateAsync({
+                id: displayLead.id,
+                data: { tags: nextTagIds },
+            });
+            await refetchLead();
+        } catch (error) {
+            console.error('Error updating lead tags:', error);
+            alert(t('failedToUpdateTags') || 'Failed to update tags. Please try again.');
+        } finally {
+            setIsUpdatingTags(false);
         }
     };
 
@@ -626,6 +649,22 @@ export const ViewLeadPage = () => {
                     ? getEditFieldLabel(ce.notes, t, ce.old_value, ce.new_value)
                     : undefined;
 
+            // Resolve tag names back to their configured colors. A tag deleted
+            // since the event was logged simply renders with the default color.
+            const toTagRefs = (names: string[]) =>
+                names.map((name) => ({
+                    name,
+                    color: tags.find((tag) => tag.name === name)?.color,
+                }));
+            const parsedTagChange =
+                ce.event_type === 'tags_change' ? parseTagsChangeNotes(ce.notes) : null;
+            const tagChanges = parsedTagChange
+                ? {
+                      added: toTagRefs(parsedTagChange.added),
+                      removed: toTagRefs(parsedTagChange.removed),
+                  }
+                : undefined;
+
             let eventColor: string | undefined;
             if (ce.event_type === 'status_change') {
                 const statusConfig = statuses.find(
@@ -658,6 +697,7 @@ export const ViewLeadPage = () => {
 
             const showValuePair =
                 ce.event_type !== 'location_update' &&
+                ce.event_type !== 'tags_change' &&
                 (oldFormatted != null || newFormatted != null);
             const suppressDetailsWithPair =
                 showValuePair &&
@@ -671,15 +711,22 @@ export const ViewLeadPage = () => {
                 avatar: actor.avatar || '',
                 action: actionText,
                 fieldLabel: editFieldLabel || undefined,
+                tagChanges,
                 details: detailsOnly ? translatedDetails : '',
                 date: formatTimelineDate(ce.created_at, lang),
                 timestamp: new Date(ce.created_at).getTime(),
+                // tags_change: the localized "Added / Removed" details line already
+                // says everything; the raw comma-joined pair would just repeat it.
                 oldValue: ce.event_type === 'location_update'
                     ? (ce.old_value || undefined)
-                    : oldFormatted,
+                    : ce.event_type === 'tags_change'
+                      ? undefined
+                      : oldFormatted,
                 newValue: ce.event_type === 'location_update'
                     ? (ce.new_value || undefined)
-                    : newFormatted,
+                    : ce.event_type === 'tags_change'
+                      ? undefined
+                      : newFormatted,
                 color: eventColor,
             };
         });
@@ -743,7 +790,7 @@ export const ViewLeadPage = () => {
             ...waEntries,
         ];
         return collapseConsecutiveWhatsAppThreads(merged, t);
-    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, channels, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
+    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, channels, tags, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
 
     const isResolvingLead = Boolean(leadId) && !displayLead && (leadLoading || leadFetching) && !leadError;
 
@@ -1079,6 +1126,21 @@ export const ViewLeadPage = () => {
                                 })()}
                             </div>
                         </div>
+                        {tags.length > 0 && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('tags')}</label>
+                                <div className="mt-1">
+                                    <TagMultiSelect
+                                        id="view-lead-tags"
+                                        tags={tags}
+                                        value={displayLead.tagsDetail?.map((tag) => tag.id) ?? []}
+                                        onChange={handleTagsChange}
+                                        disabled={isUpdatingTags}
+                                        placeholder={t('addTags')}
+                                    />
+                                </div>
+                            </div>
+                        )}
                         {displayLead.lastStage && (
                             <div>
                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('lastStage')}</label>

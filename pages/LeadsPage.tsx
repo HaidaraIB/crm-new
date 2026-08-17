@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText } from '../components/index';
 import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
@@ -111,6 +111,9 @@ export const LeadsPage = () => {
 
         if (leadFilters.communicationWay && leadFilters.communicationWay !== 'All') {
             filters.communicationWay = leadFilters.communicationWay;
+        }
+        if (leadFilters.tags?.length) {
+            filters.tags = leadFilters.tags;
         }
         if (leadFilters.budgetMin) filters.budgetMin = leadFilters.budgetMin;
         if (leadFilters.budgetMax) filters.budgetMax = leadFilters.budgetMax;
@@ -741,6 +744,7 @@ export const LeadsPage = () => {
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('assignedTo')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('communicationWay')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden md:table-cell text-center whitespace-nowrap">{t('status')}</th>
+                                        <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('tags')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('lastFeedback')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden xl:table-cell text-center whitespace-nowrap">{t('createdAt')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('actions')}</th>
@@ -988,6 +992,15 @@ export const LeadsPage = () => {
                                                             );
                                                         })()}
                                                     </div>
+                                                </td>
+                                                <td className="px-4 sm:px-6 py-4 hidden xl:table-cell text-center">
+                                                    {(lead.tagsDetail?.length ?? 0) > 0 ? (
+                                                        <div className="flex justify-center">
+                                                            <LeadTagChips tags={lead.tagsDetail} max={2} size="sm" />
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-400 dark:text-gray-500">-</span>
+                                                    )}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
                                                     {lead.lastFeedback || (lead as any).last_feedback || '-'}

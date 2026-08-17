@@ -49,6 +49,8 @@ export function normalizeLead(lead: any): any {
     ),
     isUrgent: Boolean(lead.isUrgent ?? lead.is_urgent),
     is_urgent: Boolean(lead.isUrgent ?? lead.is_urgent),
+    tags: lead.tags ?? [],
+    tagsDetail: lead.tagsDetail ?? lead.tags_detail ?? [],
   };
 }
 
@@ -70,6 +72,8 @@ export function mapApiLeadToDisplayLead(apiLead: any): Lead {
     budget: base.budget || 0,
     budgetMax: base.budgetMax,
     communicationWay: base.communication_way_name || base.communicationWay || '',
+    tags: base.tags ?? [],
+    tagsDetail: base.tagsDetail ?? [],
     priority: base.priority || '',
     isUrgent: Boolean(base.isUrgent ?? base.is_urgent),
     createdAt: base.created_at || base.createdAt || '',

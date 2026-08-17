@@ -10,7 +10,7 @@ export type LeadStatusOption = {
 
 const DEFAULT_STATUS_COLOR = '#94a3b8';
 
-const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
+export const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     return result
         ? {
@@ -21,7 +21,8 @@ const hexToRgb = (hex: string): { r: number; g: number; b: number } | null => {
         : null;
 };
 
-const getStatusSurfaceStyles = (color: string, theme: 'light' | 'dark'): React.CSSProperties => {
+/** Translucent surface derived from a settings-entity hex color; shared with tag chips. */
+export const getStatusSurfaceStyles = (color: string, theme: 'light' | 'dark'): React.CSSProperties => {
     const rgb = hexToRgb(color);
     if (!rgb) {
         return {};

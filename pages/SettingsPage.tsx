@@ -4,6 +4,7 @@ import { PageWrapper, LegalLinks } from '../components/index';
 import { ChannelsSettings } from './settings/ChannelsSettings';
 import { StagesSettings } from './settings/StagesSettings';
 import { StatusesSettings } from './settings/StatusesSettings';
+import { TagsSettings } from './settings/TagsSettings';
 import { CallMethodsSettings } from './settings/CallMethodsSettings';
 import { VisitTypesSettings } from './settings/VisitTypesSettings';
 import { LeadAssignmentSettings } from './settings/LeadAssignmentSettings';
@@ -18,6 +19,7 @@ type SettingsTab =
     | 'Channels'
     | 'Stages'
     | 'Statuses'
+    | 'Tags'
     | 'CallMethods'
     | 'VisitTypes'
     | 'LeadAssignment'
@@ -29,6 +31,7 @@ const ALL_SETTINGS_TAB_IDS: SettingsTab[] = [
     'Channels',
     'Stages',
     'Statuses',
+    'Tags',
     'CallMethods',
     'VisitTypes',
     'LeadAssignment',
@@ -49,6 +52,7 @@ export const SettingsPage = () => {
             'Channels',
             'Stages',
             'Statuses',
+            'Tags',
             'CallMethods',
             ...(showVisitTypes ? (['VisitTypes'] as const) : []),
             'LeadAssignment',
@@ -94,6 +98,8 @@ export const SettingsPage = () => {
                 return <StagesSettings />;
             case 'Statuses':
                 return <StatusesSettings />;
+            case 'Tags':
+                return <TagsSettings />;
             case 'CallMethods':
                 return <CallMethodsSettings />;
             case 'VisitTypes':
@@ -132,6 +138,12 @@ export const SettingsPage = () => {
                         className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Statuses' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('statuses')}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('Tags')}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Tags' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
+                    >
+                        {t('tags')}
                     </button>
                     <button
                         onClick={() => setActiveTab('CallMethods')}

@@ -37,6 +37,8 @@ type BuildLeadUpdatePayloadArgs = {
   phoneNumbers: LeadPhoneRowLike[];
   channels: Array<{ id: number; name: string }>;
   statuses: Array<{ id: number; name: string }>;
+  /** Selected tag ids; sorted into the payload so the diff ignores pick order */
+  tagIds?: number[];
   companyId: number;
   specialization?: string;
 };
@@ -47,6 +49,7 @@ export function buildLeadUpdatePayload({
   phoneNumbers,
   channels,
   statuses,
+  tagIds,
   companyId,
   specialization,
 }: BuildLeadUpdatePayloadArgs): Record<string, unknown> {
@@ -107,6 +110,7 @@ export function buildLeadUpdatePayload({
     priority: priorityValue,
     is_urgent: Boolean(formState.isUrgent),
     status: statusId,
+    tags: [...(tagIds ?? [])].sort((a, b) => a - b),
     company: companyId,
     lead_company_name: formState.leadCompanyName?.trim() || null,
     profession: formState.profession?.trim() || null,

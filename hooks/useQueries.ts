@@ -14,7 +14,7 @@ import {
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
-  getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getCallMethodsAPI, getVisitTypesAPI,
+  getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getTagsAPI, getCallMethodsAPI, getVisitTypesAPI,
   getCurrentUserAPI, getActivitiesAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
@@ -44,6 +44,7 @@ import {
   createChannelAPI, updateChannelAPI, deleteChannelAPI,
   createStageAPI, updateStageAPI, deleteStageAPI,
   createStatusAPI, updateStatusAPI, deleteStatusAPI,
+  createTagAPI, updateTagAPI, deleteTagAPI,
   createCallMethodAPI, updateCallMethodAPI, deleteCallMethodAPI,
   createVisitTypeAPI, updateVisitTypeAPI, deleteVisitTypeAPI,
   bulkAssignLeadsAPI,
@@ -100,6 +101,7 @@ export const queryKeys = {
   channels: ['channels'] as const,
   stages: ['stages'] as const,
   statuses: ['statuses'] as const,
+  tags: ['tags'] as const,
   callMethods: ['callMethods'] as const,
   visitTypes: ['visitTypes'] as const,
   connectedAccounts: (platform?: string) => ['connectedAccounts', platform] as const,
@@ -560,6 +562,15 @@ export const useStatuses = (options?: Omit<UseQueryOptions<any, Error>, 'queryKe
   return useQuery({
     queryKey: queryKeys.statuses,
     queryFn: () => getStatusesAPI(),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    ...options,
+  });
+};
+
+export const useTags = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
+  return useQuery({
+    queryKey: queryKeys.tags,
+    queryFn: () => getTagsAPI(),
     staleTime: 5 * 60 * 1000, // 5 minutes
     ...options,
   });
@@ -1767,6 +1778,41 @@ export const useDeleteStatus = (options?: UseMutationOptions<void, Error, number
   });
 };
 
+export const useCreateTag = (options?: UseMutationOptions<any, Error, any>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (data: any) => createTagAPI(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags });
+    },
+    ...options,
+  });
+};
+
+export const useUpdateTag = (options?: UseMutationOptions<any, Error, { id: number; data: any }>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: number; data: any }) => updateTagAPI(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags });
+    },
+    ...options,
+  });
+};
+
+export const useDeleteTag = (options?: UseMutationOptions<void, Error, number>) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => deleteTagAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.tags });
+      // Deleting a tag detaches it from every lead — drop cached lead data too
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+    ...options,
+  });
+};
+
 export const useCreateCallMethod = (options?: UseMutationOptions<any, Error, any>) => {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2020,4 +2066,5 @@ export const useAddCampaign = useCreateCampaign;
 export const useAddChannel = useCreateChannel;
 export const useAddStage = useCreateStage;
 export const useAddStatus = useCreateStatus;
+export const useAddTag = useCreateTag;
 

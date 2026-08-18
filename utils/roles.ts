@@ -1,6 +1,13 @@
 import { isMedicalSpecialization } from './medicalTranslationOverrides';
 
-export type AppRole = 'Owner' | 'Supervisor' | 'Employee' | 'DataEntry' | 'Reception' | 'Doctor';
+export type AppRole =
+  | 'Owner'
+  | 'Supervisor'
+  | 'Employee'
+  | 'DataEntry'
+  | 'Reception'
+  | 'Doctor'
+  | 'CallCenter';
 
 const normalizeRoleToken = (role?: string): string =>
   (role || '').toString().trim().toLowerCase().replace(/\s+/g, '_');
@@ -20,27 +27,42 @@ export const roleReportsPresence = (role?: string): boolean => {
     token === 'supervisor' ||
     token === 'admin' ||
     token === 'owner' ||
-    token === 'super_admin'
+    token === 'super_admin' ||
+    token === 'call_center'
   );
+};
+
+const KNOWN_ROLE_TOKENS: Record<string, AppRole> = {
+  super_admin: 'Owner',
+  admin: 'Owner',
+  owner: 'Owner',
+  supervisor: 'Supervisor',
+  data_entry: 'DataEntry',
+  dataentry: 'DataEntry',
+  reception: 'Reception',
+  doctor: 'Doctor',
+  employee: 'Employee',
+  call_center: 'CallCenter',
+  callcenter: 'CallCenter',
+};
+
+/**
+ * Strict variant: returns `null` for a role string this app doesn't recognize, instead of
+ * silently falling back to `Employee`. Use this anywhere access decisions are made
+ * (e.g. `canAccessPage`) so an unrecognized/new backend role never inherits Employee-grade UI.
+ */
+export const normalizeRoleStrict = (role?: string): AppRole | null => {
+  const token = normalizeRoleToken(role);
+  return KNOWN_ROLE_TOKENS[token] ?? null;
 };
 
 export const normalizeRole = (role?: string): AppRole => {
   const token = normalizeRoleToken(role);
-
-  if (token === 'super_admin' || token === 'admin' || token === 'owner') {
-    return 'Owner';
-  }
-  if (token === 'supervisor') {
-    return 'Supervisor';
-  }
-  if (token === 'data_entry' || token === 'dataentry') {
-    return 'DataEntry';
-  }
-  if (token === 'reception') {
-    return 'Reception';
-  }
-  if (token === 'doctor') {
-    return 'Doctor';
+  const known = KNOWN_ROLE_TOKENS[token];
+  if (known) return known;
+  if (process.env.NODE_ENV !== 'production') {
+    // eslint-disable-next-line no-console
+    console.warn(`normalizeRole: unrecognized role "${role}", falling back to Employee`);
   }
   return 'Employee';
 };
@@ -65,12 +87,20 @@ export const getRoleTranslation = (
     DataEntry: 'dataEntry',
     Reception: 'reception',
     Doctor: 'doctor',
+    CallCenter: 'callCenter',
   };
   const translationKey = translationKeyByRole[normalizedRole];
   return translationKey ? t(translationKey) : t('employee');
 };
 
-export type ApiRole = 'admin' | 'supervisor' | 'employee' | 'data_entry' | 'reception' | 'doctor';
+export type ApiRole =
+  | 'admin'
+  | 'supervisor'
+  | 'employee'
+  | 'data_entry'
+  | 'reception'
+  | 'doctor'
+  | 'call_center';
 
 export const normalizeRoleForApi = (role?: string): ApiRole => {
   const appRole = normalizeRole(role);
@@ -79,6 +109,7 @@ export const normalizeRoleForApi = (role?: string): ApiRole => {
   if (appRole === 'DataEntry') return 'data_entry';
   if (appRole === 'Reception') return 'reception';
   if (appRole === 'Doctor') return 'doctor';
+  if (appRole === 'CallCenter') return 'call_center';
   return 'employee';
 };
 
@@ -91,16 +122,16 @@ export const isAssignedClinicalAppRole = (role?: string): boolean => {
   return r === 'Owner' || r === 'Supervisor' || r === 'Employee' || r === 'Doctor';
 };
 
-/** Shown in manual lead/deal assignee pickers; data-entry and reception are not assignees. */
+/** Shown in manual lead/deal assignee pickers; data-entry, reception and call center are not assignees. */
 export const showInLeadAssigneePicker = (role?: string): boolean => {
   const ar = normalizeRole(role);
-  return ar !== 'DataEntry' && ar !== 'Reception';
+  return ar !== 'DataEntry' && ar !== 'Reception' && ar !== 'CallCenter';
 };
 
-/** Deactivate flow: ask whether to redistribute leads (data entry / reception cannot hold assignee leads). */
+/** Deactivate flow: ask whether to redistribute leads (data entry / reception / call center cannot hold assignee leads). */
 export const roleUsesLeadReassignOnDeactivate = (role?: string): boolean => {
   const ar = normalizeRole(role);
-  return ar !== 'DataEntry' && ar !== 'Reception';
+  return ar !== 'DataEntry' && ar !== 'Reception' && ar !== 'CallCenter';
 };
 
 /**

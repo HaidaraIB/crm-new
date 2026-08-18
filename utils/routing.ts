@@ -203,7 +203,8 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
     'billing', 'payment', 'payment/success', 'payment/return', 'subscription', 'support-center', 'support', 'user-guide', 'news', 'login', 'register', 'forgot-password',
     'reset-password', 'verify-email', 'verify-phone', '2fa', 'payment-success', 'change-plan',
     'create-lead', 'edit-lead', 'view-lead', 'create-deal', 'edit-deal',
-    'terms-of-service', 'terms', 'privacy-policy', 'privacy', 'data-deletion-policy', 'data-deletion'
+    'terms-of-service', 'terms', 'privacy-policy', 'privacy', 'data-deletion-policy', 'data-deletion',
+    'call-center', 'arrivals',
   ];
   
   // If first part is a known route, no company in path

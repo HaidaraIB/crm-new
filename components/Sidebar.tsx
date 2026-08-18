@@ -154,6 +154,7 @@ export const Sidebar = () => {
     const normalizedCurrentRole = normalizeRole(currentUser?.role);
     const isDataEntryUser = normalizedCurrentRole === 'DataEntry';
     const isReceptionUser = normalizedCurrentRole === 'Reception';
+    const isCallCenterUser = normalizedCurrentRole === 'CallCenter';
     const chatsNavVisible = useWhatsAppChatsAllowed();
     const { data: digest } = useSyncDigest({
         enabled: Boolean(currentUser?.company?.id),
@@ -163,12 +164,15 @@ export const Sidebar = () => {
     const callsNavVisible =
         !isDataEntryUser &&
         !isReceptionUser &&
+        !isCallCenterUser &&
         (normalizedCurrentRole !== 'Supervisor' || canAccessPage('Calls'));
     const liveCallsCount = callsNavVisible ? (digest?.whatsapp_calls_pending ?? 0) : 0;
     const newsNavVisible =
         normalizedCurrentRole !== 'Supervisor' || canAccessPage('News');
     const newsUnreadCount =
-        newsNavVisible && !isDataEntryUser && !isReceptionUser ? (digest?.news_unread ?? 0) : 0;
+        newsNavVisible && !isDataEntryUser && !isReceptionUser && !isCallCenterUser
+            ? (digest?.news_unread ?? 0)
+            : 0;
 
     // Get logo path based on theme
     const logoPath = theme === 'dark' ? '/logo_dark.png' : '/logo.png';
@@ -322,6 +326,24 @@ export const Sidebar = () => {
                     if (isReceptionUser) {
                         return item.name === 'Leads' || item.name === 'Activities';
                     }
+                    if (isCallCenterUser) {
+                        return (
+                            item.name === 'Call Center' ||
+                            item.name === 'Arrivals' ||
+                            item.name === 'Support Center' ||
+                            item.name === 'User Guide' ||
+                            item.name === 'News'
+                        );
+                    }
+                    // Only call-center users see the Call Center nav entry (checked above).
+                    if (item.name === 'Call Center') {
+                        return false;
+                    }
+                    // Arrivals: owner always; supervisor/employee/doctor per canAccessPage below.
+                    // Data-entry/reception never reach this point (returned earlier).
+                    if (item.name === 'Arrivals' && normalizedCurrentRole !== 'Supervisor') {
+                        return normalizedCurrentRole === 'Owner' || canAccessPage('Arrivals');
+                    }
                     // Hide Billing from main menu (it's shown in bottom section)
                     if (item.name === 'Billing') {
                         return false;
@@ -439,7 +461,7 @@ export const Sidebar = () => {
                 })}
             </nav>
             <div className="px-4 py-6 border-t border-gray-200 dark:border-gray-700">
-                {normalizedCurrentRole !== 'Employee' && normalizedCurrentRole !== 'DataEntry' && normalizedCurrentRole !== 'Doctor' && normalizedCurrentRole !== 'Reception' && (
+                {normalizedCurrentRole !== 'Employee' && normalizedCurrentRole !== 'DataEntry' && normalizedCurrentRole !== 'Doctor' && normalizedCurrentRole !== 'Reception' && normalizedCurrentRole !== 'CallCenter' && (
                     <>
                         {normalizedCurrentRole !== 'Supervisor' && (
                             <SidebarItem

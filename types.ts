@@ -21,6 +21,8 @@ export type Page =
   | 'Support Center'
   | 'User Guide'
   | 'News'
+  | 'Call Center'
+  | 'Arrivals'
   // Auth / onboarding pages
   | 'Login' | 'Register' | 'ForgotPassword' | 'ResetPassword'
   | 'VerifyEmail' | 'VerifyPhone' | 'TwoFactorAuth'
@@ -65,6 +67,41 @@ export interface Company {
   /** True after any paid conversion or expired/forfeited trial — no new time-limited trials. */
   free_trial_consumed?: boolean;
   subscription?: Subscription;
+  /** Notify owner + manage_leads supervisors when a walk-in arrival goes unacknowledged. */
+  arrival_escalation_enabled?: boolean;
+  /** Minutes an arrival can stay unacknowledged before escalation (1-120). */
+  arrival_escalation_minutes?: number;
+}
+
+/** Front-desk "customer arrived" announcement (CALL_CENTER). */
+export type LeadArrivalRouting =
+  | 'existing_assignee'
+  | 'auto_assigned'
+  | 'owner_assignee_off_shift'
+  | 'owner_no_eligible'
+  | 'unroutable';
+
+export type LeadArrivalStatus = 'waiting' | 'acknowledged' | 'escalated';
+
+export interface LeadArrival {
+  id: number;
+  client: number;
+  client_name: string;
+  client_phone: string | null;
+  announced_by: number | null;
+  announced_by_name: string | null;
+  announced_at: string;
+  notes: string;
+  routing: LeadArrivalRouting;
+  lead_created: boolean;
+  assignee_at_arrival: number | null;
+  notified_user_names: string[];
+  escalation_due_at: string | null;
+  escalated_at: string | null;
+  acknowledged_at: string | null;
+  acknowledged_by: number | null;
+  acknowledged_by_name: string | null;
+  status: LeadArrivalStatus;
 }
 
 /** Supervisor permissions (company CRM, granted by admin) */

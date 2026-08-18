@@ -1,7 +1,7 @@
 
 
 import React from 'react';
-import { AppProvider, useAppContext } from './context/AppContext';
+import { AppProvider, useAppContext, resolveFallbackPage } from './context/AppContext';
 import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotifications';
 import { useWhatsAppAwayNotifications } from './hooks/useWhatsAppAwayNotifications';
@@ -9,8 +9,9 @@ import { useSyncDigest } from './hooks/useQueries';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage } from './pages';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage } from './pages';
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
+import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import ImpersonationBanner from './components/ImpersonationBanner';
@@ -24,7 +25,6 @@ import {
     isGatewayPaymentReturnSearch,
     isPaymentSuccessPath,
 } from './utils/paymentSession';
-import { normalizeRole } from './utils/roles';
 
 /** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
 function CurrentPageContent({ currentPage }: { currentPage: Page }) {
@@ -128,6 +128,10 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <LibraryPage />;
         case 'Profile':
             return <ProfilePage />;
+        case 'Call Center':
+            return <CallCenterPage />;
+        case 'Arrivals':
+            return <ArrivalsPage />;
         default:
             return (
                 <PageWrapper title={currentPage}>
@@ -140,9 +144,24 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
 const TheApp = () => {
     const { isLoggedIn, language, t, isSidebarOpen, setIsSidebarOpen, isConfirmDeleteModalOpen, setIsConfirmDeleteModalOpen, confirmDeleteConfig, setConfirmDeleteConfig, currentPage, currentUser, isUserDataReady, setIsEmailVerificationModalOpen, setCurrentPage, setCurrentUser, setIsLoggedIn, canAccessPage, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, isTeamChatDialogOpen, setIsTeamChatDialogOpen, isNotificationsDialogOpen, setIsNotificationsDialogOpen, selectedLead } = useAppContext();
     const fieldVisitsAllowed = useFieldVisitAllowed();
+    // `currentPage` starts as the 'Dashboard' default until the pathname-parsing effect
+    // below resolves the real page from the URL. For a role that cannot access Dashboard
+    // (e.g. CallCenter), the URL/page-sync effect would otherwise race that resolution:
+    // it reads the stale 'Dashboard' default first, decides it's disallowed, and rewrites
+    // the URL to a fallback page before the pathname parser's own update lands — permanently
+    // losing the page the user actually navigated to. Deferring that effect until the first
+    // pathname parse has run avoids acting on the stale default.
+    const [initialPathResolved, setInitialPathResolved] = React.useState(false);
     useTeamChatAwayNotifications();
     useWhatsAppAwayNotifications();
     useSyncDigest({ enabled: Boolean(isLoggedIn && currentUser) });
+    // Page actually rendered below — never the raw (possibly disallowed) `currentPage`,
+    // so an unauthorized page never mounts even for one frame. See sync effect further
+    // down, which keeps `currentPage`/the URL consistent with this after the fact.
+    const pageToRender = React.useMemo<Page>(() => {
+        if (!currentUser || canAccessPage(currentPage)) return currentPage;
+        return resolveFallbackPage(canAccessPage);
+    }, [currentPage, currentUser, canAccessPage]);
     React.useEffect(() => {
         if (!isLoggedIn || currentPage !== 'Team Chat') return;
         setIsTeamChatDialogOpen(true);
@@ -369,6 +388,8 @@ const TheApp = () => {
                 'settings': 'Settings',
                 'library': 'Library',
                 'profile': 'Profile',
+                'call-center': 'Call Center',
+                'arrivals': 'Arrivals',
             };
 
             const normalizedPath = pageFromPath.toLowerCase();
@@ -440,6 +461,7 @@ const TheApp = () => {
 
         // Check immediately
         checkPathname();
+        setInitialPathResolved(true);
 
         // Listen to popstate for browser back/forward
         window.addEventListener('popstate', checkPathname);
@@ -453,38 +475,16 @@ const TheApp = () => {
         };
     }, [isLoggedIn, currentPage, setCurrentPage, currentUser, selectedLead, setIsTeamChatDialogOpen]);
 
-    // Supervisor / Employee / Doctor: redirect to Dashboard if they try to access a page
-    // they don't have permission for (typed URL, stale tab, bookmark).
+    // Keep `currentPage` state and the URL bar consistent with `pageToRender` (the page
+    // actually mounted, computed above). Not a security check — `pageToRender` already
+    // guarantees a disallowed page never rendered; this just avoids the URL/back-button
+    // getting out of sync with what's on screen.
     React.useEffect(() => {
-        if (!isLoggedIn || !currentUser) return;
-        const role = normalizeRole(currentUser.role);
-        if (role !== 'Supervisor' && role !== 'Employee' && role !== 'Doctor') return;
-        if (!canAccessPage(currentPage)) {
-            setCurrentPage('Dashboard');
-            if (currentUser?.company) {
-                const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                window.history.replaceState({}, '', dashboardRoute);
-            } else {
-                window.history.replaceState({}, '', '/dashboard');
-            }
-        }
-    }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
-
-    // Data entry / reception: restricted pages; redirect if URL/state is outside scope
-    React.useEffect(() => {
-        if (!isLoggedIn || !currentUser) return;
-        const r = currentUser.role;
-        if (r !== 'DataEntry' && r !== 'Reception') return;
-        if (!canAccessPage(currentPage)) {
-            setCurrentPage('All Leads');
-            if (currentUser?.company) {
-                const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads');
-                window.history.replaceState({}, '', route);
-            } else {
-                window.history.replaceState({}, '', '/all-leads');
-            }
-        }
-    }, [isLoggedIn, currentUser, currentPage, canAccessPage, setCurrentPage]);
+        if (!isLoggedIn || !currentUser || !initialPathResolved || pageToRender === currentPage) return;
+        setCurrentPage(pageToRender);
+        const route = getCompanyRoute(currentUser.company?.name, currentUser.company?.domain, pageToRender);
+        window.history.replaceState({}, '', route);
+    }, [isLoggedIn, currentUser, currentPage, pageToRender, setCurrentPage, initialPathResolved]);
     
     // Subdomain slug for path (company.domain used in URL folder, not company name)
     const getCompanySubdomainSlug = (): string => {
@@ -659,8 +659,10 @@ const TheApp = () => {
             'settings': 'Settings',
             'library': 'Library',
             'profile': 'Profile',
+            'call-center': 'Call Center',
+            'arrivals': 'Arrivals',
         };
-        
+
         // Handle root path - redirect to /subdomain/dashboard
         if (pathnameToCheck === '/' || pathnameToCheck === '') {
             if (currentUser?.company) {
@@ -982,11 +984,11 @@ const TheApp = () => {
                 )}
                 <main
                     className={`app-main-scroll flex-1 min-h-0 overflow-x-hidden overscroll-y-contain bg-gray-50 dark:bg-gray-900 ${
-                        currentPage === 'Chats' ? 'overflow-y-hidden' : 'overflow-y-auto'
+                        pageToRender === 'Chats' ? 'overflow-y-hidden' : 'overflow-y-auto'
                     }`}
                 >
-                    <div className={currentPage === 'Chats' ? 'h-full min-h-0' : undefined}>
-                        <CurrentPageContent currentPage={currentPage} />
+                    <div className={pageToRender === 'Chats' ? 'h-full min-h-0' : undefined}>
+                        <CurrentPageContent currentPage={pageToRender} />
                     </div>
                 </main>
             </div>
@@ -1086,6 +1088,7 @@ const TheApp = () => {
                 <NotificationsDialog onClose={() => setIsNotificationsDialogOpen(false)} />
             ) : null}
             <PbxScreenPopListener />
+            <ArrivalAlertHost />
         </div>
         );
     };

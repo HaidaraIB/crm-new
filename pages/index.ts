@@ -21,6 +21,8 @@ export * from './DealsPage';
 export * from './CreateDealPage';
 export * from './EditDealPage';
 export * from './CreateLeadPage';
+export * from './CallCenterPage';
+export * from './ArrivalsPage';
 export * from './EditLeadPage';
 export * from './UsersPage';
 export * from './CampaignsPage';

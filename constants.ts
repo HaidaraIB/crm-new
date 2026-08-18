@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { Page, Lead, User, Deal, Todo, Campaign, TimelineEntry, Activity, Developer, Project, Unit, Owner, Channel, Stage, Status, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier } from './types';
-import { BookIcon, ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, LibraryIcon, MegaphoneIcon, NewspaperIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon, WhatsappIcon, PhoneIcon } from './components/index';
+import { BellIcon, BookIcon, ChartIcon, CheckSquareIcon, ChevronsUpDownIcon, FileTextIcon, HandshakeIcon, HeadphonesIcon, LibraryIcon, MegaphoneIcon, NewspaperIcon, SettingsIcon, ShoppingBagIcon, StarIcon, TargetIcon, UsersIcon, CreditCardIcon, WhatsappIcon, PhoneIcon } from './components/index';
 
 export const SIDEBAR_ITEMS: {
   name: Page;
@@ -10,6 +10,8 @@ export const SIDEBAR_ITEMS: {
   subItems?: Page[]
 }[] = [
     { name: 'Dashboard', icon: ChartIcon },
+    { name: 'Call Center', icon: PhoneIcon },
+    { name: 'Arrivals', icon: BellIcon },
     { name: 'Leads', icon: TargetIcon, subItems: ['All Leads', 'Fresh Leads', 'Hot Leads', 'Cold Leads', 'My Leads'] },
     { name: 'Activities', icon: StarIcon },
     { name: 'Inventory', icon: ShoppingBagIcon, subItems: ['Properties', 'Owners'] },
@@ -1925,6 +1927,26 @@ export const translations = {
     patientFileNumber: "Patient file #",
     reception: "Reception",
     doctor: "Doctor",
+    callCenter: "Call Center",
+    searchLeadByNameOrPhone: "Search by name or phone",
+    leadNotFoundCreateOne: "No matching lead found.",
+    arrivals: "Arrivals",
+    announceArrival: "Customer arrived",
+    customerArrived: "Customer arrived",
+    arrivalWaiting: "Waiting",
+    arrivalAcknowledged: "Acknowledged",
+    arrivalEscalated: "Escalated",
+    arrivalAssigneeOffShift: "Assignee off-shift",
+    understood: "Understood",
+    arrivalAnnouncedToast: "Arrival announced",
+    arrivalCooldownActive: "This customer's arrival was already announced recently.",
+    noArrivalsToday: "No arrivals today.",
+    arrivalAnnouncedBy: "Announced by",
+    arrivalNotifiedTo: "Notified",
+    arrivalEscalationEnabled: "Escalate unacknowledged arrivals",
+    arrivalEscalationMinutes: "Escalation delay (minutes)",
+    timelineCustomerArrived: "Customer arrived",
+    timelineCustomerArrivalAcknowledged: "Arrival acknowledged",
     leadInventoryInterest: "Property interest (optional)",
     interestedDeveloper: "Developer",
     interestedProject: "Project",
@@ -4616,6 +4638,26 @@ export const translations = {
     patientFileNumber: "رقم الملف",
     reception: "استقبال",
     doctor: "طبيب",
+    callCenter: "مركز الاتصال",
+    searchLeadByNameOrPhone: "ابحث بالاسم أو رقم الهاتف",
+    leadNotFoundCreateOne: "لم يتم العثور على عميل مطابق.",
+    arrivals: "الوصول",
+    announceArrival: "وصل العميل",
+    customerArrived: "وصل العميل",
+    arrivalWaiting: "بالانتظار",
+    arrivalAcknowledged: "تم الاستلام",
+    arrivalEscalated: "تم التصعيد",
+    arrivalAssigneeOffShift: "الموظف المسؤول غير متاح",
+    understood: "تم",
+    arrivalAnnouncedToast: "تم الإعلان عن الوصول",
+    arrivalCooldownActive: "تم الإعلان عن وصول هذا العميل مؤخرًا بالفعل.",
+    noArrivalsToday: "لا توجد حالات وصول اليوم.",
+    arrivalAnnouncedBy: "أعلن عنه",
+    arrivalNotifiedTo: "تم إشعار",
+    arrivalEscalationEnabled: "تصعيد حالات الوصول غير المستلمة",
+    arrivalEscalationMinutes: "مدة التصعيد (دقائق)",
+    timelineCustomerArrived: "وصل العميل",
+    timelineCustomerArrivalAcknowledged: "تم استلام إشعار الوصول",
     leadInventoryInterest: "اهتمام بالعقار (اختياري)",
     interestedDeveloper: "المطور",
     interestedProject: "المشروع",

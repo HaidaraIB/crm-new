@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
-import type { LeadApiFilters } from '../types';
+import type { LeadApiFilters, LeadArrival } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
 import {
@@ -24,6 +24,7 @@ import {
   type SyncDigest,
   type WhatsAppCallRecord,
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
+  announceLeadArrivalAPI, acknowledgeLeadArrivalAPI, getLeadArrivalsAPI, getPendingLeadArrivalsAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
   createDealAPI, updateDealAPI, patchDealAPI, deleteDealAPI,
@@ -88,6 +89,9 @@ export const queryKeys = {
   clientVisits: ['clientVisits'] as const,
   clientFieldVisits: ['clientFieldVisits'] as const,
   clientEvents: (clientId?: number) => ['clientEvents', clientId] as const,
+  leadArrivals: (params?: { date?: string; status?: string; mine?: boolean }) =>
+    ['leadArrivals', params?.date ?? 'today', params?.status ?? 'all', params?.mine ?? false] as const,
+  pendingLeadArrivals: ['pendingLeadArrivals'] as const,
   developers: (page?: number, pageSize?: number) => ['developers', page ?? 'all', pageSize ?? 'default'] as const,
   projects: (page?: number, pageSize?: number, developerId?: number | null) =>
     ['projects', page ?? 'all', pageSize ?? 'default', developerId ?? 'all'] as const,
@@ -875,7 +879,64 @@ export const useConnectedAccounts = (
   });
 };
 
+export const useLeadArrivals = (
+  params?: { date?: string; status?: 'waiting' | 'acknowledged' | 'escalated' | 'all'; mine?: boolean },
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.leadArrivals(params),
+    queryFn: () => getLeadArrivalsAPI(params),
+    refetchInterval: 15000,
+    staleTime: 10000,
+    ...options,
+  });
+};
+
+export const usePendingLeadArrivals = (
+  options?: Omit<UseQueryOptions<LeadArrival[], Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.pendingLeadArrivals,
+    queryFn: () => getPendingLeadArrivalsAPI(),
+    refetchInterval: 20000,
+    staleTime: 10000,
+    ...options,
+  });
+};
+
 // ==================== Mutation Hooks ====================
+
+export const useAnnounceLeadArrival = (
+  options?: UseMutationOptions<LeadArrival, Error, { clientId: number; notes?: string }>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ clientId, notes }: { clientId: number; notes?: string }) =>
+      announceLeadArrivalAPI(clientId, notes),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['leadArrivals'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pendingLeadArrivals });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(data.client) });
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+    ...options,
+  });
+};
+
+export const useAcknowledgeLeadArrival = (
+  options?: UseMutationOptions<LeadArrival, Error, number>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (arrivalId: number) => acknowledgeLeadArrivalAPI(arrivalId),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['leadArrivals'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.pendingLeadArrivals });
+      queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(data.client) });
+    },
+    ...options,
+  });
+};
 
 export const useCreateLead = (options?: UseMutationOptions<any, Error, any>) => {
   const queryClient = useQueryClient();

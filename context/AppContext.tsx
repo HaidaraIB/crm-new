@@ -33,6 +33,17 @@ const getCompanyId = (company: any): number | null => {
 };
 
 /**
+ * Pick the first page in a "generally safe" priority list that the current role can
+ * actually access, so callers don't need a hardcoded fallback per role (and new roles
+ * are covered automatically). `Profile` is allowed by every role's `canAccessPage`
+ * branch, so it's the guaranteed terminal fallback.
+ */
+export const resolveFallbackPage = (canAccessPage: (page: Page) => boolean): Page => {
+  const priority: Page[] = ['Dashboard', 'All Leads', 'Profile'];
+  return priority.find(canAccessPage) ?? 'Profile';
+};
+
+/**
  * Get company route path
  */
 const getCompanyRoute = (companyDomain?: string, page?: string): string => {
@@ -1213,6 +1224,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           field_visit_allowed: merged.company.field_visit_allowed,
           field_visit_admin_allowed: merged.company.field_visit_admin_allowed,
           field_visit_admin_message: merged.company.field_visit_admin_message,
+          arrival_escalation_enabled: merged.company.arrival_escalation_enabled,
+          arrival_escalation_minutes: merged.company.arrival_escalation_minutes,
           subscription: merged.company.subscription,
         } : null,
         language: merged.language,
@@ -1263,6 +1276,24 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           return false;
       }
     }
+    if (role === 'CallCenter') {
+      // Front-desk role: search + create leads on a dedicated Call Center page.
+      // No full lead editing surface (ViewLead/EditLead) yet — that's read-only
+      // via the same search results, not a separate route in this phase.
+      switch (page) {
+        case 'Call Center':
+        case 'Arrivals':
+        case 'CreateLead':
+        case 'Profile':
+        case 'Support Center':
+        case 'User Guide':
+        case 'News':
+        case 'Team Chat':
+          return true;
+        default:
+          return false;
+      }
+    }
     if (role !== 'Supervisor') {
       // Employee / Doctor: allow most pages; Library is owner-managed only, and the
       // Messaging Center (bulk campaigns + template management) is not staff-facing —
@@ -1294,6 +1325,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'CreateLead':
       case 'EditLead':
       case 'Activities':
+      case 'Arrivals':
         return p('can_manage_leads');
       case 'Deals':
       case 'CreateDeal':

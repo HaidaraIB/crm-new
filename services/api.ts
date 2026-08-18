@@ -7,7 +7,7 @@
 
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
 import { isImpersonating, isTabSuperseded } from '../utils/impersonation';
-import type { LeadApiFilters } from '../types';
+import type { LeadApiFilters, LeadArrival } from '../types';
 
 function normalizeApiBaseUrl(raw: string): string {
   if (!raw) return '';
@@ -467,8 +467,15 @@ async function apiRequest<T>(
 
   // 403 may mean inactive subscription — but only for explicit inactive/expired codes/messages.
   // Do NOT match generic text like "permission to pay for this subscription" (staff payment-status).
+  // `response.body` can only be read once, so a plain (non-subscription) 403 falls through to the
+  // generic !response.ok branch below — cache the parsed body here so that branch reuses it instead
+  // of calling readJsonResponse() again on an already-consumed stream.
+  let cached403ErrorData: unknown;
+  let has403ErrorData = false;
   if (response.status === 403 && !endpoint.includes('/users/me/')) {
     const errorData = await readJsonResponse(response);
+    cached403ErrorData = errorData;
+    has403ErrorData = true;
     const errorMessage = getApiErrorMessage(errorData, '');
     const errorCode = getErrorCodeFromBody(errorData) || '';
 
@@ -530,7 +537,7 @@ async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    const errorData = await readJsonResponse(response);
+    const errorData = has403ErrorData ? cached403ErrorData : await readJsonResponse(response);
     const code = getErrorCodeFromBody(errorData);
     if (response.status === 503 && code === 'maintenance_mode') {
       const maintenanceMessage = getApiErrorMessage(
@@ -2515,6 +2522,56 @@ export const deleteLeadAPI = async (leadId: number) => {
   return apiRequest<void>(`/clients/${leadId}/`, {
     method: 'DELETE',
   });
+};
+
+/**
+ * Announce a walk-in arrival for a lead (CALL_CENTER front desk).
+ * POST /api/lead-arrivals/
+ * A 409 (arrival_cooldown_active) means the same lead was just announced —
+ * the existing arrival comes back in err.data.error.details.arrival.
+ */
+export const announceLeadArrivalAPI = async (clientId: number, notes?: string) => {
+  return apiRequest<LeadArrival>('/lead-arrivals/', {
+    method: 'POST',
+    body: JSON.stringify({ client: clientId, notes: notes || '' }),
+  });
+};
+
+/**
+ * Acknowledge a walk-in arrival ("Understood"). Idempotent — acking twice is safe.
+ * POST /api/lead-arrivals/:id/acknowledge/
+ */
+export const acknowledgeLeadArrivalAPI = async (arrivalId: number) => {
+  return apiRequest<LeadArrival>(`/lead-arrivals/${arrivalId}/acknowledge/`, {
+    method: 'POST',
+  });
+};
+
+/**
+ * Today's (or ?date=) company arrivals board.
+ * GET /api/lead-arrivals/?date=&status=&mine=
+ */
+export const getLeadArrivalsAPI = async (params?: {
+  date?: string;
+  status?: 'waiting' | 'acknowledged' | 'escalated' | 'all';
+  mine?: boolean;
+}) => {
+  const queryParams = new URLSearchParams();
+  if (params?.date) queryParams.append('date', params.date);
+  if (params?.status) queryParams.append('status', params.status);
+  if (params?.mine) queryParams.append('mine', '1');
+  const queryString = queryParams.toString();
+  return apiRequest<{ count: number; next: string | null; previous: string | null; results: LeadArrival[] }>(
+    `/lead-arrivals/${queryString ? `?${queryString}` : ''}`,
+  );
+};
+
+/**
+ * Current user's unacknowledged arrivals (powers the in-app acknowledge card).
+ * GET /api/lead-arrivals/pending/
+ */
+export const getPendingLeadArrivalsAPI = async () => {
+  return apiRequest<LeadArrival[]>('/lead-arrivals/pending/');
 };
 
 /**
@@ -5926,6 +5983,10 @@ export type SyncDigest = {
   notifications_unread: number;
   news_unread: number;
   pbx_screen_pop: { notification_id: number; client_id: number | null } | null;
+  /** Unacknowledged walk-in arrivals addressed to this user (any role). */
+  arrivals_pending: number;
+  /** Company-wide unacknowledged arrivals today; non-zero only for front desk / owner / manage_leads supervisors. */
+  arrivals_waiting: number;
   version: string;
 };
 

@@ -41,6 +41,8 @@ const EVENT_TYPE_ACTION_KEYS: Record<string, keyof typeof translations.en> = {
     re_assignment: 'leadReAssigned',
     created: 'timelineEventCreated',
     whatsapp_message: 'whatsappReceived',
+    customer_arrived: 'timelineCustomerArrived',
+    customer_arrival_acknowledged: 'timelineCustomerArrivalAcknowledged',
 };
 
 const WA_MESSAGE_TYPE_KEYS: Record<string, keyof typeof translations.en> = {

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import { usePendingLeadArrivals, useAcknowledgeLeadArrival } from '../../hooks/useQueries';
+import { usePendingLeadArrivals, useAcknowledgeLeadArrival, useSyncDigest } from '../../hooks/useQueries';
 import { Button } from '../Button';
 import { BellIcon } from '../icons';
 import { PhoneText } from '../PhoneText';
@@ -19,8 +19,18 @@ export const ArrivalAlertHost = () => {
   const [dismissedIds, setDismissedIds] = useState<Set<number>>(new Set());
   const acknowledgeMutation = useAcknowledgeLeadArrival();
 
+  // The digest already reports whether anything is pending, so the detail query only
+  // runs when there is something to fetch — the same gate WhatsAppCallListener uses
+  // for ringing calls. Polling /lead-arrivals/pending/ unconditionally every 20s meant
+  // every logged-in tab paid for it all day to render nothing.
+  const { data: digest } = useSyncDigest({
+    enabled: Boolean(currentUser),
+    refetchInterval: false,
+  });
+  const hasPending = (digest?.arrivals_pending ?? 0) > 0;
+
   const { data: pending } = usePendingLeadArrivals({
-    enabled: Boolean(currentUser?.company?.id),
+    enabled: Boolean(currentUser?.company?.id) && hasPending,
   });
 
   const visible = (pending || []).filter((a) => !dismissedIds.has(a.id)).slice(0, MAX_VISIBLE_CARDS);

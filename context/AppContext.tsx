@@ -13,7 +13,7 @@ import { formatStageName, getStageDisplayLabel, getStageCategory } from '../util
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI } from '../services/api';
-import { normalizeRole, roleReportsPresence } from '../utils/roles';
+import { normalizeRole, roleReportsPresence, roleTracksWorkHours } from '../utils/roles';
 import { navigateToPage, NavigateToPageOptions } from '../utils/routing';
 import { DEFAULT_CALL_FILTERS, callFiltersToQuery } from '../utils/callFilters';
 
@@ -1111,6 +1111,20 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   useEffect(() => {
     if (!isLoggedIn || !currentUser?.id) return;
     if (!roleReportsPresence(currentUser?.role)) return;
+    // The work-session ping refreshes last_seen_at in the same UPDATE, so running both
+    // loops would double the write rate on `users` for no benefit. Keep them mutually
+    // exclusive: whoever is tracked reports presence through the ping instead.
+    //
+    // This condition must stay in step with useWorkSessionTracker's own `enabled`,
+    // impersonation included — an impersonated session runs no ping loop, so
+    // suppressing the heartbeat too would leave it reporting no presence at all.
+    if (
+      currentUser?.company?.work_hours_tracking_enabled &&
+      roleTracksWorkHours(currentUser?.role) &&
+      !isImpersonating()
+    ) {
+      return;
+    }
 
     let cancelled = false;
     const sendHeartbeat = async () => {
@@ -1226,6 +1240,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
           field_visit_admin_message: merged.company.field_visit_admin_message,
           arrival_escalation_enabled: merged.company.arrival_escalation_enabled,
           arrival_escalation_minutes: merged.company.arrival_escalation_minutes,
+          work_hours_tracking_enabled: merged.company.work_hours_tracking_enabled,
+          work_hours_idle_timeout_minutes: merged.company.work_hours_idle_timeout_minutes,
           subscription: merged.company.subscription,
         } : null,
         language: merged.language,

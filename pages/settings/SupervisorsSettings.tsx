@@ -98,6 +98,9 @@ export const SupervisorsSettings = () => {
             can_delete_clients: data.can_delete_clients,
             can_manage_whatsapp_chats: data.can_manage_whatsapp_chats,
             can_manage_whatsapp_calls: data.can_manage_whatsapp_calls,
+            notify_team_activity_status: data.notify_team_activity_status,
+            notify_team_activity_action: data.notify_team_activity_action,
+            notify_team_activity_overdue: data.notify_team_activity_overdue,
           }),
         ]);
       } else {
@@ -121,6 +124,9 @@ export const SupervisorsSettings = () => {
           can_delete_clients: data.can_delete_clients,
           can_manage_whatsapp_chats: data.can_manage_whatsapp_chats,
           can_manage_whatsapp_calls: data.can_manage_whatsapp_calls,
+          notify_team_activity_status: data.notify_team_activity_status,
+          notify_team_activity_action: data.notify_team_activity_action,
+          notify_team_activity_overdue: data.notify_team_activity_overdue,
           });
       }
       await loadSupervisors();
@@ -209,6 +215,13 @@ export const SupervisorsSettings = () => {
     can_manage_whatsapp_calls: t('supervisorsPermCanManageWhatsappCalls'),
   };
 
+  const notifyLabels: Record<string, string> = {
+    notify_team_activity_status: t('supervisorsNotifyStatusChanges'),
+    notify_team_activity_action: t('supervisorsNotifyActions'),
+    notify_team_activity_overdue: t('supervisorsNotifyOverdue'),
+  };
+  const notifyKeys = Object.keys(notifyLabels) as (keyof Supervisor)[];
+
   const inventoryPermKeys: (keyof Supervisor)[] = ['can_manage_products', 'can_manage_services', 'can_manage_real_estate'];
   const specialization = currentUser?.company?.specialization;
   const allowedInventoryKey =
@@ -247,17 +260,18 @@ export const SupervisorsSettings = () => {
               <th className="px-6 py-3 text-center">{t('email')}</th>
               <th className="px-6 py-3 text-center">{t('status')}</th>
               <th className="px-6 py-3 text-center">{t('supervisorsPermissions')}</th>
+              <th className="px-6 py-3 text-center">{t('supervisorsNotificationsColumn')}</th>
               <th className="px-6 py-3 text-center">{t('actions')}</th>
             </tr>
           </thead>
           <tbody>
             {isLoading ? (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center">{t('loading')}</td>
+                <td colSpan={6} className="px-6 py-4 text-center">{t('loading')}</td>
               </tr>
             ) : supervisors.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-6 py-4 text-center">{t('supervisorsNone')}</td>
+                <td colSpan={6} className="px-6 py-4 text-center">{t('supervisorsNone')}</td>
               </tr>
             ) : (
               supervisors.map((s) => (
@@ -300,6 +314,18 @@ export const SupervisorsSettings = () => {
                       {permKeys.filter((k) => (s as any)[k]).length === 0 &&
                         !(s.can_delete_clients || s.user?.can_delete_clients) && (
                         <span className="text-xs text-gray-400">{t('supervisorsNoPermissions')}</span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      {notifyKeys.filter((k) => (s as any)[k]).map((k) => (
+                        <span key={k} className="px-2 py-1 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-300 rounded">
+                          {notifyLabels[k]}
+                        </span>
+                      ))}
+                      {notifyKeys.filter((k) => (s as any)[k]).length === 0 && (
+                        <span className="text-xs text-gray-400">{t('supervisorsNotifyNone')}</span>
                       )}
                     </div>
                   </td>

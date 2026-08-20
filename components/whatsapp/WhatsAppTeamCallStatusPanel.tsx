@@ -86,6 +86,7 @@ export const WhatsAppTeamCallStatusPanel: React.FC<Props> = ({ t }) => {
           ) : null}
         </div>
         <RefreshButton
+          scope="handler"
           iconOnly
           loading={refreshing}
           disabled={loading && !refreshing}

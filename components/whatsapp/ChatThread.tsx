@@ -160,6 +160,7 @@ export const ChatThread: React.FC<Props> = ({
         )}
         {onRefresh && (
           <RefreshButton
+            scope="handler"
             iconOnly
             onClick={onRefresh}
             loading={!!isFetching}

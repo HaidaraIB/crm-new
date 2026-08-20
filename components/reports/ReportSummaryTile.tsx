@@ -1,13 +1,14 @@
 import React from 'react';
 import { dashboardSurface } from '../dashboard/dashboardStyles';
 
-export type ReportTileAccent = 'indigo' | 'blue' | 'emerald' | 'violet';
+export type ReportTileAccent = 'indigo' | 'blue' | 'emerald' | 'violet' | 'amber';
 
 const TILE_BLOBS: Record<ReportTileAccent, string> = {
   indigo: 'from-indigo-500 via-violet-500 to-purple-600',
   blue: 'from-blue-500 via-indigo-500 to-primary-600',
   emerald: 'from-emerald-400 via-teal-500 to-cyan-600',
   violet: 'from-violet-500 via-purple-600 to-blue-700',
+  amber: 'from-amber-400 via-orange-500 to-rose-500',
 };
 
 type ReportSummaryTileProps = {

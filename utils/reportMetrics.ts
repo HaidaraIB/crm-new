@@ -38,6 +38,10 @@ export interface EmployeeReportRow {
   totalActivities?: number;
   totalClientTasks?: number;
   totalClientCalls?: number;
+  /** Measured CRM usage seconds in the report range (API-backed rows only). */
+  workedSeconds?: number;
+  /** Preformatted `7h 42m` for display/CSV; filled in by the page, which owns `t`. */
+  workedHours?: string;
 }
 
 export interface TeamReportRow extends EmployeeReportRow {
@@ -457,6 +461,7 @@ export function mapApiEmployeeReportRow(row: any): EmployeeReportRow {
     wonDeals: Number(row.won_deals ?? row.wonDeals ?? 0),
     totalClientTasks: Number(row.total_client_tasks ?? row.totalClientTasks ?? 0),
     totalClientCalls: Number(row.total_client_calls ?? row.totalClientCalls ?? 0),
+    workedSeconds: Number(row.worked_seconds ?? row.workedSeconds ?? 0),
   };
 }
 

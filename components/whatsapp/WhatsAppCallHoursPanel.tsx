@@ -139,6 +139,7 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
             </p>
           </div>
           <RefreshButton
+            scope="handler"
             iconOnly
             loading={refreshing || loading}
             onClick={() => void load({ silent: true })}
@@ -167,6 +168,7 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
         </div>
         <div className="flex items-center gap-3">
           <RefreshButton
+            scope="handler"
             iconOnly
             loading={refreshing}
             disabled={busy}

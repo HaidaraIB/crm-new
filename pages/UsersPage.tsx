@@ -1,10 +1,11 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText, RefreshButton } from '../components/index';
 import { User } from '../types';
-import { useUsers, useReactivateEmployee } from '../hooks/useQueries';
+import { useUsers, useReactivateEmployee, useWorkSessionSummary } from '../hooks/useQueries';
 import { getRoleTranslation, normalizeRole } from '../utils/roles';
+import { formatWorkedDuration } from '../utils/workHours';
 import { buildWaMeUrl } from '../utils/whatsappLaunch';
 
 const DEFAULT_PAGE_SIZE = 20;
@@ -108,7 +109,12 @@ const Avatar = ({ src, alt, className }: { src: string; alt: string; className?:
     );
 };
 
-const UserCard = ({ user }: { user: User }) => {
+/** Trailing window shown next to today's total on each employee card. */
+const WORK_HOURS_WINDOW_DAYS = 7;
+
+type UserWorkHours = { today_seconds: number; range_seconds: number };
+
+const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }) => {
     const {
         t,
         setSelectedUser,
@@ -206,6 +212,32 @@ const UserCard = ({ user }: { user: User }) => {
                     </div>
                 )}
                 <p className="text-sm text-gray-500 dark:text-gray-400">{getRoleTranslation(user.role, t, currentUser?.company?.specialization)}</p>
+                {isAdmin && workHours && (
+                    <div className="mt-2 w-full rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3 py-2">
+                        <div className="flex items-center justify-center gap-4">
+                            <div className="text-center">
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                                    {t('today') || 'Today'}
+                                </p>
+                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    {formatWorkedDuration(workHours.today_seconds, t)}
+                                </p>
+                            </div>
+                            <div className="h-8 w-px bg-gray-200 dark:bg-gray-700" aria-hidden="true" />
+                            <div className="text-center">
+                                <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-tight">
+                                    {(t('lastNDays') || 'Last {days} days').replace('{days}', String(WORK_HOURS_WINDOW_DAYS))}
+                                </p>
+                                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                    {formatWorkedDuration(workHours.range_seconds, t)}
+                                </p>
+                            </div>
+                        </div>
+                        <p className="mt-1 text-[10px] text-gray-400 dark:text-gray-500">
+                            {t('workedHours')}
+                        </p>
+                    </div>
+                )}
                 {isAdmin && (
                     <span
                         className={`inline-block mt-1 px-2 py-0.5 text-xs font-medium rounded-full ${
@@ -279,6 +311,29 @@ export const UsersPage = () => {
     const currentRole = normalizeRole(currentUser?.role);
     const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
 
+    // One aggregate for the whole team, joined into the cards by user id — the API
+    // returns 403 for anyone else, so don't ask unless this viewer may see it.
+    const workHoursEnabled = Boolean(currentUser?.company?.work_hours_tracking_enabled) && isAdmin;
+    const {
+        data: workHoursSummary,
+        isFetching: workHoursFetching,
+        refetch: refetchWorkHours,
+    } = useWorkSessionSummary(WORK_HOURS_WINDOW_DAYS, {
+        enabled: workHoursEnabled,
+    });
+    const workHoursByUser = useMemo(() => {
+        const map = new Map<number, UserWorkHours>();
+        for (const row of workHoursSummary?.users ?? []) {
+            map.set(row.user_id, {
+                today_seconds: row.today_seconds,
+                range_seconds: row.range_seconds,
+            });
+        }
+        return map;
+    }, [workHoursSummary?.users]);
+    // Users with no rows yet must still render a card, showing zero rather than nothing.
+    const zeroHours: UserWorkHours = { today_seconds: 0, range_seconds: 0 };
+
     if (usersLoading) {
         return (
             <PageWrapper title={`${t('employees')}: ${userCount}`}>
@@ -313,8 +368,13 @@ export const UsersPage = () => {
                 isAdmin && (
                     <div className="flex w-full sm:w-auto items-center gap-2">
                         <RefreshButton
-                            onClick={() => refetchUsers()}
-                            loading={usersFetching && !usersLoading}
+                            onClick={() => {
+                                // Every query this page renders has to be listed here —
+                                // the button refetches what it is told to, nothing more.
+                                void refetchUsers();
+                                if (workHoursEnabled) void refetchWorkHours();
+                            }}
+                            loading={(usersFetching || workHoursFetching) && !usersLoading}
                             className="w-full sm:w-auto"
                             hideLabelOnMobile={false}
                         />
@@ -371,7 +431,14 @@ export const UsersPage = () => {
                         {filteredUsers.map(user => (
                             // FIX: Wrapped UserCard in a div with a key to resolve TypeScript error about key prop not being in UserCard's props.
                             <div key={user.id}>
-                                <UserCard user={user} />
+                                <UserCard
+                                    user={user}
+                                    workHours={
+                                        workHoursEnabled && workHoursSummary?.tracking_enabled
+                                            ? workHoursByUser.get(user.id) ?? zeroHours
+                                            : undefined
+                                    }
+                                />
                             </div>
                         ))}
                     </div>

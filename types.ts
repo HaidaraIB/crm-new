@@ -71,6 +71,38 @@ export interface Company {
   arrival_escalation_enabled?: boolean;
   /** Minutes an arrival can stay unacknowledged before escalation (1-120). */
   arrival_escalation_minutes?: number;
+  /** Measure actual CRM usage time for staff from web/mobile activity. Opt-in, default off. */
+  work_hours_tracking_enabled?: boolean;
+  /** Minutes of no activity before tracking pauses and the user is alerted (1-120). */
+  work_hours_idle_timeout_minutes?: number;
+}
+
+/** Response of `/work-sessions/ping/` and `/work-sessions/today/`. */
+export interface WorkSessionStatus {
+  tracking_enabled: boolean;
+  /** Present on inert responses: why the client should stand down. */
+  reason?: 'impersonation' | 'tracking_disabled' | 'role_not_tracked';
+  ping_interval_seconds: number;
+  idle_timeout_minutes: number;
+  work_date: string | null;
+  today_seconds: number;
+  /** Ping only: seconds this request actually credited. */
+  credited_seconds?: number;
+  last_activity_at?: string | null;
+}
+
+/** Per-user measured hours for the whole company — feeds the Employees page. */
+export interface WorkSessionSummary {
+  tracking_enabled: boolean;
+  work_date: string | null;
+  /** Size of the trailing window `range_seconds` covers, in days. */
+  days: number;
+  idle_timeout_minutes: number;
+  users: Array<{
+    user_id: number;
+    today_seconds: number;
+    range_seconds: number;
+  }>;
 }
 
 /** Front-desk "customer arrived" announcement (CALL_CENTER). */
@@ -146,6 +178,10 @@ export interface Supervisor {
   can_delete_clients?: boolean;
   can_manage_whatsapp_chats?: boolean;
   can_manage_whatsapp_calls?: boolean;
+  /** Owner-controlled team-activity notification toggles (default off) */
+  notify_team_activity_status?: boolean;
+  notify_team_activity_action?: boolean;
+  notify_team_activity_overdue?: boolean;
 }
 
 export interface User {

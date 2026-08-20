@@ -6,7 +6,7 @@
 import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
-import type { LeadApiFilters, LeadArrival } from '../types';
+import type { LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
 import {
@@ -15,7 +15,7 @@ import {
   getServicesAPI, getServicePackagesAPI, getServiceProvidersAPI,
   getProductsAPI, getProductCategoriesAPI, getSuppliersAPI,
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getTagsAPI, getCallMethodsAPI, getVisitTypesAPI,
-  getCurrentUserAPI, getActivitiesAPI,
+  getCurrentUserAPI, getActivitiesAPI, getWorkSessionTodayAPI, getWorkSessionSummaryAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
   getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI, getWhatsAppCallsPendingAPI, getWhatsAppCallsLiveAPI,
@@ -80,6 +80,8 @@ export const queryKeys = {
   teamsReport: (params?: ReportQueryParams) => ['teamsReport', params] as const,
   marketingReport: (params?: ReportQueryParams) => ['marketingReport', params] as const,
   callReport: (params?: ReportQueryParams) => ['callReport', params] as const,
+  workSessionToday: ['workSessionToday'] as const,
+  workSessionSummary: (days?: number) => ['workSessionSummary', days ?? 7] as const,
   deals: (page?: number, pageSize?: number, search?: string, stage?: string) =>
     ['deals', page ?? 'all', pageSize ?? 'default', search ?? '', stage ?? ''] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
@@ -590,6 +592,43 @@ export const useEmployeeReport = (
   return useQuery({
     queryKey: queryKeys.employeeReport(params),
     queryFn: () => getEmployeeReportAPI(params),
+    staleTime: 60 * 1000,
+    ...options,
+  });
+};
+
+/**
+ * The current user's own measured CRM usage for today.
+ *
+ * Rarely actually fetches: the work-session tracker writes every ping response
+ * straight into this cache key, so the pill refreshes once a minute at no extra
+ * request cost. The GET is really only for first mount and window refocus.
+ */
+export const useWorkSessionToday = (
+  options?: Omit<UseQueryOptions<WorkSessionStatus, Error>, 'queryKey' | 'queryFn'>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.workSessionToday,
+    queryFn: () => getWorkSessionTodayAPI(),
+    staleTime: 30 * 1000,
+    ...options,
+  });
+};
+
+/**
+ * Measured hours for every user in the company, keyed by user id.
+ *
+ * One request per Employees page render regardless of how many cards are on it.
+ * Callers must gate on the viewer being an owner / manage_users supervisor — the API
+ * returns 403 otherwise, and an unnecessary 403 on every page load is noise.
+ */
+export const useWorkSessionSummary = (
+  days = 7,
+  options?: Omit<UseQueryOptions<WorkSessionSummary, Error>, 'queryKey' | 'queryFn'>,
+) => {
+  return useQuery({
+    queryKey: queryKeys.workSessionSummary(days),
+    queryFn: () => getWorkSessionSummaryAPI(days),
     staleTime: 60 * 1000,
     ...options,
   });

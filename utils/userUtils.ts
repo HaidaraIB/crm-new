@@ -55,6 +55,12 @@ export const normalizeUser = (userData: any): User => {
       field_visit_admin_message: typeof userData.company === 'object'
         ? (userData.company.field_visit_admin_message ?? '')
         : '',
+      work_hours_tracking_enabled: typeof userData.company === 'object'
+        ? (userData.company.work_hours_tracking_enabled ?? false)
+        : false,
+      work_hours_idle_timeout_minutes: typeof userData.company === 'object'
+        ? (userData.company.work_hours_idle_timeout_minutes ?? 10)
+        : 10,
       subscription: typeof userData.company === 'object' ? userData.company.subscription : undefined,
     } : undefined,
     // Only treat as unverified when the API/storage explicitly says so — never

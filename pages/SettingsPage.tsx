@@ -11,6 +11,7 @@ import { LeadAssignmentSettings } from './settings/LeadAssignmentSettings';
 import { FieldVisitSettings } from './settings/FieldVisitSettings';
 import { SupervisorsSettings } from './settings/SupervisorsSettings';
 import { NewLeadSmsSettings } from './settings/NewLeadSmsSettings';
+import { WorkHoursSettings } from './settings/WorkHoursSettings';
 import { useAppContext } from '../context/AppContext';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
@@ -25,6 +26,7 @@ type SettingsTab =
     | 'LeadAssignment'
     | 'FieldVisits'
     | 'NewLeadSms'
+    | 'WorkHours'
     | 'Supervisors';
 
 const ALL_SETTINGS_TAB_IDS: SettingsTab[] = [
@@ -37,6 +39,7 @@ const ALL_SETTINGS_TAB_IDS: SettingsTab[] = [
     'LeadAssignment',
     'FieldVisits',
     'NewLeadSms',
+    'WorkHours',
     'Supervisors',
 ];
 
@@ -58,6 +61,7 @@ export const SettingsPage = () => {
             'LeadAssignment',
             ...(normalizeRole(currentUser?.role) === 'Owner' ? (['FieldVisits'] as const) : []),
             'NewLeadSms',
+            ...(normalizeRole(currentUser?.role) === 'Owner' ? (['WorkHours'] as const) : []),
             ...(normalizeRole(currentUser?.role) === 'Owner' ? (['Supervisors'] as const) : []),
         ],
         [currentUser?.role, showVisitTypes]
@@ -80,6 +84,9 @@ export const SettingsPage = () => {
             setActiveTab('Channels');
         }
         if (activeTab === 'FieldVisits' && normalizeRole(currentUser?.role) !== 'Owner') {
+            setActiveTab('Channels');
+        }
+        if (activeTab === 'WorkHours' && normalizeRole(currentUser?.role) !== 'Owner') {
             setActiveTab('Channels');
         }
     }, [currentUser?.role, activeTab]);
@@ -110,6 +117,8 @@ export const SettingsPage = () => {
                 return <FieldVisitSettings />;
             case 'NewLeadSms':
                 return <NewLeadSmsSettings />;
+            case 'WorkHours':
+                return <WorkHoursSettings />;
             case 'Supervisors':
                 return <SupervisorsSettings />;
             default:
@@ -179,6 +188,14 @@ export const SettingsPage = () => {
                     >
                         {t('newLeadSmsSettings')}
                     </button>
+                    {normalizeRole(currentUser?.role) === 'Owner' && (
+                        <button
+                            onClick={() => setActiveTab('WorkHours')}
+                            className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'WorkHours' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
+                        >
+                            {t('workHoursSettings')}
+                        </button>
+                    )}
                     {normalizeRole(currentUser?.role) === 'Owner' && (
                         <button
                             onClick={() => setActiveTab('Supervisors')}

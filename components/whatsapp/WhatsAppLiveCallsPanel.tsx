@@ -197,6 +197,7 @@ export const WhatsAppLiveCallsPanel: React.FC<Props> = ({
         {onRefresh ? (
           <div className="ms-auto">
             <RefreshButton
+              scope="handler"
               iconOnly
               loading={Boolean(refreshing)}
               onClick={onRefresh}

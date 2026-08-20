@@ -466,6 +466,7 @@ export function PbxSettingsForm({
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <RefreshButton
+              scope="handler"
               onClick={() => void handleRefreshHealth()}
               loading={healthRefreshing}
               hideLabelOnMobile={false}

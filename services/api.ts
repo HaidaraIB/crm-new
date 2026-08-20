@@ -7,7 +7,7 @@
 
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
 import { isImpersonating, isTabSuperseded } from '../utils/impersonation';
-import type { LeadApiFilters, LeadArrival } from '../types';
+import type { LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
 
 function normalizeApiBaseUrl(raw: string): string {
   if (!raw) return '';
@@ -2017,6 +2017,40 @@ export const sendPresenceHeartbeatAPI = async (source: 'web' | 'mobile' | 'unkno
 };
 
 /**
+ * تسجيل نبضة وقت العمل الفعلي
+ * POST /api/work-sessions/ping/
+ *
+ * Sends the source only — never a duration. The server credits the interval since its
+ * own cursor, which is what caps how much any single request can add. Also refreshes
+ * presence, so callers running this loop can skip `sendPresenceHeartbeatAPI`.
+ */
+export const sendWorkSessionPingAPI = async () => {
+  return apiRequest<WorkSessionStatus>('/work-sessions/ping/', {
+    method: 'POST',
+    body: JSON.stringify({ source: 'web' }),
+  });
+};
+
+/**
+ * ساعات العمل المحتسبة اليوم للمستخدم الحالي
+ * GET /api/work-sessions/today/
+ */
+export const getWorkSessionTodayAPI = async () => {
+  return apiRequest<WorkSessionStatus>('/work-sessions/today/');
+};
+
+/**
+ * ساعات العمل لكل موظفي الشركة (صفحة الموظفين)
+ * GET /api/work-sessions/summary/?days=7
+ *
+ * One grouped aggregate for the whole team, so the Employees page can label a full
+ * page of cards without a request per card. Owner / manage_users supervisors only.
+ */
+export const getWorkSessionSummaryAPI = async (days = 7) => {
+  return apiRequest<WorkSessionSummary>(`/work-sessions/summary/?days=${days}`);
+};
+
+/**
  * إنشاء مستخدم جديد
  * POST /api/users/
  * Body: { username, email, password, first_name, last_name, role, company }
@@ -2119,6 +2153,11 @@ export const createSupervisorAPI = async (data: {
   can_manage_real_estate?: boolean;
   can_manage_settings?: boolean;
   can_delete_clients?: boolean;
+  can_manage_whatsapp_chats?: boolean;
+  can_manage_whatsapp_calls?: boolean;
+  notify_team_activity_status?: boolean;
+  notify_team_activity_action?: boolean;
+  notify_team_activity_overdue?: boolean;
 }) => {
   return apiRequest<any>('/supervisors/', {
     method: 'POST',
@@ -2140,6 +2179,11 @@ export const updateSupervisorAPI = async (id: number, data: Partial<{
   can_manage_real_estate: boolean;
   can_manage_settings: boolean;
   can_delete_clients: boolean;
+  can_manage_whatsapp_chats: boolean;
+  can_manage_whatsapp_calls: boolean;
+  notify_team_activity_status: boolean;
+  notify_team_activity_action: boolean;
+  notify_team_activity_overdue: boolean;
 }>) => {
   return apiRequest<any>(`/supervisors/${id}/`, {
     method: 'PATCH',
@@ -5490,6 +5534,8 @@ export const updateCompanyAssignmentSettingsAPI = async (
     no_follow_up_hours?: number;
     no_follow_up_digest_hour?: number;
     timezone?: string;
+    work_hours_tracking_enabled?: boolean;
+    work_hours_idle_timeout_minutes?: number;
   }
 ) => {
   return apiRequest<any>(`/companies/${companyId}/update_assignment_settings/`, {

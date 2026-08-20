@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { PageWrapper, Button, Loader, FilterButton, RefreshButton, hasActiveFilters } from '../components/index';
 import { DEFAULT_EMPLOYEES_REPORT_FILTERS } from '../components/drawers/EmployeesReportFilterDrawer';
 import { useAppContext } from '../context/AppContext';
-import { PhoneIcon, CheckIcon, ClockIcon, UsersIcon } from '../components/icons';
+import { PhoneIcon, CheckIcon, ClockIcon, UsersIcon, BriefcaseIcon } from '../components/icons';
 import { useEmployeeReport } from '../hooks/useQueries';
 import { translations } from '../constants';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
@@ -16,6 +16,7 @@ import {
   type EmployeeReportRow,
 } from '../utils/reportMetrics';
 import { downloadCsv } from '../utils/reportExport';
+import { formatWorkedDuration } from '../utils/workHours';
 
 const getReportColumns = (t: (key: keyof typeof translations.en) => string) => [
   { header: t('name') || 'Name', accessor: 'name' },
@@ -29,6 +30,7 @@ const getReportColumns = (t: (key: keyof typeof translations.en) => string) => [
   { header: t('totalCalls') || 'Total Calls', accessor: 'totalCalls' },
   { header: t('totalDeals') || 'Total Deals', accessor: 'totalDeals' },
   { header: t('wonDeals') || 'Won Deals', accessor: 'wonDeals' },
+  { header: t('workedHours') || 'Working hours', accessor: 'workedHours' },
 ];
 
 export const EmployeesReportPage = () => {
@@ -46,9 +48,15 @@ export const EmployeesReportPage = () => {
 
   const { data, isLoading, isFetching, isError, refetch } = useEmployeeReport(reportParams);
 
+  // Working hours are preformatted here (rather than in the pure mapper) because this
+  // is where `t` lives — and a string value means CSV export needs no special casing.
   const employeeStats = useMemo(
-    () => (data?.rows ?? []).map(mapApiEmployeeReportRow),
-    [data?.rows],
+    () =>
+      (data?.rows ?? []).map((row: any) => {
+        const mapped = mapApiEmployeeReportRow(row);
+        return { ...mapped, workedHours: formatWorkedDuration(mapped.workedSeconds ?? 0, t) };
+      }),
+    [data?.rows, t],
   );
 
   const reportHeroSubtitle = useMemo(
@@ -71,6 +79,9 @@ export const EmployeesReportPage = () => {
     data?.summary?.answered_calls ?? employeeStats.reduce((sum, emp) => sum + emp.answeredCalls, 0);
   const notAnsweredCalls =
     data?.summary?.not_answered_calls ?? employeeStats.reduce((sum, emp) => sum + emp.notAnsweredCalls, 0);
+  const totalWorkedSeconds =
+    data?.summary?.total_worked_seconds ??
+    employeeStats.reduce((sum, emp) => sum + (emp.workedSeconds ?? 0), 0);
 
   const handleExport = () => {
     if (!employeeStats.length) return;
@@ -124,7 +135,7 @@ export const EmployeesReportPage = () => {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6">
               <ReportSummaryTile
                 title={t('totalCalls')}
                 value={totalCalls.toLocaleString(undefined, withLatinDigits())}
@@ -152,13 +163,19 @@ export const EmployeesReportPage = () => {
                 accent="blue"
                 icon={<UsersIcon />}
               />
+              <ReportSummaryTile
+                title={t('totalWorkedHours')}
+                value={formatWorkedDuration(totalWorkedSeconds, t)}
+                accent="amber"
+                icon={<BriefcaseIcon />}
+              />
             </div>
 
             <ReportTableCard
               title={t('employeeDetails') || 'Employee Details'}
               empty={employeeStats.length === 0}
               emptyMessage={isError ? t('errorLoadingData') || t('noDataAvailable') : t('noDataAvailable')}
-              minWidth={1040}
+              minWidth={1160}
             >
               {!employeeStats.length ? null : (
                 <>

@@ -266,6 +266,7 @@ export function MessageLogsPanel() {
                         {t('search')}
                     </Button>
                     <RefreshButton
+                        scope="handler"
                         variant="ghost"
                         onClick={() => refetch()}
                         loading={isFetching && !isLoading}

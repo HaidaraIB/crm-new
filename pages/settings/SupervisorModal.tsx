@@ -41,6 +41,9 @@ export interface SupervisorFormData {
   can_delete_clients: boolean;
   can_manage_whatsapp_chats: boolean;
   can_manage_whatsapp_calls: boolean;
+  notify_team_activity_status: boolean;
+  notify_team_activity_action: boolean;
+  notify_team_activity_overdue: boolean;
 }
 
 const PERMISSION_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'password' | 'first_name' | 'last_name' | 'phone' | 'is_active'>)[] = [
@@ -58,6 +61,12 @@ const PERMISSION_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'p
 ];
 
 const INVENTORY_PERM_KEYS: (keyof SupervisorFormData)[] = ['can_manage_products', 'can_manage_services', 'can_manage_real_estate'];
+
+const NOTIFY_KEYS: (keyof Omit<SupervisorFormData, 'username' | 'email' | 'password' | 'first_name' | 'last_name' | 'phone' | 'is_active'>)[] = [
+  'notify_team_activity_status',
+  'notify_team_activity_action',
+  'notify_team_activity_overdue',
+];
 
 function getInventoryPermissionForSpecialization(spec: string | undefined): keyof SupervisorFormData | null {
   if (!spec) return null;
@@ -118,6 +127,9 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     can_delete_clients: false,
     can_manage_whatsapp_chats: true,
     can_manage_whatsapp_calls: true,
+    notify_team_activity_status: false,
+    notify_team_activity_action: false,
+    notify_team_activity_overdue: false,
   });
 
   useEffect(() => {
@@ -153,6 +165,9 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
           editingSupervisor.can_manage_whatsapp_calls === null
             ? true
             : Boolean(editingSupervisor.can_manage_whatsapp_calls),
+        notify_team_activity_status: Boolean(editingSupervisor.notify_team_activity_status),
+        notify_team_activity_action: Boolean(editingSupervisor.notify_team_activity_action),
+        notify_team_activity_overdue: Boolean(editingSupervisor.notify_team_activity_overdue),
       });
     } else {
       setFormData({
@@ -175,6 +190,9 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         can_delete_clients: false,
         can_manage_whatsapp_chats: true,
         can_manage_whatsapp_calls: true,
+        notify_team_activity_status: false,
+        notify_team_activity_action: false,
+        notify_team_activity_overdue: false,
       });
     }
   }, [editingSupervisor, isOpen]);
@@ -260,6 +278,12 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     can_manage_settings: 'supervisorsPermCanManageSettings',
     can_manage_whatsapp_chats: 'supervisorsPermCanManageWhatsappChats',
     can_manage_whatsapp_calls: 'supervisorsPermCanManageWhatsappCalls',
+  };
+
+  const notifyLabelKey: Record<string, string> = {
+    notify_team_activity_status: 'supervisorsNotifyStatusChanges',
+    notify_team_activity_action: 'supervisorsNotifyActions',
+    notify_team_activity_overdue: 'supervisorsNotifyOverdue',
   };
 
   const formDir = language === 'ar' ? 'rtl' : 'ltr';
@@ -401,6 +425,18 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
                 <label className="text-sm text-gray-700 dark:text-gray-300">{t('canDeleteClients')}</label>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400 ps-6">{t('canDeleteClientsHelp')}</p>
+            </div>
+          </div>
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-4">
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1">{t('supervisorsNotifyTeamActivityTitle')}</h3>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">{t('supervisorsNotifyTeamActivityHint')}</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {NOTIFY_KEYS.map((key) => (
+                <div key={key} className="flex items-center gap-2">
+                  <input name={key} type="checkbox" checked={formData[key]} onChange={handleChange} className="rounded" />
+                  <label className="text-sm text-gray-700 dark:text-gray-300">{t(notifyLabelKey[key] as any)}</label>
+                </div>
+              ))}
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">

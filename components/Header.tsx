@@ -8,6 +8,7 @@ import { MoonIcon, SunIcon, MenuIcon, ChevronDownIcon, ChatBubbleIcon, BellIcon 
 import { Dropdown, DropdownItem } from './Dropdown';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { useCurrentUser, useSyncDigest } from '../hooks/useQueries';
+import { WorkHoursPill } from './work/WorkHoursPill';
 
 type HeaderProps = {
     isInternetOnline: boolean;
@@ -50,6 +51,7 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                     />
                     <span>{isInternetOnline ? t('connectivityOnline') : t('connectivityOffline')}</span>
                 </div>
+                <WorkHoursPill />
             </div>
             <div className={`flex items-center ${language === 'ar' ? 'gap-4' : 'space-x-4'} flex-shrink-0`}>
                 <button

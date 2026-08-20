@@ -32,6 +32,20 @@ export const roleReportsPresence = (role?: string): boolean => {
   );
 };
 
+/**
+ * Roles whose actual CRM usage time is measured ("working hours").
+ *
+ * Every company role, owners/admins included. Only `super_admin` is excluded: it is
+ * the platform operator, not company staff, with no company to attribute hours to.
+ * Mirrors WORK_TRACKED_ROLES in accounts/work_tracking.py — this check only avoids
+ * pointless requests; the API is the enforcement point.
+ */
+export const roleTracksWorkHours = (role?: string): boolean => {
+  const token = normalizeRoleToken(role);
+  if (!token || token === 'super_admin') return false;
+  return true;
+};
+
 const KNOWN_ROLE_TOKENS: Record<string, AppRole> = {
   super_admin: 'Owner',
   admin: 'Owner',

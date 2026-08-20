@@ -235,6 +235,7 @@ export function CallErrorLogsPanel() {
             {t('search')}
           </Button>
           <RefreshButton
+            scope="handler"
             variant="ghost"
             onClick={() => refetch()}
             loading={isFetching && !isLoading}

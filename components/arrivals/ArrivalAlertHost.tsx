@@ -33,7 +33,14 @@ export const ArrivalAlertHost = () => {
     enabled: Boolean(currentUser?.company?.id) && hasPending,
   });
 
-  const visible = (pending || []).filter((a) => !dismissedIds.has(a.id)).slice(0, MAX_VISIBLE_CARDS);
+  // Disabling a query stops it refetching but does NOT clear what it already
+  // fetched, so `pending` still holds the last arrival after it stops being
+  // pending — acknowledged by a colleague, or aged past the 2h window. The digest
+  // count is the authority on whether anything is outstanding; without this the
+  // card would sit on screen until the tab was reloaded.
+  const arrivals = hasPending ? pending || [] : [];
+
+  const visible = arrivals.filter((a) => !dismissedIds.has(a.id)).slice(0, MAX_VISIBLE_CARDS);
 
   if (visible.length === 0) return null;
 

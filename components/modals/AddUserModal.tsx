@@ -358,13 +358,13 @@ export const AddUserModal = () => {
                             <>
                                 <option value="doctor">{t('doctor')}</option>
                                 <option value="reception">{t('reception')}</option>
-                                <option value="call_center">{t('callCenter')}</option>
+                                <option value="call_center">{t('callCenterRole')}</option>
                             </>
                         ) : (
                             <>
                                 <option value="employee">{t('employee')}</option>
                                 <option value="data_entry">{t('dataEntry')}</option>
-                                <option value="call_center">{t('callCenter')}</option>
+                                <option value="call_center">{t('callCenterRole')}</option>
                             </>
                         )}
                     </Select>

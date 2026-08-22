@@ -1934,7 +1934,10 @@ export const translations = {
     patientFileNumber: "Patient file #",
     reception: "Reception",
     doctor: "Doctor",
-    callCenter: "Call Center",
+    // Page/nav label for the call-center desk. The `call_center` ROLE is labeled with
+    // `callCenterRole` instead, so it never collides with the medical `reception` role.
+    callCenter: "Reception",
+    callCenterRole: "Receptionist",
     searchLeadByNameOrPhone: "Search by name or phone",
     leadNotFoundCreateOne: "No matching lead found.",
     arrivals: "Arrivals",
@@ -4675,7 +4678,8 @@ export const translations = {
     patientFileNumber: "رقم الملف",
     reception: "استقبال",
     doctor: "طبيب",
-    callCenter: "مركز الاتصال",
+    callCenter: "الاستقبال",
+    callCenterRole: "الريسبشن",
     searchLeadByNameOrPhone: "ابحث بالاسم أو رقم الهاتف",
     leadNotFoundCreateOne: "لم يتم العثور على عميل مطابق.",
     arrivals: "الوصول",

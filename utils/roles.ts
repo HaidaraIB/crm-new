@@ -101,7 +101,10 @@ export const getRoleTranslation = (
     DataEntry: 'dataEntry',
     Reception: 'reception',
     Doctor: 'doctor',
-    CallCenter: 'callCenter',
+    // Role label only ("Receptionist" / "الريسبشن"). Deliberately different from the
+    // medical `reception` role ("Reception" / "موظف استقبال") and from the `callCenter`
+    // page/nav label, so the two reception-like roles stay distinguishable.
+    CallCenter: 'callCenterRole',
   };
   const translationKey = translationKeyByRole[normalizedRole];
   return translationKey ? t(translationKey) : t('employee');

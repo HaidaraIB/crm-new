@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, NumberInput, ArrowLeftIcon, PageLoadingState } from '../components/index';
-import { usePatchDeal, useProjects, useUnits, useLeads, useUsers } from '../hooks/useQueries';
-import { Lead, User } from '../types';
+import { PageWrapper, Card, Input, Button, NumberInput, ArrowLeftIcon, PageLoadingState, LeadSearchSelect } from '../components/index';
+import { usePatchDeal, useProjects, useUnits, useUsers } from '../hooks/useQueries';
+import { User } from '../types';
 import { isUserOnWeeklyDayOff } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../utils/roles';
 import { buildUpdateDiff } from '../utils/buildUpdateDiff';
@@ -65,9 +65,6 @@ export const EditDealPage = () => {
     const allUnits = Array.isArray(unitsResponse)
         ? unitsResponse
         : (unitsResponse?.results ?? EMPTY_LIST);
-
-    const { data: leadsResponse } = useLeads();
-    const leads: Lead[] = leadsResponse?.results ?? EMPTY_LIST;
 
     const { data: usersResponse } = useUsers();
     const users = Array.isArray(usersResponse)
@@ -519,18 +516,15 @@ export const EditDealPage = () => {
                         )}
                         <div>
                             <Label htmlFor="leadId">{t('lead')} <span className="text-red-500">*</span></Label>
-                            <Select
+                            <LeadSearchSelect
                                 id="leadId"
-                                className={errors.leadId ? 'border-red-500 dark:border-red-500' : ''}
                                 value={formState.leadId}
-                                onChange={(e) => {
-                                    setFormState(p => ({ ...p, leadId: Number(e.target.value) }));
+                                hasError={!!errors.leadId}
+                                onChange={(leadId) => {
+                                    setFormState(p => ({ ...p, leadId }));
                                     clearError('leadId');
                                 }}
-                            >
-                                <option disabled value={0}>{t('selectLead')}</option>
-                                {leads.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                            </Select>
+                            />
                             {errors.leadId && (
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.leadId}</p>
                             )}

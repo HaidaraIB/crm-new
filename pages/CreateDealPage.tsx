@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, PlusIcon, NumberInput, ArrowLeftIcon, PageLoadingState } from '../components/index';
+import { PageWrapper, Card, Input, Button, PlusIcon, NumberInput, ArrowLeftIcon, PageLoadingState, LeadSearchSelect } from '../components/index';
 import { useProjects, useUnits, useLeads, useUsers, useCreateDeal } from '../hooks/useQueries';
 import { User } from '../types';
 import { isUserOnWeeklyDayOff } from '../utils/weekOff';
@@ -415,18 +415,17 @@ export const CreateDealPage = () => {
                         <div>
                             <Label htmlFor="leadId">{t('lead')} <span className="text-red-500">*</span></Label>
                             <div className="flex gap-2">
-                                <Select 
-                                    id="leadId" 
-                                    className={`flex-grow ${errors.leadId ? 'border-red-500 dark:border-red-500' : ''}`} 
-                                    value={formState.leadId} 
-                                    onChange={(e) => {
-                                        setFormState(p => ({...p, leadId: Number(e.target.value)}));
-                                        clearError('leadId');
-                                    }}
-                                >
-                                    <option disabled value={0}>{t('selectLead')}</option>
-                                    {(leads || []).map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-                                </Select>
+                                <div className="flex-grow">
+                                    <LeadSearchSelect
+                                        id="leadId"
+                                        value={formState.leadId}
+                                        hasError={!!errors.leadId}
+                                        onChange={(leadId) => {
+                                            setFormState(p => ({...p, leadId}));
+                                            clearError('leadId');
+                                        }}
+                                    />
+                                </div>
                                 <Button type="button" variant="secondary" className="px-3" onClick={() => { window.history.pushState({}, '', '/create-lead'); setCurrentPage('CreateLead'); }}>
                                     <PlusIcon className="w-4 h-4"/>
                                 </Button>

@@ -101,6 +101,7 @@ export * from './modals/AddTagModal';
 export * from './modals/EditTagModal';
 export * from './leads/LeadTagChips';
 export * from './leads/TagMultiSelect';
+export * from './leads/LeadSearchSelect';
 export * from './modals/AddCallMethodModal';
 export * from './modals/EditCallMethodModal';
 export * from './modals/AddVisitTypeModal';

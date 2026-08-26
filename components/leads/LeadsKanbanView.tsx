@@ -10,6 +10,8 @@ import { normalizeLead } from '../../utils/normalizeLead';
 import { resolvePrimaryPhone } from '../../utils/resolvePrimaryPhone';
 import type { LeadApiFilters, Status } from '../../types';
 import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
+import { StatusChangeReasonModal } from '../modals/StatusChangeReasonModal';
+import { useStatusChangeReason } from '../../hooks/useStatusChangeReason';
 
 const COLUMN_PAGE_SIZE = 30;
 
@@ -104,6 +106,8 @@ export const LeadsKanbanView = ({
     const queryClient = useQueryClient();
 
     const visibleStatuses = useMemo(() => statuses.filter((s) => !s.isHidden), [statuses]);
+
+    const { requestStatusChange, reasonModalProps } = useStatusChangeReason(visibleStatuses);
 
     const filtersKey = useMemo(() => JSON.stringify(baseFilters), [baseFilters]);
     const statusIdsKey = useMemo(
@@ -242,10 +246,8 @@ export const LeadsKanbanView = ({
         ],
     );
 
-    const handleMove = useCallback(
-        async ({ itemId, fromColumnId, toColumnId }: KanbanMoveEvent) => {
-            if (String(fromColumnId) === String(toColumnId)) return;
-
+    const applyMove = useCallback(
+        async ({ itemId, fromColumnId, toColumnId }: KanbanMoveEvent, reason?: string) => {
             const fromKey = String(fromColumnId);
             const toKey = String(toColumnId);
             const toStatus = visibleStatuses.find((s) => String(s.id) === toKey);
@@ -274,7 +276,10 @@ export const LeadsKanbanView = ({
 
             setMovingId(itemId);
             try {
-                await patchLeadAPI(leadId, { status: toStatus.id });
+                await patchLeadAPI(leadId, {
+                    status: toStatus.id,
+                    ...(reason ? { status_change_reason: reason } : {}),
+                });
                 // Refresh counts / table caches without re-seeding board columns (keeps load-more + optimistic UI).
                 queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
                 queryClient.invalidateQueries({ queryKey: ['leads'] });
@@ -308,6 +313,23 @@ export const LeadsKanbanView = ({
         ],
     );
 
+    /**
+     * Statuses flagged in settings collect a written reason first. The prompt must
+     * resolve before applyMove runs, so a cancelled prompt leaves the card in place
+     * rather than moving it optimistically and snapping it back.
+     */
+    const handleMove = useCallback(
+        (event: KanbanMoveEvent) => {
+            if (String(event.fromColumnId) === String(event.toColumnId)) return;
+            const toStatus = visibleStatuses.find(
+                (s) => String(s.id) === String(event.toColumnId),
+            );
+            if (!toStatus) return;
+            requestStatusChange(toStatus.id, (reason) => applyMove(event, reason));
+        },
+        [visibleStatuses, requestStatusChange, applyMove],
+    );
+
     const userNameById = useMemo(() => {
         const map = new Map<number, string>();
         for (const u of users) {
@@ -331,6 +353,7 @@ export const LeadsKanbanView = ({
     }
 
     return (
+        <>
         <KanbanBoard<LeadKanbanCardModelWithMeta>
             columns={columns}
             itemsByColumn={itemsByColumn}
@@ -376,5 +399,7 @@ export const LeadsKanbanView = ({
                 );
             }}
         />
+        <StatusChangeReasonModal {...reasonModalProps} />
+        </>
     );
 };

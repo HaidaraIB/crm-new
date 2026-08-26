@@ -15,6 +15,8 @@ import { mapApiLeadToDisplayLead, normalizeLead } from '../utils/normalizeLead';
 import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
 import { LeadUrgentToggle } from '../components/LeadUrgentToggle';
 import { buildLeadUpdateDiff, buildLeadUpdatePayload } from '../utils/leadUpdatePayload';
+import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
+import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -53,10 +55,12 @@ export const EditLeadPage = () => {
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
-    const statuses = Array.isArray(statusesData) 
-        ? statusesData 
+    const statuses = Array.isArray(statusesData)
+        ? statusesData
         : (statusesData?.results || []);
-    
+
+    const { requestStatusChange, reasonModalProps } = useStatusChangeReason(statuses);
+
     const { data: channelsData } = useChannels();
     // Handle both array response and object with results property
     const channels = Array.isArray(channelsData)
@@ -337,15 +341,46 @@ export const EditLeadPage = () => {
             }]
             : [];
 
-        try {
-            const companyId = currentUser?.company?.id;
-            if (!companyId) {
-                setErrors({ 
-                    general: t('companyRequired') || 'Company is required. Please log in again.' 
-                });
-                return;
-            }
+        const companyId = currentUser?.company?.id;
+        if (!companyId) {
+            setErrors({
+                general: t('companyRequired') || 'Company is required. Please log in again.'
+            });
+            return;
+        }
 
+        const submitPatch = async (patchData: Record<string, unknown>, reason?: string) => {
+            try {
+                const updatedLead = await updateLeadMutation.mutateAsync({
+                    id: editingLead.id,
+                    data: reason ? { ...patchData, status_change_reason: reason } : patchData,
+                });
+
+                // Update selectedLead with the updated data
+                if (updatedLead) {
+                    const transformedLead = mapApiLeadToDisplayLead(updatedLead);
+                    setSelectedLead(transformedLead);
+                    setEditingLead(transformedLead);
+                    initialPayloadRef.current = buildLeadUpdatePayload({
+                        formState,
+                        phoneNumbers: finalPhoneNumbers,
+                        channels,
+                        statuses,
+                        companyId,
+                        specialization: currentUser?.company?.specialization,
+                    });
+                }
+
+                // Navigate to ViewLead page to see the updated lead
+                window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
+                setCurrentPage('ViewLead');
+            } catch (error: any) {
+                console.error('Error updating lead:', error);
+                setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorUpdatingLead'));
+            }
+        };
+
+        try {
             const updateData = buildLeadUpdatePayload({
                 formState,
                 phoneNumbers: finalPhoneNumbers,
@@ -367,26 +402,15 @@ export const EditLeadPage = () => {
                 return;
             }
 
-            const updatedLead = await updateLeadMutation.mutateAsync({ id: editingLead.id, data: patchData });
-            
-            // Update selectedLead with the updated data
-            if (updatedLead) {
-                const transformedLead = mapApiLeadToDisplayLead(updatedLead);
-                setSelectedLead(transformedLead);
-                setEditingLead(transformedLead);
-                initialPayloadRef.current = buildLeadUpdatePayload({
-                    formState,
-                    phoneNumbers: finalPhoneNumbers,
-                    channels,
-                    statuses,
-                    companyId,
-                    specialization: currentUser?.company?.specialization,
-                });
+            // A `status` key in the sparse diff means the status actually changed, so
+            // a flagged target status prompts for its reason before the patch goes out.
+            const nextStatusId = patchData.status != null ? Number(patchData.status) : null;
+            if (nextStatusId != null && Number.isFinite(nextStatusId)) {
+                requestStatusChange(nextStatusId, (reason) => submitPatch(patchData, reason));
+                return;
             }
-            
-            // Navigate to ViewLead page to see the updated lead
-            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
-            setCurrentPage('ViewLead');
+
+            await submitPatch(patchData);
         } catch (error: any) {
             console.error('Error updating lead:', error);
             setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorUpdatingLead'));
@@ -779,6 +803,8 @@ export const EditLeadPage = () => {
                     </div>
                 </Card>
             </form>
+
+            <StatusChangeReasonModal {...reasonModalProps} />
         </PageWrapper>
     );
 };

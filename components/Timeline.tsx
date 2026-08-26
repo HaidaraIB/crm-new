@@ -530,6 +530,17 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                         />
                                     )}
 
+                                    {entry.reason && (
+                                        <div className="mt-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/60 px-3 py-2 max-w-full">
+                                            <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                                {t('statusChangeReasonLabel')}
+                                            </p>
+                                            <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+                                                {entry.reason}
+                                            </p>
+                                        </div>
+                                    )}
+
                                     {entry.type === 'location_update' && (
                                         <div className="mt-2 inline-flex flex-col gap-2 px-3 py-2 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/70 dark:bg-emerald-900/20 text-sm max-w-full">
                                             {(entry.oldValue || entry.newValue) && (

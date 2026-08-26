@@ -7,6 +7,8 @@ import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
 import SendSMSModal from '../components/modals/SendSMSModal';
+import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
+import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
 import { Lead, LeadApiFilters, Status, User } from '../types';
 import { useLeads, useLeadStatusCounts, useDeleteLead, usePatchLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { pbxDialAPI, getPbxDialStatusAPI, getLeadsAPI } from '../services/api';
@@ -286,9 +288,11 @@ export const LeadsPage = () => {
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
-    const statuses: Status[] = Array.isArray(statusesData) 
-        ? statusesData 
+    const statuses: Status[] = Array.isArray(statusesData)
+        ? statusesData
         : (statusesData?.results || []);
+
+    const { requestStatusChange, reasonModalProps } = useStatusChangeReason(statuses);
     
     // Delete lead mutation
     const deleteLeadMutation = useDeleteLead();
@@ -378,7 +382,7 @@ export const LeadsPage = () => {
     const showLeadSearchClear = leadSearchDraft.length > 0 || Boolean(leadFilters.search);
 
     // Handle status change — sparse PATCH only
-    const handleStatusChange = async (leadId: number, newStatusId: number) => {
+    const applyStatusChange = async (leadId: number, newStatusId: number, reason?: string) => {
         setUpdatingLeadId(leadId);
         try {
             const status = statuses.find(s => s.id === newStatusId);
@@ -388,7 +392,10 @@ export const LeadsPage = () => {
 
             await updateLeadMutation.mutateAsync({
                 id: leadId,
-                data: { status: status.id },
+                data: {
+                    status: status.id,
+                    ...(reason ? { status_change_reason: reason } : {}),
+                },
             });
         } catch (error) {
             console.error('Error updating lead status:', error);
@@ -396,6 +403,13 @@ export const LeadsPage = () => {
         } finally {
             setUpdatingLeadId(null);
         }
+    };
+
+    // Statuses flagged in settings collect a written reason before the patch goes out.
+    const handleStatusChange = (leadId: number, newStatusId: number) => {
+        requestStatusChange(newStatusId, (reason) =>
+            applyStatusChange(leadId, newStatusId, reason)
+        );
     };
 
     // Helper function to convert status to translation key
@@ -1182,6 +1196,8 @@ export const LeadsPage = () => {
                 </div>
             </Card>
             )}
+
+            <StatusChangeReasonModal {...reasonModalProps} />
         </PageWrapper>
         <ImportLeadsModal
             isOpen={isImportLeadsModalOpen}

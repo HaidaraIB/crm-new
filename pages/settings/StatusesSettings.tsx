@@ -110,6 +110,9 @@ export const StatusesSettings = () => {
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[120px]">
                                     {t('autoDeleteColumn')}
                                 </th>
+                                <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider min-w-[140px]">
+                                    {t('requiresChangeReasonColumn')}
+                                </th>
                                 <th className="px-6 py-4 text-center text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider w-[140px]">
                                     {t('actions')}
                                 </th>
@@ -119,6 +122,7 @@ export const StatusesSettings = () => {
                             {statuses.length > 0 ? statuses.map(status => {
                                 const isDefault = (status as any).isDefault ?? (status as any).is_default;
                                 const adh = (status as any).auto_delete_after_hours ?? (status as any).autoDeleteAfterHours;
+                                const requiresReason = (status as any).requires_change_reason ?? (status as any).requiresChangeReason ?? false;
                                 return (
                                 <tr 
                                     key={status.id} 
@@ -188,6 +192,15 @@ export const StatusesSettings = () => {
                                             <span className="text-gray-400 dark:text-gray-500">{t('autoDeleteOff')}</span>
                                         )}
                                     </td>
+                                    <td className="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-700 dark:text-gray-300">
+                                        {requiresReason ? (
+                                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-900 dark:bg-indigo-900/40 dark:text-indigo-100">
+                                                {t('required')}
+                                            </span>
+                                        ) : (
+                                            <span className="text-gray-400 dark:text-gray-500">{t('autoDeleteOff')}</span>
+                                        )}
+                                    </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
                                             <button
@@ -212,7 +225,7 @@ export const StatusesSettings = () => {
                                 </tr>
                             ); }) : (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-12 text-center">
+                                    <td colSpan={8} className="px-6 py-12 text-center">
                                         <div className="text-sm text-gray-500 dark:text-gray-400">
                                             {t('noStatusesFound') || 'No statuses found'}
                                         </div>

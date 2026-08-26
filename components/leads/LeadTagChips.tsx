@@ -43,7 +43,7 @@ export const LeadTagChips = ({ tags, max, size = 'sm', className = '' }: LeadTag
                     <span
                         key={tag.id}
                         title={tag.name}
-                        className={`inline-flex max-w-[10rem] items-center rounded-full border font-medium ${sizeClasses[size]}`}
+                        className={`inline-flex max-w-[10rem] items-center rounded-full font-medium ${sizeClasses[size]}`}
                         style={getStatusSurfaceStyles(color, theme)}
                     >
                         <span

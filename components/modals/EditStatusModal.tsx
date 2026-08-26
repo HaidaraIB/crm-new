@@ -41,6 +41,7 @@ export const EditStatusModal = () => {
             company: currentUser?.company?.id,
             is_default: state.isDefault,
             auto_delete_after_hours: raw === '' ? null : parseInt(raw, 10),
+            requires_change_reason: state.requiresChangeReason,
         };
     };
 
@@ -51,6 +52,7 @@ export const EditStatusModal = () => {
         color: '#808080',
         isDefault: false,
         autoDeleteHoursRaw: '',
+        requiresChangeReason: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -108,6 +110,10 @@ export const EditStatusModal = () => {
                 color: editingStatus.color || '#808080',
                 isDefault: (editingStatus as any).isDefault ?? (editingStatus as any).is_default ?? false,
                 autoDeleteHoursRaw: adh != null && adh !== '' ? String(adh) : '',
+                requiresChangeReason:
+                    (editingStatus as any).requires_change_reason ??
+                    (editingStatus as any).requiresChangeReason ??
+                    false,
             };
             setFormState(initState);
             initialPayloadRef.current = buildPayload(initState);
@@ -283,6 +289,19 @@ export const EditStatusModal = () => {
                         className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary bg-white dark:bg-gray-800"
                     />
                     <Label htmlFor="isDefault">{t('setAsDefault') || 'Set as default'}</Label>
+                </div>
+                <div className="flex items-start gap-2">
+                    <input
+                        type="checkbox"
+                        id="requiresChangeReason"
+                        checked={formState.requiresChangeReason}
+                        onChange={(e) => setFormState(prev => ({ ...prev, requiresChangeReason: e.target.checked }))}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary bg-white dark:bg-gray-800"
+                    />
+                    <div>
+                        <Label htmlFor="requiresChangeReason">{t('requiresChangeReasonLabel')}</Label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('requiresChangeReasonHelp')}</p>
+                    </div>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

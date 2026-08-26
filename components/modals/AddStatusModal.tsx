@@ -35,6 +35,7 @@ export const AddStatusModal = () => {
         color: '#808080',
         isDefault: false,
         autoDeleteHoursRaw: '',
+        requiresChangeReason: false,
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -84,6 +85,7 @@ export const AddStatusModal = () => {
                 color: '#808080',
                 isDefault: false,
                 autoDeleteHoursRaw: '',
+                requiresChangeReason: false,
             });
             setErrors({});
         }
@@ -104,6 +106,7 @@ export const AddStatusModal = () => {
             color: '#808080',
             isDefault: false,
             autoDeleteHoursRaw: '',
+            requiresChangeReason: false,
         });
         setErrors({});
     };
@@ -128,6 +131,7 @@ export const AddStatusModal = () => {
                 is_hidden: false,
                 company: currentUser?.company?.id,
                 auto_delete_after_hours,
+                requires_change_reason: formState.requiresChangeReason,
             });
 
             handleClose();
@@ -262,6 +266,19 @@ export const AddStatusModal = () => {
                         className="h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary bg-white dark:bg-gray-800"
                     />
                     <Label htmlFor="isDefault">{t('setAsDefault') || 'Set as default'}</Label>
+                </div>
+                <div className="flex items-start gap-2">
+                    <input
+                        type="checkbox"
+                        id="requiresChangeReason"
+                        checked={formState.requiresChangeReason}
+                        onChange={(e) => setFormState(prev => ({ ...prev, requiresChangeReason: e.target.checked }))}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 dark:border-gray-600 text-primary focus:ring-primary bg-white dark:bg-gray-800"
+                    />
+                    <div>
+                        <Label htmlFor="requiresChangeReason">{t('requiresChangeReasonLabel')}</Label>
+                        <p className="text-xs text-gray-500 dark:text-gray-400">{t('requiresChangeReasonHelp')}</p>
+                    </div>
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

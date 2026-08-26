@@ -1850,6 +1850,17 @@ export const translations = {
     autoDeleteHelp:
         "Leads that stay in this status longer than the set number of hours are permanently deleted (hourly job). Leave empty to disable.",
     invalidNumber: "Enter a valid positive whole number, or leave empty.",
+    // Status change reason
+    requiresChangeReasonColumn: "Reason required",
+    requiresChangeReasonLabel: "Require a reason when moving a lead to this status",
+    requiresChangeReasonHelp:
+        "Users must write why they are moving a lead into this status. The reason is saved and shown in the lead timeline.",
+    statusChangeReasonTitle: "Reason for status change",
+    statusChangeReasonIntro: "You are moving this lead to \"{status}\".",
+    statusChangeReasonLabel: "Reason",
+    statusChangeReasonPlaceholder: "Why is this lead being moved to this status?",
+    statusChangeReasonRequired: "A reason is required for this status",
+    statusChangeReasonConfirm: "Confirm",
     // Call Methods
     callMethods: "Call Methods",
     addCallMethod: "Add Call Method",
@@ -4626,6 +4637,17 @@ export const translations = {
     autoDeleteHelp:
         "يُحذف العملاء الذين يبقون في هذه الحالة أطول من العدد المحدد من الساعات نهائياً (مهمة كل ساعة). اتركه فارغاً للتعطيل.",
     invalidNumber: "أدخل عدداً صحيحاً موجباً أو اتركه فارغاً.",
+    // Status change reason
+    requiresChangeReasonColumn: "السبب مطلوب",
+    requiresChangeReasonLabel: "طلب كتابة سبب عند نقل العميل إلى هذه الحالة",
+    requiresChangeReasonHelp:
+        "يجب على المستخدمين كتابة سبب نقل العميل إلى هذه الحالة. يُحفظ السبب ويظهر في السجل الزمني للعميل.",
+    statusChangeReasonTitle: "سبب تغيير الحالة",
+    statusChangeReasonIntro: "أنت تنقل هذا العميل إلى \"{status}\".",
+    statusChangeReasonLabel: "السبب",
+    statusChangeReasonPlaceholder: "لماذا يتم نقل هذا العميل إلى هذه الحالة؟",
+    statusChangeReasonRequired: "يجب كتابة سبب لهذه الحالة",
+    statusChangeReasonConfirm: "تأكيد",
     // Call Methods
     callMethods: "طرق المكالمات",
     addCallMethod: "إضافة طريقة مكالمة",

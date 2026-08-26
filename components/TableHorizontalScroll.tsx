@@ -5,7 +5,16 @@ type TableHorizontalScrollProps = {
     className?: string;
     /** Classes applied to the main (table body) scroll container only */
     scrollClassName?: string;
+    /**
+     * Key used to remember the scroll position across remounts (e.g. page navigation,
+     * filter changes that unmount/remount the table). Defaults to the current pathname,
+     * so pass an explicit key when multiple tables share a page.
+     */
+    persistKey?: string;
 };
+
+/** Module-level store so scroll position survives component remounts, not just re-renders. */
+const persistedScrollPositions = new Map<string, number>();
 
 /**
  * Wraps wide tables with a synced horizontal scrollbar at the top.
@@ -16,6 +25,7 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
     children,
     className = '',
     scrollClassName = '',
+    persistKey,
 }) => {
     const topScrollRef = useRef<HTMLDivElement>(null);
     const mainScrollRef = useRef<HTMLDivElement>(null);
@@ -23,6 +33,9 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
     const spacerRef = useRef<HTMLDivElement>(null);
     const isSyncingRef = useRef(false);
     const userScrolledRef = useRef(false);
+    const storeKeyRef = useRef(
+        persistKey || (typeof window !== 'undefined' ? window.location.pathname : 'table-horizontal-scroll'),
+    );
 
     const updateSpacerWidth = useCallback(() => {
         const content = contentRef.current;
@@ -43,8 +56,9 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
         if (!top || !main) return;
 
         const maxScroll = Math.max(0, main.scrollWidth - main.clientWidth);
+        const persisted = persistedScrollPositions.get(storeKeyRef.current);
         const isRtl = document.documentElement.dir === 'rtl';
-        const target = isRtl ? maxScroll : 0;
+        const target = persisted !== undefined ? Math.min(persisted, maxScroll) : isRtl ? maxScroll : 0;
 
         if (top.scrollLeft === target && main.scrollLeft === target) return;
 
@@ -109,6 +123,7 @@ export const TableHorizontalScroll: React.FC<TableHorizontalScrollProps> = ({
         if (!top || !main) return;
         userScrolledRef.current = true;
         const scrollLeft = source === 'top' ? top.scrollLeft : main.scrollLeft;
+        persistedScrollPositions.set(storeKeyRef.current, scrollLeft);
         isSyncingRef.current = true;
         top.scrollLeft = scrollLeft;
         main.scrollLeft = scrollLeft;

@@ -140,6 +140,14 @@ export const getCompanyViewLeadRoute = (companyName?: string, companyDomain?: st
   return `/${subdomainSlug}/${path}`;
 };
 
+/** Lead/patient id from /view-lead/:id or /view-patient/:id (with or without company prefix). */
+export const extractViewLeadIdFromPath = (pathname: string): number | null => {
+  const match = decodeURIComponent(pathname).match(/\/view-(?:lead|patient)\/(\d+)/i);
+  if (!match) return null;
+  const id = parseInt(match[1], 10);
+  return Number.isFinite(id) && id > 0 ? id : null;
+};
+
 /**
  * Get company subdomain URL (optional; for host-based subdomain if needed later)
  */
@@ -220,6 +228,8 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
     'billing', 'payment', 'payment/success', 'payment/return', 'subscription', 'support-center', 'support', 'user-guide', 'news', 'login', 'register', 'forgot-password',
     'reset-password', 'verify-email', 'verify-phone', '2fa', 'payment-success', 'change-plan',
     'create-lead', 'edit-lead', 'view-lead', 'create-deal', 'edit-deal',
+    'patients', 'all-patients', 'fresh-patients', 'hot-patients', 'cold-patients', 'my-patients', 'rotated-patients',
+    'create-patient', 'edit-patient', 'view-patient',
     'terms-of-service', 'terms', 'privacy-policy', 'privacy', 'data-deletion-policy', 'data-deletion',
     'call-center', 'arrivals',
   ];

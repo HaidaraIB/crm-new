@@ -291,6 +291,8 @@ export interface TimelineEntry {
   color?: string; // Optional: color for the stage or event
   oldValue?: string;
   newValue?: string;
+  /** User-supplied justification, e.g. why a lead was moved into this status. */
+  reason?: string;
   /** Localized label for which field changed (edit events). */
   fieldLabel?: string;
   /** Resolved tags added/removed by a tags_change event, for colored chips. */
@@ -805,6 +807,8 @@ export interface Status {
     isHidden?: boolean;
     /** Hours in this status before scheduled hard-delete; null/undefined = disabled */
     auto_delete_after_hours?: number | null;
+    /** When true, moving a lead into this status requires a written reason */
+    requires_change_reason?: boolean;
 }
 
 // Helper function to get user display name

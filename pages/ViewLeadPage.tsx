@@ -11,6 +11,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
+import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
+import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
 import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
@@ -20,7 +22,7 @@ import {
     parseLeadCoordinate,
 } from '../utils/leadLocation';
 import { BriefcaseIcon, MapPinIcon } from '../components/icons';
-import { Lead, TimelineEntry, Tag } from '../types';
+import { Lead, TimelineEntry, Tag, User, Status, Stage } from '../types';
 import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
 import {
     formatTimelineEventValuePair,
@@ -35,7 +37,7 @@ import { localizeWhatsAppMessageBody } from '../utils/whatsappMessageBodyDisplay
 import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
 import { normalizeRole } from '../utils/roles';
-import { getCompanyRoute } from '../utils/routing';
+import { getCompanyRoute, extractViewLeadIdFromPath } from '../utils/routing';
 import { getLeadsReturnPage } from '../utils/leadsReturnPage';
 
 /** Collapse consecutive WhatsApp rows (after chronological sort) into thread cards. */
@@ -104,20 +106,19 @@ export const ViewLeadPage = () => {
         if (container) container.scrollTop = 0;
     }, []);
 
-    // Get leadId from URL
-    const pathname = decodeURIComponent(window.location.pathname);
-    const leadIdFromUrl = pathname.match(/\/view-lead\/(\d+)/)?.[1];
-    const leadId = leadIdFromUrl ? parseInt(leadIdFromUrl, 10) : selectedLead?.id;
+    // Get leadId from URL (view-lead/:id and medical view-patient/:id)
+    const leadIdFromUrl = extractViewLeadIdFromPath(window.location.pathname);
+    const leadId = leadIdFromUrl ?? selectedLead?.id;
 
     // Fetch data using React Query hooks
     const { data: usersResponse } = useUsers();
-    const users = usersResponse?.results || [];
+    const users: User[] = usersResponse?.results || [];
     
     const { data: clientTasksResponse } = useClientTasks();
-    const clientTasks = clientTasksResponse?.results || [];
+    const clientTasks: Record<string, any>[] = clientTasksResponse?.results || [];
     
     const { data: clientCallsResponse } = useClientCalls();
-    const clientCalls = clientCallsResponse?.results || [];
+    const clientCalls: Record<string, any>[] = clientCallsResponse?.results || [];
 
     const { data: clientVisitsResponse } = useClientVisits();
     const clientVisits = clientVisitsResponse?.results || [];
@@ -130,7 +131,7 @@ export const ViewLeadPage = () => {
     const clientFieldVisits = clientFieldVisitsResponse?.results || [];
     
     const { data: callMethodsData } = useCallMethods();
-    const callMethods = Array.isArray(callMethodsData) 
+    const callMethods: { id: number; name?: string; color?: string }[] = Array.isArray(callMethodsData) 
         ? callMethodsData 
         : (callMethodsData?.results || []);
 
@@ -140,16 +141,28 @@ export const ViewLeadPage = () => {
         : (visitTypesData?.results || []);
     
     const { data: clientEventsResponse } = useClientEvents(leadId);
-    const clientEvents = clientEventsResponse?.results || [];
+    const clientEvents: Array<{
+        id: number;
+        event_type: string;
+        notes?: string;
+        old_value?: string | null;
+        new_value?: string | null;
+        created_by?: number | null;
+        created_by_username?: string;
+        created_at: string;
+        reason?: string;
+    }> = clientEventsResponse?.results || [];
     
     const { data: leadSMSMessages = [], refetch: refetchLeadSMS } = useLeadSMSMessages(leadId ?? undefined);
     const { data: leadWhatsAppMessages = [] } = useLeadWhatsAppMessages(leadId ?? undefined);
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
-    const statuses = Array.isArray(statusesData) 
-        ? statusesData 
+    const statuses: Status[] = Array.isArray(statusesData)
+        ? statusesData
         : (statusesData?.results || []);
+
+    const { requestStatusChange, reasonModalProps } = useStatusChangeReason(statuses);
 
     const { data: channelsData } = useChannels();
     const channels = Array.isArray(channelsData)
@@ -160,7 +173,7 @@ export const ViewLeadPage = () => {
     const tags: Tag[] = Array.isArray(tagsData) ? tagsData : (tagsData?.results || []);
 
     const { data: stagesData } = useStages();
-    const stages = Array.isArray(stagesData) 
+    const stages: Stage[] = Array.isArray(stagesData) 
         ? stagesData 
         : (stagesData?.results || []);
     
@@ -220,7 +233,11 @@ export const ViewLeadPage = () => {
     const displayLead = currentLead || selectedLead;
 
     // Handle status change
-    const handleStatusChange = async (targetLeadId: number, newStatusId: number) => {
+    const applyStatusChange = async (
+        targetLeadId: number,
+        newStatusId: number,
+        reason?: string
+    ) => {
         setUpdatingLeadId(targetLeadId);
         try {
             const status = statuses.find(s => s.id === newStatusId);
@@ -230,7 +247,10 @@ export const ViewLeadPage = () => {
 
             await patchLeadMutation.mutateAsync({
                 id: targetLeadId,
-                data: { status: status.id },
+                data: {
+                    status: status.id,
+                    ...(reason ? { status_change_reason: reason } : {}),
+                },
             });
 
             await refetchLead();
@@ -240,6 +260,13 @@ export const ViewLeadPage = () => {
         } finally {
             setUpdatingLeadId(null);
         }
+    };
+
+    // Statuses flagged in settings collect a written reason before the patch goes out.
+    const handleStatusChange = (targetLeadId: number, newStatusId: number) => {
+        requestStatusChange(newStatusId, (reason) =>
+            applyStatusChange(targetLeadId, newStatusId, reason)
+        );
     };
 
     /** Inline tag edit — patches immediately so users never open the Edit page for a tag. */
@@ -355,7 +382,7 @@ export const ViewLeadPage = () => {
         else if (direction === 'outbound') parts.push(t('outgoing'));
         const status = (cc.whatsapp_call_status ?? cc.whatsappCallStatus) as string | undefined;
         if (status) {
-            const key = `whatsappCallStatus_${String(status).toLowerCase()}`;
+            const key = `whatsappCallStatus_${String(status).toLowerCase()}` as Parameters<typeof t>[0];
             const translated = t(key);
             parts.push(translated === key ? String(status).replace(/_/g, ' ') : translated);
         }
@@ -736,6 +763,7 @@ export const ViewLeadPage = () => {
                     : ce.event_type === 'tags_change'
                       ? undefined
                       : newFormatted,
+                reason: (ce as any).reason || undefined,
                 color: eventColor,
             };
         });
@@ -1009,7 +1037,7 @@ export const ViewLeadPage = () => {
                                     onSms={(phone) => setSendSMSModal({ phone })}
                                     onWhatsApp={(phone) => openWhatsApp(displayLead, phone)}
                                     onPbxDial={handlePbxDial}
-                                    t={t}
+                                    t={(key: string) => t(key as Parameters<typeof t>[0])}
                                 />
                                 {whatsappCalling ? (
                                     <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -1024,7 +1052,8 @@ export const ViewLeadPage = () => {
                                         className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
                                         onClick={() => {
                                             const phone =
-                                                displayLead.phoneNumbers?.[0]?.number ||
+                                                displayLead.phoneNumbers?.find((p) => p.is_primary)?.phone_number ||
+                                                displayLead.phoneNumbers?.[0]?.phone_number ||
                                                 displayLead.phone ||
                                                 '';
                                             if (!phone) return;
@@ -1108,8 +1137,9 @@ export const ViewLeadPage = () => {
                             <div className="mt-1">
                                 {(() => {
                                     // Use status_name from API if available, otherwise find by ID or name
+                                    const leadStatus = displayLead.status;
                                     const statusName = (displayLead as any).status_name || 
-                                        (displayLead.status ? statuses.find(s => s.id.toString() === displayLead.status.toString() || s.name === displayLead.status)?.name : null);
+                                        (leadStatus ? statuses.find(s => s.id.toString() === leadStatus.toString() || s.name === leadStatus)?.name : null);
                                     
                                     // Find current status config
                                     const currentStatusConfig = statuses.find(s => 
@@ -1416,6 +1446,8 @@ export const ViewLeadPage = () => {
                     onSent={() => refetchLeadSMS()}
                 />
             )}
+
+            <StatusChangeReasonModal {...reasonModalProps} />
         </PageWrapper>
     )
 }

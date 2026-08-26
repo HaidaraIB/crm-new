@@ -80,12 +80,12 @@ export const TagMultiSelect = ({
     return (
         <div className="relative" ref={rootRef}>
             <div
-                className={`flex min-h-[2.75rem] w-full flex-wrap items-center gap-1.5 rounded-xl border bg-white px-2 py-1.5 transition-colors dark:bg-gray-800/60 ${
+                className={`flex min-h-[2.75rem] w-full flex-wrap items-center gap-1.5 rounded-xl bg-white px-2 py-1.5 transition-colors dark:bg-gray-800/60 ${
                     disabled
-                        ? 'cursor-not-allowed border-gray-200 opacity-60 dark:border-gray-700'
+                        ? 'cursor-not-allowed opacity-60'
                         : isOpen
-                          ? 'border-primary/60 ring-2 ring-primary/20'
-                          : 'border-gray-300 hover:border-primary/40 dark:border-gray-600 dark:hover:border-primary/40'
+                          ? 'ring-2 ring-primary/20'
+                          : ''
                 }`}
             >
                 {selectedTags.map((tag) => {
@@ -93,7 +93,7 @@ export const TagMultiSelect = ({
                     return (
                         <span
                             key={tag.id}
-                            className="group inline-flex max-w-[12rem] items-center gap-1.5 rounded-full border py-1 ps-2 pe-1 text-xs font-medium"
+                            className="group inline-flex max-w-[12rem] items-center gap-1.5 rounded-full py-1 ps-2 pe-1 text-xs font-medium"
                             style={getStatusSurfaceStyles(color, theme)}
                         >
                             <span

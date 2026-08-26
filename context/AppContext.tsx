@@ -1270,6 +1270,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         case 'User Guide':
         case 'News':
         case 'Team Chat':
+        case 'Messaging Center':
           return true;
         default:
           return false;
@@ -1287,6 +1288,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         case 'User Guide':
         case 'News':
         case 'Team Chat':
+        case 'Messaging Center':
           return true;
         default:
           return false;
@@ -1305,16 +1307,18 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         case 'User Guide':
         case 'News':
         case 'Team Chat':
+        case 'Messaging Center':
           return true;
         default:
           return false;
       }
     }
     if (role !== 'Supervisor') {
-      // Employee / Doctor: allow most pages; Library is owner-managed only, and the
-      // Messaging Center (bulk campaigns + template management) is not staff-facing —
-      // they use Chats for WhatsApp, same as the Integrations settings rule.
-      if (page === 'Library' || page === 'Messaging Center') return false;
+      // Employee / Doctor: allow most pages; Library is owner-managed only.
+      // Messaging Center is now allowed too, but restricted staff only ever see the
+      // submit-for-approval flow inside it (own-leads-only audience, no instant send) —
+      // see IntegrationsPage.tsx's isRestrictedCampaignRole branch.
+      if (page === 'Library') return false;
       // WhatsApp access is a per-user toggle the owner controls; without it the
       // Chats page can only 403 (and poll the server doing so).
       if (page === 'Chats') return currentUser.whatsapp_chat_enabled !== false;
@@ -1375,6 +1379,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         return p('can_manage_settings');
       case 'Library':
         return false;
+      case 'Messaging Center':
+        // Supervisor keeps the owner's unrestricted instant-send flow (no
+        // approval gate, no own-leads-only audience limit).
+        return true;
       case 'Marketing':
       case 'Campaigns':
       case 'Integrations':

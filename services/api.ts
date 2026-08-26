@@ -7,7 +7,7 @@
 
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
 import { isImpersonating, isTabSuperseded } from '../utils/impersonation';
-import type { LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
+import type { CampaignRequest, LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
 
 function normalizeApiBaseUrl(raw: string): string {
   if (!raw) return '';
@@ -4912,6 +4912,80 @@ export const recordCampaignFailureAPI = async (
 ): Promise<{ id: number }> => {
   return apiRequest<{ id: number }>(`/integrations/campaign-batches/${batchId}/failures/`, {
     method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+export type SubmitCampaignRequestPayload = {
+  channel: 'sms' | 'whatsapp';
+  message_preview?: string;
+  recipients: Array<{ client_id: number; phone_number?: string }>;
+  message_payload: Record<string, unknown>;
+};
+
+/**
+ * POST /api/integrations/campaign-requests/ - restricted staff submit a bulk-send
+ * request (own leads only) for owner approval, instead of sending instantly.
+ */
+export const submitCampaignRequestAPI = async (
+  data: SubmitCampaignRequestPayload,
+): Promise<CampaignRequest> => {
+  return apiRequest<CampaignRequest>('/integrations/campaign-requests/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+};
+
+/**
+ * GET /api/integrations/campaign-requests/ - the caller's own campaign requests.
+ */
+export const listCampaignRequestsAPI = async (
+  status?: string,
+): Promise<{ results: CampaignRequest[] }> => {
+  const qs = status ? `?status=${encodeURIComponent(status)}` : '';
+  return apiRequest<{ results: CampaignRequest[] }>(`/integrations/campaign-requests/${qs}`);
+};
+
+/**
+ * GET /api/integrations/campaign-requests/pending/ - owner's approval queue.
+ */
+export const listPendingCampaignRequestsAPI = async (): Promise<{ results: CampaignRequest[] }> => {
+  return apiRequest<{ results: CampaignRequest[] }>('/integrations/campaign-requests/pending/');
+};
+
+/**
+ * PATCH /api/integrations/campaign-requests/:id/approve/
+ */
+export const approveCampaignRequestAPI = async (batchId: number): Promise<CampaignRequest> => {
+  return apiRequest<CampaignRequest>(`/integrations/campaign-requests/${batchId}/approve/`, {
+    method: 'PATCH',
+    body: JSON.stringify({}),
+  });
+};
+
+/**
+ * PATCH /api/integrations/campaign-requests/:id/reject/
+ */
+export const rejectCampaignRequestAPI = async (
+  batchId: number,
+  reason: string,
+): Promise<CampaignRequest> => {
+  return apiRequest<CampaignRequest>(`/integrations/campaign-requests/${batchId}/reject/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ reason }),
+  });
+};
+
+/**
+ * PATCH /api/integrations/campaign-requests/:id/resubmit/ - edit and resubmit a
+ * rejected request (same row transitions back to pending_approval).
+ */
+export const resubmitCampaignRequestAPI = async (
+  batchId: number,
+  data: SubmitCampaignRequestPayload,
+): Promise<CampaignRequest> => {
+  return apiRequest<CampaignRequest>(`/integrations/campaign-requests/${batchId}/resubmit/`, {
+    method: 'PATCH',
     body: JSON.stringify(data),
   });
 };

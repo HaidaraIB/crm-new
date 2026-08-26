@@ -348,13 +348,28 @@ interface CampaignLeadPickerProps {
     enabled: boolean;
     selectedIds: Set<number>;
     onSelectedIdsChange: React.Dispatch<React.SetStateAction<Set<number>>>;
+    /**
+     * Restricted staff roles (requires_campaign_approval) may only ever target
+     * their own assigned leads: lock the "assigned to me" filter on and hide
+     * the controls that would let them pick someone else's audience. This is
+     * a UX convenience only - the backend re-validates the audience server-side
+     * regardless of what this prop does.
+     */
+    forceAssignedToMe?: boolean;
 }
 
-export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }: CampaignLeadPickerProps) {
+export function CampaignLeadPicker({
+    enabled,
+    selectedIds,
+    onSelectedIdsChange,
+    forceAssignedToMe = false,
+}: CampaignLeadPickerProps) {
     const { t, language, currentUser } = useAppContext();
     const [searchDraft, setSearchDraft] = useState('');
     const [searchApplied, setSearchApplied] = useState('');
-    const [filters, setFilters] = useState<CampaignLeadFilters>(EMPTY_FILTERS);
+    const [filters, setFilters] = useState<CampaignLeadFilters>(
+        forceAssignedToMe ? { ...EMPTY_FILTERS, assignedToMe: true } : EMPTY_FILTERS,
+    );
     const [activeDatePreset, setActiveDatePreset] = useState<DatePreset | null>(null);
     const [openDropdown, setOpenDropdown] = useState<string | null>(null);
 
@@ -443,7 +458,7 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
     const clearFilters = () => {
         setSearchDraft('');
         setSearchApplied('');
-        setFilters(EMPTY_FILTERS);
+        setFilters(forceAssignedToMe ? { ...EMPTY_FILTERS, assignedToMe: true } : EMPTY_FILTERS);
         setActiveDatePreset(null);
         setOpenDropdown(null);
     };
@@ -544,7 +559,7 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
         }
 
         const assigneeChips: ChipItem[] = [];
-        if (filters.assignedToMe) {
+        if (filters.assignedToMe && !forceAssignedToMe) {
             assigneeChips.push({
                 key: 'me',
                 label: t('campaignAssignedToMe'),
@@ -691,19 +706,21 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
                             searchPlaceholder={t('search')}
                         />
                     )}
-                    <MultiSelectDropdown
-                        label={t('assignedTo')}
-                        options={assigneeOptions}
-                        selected={filters.assignedToMe ? [] : filters.assignees}
-                        onChange={(assignees) =>
-                            setFilters((prev) => ({ ...prev, assignees, assignedToMe: false }))
-                        }
-                        open={openDropdown === 'assignee'}
-                        onOpenChange={(open) => setOpenDropdown(open ? 'assignee' : null)}
-                        language={language}
-                        searchable
-                        searchPlaceholder={t('search')}
-                    />
+                    {!forceAssignedToMe && (
+                        <MultiSelectDropdown
+                            label={t('assignedTo')}
+                            options={assigneeOptions}
+                            selected={filters.assignedToMe ? [] : filters.assignees}
+                            onChange={(assignees) =>
+                                setFilters((prev) => ({ ...prev, assignees, assignedToMe: false }))
+                            }
+                            open={openDropdown === 'assignee'}
+                            onOpenChange={(open) => setOpenDropdown(open ? 'assignee' : null)}
+                            language={language}
+                            searchable
+                            searchPlaceholder={t('search')}
+                        />
+                    )}
 
                     <div className="relative" ref={dateRef}>
                         <button
@@ -786,21 +803,23 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
                                 className="absolute z-40 mt-1 min-w-[200px] rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 shadow-lg py-1"
                                 dir={language === 'ar' ? 'rtl' : 'ltr'}
                             >
-                                <label className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800">
-                                    <input
-                                        type="checkbox"
-                                        checked={filters.assignedToMe}
-                                        onChange={() =>
-                                            setFilters((prev) => ({
-                                                ...prev,
-                                                assignedToMe: !prev.assignedToMe,
-                                                assignees: !prev.assignedToMe ? [] : prev.assignees,
-                                            }))
-                                        }
-                                        className="rounded border-gray-300 dark:border-gray-600 text-primary"
-                                    />
-                                    {t('campaignAssignedToMe')}
-                                </label>
+                                {!forceAssignedToMe && (
+                                    <label className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800">
+                                        <input
+                                            type="checkbox"
+                                            checked={filters.assignedToMe}
+                                            onChange={() =>
+                                                setFilters((prev) => ({
+                                                    ...prev,
+                                                    assignedToMe: !prev.assignedToMe,
+                                                    assignees: !prev.assignedToMe ? [] : prev.assignees,
+                                                }))
+                                            }
+                                            className="rounded border-gray-300 dark:border-gray-600 text-primary"
+                                        />
+                                        {t('campaignAssignedToMe')}
+                                    </label>
+                                )}
                                 <label className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-800">
                                     <input
                                         type="checkbox"
@@ -893,7 +912,9 @@ export function CampaignLeadPicker({ enabled, selectedIds, onSelectedIdsChange }
                                             }}
                                             className="rounded border-gray-300 dark:border-gray-600 text-primary shrink-0"
                                         />
-                                        <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm shrink-0">
+                                        {/* `text-primary` (primary-500) is too dark on the dark-mode
+                                            tint — step up to primary-200, same rule as the page tabs. */}
+                                        <div className="w-9 h-9 rounded-full bg-primary/20 dark:bg-primary/30 flex items-center justify-center text-primary-700 dark:text-primary-100 font-semibold text-sm shrink-0">
                                             {displayTitle.charAt(0)}
                                         </div>
                                         <div className="min-w-0 flex-1">

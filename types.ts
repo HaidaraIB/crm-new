@@ -219,6 +219,48 @@ export interface User {
   whatsapp_chat_enabled?: boolean;
   /** When false, this user is blocked from using WhatsApp Calling (default true) */
   whatsapp_call_enabled?: boolean;
+  /** True for every staff role except Owner/Supervisor: Messaging Center bulk
+   * sends are limited to their own assigned leads and require owner approval. */
+  requires_campaign_approval?: boolean;
+}
+
+export type CampaignRequestStatus =
+  | 'pending_approval'
+  | 'approved'
+  | 'rejected'
+  | 'sending'
+  | 'completed'
+  | 'failed'
+  | 'sent';
+
+export interface CampaignRequestUserRef {
+  id: number;
+  name: string;
+}
+
+export interface CampaignRequest {
+  id: number;
+  channel: 'sms' | 'whatsapp';
+  message_preview: string;
+  status: CampaignRequestStatus;
+  recipient_count: number;
+  sent_count: number;
+  failed_count: number;
+  /** SMS: { body }. WhatsApp: { template_id }. Used to prefill edit & resubmit. */
+  message_payload: Record<string, unknown>;
+  /** Every recipient id, so resubmit can re-select the original audience. */
+  audience_client_ids: number[];
+  /** First few recipients, for the name chips on the request card. */
+  audience_preview: Array<{ client_id: number; name: string }>;
+  /** Resolved WhatsApp template name (null for SMS). */
+  template_name: string | null;
+  requested_by: CampaignRequestUserRef | null;
+  reviewed_by: CampaignRequestUserRef | null;
+  rejection_reason: string;
+  submitted_at: string | null;
+  resubmitted_at: string | null;
+  reviewed_at: string | null;
+  created_at: string | null;
 }
 
 export interface TimelineWhatsAppThreadMessage {

@@ -321,10 +321,10 @@ export const Sidebar = () => {
             <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto overflow-x-hidden custom-scrollbar">
                 {SIDEBAR_ITEMS.filter((item) => {
                     if (isDataEntryUser) {
-                        return item.name === 'Leads';
+                        return item.name === 'Leads' || item.name === 'Marketing';
                     }
                     if (isReceptionUser) {
-                        return item.name === 'Leads' || item.name === 'Activities';
+                        return item.name === 'Leads' || item.name === 'Activities' || item.name === 'Marketing';
                     }
                     if (isCallCenterUser) {
                         return (
@@ -332,7 +332,8 @@ export const Sidebar = () => {
                             item.name === 'Arrivals' ||
                             item.name === 'Support Center' ||
                             item.name === 'User Guide' ||
-                            item.name === 'News'
+                            item.name === 'News' ||
+                            item.name === 'Marketing'
                         );
                     }
                     // Only call-center users see the Call Center nav entry (checked above).
@@ -386,12 +387,17 @@ export const Sidebar = () => {
                         subItems = ['All Leads', 'CreateLead'];
                     }
                     // Supervisor: filter sub-items by permission.
-                    // Employee / Doctor: drop staff-restricted sub-items (Messaging Center).
+                    // Employee / Doctor / DataEntry / Reception / CallCenter: drop
+                    // sub-items they can't reach (e.g. Campaigns, the lead-source page) -
+                    // Messaging Center now passes through for all of them.
                     if (
                         subItems &&
                         (normalizedCurrentRole === 'Supervisor' ||
                             normalizedCurrentRole === 'Employee' ||
-                            normalizedCurrentRole === 'Doctor')
+                            normalizedCurrentRole === 'Doctor' ||
+                            isDataEntryUser ||
+                            isReceptionUser ||
+                            isCallCenterUser)
                     ) {
                         subItems = subItems.filter((sub) => canAccessPage(sub));
                     }

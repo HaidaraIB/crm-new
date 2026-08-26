@@ -1221,7 +1221,7 @@ export const DashboardPage = () => {
                         </div>
                     </Card>
                 )}
-                <Card className="lg:col-span-2 rounded-2xl border-0 shadow-xl shadow-gray-200/70 dark:shadow-none dark:ring-1 dark:ring-gray-700/50 hover:shadow-2xl transition-shadow duration-300">
+                <Card className={`${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'} rounded-2xl border-0 shadow-xl shadow-gray-200/70 dark:shadow-none dark:ring-1 dark:ring-gray-700/50 hover:shadow-2xl transition-shadow duration-300`}>
                     <div className="flex items-center justify-between mb-6 pb-4 border-b border-gray-200 dark:border-gray-700">
                         <div>
                             <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100">{t('latestFeedbacks')}</h2>

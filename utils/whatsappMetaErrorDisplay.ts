@@ -7,6 +7,7 @@ const CODE_TO_KEY: Record<string, string> = {
   '131049': 'whatsapp_ecosystem_engagement_limit',
   '132000': 'whatsapp_template_parameter_count',
   '132001': 'whatsapp_template_not_found_or_language',
+  '130472': 'whatsapp_recipient_experiment_block',
 };
 
 /**

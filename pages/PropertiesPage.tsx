@@ -14,16 +14,7 @@ import { withLatinDigits } from '../utils/dateUtils';
 
 type Tab = 'units' | 'projects' | 'developers';
 
-const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
-
-const getPageSizeFromResponse = (response: any): number => {
-    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
-    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
-    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
-    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
-    return DEFAULT_PAGE_SIZE;
-};
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -635,9 +626,9 @@ export const PropertiesPage = () => {
     }, [units, unitFilters]);
 
     const renderContent = () => {
-        const developersTotalPages = Math.max(1, Math.ceil((developersResponse?.count || 0) / getPageSizeFromResponse(developersResponse)));
-        const projectsTotalPages = Math.max(1, Math.ceil((projectsResponse?.count || 0) / getPageSizeFromResponse(projectsResponse)));
-        const unitsTotalPages = Math.max(1, Math.ceil((unitsResponse?.count || 0) / getPageSizeFromResponse(unitsResponse)));
+        const developersTotalPages = Math.max(1, Math.ceil((developersResponse?.count || 0) / developersPageSize));
+        const projectsTotalPages = Math.max(1, Math.ceil((projectsResponse?.count || 0) / projectsPageSize));
+        const unitsTotalPages = Math.max(1, Math.ceil((unitsResponse?.count || 0) / unitsPageSize));
         const visibleDeveloperPages = getPaginationItems(developersPageNumber, developersTotalPages);
         const visibleProjectPages = getPaginationItems(projectsPageNumber, projectsTotalPages);
         const visibleUnitPages = getPaginationItems(unitsPageNumber, unitsTotalPages);

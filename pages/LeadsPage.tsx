@@ -24,16 +24,7 @@ import { formatLeadBudget } from '../utils/budgetRange';
 import { ARABIC_DATE_LOCALE, formatTimelineDate, withLatinDigits } from '../utils/dateUtils';
 import { MarqueeText } from '../components/MarqueeText';
 
-const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
-
-const getPageSizeFromResponse = (response: any): number => {
-    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
-    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
-    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
-    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
-    return DEFAULT_PAGE_SIZE;
-};
 
 const LEADS_STATUS_TAB_STORAGE_KEY = 'crm:leadsStatusTab';
 const LEADS_SCROLL_STORAGE_KEY = 'crm:leadsScrollY';
@@ -209,7 +200,7 @@ export const LeadsPage = () => {
     const totalLeadsCount = leadsResponse?.count || 0;
     const hasNextPage = Boolean(leadsResponse?.next);
     const hasPreviousPage = Boolean(leadsResponse?.previous);
-    const pageSize = getPageSizeFromResponse(leadsResponse);
+    const pageSize = leadsPageSize;
     const totalPages = Math.max(1, Math.ceil(totalLeadsCount / pageSize));
     const paginationItems = getPaginationItems(leadsPageNumber, totalPages);
 

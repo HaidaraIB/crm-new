@@ -10,16 +10,7 @@ import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQuer
 import { exportToExcel } from '../utils/exportToExcel';
 import { withLatinDigits } from '../utils/dateUtils';
 
-const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
-
-const getPageSizeFromResponse = (response: any): number => {
-    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
-    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
-    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
-    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
-    return DEFAULT_PAGE_SIZE;
-};
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -257,7 +248,7 @@ export const DealsPage = () => {
     const hasNextPage = Boolean(dealsResponse?.next);
     const hasPreviousPage = Boolean(dealsResponse?.previous);
     const totalDealsCount = dealsResponse?.count || 0;
-    const pageSize = getPageSizeFromResponse(dealsResponse);
+    const pageSize = dealsPageSize;
     const totalPages = Math.max(1, Math.ceil(totalDealsCount / pageSize));
     const paginationItems = getPaginationItems(dealsPageNumber, totalPages);
 

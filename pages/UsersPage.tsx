@@ -8,16 +8,7 @@ import { getRoleTranslation, normalizeRole } from '../utils/roles';
 import { formatWorkedDuration } from '../utils/workHours';
 import { buildWaMeUrl } from '../utils/whatsappLaunch';
 
-const DEFAULT_PAGE_SIZE = 20;
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
-
-const getPageSizeFromResponse = (response: any): number => {
-    const fromNext = response?.next ? Number(new URL(response.next).searchParams.get('page_size')) : NaN;
-    const fromPrev = response?.previous ? Number(new URL(response.previous).searchParams.get('page_size')) : NaN;
-    if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
-    if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
-    return DEFAULT_PAGE_SIZE;
-};
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -292,7 +283,7 @@ export const UsersPage = () => {
     const hasNextPage = Boolean(usersResponse?.next);
     const hasPreviousPage = Boolean(usersResponse?.previous);
     const totalUsersCount = usersResponse?.count || 0;
-    const pageSize = getPageSizeFromResponse(usersResponse);
+    const pageSize = usersPageSize;
     const totalPages = Math.max(1, Math.ceil(totalUsersCount / pageSize));
     const paginationItems = getPaginationItems(usersPageNumber, totalPages);
 

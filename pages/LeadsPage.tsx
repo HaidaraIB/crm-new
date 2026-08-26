@@ -17,6 +17,7 @@ import { exportToExcel } from '../utils/exportToExcel';
 import { normalizeLead } from '../utils/normalizeLead';
 import { resolvePrimaryPhone } from '../utils/resolvePrimaryPhone';
 import { getCompanyViewLeadRoute } from '../utils/routing';
+import { setLeadsReturnPage } from '../utils/leadsReturnPage';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { formatLeadBudget } from '../utils/budgetRange';
@@ -32,6 +33,28 @@ const getPageSizeFromResponse = (response: any): number => {
     if (!Number.isNaN(fromNext) && fromNext > 0) return fromNext;
     if (!Number.isNaN(fromPrev) && fromPrev > 0) return fromPrev;
     return DEFAULT_PAGE_SIZE;
+};
+
+const LEADS_STATUS_TAB_STORAGE_KEY = 'crm:leadsStatusTab';
+const LEADS_SCROLL_STORAGE_KEY = 'crm:leadsScrollY';
+
+const readStoredStatusTab = (page: string): Lead['status'] => {
+    try {
+        const raw = localStorage.getItem(`${LEADS_STATUS_TAB_STORAGE_KEY}:${page}`);
+        return (raw as Lead['status']) || 'All';
+    } catch {
+        return 'All';
+    }
+};
+
+const readStoredScrollY = (page: string): number => {
+    try {
+        const raw = localStorage.getItem(`${LEADS_SCROLL_STORAGE_KEY}:${page}`);
+        const value = raw ? Number(raw) : NaN;
+        return Number.isFinite(value) ? value : 0;
+    } catch {
+        return 0;
+    }
 };
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
@@ -80,9 +103,24 @@ export const LeadsPage = () => {
     );
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
     const [leadsPageSize, setLeadsPageSize] = useState(20);
-    const [activeStatusFilter, setActiveStatusFilter] = useState<Lead['status']>('All');
+    const [activeStatusFilter, setActiveStatusFilterState] = useState<Lead['status']>(() => readStoredStatusTab(currentPage));
     const [viewMode, setViewMode] = useEntityViewMode('leads');
     const isBoardView = viewMode === 'board';
+
+    // Re-sync the persisted tab when switching between Leads-family pages (Fresh/Hot/Cold/My/...)
+    // that share this component without unmounting it.
+    useEffect(() => {
+        setActiveStatusFilterState(readStoredStatusTab(currentPage));
+    }, [currentPage]);
+
+    const setActiveStatusFilter = (status: Lead['status']) => {
+        setActiveStatusFilterState(status);
+        try {
+            localStorage.setItem(`${LEADS_STATUS_TAB_STORAGE_KEY}:${currentPage}`, status);
+        } catch {
+            // Ignore storage errors (private mode, etc.)
+        }
+    };
 
     const baseLeadFilters = useMemo((): LeadApiFilters => {
         const filters: LeadApiFilters = {};
@@ -178,6 +216,46 @@ export const LeadsPage = () => {
     useEffect(() => {
         setLeadsPageNumber(1);
     }, [currentPage, apiFilters, leadsPageSize]);
+
+    // Persist scroll position of the app's scroll container so returning to this
+    // page (e.g. after viewing a lead) restores where the user left off.
+    const scrollRestoredForPageRef = useRef<string | null>(null);
+    useEffect(() => {
+        const container = document.querySelector('.app-main-scroll') as HTMLElement | null;
+        if (!container) return;
+
+        let ticking = false;
+        const handleScroll = () => {
+            if (ticking) return;
+            ticking = true;
+            requestAnimationFrame(() => {
+                try {
+                    localStorage.setItem(`${LEADS_SCROLL_STORAGE_KEY}:${currentPage}`, String(container.scrollTop));
+                } catch {
+                    // Ignore storage errors (private mode, etc.)
+                }
+                ticking = false;
+            });
+        };
+
+        container.addEventListener('scroll', handleScroll, { passive: true });
+        return () => container.removeEventListener('scroll', handleScroll);
+    }, [currentPage]);
+
+    useEffect(() => {
+        if (isBoardView || leadsLoading) return;
+        if (scrollRestoredForPageRef.current === currentPage) return;
+        scrollRestoredForPageRef.current = currentPage;
+
+        const container = document.querySelector('.app-main-scroll') as HTMLElement | null;
+        if (!container) return;
+        const storedY = readStoredScrollY(currentPage);
+        if (storedY > 0) {
+            requestAnimationFrame(() => {
+                container.scrollTop = storedY;
+            });
+        }
+    }, [currentPage, isBoardView, leadsLoading, allLeads]);
     // Normalize API fields to frontend naming for consistent rendering (phone_numbers -> phoneNumbers, etc.)
     const normalizedLeads = React.useMemo((): Lead[] => {
         return (allLeads || []).map((l: any): Lead => {
@@ -436,8 +514,9 @@ export const LeadsPage = () => {
 
     const handleViewLead = (lead: Lead) => {
         setSelectedLead(lead);
+        setLeadsReturnPage(currentPage);
         const viewLeadPath = currentUser?.company
-            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, lead.id)
+            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, lead.id, currentUser.company.specialization)
             : `/view-lead/${lead.id}`;
         window.history.pushState({}, '', viewLeadPath);
         setCurrentPage('ViewLead');

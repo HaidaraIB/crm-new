@@ -338,7 +338,7 @@ export const CreateLeadPage = () => {
                 setIsSuccessModalOpen(true);
             }
             if (postCreateNavigateToAllLeads && currentUser?.company) {
-                const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads');
+                const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads', currentUser.company.specialization);
                 window.history.pushState({}, '', route);
                 setCurrentPage('All Leads');
             } else {
@@ -667,7 +667,7 @@ export const CreateLeadPage = () => {
                     <div className="mt-6 flex justify-end gap-2">
                         <Button type="button" variant="secondary" onClick={() => {
                             if (postCreateNavigateToAllLeads && currentUser?.company) {
-                                window.history.pushState({}, '', getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads'));
+                                window.history.pushState({}, '', getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads', currentUser.company.specialization));
                                 setCurrentPage('All Leads');
                             } else {
                                 window.history.pushState({}, '', '/leads');

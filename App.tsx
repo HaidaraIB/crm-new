@@ -302,10 +302,10 @@ const TheApp = () => {
                 return;
             }
             if (!companyFromPath && currentUser?.company && currentPath !== '/' && subdomainSlug) {
-                const viewLeadMatch = pageFromPath.match(/^view-lead\/(\d+)$/i);
+                const viewLeadMatch = pageFromPath.match(/^view-(?:lead|patient)\/(\d+)$/i);
                 const correctRoute = viewLeadMatch
-                    ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10))
-                    : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
+                    ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10), currentUser.company.specialization)
+                    : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage, currentUser.company.specialization);
                 window.history.replaceState({}, '', withCurrentSearchAndHash(correctRoute));
                 return;
             }
@@ -328,6 +328,23 @@ const TheApp = () => {
                 'create-lead': 'CreateLead',
                 'edit-lead': 'EditLead',
                 'view-lead': 'ViewLead',
+                // Medical companies use "patients" wording in the URL (see medicalTranslationOverrides.ts) — accept both.
+                'patients': 'Leads',
+                'all-patients': 'All Leads',
+                'all patients': 'All Leads',
+                'fresh-patients': 'Fresh Leads',
+                'fresh patients': 'Fresh Leads',
+                'hot-patients': 'Hot Leads',
+                'hot patients': 'Hot Leads',
+                'cold-patients': 'Cold Leads',
+                'cold patients': 'Cold Leads',
+                'my-patients': 'My Leads',
+                'my patients': 'My Leads',
+                'rotated-patients': 'Rotated Leads',
+                'rotated patients': 'Rotated Leads',
+                'create-patient': 'CreateLead',
+                'edit-patient': 'EditLead',
+                'view-patient': 'ViewLead',
                 'activities': 'Activities',
                 'properties': 'Properties',
                 'owners': 'Owners',
@@ -397,18 +414,18 @@ const TheApp = () => {
             console.log('[App] checkPathname - currentPath:', currentPath, 'pageFromPath:', pageFromPath, 'normalizedPath:', normalizedPath);
 
             // Check for view-lead/:id pattern
-            if (normalizedPath.startsWith('view-lead/')) {
-                const leadIdMatch = pageFromPath.match(/view-lead\/(\d+)/);
+            if (normalizedPath.startsWith('view-lead/') || normalizedPath.startsWith('view-patient/')) {
+                const leadIdMatch = pageFromPath.match(/view-(?:lead|patient)\/(\d+)/);
                 if (leadIdMatch && currentPage !== 'ViewLead') {
                     setCurrentPage('ViewLead');
                 } else if (!leadIdMatch) {
                     if (currentUser?.company) {
-                        const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
+                        const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads', currentUser.company.specialization);
                         window.history.replaceState({}, '', withCurrentSearchAndHash(leadsRoute));
                     } else {
                         window.history.replaceState({}, '', withCurrentSearchAndHash('/leads'));
                     }
-                    setCurrentPage('Leads');
+                    setCurrentPage('All Leads');
                 }
                 return;
             }
@@ -483,7 +500,7 @@ const TheApp = () => {
     React.useEffect(() => {
         if (!isLoggedIn || !currentUser || !initialPathResolved || pageToRender === currentPage) return;
         setCurrentPage(pageToRender);
-        const route = getCompanyRoute(currentUser.company?.name, currentUser.company?.domain, pageToRender);
+        const route = getCompanyRoute(currentUser.company?.name, currentUser.company?.domain, pageToRender, currentUser.company?.specialization);
         window.history.replaceState({}, '', route);
     }, [isLoggedIn, currentUser, currentPage, pageToRender, setCurrentPage, initialPathResolved]);
     
@@ -571,10 +588,10 @@ const TheApp = () => {
         }
         if (!companyFromPath && currentUser?.company && pathnameToCheck !== '/' && subdomainSlug) {
             // Preserve view-lead/:id pattern (getCompanyRoute would mangle it to view-lead123)
-            const viewLeadMatch = pageFromPath.match(/^view-lead\/(\d+)$/i);
+            const viewLeadMatch = pageFromPath.match(/^view-(?:lead|patient)\/(\d+)$/i);
             const correctRoute = viewLeadMatch
-                ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10))
-                : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage);
+                ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10), currentUser.company.specialization)
+                : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage, currentUser.company.specialization);
             window.history.replaceState({}, '', withSearch(correctRoute));
             return;
         }
@@ -599,6 +616,23 @@ const TheApp = () => {
             'create-lead': 'CreateLead',
             'edit-lead': 'EditLead',
             'view-lead': 'ViewLead', // Base route, will handle view-lead/:id pattern
+            // Medical companies use "patients" wording in the URL (see medicalTranslationOverrides.ts) — accept both.
+            'patients': 'Leads',
+            'all-patients': 'All Leads',
+            'all patients': 'All Leads',
+            'fresh-patients': 'Fresh Leads',
+            'fresh patients': 'Fresh Leads',
+            'hot-patients': 'Hot Leads',
+            'hot patients': 'Hot Leads',
+            'cold-patients': 'Cold Leads',
+            'cold patients': 'Cold Leads',
+            'my-patients': 'My Leads',
+            'my patients': 'My Leads',
+            'rotated-patients': 'Rotated Leads',
+            'rotated patients': 'Rotated Leads',
+            'create-patient': 'CreateLead',
+            'edit-patient': 'EditLead',
+            'view-patient': 'ViewLead',
             'activities': 'Activities',
             'properties': 'Properties',
             'owners': 'Owners',
@@ -681,19 +715,19 @@ const TheApp = () => {
         console.log('[App] pageFromPath:', pageFromPath, 'normalizedPath:', normalizedPath);
         
         // Check for view-lead/:id pattern
-        if (normalizedPath.startsWith('view-lead/')) {
-            const leadIdMatch = pageFromPath.match(/view-lead\/(\d+)/);
+        if (normalizedPath.startsWith('view-lead/') || normalizedPath.startsWith('view-patient/')) {
+            const leadIdMatch = pageFromPath.match(/view-(?:lead|patient)\/(\d+)/);
             if (leadIdMatch && currentPage !== 'ViewLead') {
                 setCurrentPage('ViewLead');
             } else if (!leadIdMatch) {
-                // Invalid view-lead URL, redirect to leads
+                // Invalid view-lead/view-patient URL, redirect to the leads list
                 if (currentUser?.company) {
-                    const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
+                    const leadsRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads', currentUser.company.specialization);
                     window.history.replaceState({}, '', withSearch(leadsRoute));
                 } else {
                     window.history.replaceState({}, '', withSearch('/leads'));
                 }
-                setCurrentPage('Leads');
+                setCurrentPage('All Leads');
             }
             return;
         }

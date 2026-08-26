@@ -36,6 +36,7 @@ import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
 import { normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
+import { getLeadsReturnPage } from '../utils/leadsReturnPage';
 
 /** Collapse consecutive WhatsApp rows (after chronological sort) into thread cards. */
 function collapseConsecutiveWhatsAppThreads(
@@ -95,6 +96,13 @@ export const ViewLeadPage = () => {
     const [isUpdatingTags, setIsUpdatingTags] = React.useState(false);
     const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
     const [updatingMetaQualification, setUpdatingMetaQualification] = React.useState(false);
+
+    // Open the lead detail view at the top, instead of inheriting the leads list's scroll position
+    // (the app's main scroll container is shared across pages and is not reset on navigation).
+    useEffect(() => {
+        const container = document.querySelector('.app-main-scroll') as HTMLElement | null;
+        if (container) container.scrollTop = 0;
+    }, []);
 
     // Get leadId from URL
     const pathname = decodeURIComponent(window.location.pathname);
@@ -303,13 +311,14 @@ export const ViewLeadPage = () => {
                 try {
                     await deleteLeadMutation.mutateAsync(lead.id);
                     setSelectedLead(null);
+                    const returnPage = getLeadsReturnPage();
                     if (currentUser?.company) {
-                        const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Leads');
+                        const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, returnPage, currentUser.company.specialization);
                         window.history.pushState({}, '', route);
                     } else {
-                        window.history.pushState({}, '', '/leads');
+                        window.history.pushState({}, '', `/${returnPage.toLowerCase().replace(/\s+/g, '-')}`);
                     }
-                    setCurrentPage('Leads');
+                    setCurrentPage(returnPage);
                 } catch (error: any) {
                     console.error('Error deleting lead:', error);
                     throw error;
@@ -815,8 +824,12 @@ export const ViewLeadPage = () => {
                     <button
                         type="button"
                         onClick={() => {
-                            window.history.pushState({}, '', '/leads');
-                            setCurrentPage('Leads');
+                            const returnPage = getLeadsReturnPage();
+                            const route = currentUser?.company
+                                ? getCompanyRoute(currentUser.company.name, currentUser.company.domain, returnPage, currentUser.company.specialization)
+                                : `/${returnPage.toLowerCase().replace(/\s+/g, '-')}`;
+                            window.history.pushState({}, '', route);
+                            setCurrentPage(returnPage);
                         }}
                         className="shrink-0 rounded-md p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                         title={t('back') || 'Back'}

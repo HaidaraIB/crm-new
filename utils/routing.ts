@@ -1,3 +1,19 @@
+import { isMedicalSpecialization } from './medicalTranslationOverrides';
+
+/**
+ * Pages whose URL slug should read "patient(s)" instead of "lead(s)" for medical
+ * companies, mirroring the `t()` text override in medicalTranslationOverrides.ts.
+ */
+const MEDICAL_ALIASABLE_PAGES: ReadonlySet<string> = new Set([
+  'Leads', 'All Leads', 'Fresh Leads', 'Hot Leads', 'Cold Leads', 'My Leads', 'Rotated Leads',
+  'CreateLead', 'EditLead', 'ViewLead',
+]);
+
+const applyMedicalSlugAlias = (page: string, pagePath: string, specialization?: string | null): string => {
+  if (!isMedicalSpecialization(specialization) || !MEDICAL_ALIASABLE_PAGES.has(page)) return pagePath;
+  return pagePath.replace(/\bleads\b/g, 'patients').replace(/\blead\b/g, 'patient');
+};
+
 /**
  * Get the base domain (app domain; company is subdomain).
  * For production (e.g. apple.dashboard.loop-crm.app) set VITE_BASE_DOMAIN=dashboard.loop-crm.app
@@ -105,9 +121,9 @@ const toSubdomainSlug = (value: string): string => {
  * Get company route path. Folder structure with subdomain (company domain) in path, not company name.
  * Example: /apple/dashboard, /apple/leads (apple = company.domain / subdomain value)
  */
-export const getCompanyRoute = (companyName?: string, companyDomain?: string, page?: string): string => {
+export const getCompanyRoute = (companyName?: string, companyDomain?: string, page?: string, specialization?: string | null): string => {
   const subdomainSlug = companyDomain ? toSubdomainSlug(companyDomain) : (companyName ? toSubdomainSlug(companyName) : '');
-  const pagePath = page ? pageToPathSegment(page) : 'dashboard';
+  const pagePath = page ? applyMedicalSlugAlias(page, pageToPathSegment(page), specialization) : 'dashboard';
   if (!subdomainSlug) return `/${pagePath}`;
   return `/${subdomainSlug}/${pagePath}`;
 };
@@ -116,9 +132,10 @@ export const getCompanyRoute = (companyName?: string, companyDomain?: string, pa
  * Get route for view-lead page (preserves view-lead/:id pattern; getCompanyRoute would turn it into view-lead123).
  * Example: /apple/view-lead/123 or /view-lead/123
  */
-export const getCompanyViewLeadRoute = (companyName?: string, companyDomain?: string, leadId?: number): string => {
+export const getCompanyViewLeadRoute = (companyName?: string, companyDomain?: string, leadId?: number, specialization?: string | null): string => {
   const subdomainSlug = companyDomain ? toSubdomainSlug(companyDomain) : (companyName ? toSubdomainSlug(companyName) : '');
-  const path = `view-lead/${leadId ?? ''}`;
+  const segment = isMedicalSpecialization(specialization) ? 'view-patient' : 'view-lead';
+  const path = `${segment}/${leadId ?? ''}`;
   if (!subdomainSlug) return `/${path}`;
   return `/${subdomainSlug}/${path}`;
 };
@@ -140,8 +157,8 @@ export const getCompanySubdomainUrl = (companyDomain: string, page?: string): st
 /**
  * Navigate to company route. Path stays folder-like: /subdomain/page (e.g. /apple/dashboard).
  */
-export const navigateToCompanyRoute = (companyName?: string, companyDomain?: string, page: string = 'Dashboard'): void => {
-  const route = getCompanyRoute(companyName, companyDomain, page);
+export const navigateToCompanyRoute = (companyName?: string, companyDomain?: string, page: string = 'Dashboard', specialization?: string | null): void => {
+  const route = getCompanyRoute(companyName, companyDomain, page, specialization);
   window.history.replaceState({}, '', route);
 };
 

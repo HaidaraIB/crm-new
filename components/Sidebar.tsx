@@ -256,7 +256,7 @@ export const Sidebar = () => {
             }
         } else {
             // Update URL to company route for other pages
-            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page);
+            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, page, currentUser?.company?.specialization);
         }
         
         if (window.innerWidth < 1024) { // lg breakpoint

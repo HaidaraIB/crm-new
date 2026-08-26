@@ -70,8 +70,8 @@ const TEMPLATES: Record<string, Record<NotificationLang, Template>> = {
     en: { title: 'Lead Reminder', body: 'Reminder to follow up with lead {lead_name}' },
   },
   customer_arrived: {
-    ar: { title: 'وصل العميل', body: 'وصل العميل {lead_name} وينتظر في الاستقبال' },
-    en: { title: 'Customer Arrived', body: '{lead_name} has arrived and is waiting at reception' },
+    ar: { title: 'استقبال زبون', body: 'وصل العميل {lead_name} وينتظر في الاستقبال' },
+    en: { title: 'Customer Reception', body: '{lead_name} has arrived and is waiting at reception' },
   },
   customer_arrival_acknowledged: {
     ar: { title: 'تم استلام إشعار الوصول', body: 'تم استلام إشعار وصول العميل {lead_name}' },

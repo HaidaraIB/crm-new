@@ -1,18 +1,24 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { usePendingLeadArrivals, useAcknowledgeLeadArrival, useSyncDigest } from '../../hooks/useQueries';
 import { Button } from '../Button';
 import { BellIcon } from '../icons';
 import { PhoneText } from '../PhoneText';
-
-const MAX_VISIBLE_CARDS = 3;
+import {
+  preloadArrivalRingtone,
+  startArrivalRingtone,
+  stopArrivalRingtone,
+} from '../../utils/arrivalRingtone';
 
 /**
- * Global in-app "customer arrived" cards for whoever the arrival was routed to.
+ * Global "customer arrived" alert for whoever the arrival was routed to.
  * Mirrors PbxScreenPopListener's mounting pattern (one global listener in TheApp),
  * but is driven by /lead-arrivals/pending/ instead of the notification inbox.
- * Stacks multiple simultaneous arrivals vertically instead of one card silently
- * replacing another (a second walk-in must never hide the first).
+ *
+ * Presented as a centered, ringing call-style dialog (same shape as an incoming
+ * WhatsApp call): a customer standing at the desk has to interrupt whatever the
+ * recipient is doing, which a corner toast did not. Simultaneous arrivals queue
+ * one behind the other — a second walk-in must never silently hide the first.
  */
 export const ArrivalAlertHost = () => {
   const { t, currentUser } = useAppContext();
@@ -40,55 +46,73 @@ export const ArrivalAlertHost = () => {
   // card would sit on screen until the tab was reloaded.
   const arrivals = hasPending ? pending || [] : [];
 
-  const visible = arrivals.filter((a) => !dismissedIds.has(a.id)).slice(0, MAX_VISIBLE_CARDS);
+  const queue = arrivals.filter((a) => !dismissedIds.has(a.id));
+  const current = queue[0] ?? null;
+  const waitingBehind = Math.max(queue.length - 1, 0);
 
-  if (visible.length === 0) return null;
+  useEffect(() => {
+    if (!currentUser) return;
+    preloadArrivalRingtone();
+  }, [currentUser]);
+
+  useEffect(() => {
+    if (!current) {
+      stopArrivalRingtone();
+      return;
+    }
+    startArrivalRingtone();
+    return () => stopArrivalRingtone();
+  }, [current?.id]);
+
+  if (!current) return null;
 
   const acknowledge = (arrivalId: number) => {
+    stopArrivalRingtone();
     setDismissedIds((prev) => new Set(prev).add(arrivalId));
     acknowledgeMutation.mutate(arrivalId);
   };
 
   return (
     <div
-      className="pointer-events-none fixed bottom-0 end-0 z-[90] flex flex-col-reverse gap-3 p-4 sm:p-6"
-      aria-live="polite"
+      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/50 p-4 dark:bg-black/60"
+      role="dialog"
+      aria-modal="true"
+      aria-live="assertive"
+      aria-label={t('customerReception')}
     >
-      {visible.map((arrival) => (
-        <div
-          key={arrival.id}
-          role="status"
-          className="pointer-events-auto w-[min(100vw-2rem,24rem)] overflow-hidden rounded-xl border border-primary-300/80 bg-white/95 shadow-xl backdrop-blur-sm dark:border-primary-700/60 dark:bg-gray-900/95"
-        >
-          <div className="flex items-start gap-3 p-4">
-            <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">
-              <BellIcon className="h-5 w-5" />
-            </div>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold text-gray-900 dark:text-white">
-                {t('customerArrived') || 'Customer arrived'}
-              </p>
-              <p dir="auto" className="mt-0.5 text-sm text-gray-600 dark:text-gray-300">
-                {arrival.client_name}
-              </p>
-              {arrival.client_phone ? (
-                <PhoneText as="p" className="mt-1 font-mono text-base text-gray-900 dark:text-gray-100">
-                  {arrival.client_phone}
-                </PhoneText>
-              ) : null}
-              <div className="mt-3 flex flex-wrap gap-2">
-                <Button
-                  className="h-8 px-3 text-xs"
-                  onClick={() => acknowledge(arrival.id)}
-                  disabled={acknowledgeMutation.isPending}
-                >
-                  {t('understood') || 'Understood'}
-                </Button>
-              </div>
-            </div>
-          </div>
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-primary-300/80 bg-white text-center shadow-2xl dark:border-primary-700/60 dark:bg-gray-900">
+        <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6">
+          <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">
+            <span className="absolute inset-0 animate-ping rounded-full bg-primary-400/40" />
+            <BellIcon className="relative h-7 w-7" />
+          </span>
+          <p className="text-lg font-bold text-gray-900 dark:text-white">
+            {t('customerReception')}
+          </p>
+          <p dir="auto" className="text-base font-semibold text-gray-800 dark:text-gray-100">
+            {current.client_name}
+          </p>
+          {current.client_phone ? (
+            <PhoneText as="p" className="font-mono text-base text-gray-600 dark:text-gray-300">
+              {current.client_phone}
+            </PhoneText>
+          ) : null}
+          {waitingBehind > 0 ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('moreArrivalsWaiting').replace('{count}', String(waitingBehind))}
+            </p>
+          ) : null}
         </div>
-      ))}
+        <div className="border-t border-gray-200 p-4 dark:border-gray-700">
+          <Button
+            className="w-full"
+            onClick={() => acknowledge(current.id)}
+            disabled={acknowledgeMutation.isPending}
+          >
+            {t('understood')}
+          </Button>
+        </div>
+      </div>
     </div>
   );
 };

@@ -318,7 +318,7 @@ function TwilioSMSForm({
                                 autoComplete="off"
                                 data-form-type="other"
                                 data-lpignore="true"
-                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm ${errors.accountSid ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pe-10 text-sm ${errors.accountSid ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                 placeholder={t('accountSidPlaceholder')}
                             />
                             <button
@@ -366,7 +366,7 @@ function TwilioSMSForm({
                                 autoComplete="new-password"
                                 data-form-type="other"
                                 data-lpignore="true"
-                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm ${errors.authToken ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pe-10 text-sm ${errors.authToken ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                 placeholder={t('leaveBlankToKeepCurrent')}
                             />
                             <button
@@ -650,7 +650,7 @@ function OpenAISettingsForm({
                                 autoComplete="new-password"
                                 data-form-type="other"
                                 data-lpignore="true"
-                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pr-10 text-sm ${errors.apiKey ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
+                                className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 pe-10 text-sm ${errors.apiKey ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                                 placeholder={t('openaiApiKeyPlaceholder')}
                             />
                             <button

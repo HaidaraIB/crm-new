@@ -324,7 +324,7 @@ export const AddUserModal = () => {
                             type={passwordVisible ? 'text' : 'password'}
                             value={formData.password}
                             onChange={(e) => handleChange('password', e.target.value)}
-                            className="pr-10"
+                            className="pe-10"
                         />
                         <button 
                             type="button"

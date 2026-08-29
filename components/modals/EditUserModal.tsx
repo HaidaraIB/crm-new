@@ -20,6 +20,7 @@ const EDIT_USER_DOM_ID_MAP: Record<string, string> = {
     email: 'edit-user-email',
     password: 'edit-user-password',
     role: 'edit-user-role',
+    workEndTime: 'edit-user-workEndTime',
 };
 
 // FIX: Made children optional to fix missing children prop error.
@@ -275,6 +276,8 @@ export const EditUserModal = () => {
             workStartTime: '',
             workEndTime: '',
             canDeleteClients: false,
+            whatsappChatEnabled: true,
+            whatsappCallEnabled: true,
         });
         setErrors({});
         setPasswordVisible(false);
@@ -407,7 +410,7 @@ export const EditUserModal = () => {
                             onChange={handleChange} 
                             placeholder={t('leaveBlankPassword')}
                             autoComplete="new-password"
-                            className={`pr-10 ${errors.password ? 'border-red-500 dark:border-red-500' : ''}`}
+                            className={`pe-10 ${errors.password ? 'border-red-500 dark:border-red-500' : ''}`}
                         />
                         <button
                             type="button"
@@ -465,6 +468,9 @@ export const EditUserModal = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
                     </div>
                 )}
+                {/* Planned leave is deliberately not editable here: short absences are
+                    handled by "Mark unavailable" on the employee card, which expires by
+                    itself instead of leaving a date window to remember to clear. */}
                 {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
                     (formState.role === 'employee' || formState.role === 'doctor') && (
                     <div>

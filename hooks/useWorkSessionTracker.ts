@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { sendWorkSessionPingAPI } from '../services/api';
 import { queryKeys } from './useQueries';
-import { roleTracksWorkHours } from '../utils/roles';
+import { userTracksWorkHours } from '../utils/roles';
 import { isImpersonating } from '../utils/impersonation';
 import type { WorkSessionStatus } from '../types';
 
@@ -59,7 +59,7 @@ export const useWorkSessionTracker = (): WorkSessionTracker => {
     Boolean(isLoggedIn) &&
     Boolean(currentUser?.id) &&
     Boolean(company?.work_hours_tracking_enabled) &&
-    roleTracksWorkHours(currentUser?.role) &&
+    userTracksWorkHours(currentUser) &&
     !isImpersonating();
 
   const configuredIdleMinutes = Number(company?.work_hours_idle_timeout_minutes) || 10;

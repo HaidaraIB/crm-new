@@ -5,7 +5,7 @@ import { Button } from '../Button';
 import { Checkbox } from '../Checkbox';
 import { useUsers, useAssignLeads } from '../../hooks/useQueries';
 import { getUserDisplayName } from '../../types';
-import { isUserOnWeeklyDayOff } from '../../utils/weekOff';
+import { getAssignmentBlockReason, ASSIGNMENT_BLOCK_LABEL_KEY } from '../../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../../utils/roles';
 import { clearFieldError } from '../../utils/formFieldErrors';
 
@@ -137,13 +137,11 @@ export const AssignLeadModal = () => {
                             >
                                 <option value="">{t('selectEmployee') || 'Select Employee'}</option>
                                 {userOptions?.map(user => {
-                                    const off = isUserOnWeeklyDayOff(
-                                        { weekly_day_off: user.weekly_day_off },
-                                        companyTz
-                                    );
+                                    const blockReason = getAssignmentBlockReason(user, companyTz);
                                     return (
-                                        <option key={user.id} value={user.id} disabled={off}>
-                                            {getUserDisplayName(user) + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                        <option key={user.id} value={user.id} disabled={!!blockReason}>
+                                            {getUserDisplayName(user) +
+                                                (blockReason ? ` (${t(ASSIGNMENT_BLOCK_LABEL_KEY[blockReason])})` : '')}
                                         </option>
                                     );
                                 }) || []}

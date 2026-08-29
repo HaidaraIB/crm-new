@@ -6,7 +6,7 @@ import { Lead, PhoneNumber, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useTags, usePatchLead } from '../hooks/useQueries';
 import { TagMultiSelect } from '../components/leads/TagMultiSelect';
-import { isUserOnWeeklyDayOff } from '../utils/weekOff';
+import { getAssignmentBlockReason, ASSIGNMENT_BLOCK_LABEL_KEY } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../utils/roles';
 import { LeadInterestInventoryFields } from '../components/LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
@@ -682,14 +682,11 @@ export const EditLeadPage = () => {
                             <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
                                 <option value="">{t('selectEmployee') || 'Select Employee'}</option>
                                 {userOptions.map(user => {
-                                    const off = isUserOnWeeklyDayOff(
-                                        { weekly_day_off: user.weekly_day_off },
-                                        companyTz
-                                    );
+                                    const blockReason = getAssignmentBlockReason(user, companyTz);
                                     return (
-                                        <option key={user.id} value={user.id.toString()} disabled={off}>
+                                        <option key={user.id} value={user.id.toString()} disabled={!!blockReason}>
                                             {(user.name || user.username || user.email || `User ${user.id}`) +
-                                                (off ? ` (${t('weeklyDayOff')})` : '')}
+                                                (blockReason ? ` (${t(ASSIGNMENT_BLOCK_LABEL_KEY[blockReason])})` : '')}
                                         </option>
                                     );
                                 })}

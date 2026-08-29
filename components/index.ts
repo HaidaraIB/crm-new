@@ -32,6 +32,7 @@ export * from './modals/ImportLeadsModal';
 export * from './drawers/FilterDrawer';
 export * from './drawers/CallsFilterDrawer';
 export * from './drawers/ActivitiesFilterDrawer';
+export * from './drawers/ArrivalsFilterDrawer';
 export * from './drawers/DevelopersFilterDrawer';
 export * from './drawers/ProjectsFilterDrawer';
 export * from './drawers/OwnersFilterDrawer';

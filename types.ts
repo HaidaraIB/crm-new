@@ -81,7 +81,7 @@ export interface Company {
 export interface WorkSessionStatus {
   tracking_enabled: boolean;
   /** Present on inert responses: why the client should stand down. */
-  reason?: 'impersonation' | 'tracking_disabled' | 'role_not_tracked';
+  reason?: 'impersonation' | 'tracking_disabled' | 'role_not_tracked' | 'owner_not_tracked';
   ping_interval_seconds: number;
   idle_timeout_minutes: number;
   work_date: string | null;
@@ -184,6 +184,16 @@ export interface Supervisor {
   notify_team_activity_overdue?: boolean;
 }
 
+/** Why a user is skipped by lead/arrival routing right now. */
+export type AssignmentBlockReason = 'time_off' | 'unavailable' | 'weekly_day_off';
+
+export interface UserAvailability {
+  accepts_new_assignments: boolean;
+  reason: AssignmentBlockReason | null;
+  /** End date of planned leave, or expiry timestamp of the ad-hoc toggle; null otherwise */
+  until: string | null;
+}
+
 export interface User {
   id: number;
   name?: string; // Computed from first_name + last_name, kept for backward compatibility
@@ -212,6 +222,13 @@ export interface User {
   /** Daily work window HH:MM:SS or HH:MM; both null = no shift for urgent routing */
   work_start_time?: string | null;
   work_end_time?: string | null;
+  /** Planned time off, YYYY-MM-DD in company timezone, inclusive. Both set or both null. */
+  time_off_start_date?: string | null;
+  time_off_end_date?: string | null;
+  /** Ad-hoc "unavailable" toggle; ISO timestamp, expires on its own */
+  unavailable_until?: string | null;
+  /** Server-computed routing availability (see utils/weekOff for the client-side mirror) */
+  availability?: UserAvailability;
   is_active?: boolean;
   /** When true, employee/supervisor may delete customers (clients) */
   can_delete_clients?: boolean;
@@ -423,6 +440,18 @@ export interface CallFilters {
   /** Lead/client id as string, or '' */
   clientId: string;
   hasRecording: boolean;
+  search: string;
+}
+
+/** Arrivals board filters (toolbar status chips + filter drawer). */
+export interface ArrivalFilters {
+  /** Toolbar status axis: all | waiting | acknowledged | escalated */
+  status: 'all' | LeadArrivalStatus;
+  /** Company-local day as YYYY-MM-DD; '' means today (the server default). */
+  date: string;
+  /** Only arrivals the current user announced or was notified about. */
+  mine: boolean;
+  /** Customer name/phone match, applied client-side — the endpoint has no search param. */
   search: string;
 }
 

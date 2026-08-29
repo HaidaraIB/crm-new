@@ -27,6 +27,7 @@ import {
   announceLeadArrivalAPI, acknowledgeLeadArrivalAPI, getLeadArrivalsAPI, getPendingLeadArrivalsAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
+  setUserAvailabilityAPI,
   createDealAPI, updateDealAPI, patchDealAPI, deleteDealAPI,
   createTaskAPI, updateTaskAPI, patchTaskAPI, deleteTaskAPI, completeTaskAPI,
   createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI, completeClientTaskReminderAPI,
@@ -1147,6 +1148,25 @@ export const useReactivateEmployee = (
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => reactivateEmployeeAPI(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users'] });
+    },
+    ...options,
+  });
+};
+
+/** Quick availability toggle; pass durationMinutes 0 to make the user available again. */
+export const useSetUserAvailability = (
+  options?: UseMutationOptions<
+    Awaited<ReturnType<typeof setUserAvailabilityAPI>>,
+    Error,
+    { id: number; durationMinutes: number }
+  >
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, durationMinutes }: { id: number; durationMinutes: number }) =>
+      setUserAvailabilityAPI(id, durationMinutes),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['users'] });
     },

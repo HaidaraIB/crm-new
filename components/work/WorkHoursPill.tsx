@@ -2,7 +2,7 @@ import React from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useWorkSessionSnapshot } from './workSessionStore';
 import { formatWorkedDuration } from '../../utils/workHours';
-import { roleTracksWorkHours } from '../../utils/roles';
+import { userTracksWorkHours } from '../../utils/roles';
 
 /**
  * The employee's own measured CRM usage for today, next to the connectivity pill.
@@ -17,7 +17,7 @@ export const WorkHoursPill = () => {
 
   const trackingEnabled =
     Boolean(currentUser?.company?.work_hours_tracking_enabled) &&
-    roleTracksWorkHours(currentUser?.role);
+    userTracksWorkHours(currentUser);
 
   if (!trackingEnabled || state === 'off') return null;
 

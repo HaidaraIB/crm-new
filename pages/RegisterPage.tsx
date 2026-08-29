@@ -1209,12 +1209,12 @@ export const RegisterPage = () => {
                                                     setPassword(e.target.value);
                                                     clearFieldError('password');
                                                 }}
-                                                className={`pr-10 ${errors.password ? 'border-red-500' : ''}`}
+                                                className={`pe-10 ${errors.password ? 'border-red-500' : ''}`}
                                             />
 
                                             <button
                                                 type="button"
-                                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                                                className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
                                                 onClick={handlePasswordVisibilityToggle}
                                             >
                                                 {passwordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
@@ -1248,12 +1248,12 @@ export const RegisterPage = () => {
                                                     setConfirmPassword(e.target.value);
                                                     clearFieldError('confirmPassword');
                                                 }}
-                                                className={`pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                                                className={`pe-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
                                             />
 
                                             <button
                                                 type="button"
-                                                className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                                                className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
                                                 onClick={handleConfirmPasswordVisibilityToggle}
                                             >
                                                 {confirmPasswordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}

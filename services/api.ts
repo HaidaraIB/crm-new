@@ -7,7 +7,7 @@
 
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
 import { isImpersonating, isTabSuperseded } from '../utils/impersonation';
-import type { CampaignRequest, LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
+import type { CampaignRequest, LeadApiFilters, LeadArrival, User, WorkSessionStatus, WorkSessionSummary } from '../types';
 
 function normalizeApiBaseUrl(raw: string): string {
   if (!raw) return '';
@@ -2124,6 +2124,25 @@ export const deactivateEmployeeAPI = async (
 export const reactivateEmployeeAPI = async (userId: number) => {
   return apiRequest<{ user: any }>(`/users/${userId}/reactivate/`, {
     method: 'POST',
+  });
+};
+
+/**
+ * Quick availability toggle: pause new leads for a while, or resume now.
+ * POST /api/users/:id/availability/
+ *
+ * The server computes the end from the duration, so pass minutes — never a timestamp
+ * (1..1440). Pass 0 (or omit) to make the user available again. This is the only
+ * availability control in the UI: the API's planned-leave window
+ * (time_off_start_date/time_off_end_date) is no longer edited from any screen.
+ */
+export const setUserAvailabilityAPI = async (
+  userId: number,
+  durationMinutes: number
+) => {
+  return apiRequest<{ user: User }>(`/users/${userId}/availability/`, {
+    method: 'POST',
+    body: JSON.stringify({ duration_minutes: durationMinutes }),
   });
 };
 

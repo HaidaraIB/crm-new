@@ -1,7 +1,7 @@
 
 
 import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
-import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
+import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ArrivalFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
 import {
   isMedicalSpecialization,
@@ -13,9 +13,10 @@ import { formatStageName, getStageDisplayLabel, getStageCategory } from '../util
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI } from '../services/api';
-import { normalizeRole, roleReportsPresence, roleTracksWorkHours } from '../utils/roles';
+import { normalizeRole, roleReportsPresence, userTracksWorkHours } from '../utils/roles';
 import { navigateToPage, NavigateToPageOptions } from '../utils/routing';
 import { DEFAULT_CALL_FILTERS, callFiltersToQuery } from '../utils/callFilters';
+import { DEFAULT_ARRIVAL_FILTERS } from '../utils/arrivalFilters';
 
 // --- Helper Functions ---
 /**
@@ -146,6 +147,8 @@ export interface AppContextType {
   setIsCallFilterDrawerOpen: (isOpen: boolean) => void;
   isActivitiesFilterDrawerOpen: boolean;
   setIsActivitiesFilterDrawerOpen: (isOpen: boolean) => void;
+  isArrivalsFilterDrawerOpen: boolean;
+  setIsArrivalsFilterDrawerOpen: (isOpen: boolean) => void;
   isDeveloperFilterDrawerOpen: boolean;
   setIsDeveloperFilterDrawerOpen: (isOpen: boolean) => void;
   isProjectFilterDrawerOpen: boolean;
@@ -362,6 +365,8 @@ export interface AppContextType {
   setLeadFilters: React.Dispatch<React.SetStateAction<LeadFilters>>;
   callFilters: CallFilters;
   setCallFilters: React.Dispatch<React.SetStateAction<CallFilters>>;
+  arrivalFilters: ArrivalFilters;
+  setArrivalFilters: React.Dispatch<React.SetStateAction<ArrivalFilters>>;
   /** Navigate to Calls inbox with filters (e.g. from a lead). */
   openCallsFiltered: (partial: Partial<CallFilters>) => void;
   /** One-shot preset when navigating to Todos from mission bar chips. */
@@ -518,6 +523,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   });
   const [todosPagePreset, setTodosPagePreset] = useState<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>(null);
   const [callFilters, setCallFilters] = useState<CallFilters>(DEFAULT_CALL_FILTERS);
+  const [arrivalFilters, setArrivalFilters] = useState<ArrivalFilters>(DEFAULT_ARRIVAL_FILTERS);
   const [activityFilters, setActivityFilters] = useState<ActivityFilters>({
     user: 'All',
     stage: 'All',
@@ -681,6 +687,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isFilterDrawerOpen, setIsFilterDrawerOpen] = useState(false);
   const [isCallFilterDrawerOpen, setIsCallFilterDrawerOpen] = useState(false);
   const [isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen] = useState(false);
+  const [isArrivalsFilterDrawerOpen, setIsArrivalsFilterDrawerOpen] = useState(false);
   const [isDeveloperFilterDrawerOpen, setIsDeveloperFilterDrawerOpen] = useState(false);
   const [isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen] = useState(false);
   const [isOwnerFilterDrawerOpen, setIsOwnerFilterDrawerOpen] = useState(false);
@@ -1120,7 +1127,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     // suppressing the heartbeat too would leave it reporting no presence at all.
     if (
       currentUser?.company?.work_hours_tracking_enabled &&
-      roleTracksWorkHours(currentUser?.role) &&
+      userTracksWorkHours(currentUser) &&
       !isImpersonating()
     ) {
       return;
@@ -1578,6 +1585,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isFilterDrawerOpen, setIsFilterDrawerOpen,
     isCallFilterDrawerOpen, setIsCallFilterDrawerOpen,
     isActivitiesFilterDrawerOpen, setIsActivitiesFilterDrawerOpen,
+    isArrivalsFilterDrawerOpen, setIsArrivalsFilterDrawerOpen,
     isDeveloperFilterDrawerOpen, setIsDeveloperFilterDrawerOpen,
     isProjectFilterDrawerOpen, setIsProjectFilterDrawerOpen,
     isOwnerFilterDrawerOpen, setIsOwnerFilterDrawerOpen,
@@ -1660,6 +1668,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     // Filters (UI state only)
     leadFilters, setLeadFilters,
     callFilters, setCallFilters,
+    arrivalFilters, setArrivalFilters,
     openCallsFiltered,
     todosPagePreset, setTodosPagePreset,
     dealFilters, setDealFilters,

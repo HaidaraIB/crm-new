@@ -6,6 +6,7 @@ import { Button } from '../Button';
 import { PhoneText } from '../PhoneText';
 import { getRoleTranslation } from '../../utils/roles';
 import { toHtmlTimeValue } from '../../utils/weekOff';
+import { UserAvailabilityBadge } from '../UserAvailabilityBadge';
 
 const WEEKLY_DAY_OFF_LABEL_KEYS = [
     'dayOffMonday',
@@ -85,6 +86,7 @@ export const ViewUserModal = () => {
     if (!selectedUser) return null;
 
     const displayName = getUserDisplayName(selectedUser, t);
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
 
     return (
         <Modal isOpen={isViewUserModalOpen} onClose={() => setIsViewUserModalOpen(false)} title={`${t('viewEmployee')}: ${displayName}`}>
@@ -161,6 +163,16 @@ export const ViewUserModal = () => {
                                 : t('workingHoursNone')}
                         </div>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('workingHoursHelp')}</p>
+                    </div>
+
+                    {/* No planned-leave row: nothing in the UI schedules a date window
+                        any more — short absences go through "Mark unavailable", whose
+                        state is shown by the availability row below. */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                            {t('availableForLeads')}
+                        </label>
+                        <UserAvailabilityBadge user={selectedUser} companyTimeZone={companyTz} t={t} />
                     </div>
                 </div>
 

@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, ArrowLeftIcon, PageLoadingState, LeadSearchSelect } from '../components/index';
 import { usePatchDeal, useProjects, useUnits, useUsers } from '../hooks/useQueries';
 import { User } from '../types';
-import { isUserOnWeeklyDayOff } from '../utils/weekOff';
+import { getAssignmentBlockReason, ASSIGNMENT_BLOCK_LABEL_KEY } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../utils/roles';
 import { buildUpdateDiff } from '../utils/buildUpdateDiff';
 
@@ -539,13 +539,11 @@ export const EditDealPage = () => {
                             >
                                 {userOptions.length > 0 ? (
                                     userOptions.map(u => {
-                                        const off = isUserOnWeeklyDayOff(
-                                            { weekly_day_off: u.weekly_day_off },
-                                            companyTz
-                                        );
+                                        const blockReason = getAssignmentBlockReason(u, companyTz);
                                         return (
-                                            <option key={u.id} value={u.id} disabled={off}>
-                                                {getUserDisplayName(u) + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                            <option key={u.id} value={u.id} disabled={!!blockReason}>
+                                                {getUserDisplayName(u) +
+                                                    (blockReason ? ` (${t(ASSIGNMENT_BLOCK_LABEL_KEY[blockReason])})` : '')}
                                             </option>
                                         );
                                     })

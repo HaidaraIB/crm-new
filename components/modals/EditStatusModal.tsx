@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
+import { NumberInput } from '../NumberInput';
 import { Button } from '../Button';
 import { Status } from '../../types';
 import { useUpdateStatus } from '../../hooks/useQueries';
@@ -244,10 +245,9 @@ export const EditStatusModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="autoDeleteHoursRaw">{t('autoDeleteAfterHoursLabel')}</Label>
-                    <Input
+                    <NumberInput
                         id="autoDeleteHoursRaw"
-                        type="text"
-                        inputMode="numeric"
+                        min={1}
                         placeholder={t('autoDeleteHoursPlaceholder')}
                         value={formState.autoDeleteHoursRaw}
                         onChange={(e) => {

@@ -210,11 +210,11 @@ export const ChangePasswordModal = () => {
                             data-form-type="other"
                             readOnly
                             onFocus={(e) => e.target.removeAttribute('readonly')}
-                            className={`pr-10 ${errors.currentPassword ? 'border-red-500' : ''}`}
+                            className={`pe-10 ${errors.currentPassword ? 'border-red-500' : ''}`}
                         />
                         <button
                             type="button"
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                            className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-400"
                             onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                         >
                             {showCurrentPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
@@ -240,11 +240,11 @@ export const ChangePasswordModal = () => {
                             data-form-type="other"
                             readOnly
                             onFocus={(e) => e.target.removeAttribute('readonly')}
-                            className={`pr-10 ${errors.newPassword ? 'border-red-500' : ''}`}
+                            className={`pe-10 ${errors.newPassword ? 'border-red-500' : ''}`}
                         />
                         <button
                             type="button"
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                            className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-400"
                             onClick={handleNewPasswordVisibilityToggle}
                         >
                             {showNewPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
@@ -270,11 +270,11 @@ export const ChangePasswordModal = () => {
                             data-form-type="other"
                             readOnly
                             onFocus={(e) => e.target.removeAttribute('readonly')}
-                            className={`pr-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                            className={`pe-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
                         />
                         <button
                             type="button"
-                            className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400"
+                            className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-400"
                             onClick={handleConfirmPasswordVisibilityToggle}
                         >
                             {showConfirmPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}

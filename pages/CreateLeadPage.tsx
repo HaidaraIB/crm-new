@@ -7,7 +7,7 @@ import { PlusIcon, TrashIcon } from '../components/icons';
 import { TagMultiSelect } from '../components/leads/TagMultiSelect';
 import { useUsers, useStatuses, useChannels, useTags, useCreateLead } from '../hooks/useQueries';
 import { getCompanyRoute } from '../utils/routing';
-import { isUserOnWeeklyDayOff } from '../utils/weekOff';
+import { getAssignmentBlockReason, ASSIGNMENT_BLOCK_LABEL_KEY } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole, normalizeRole } from '../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
@@ -586,13 +586,11 @@ export const CreateLeadPage = () => {
                             <Select id="assignedTo" value={formState.assignedTo} onChange={handleChange}>
                                 <option value="">{t('selectEmployee') || 'Select Employee'}</option>
                                 {userOptions.map(user => {
-                                    const off = isUserOnWeeklyDayOff(
-                                        { weekly_day_off: user.weekly_day_off },
-                                        companyTz
-                                    );
+                                    const blockReason = getAssignmentBlockReason(user, companyTz);
                                     return (
-                                        <option key={user.id} value={user.id} disabled={off}>
-                                            {(user.name || user.username || user.email) + (off ? ` (${t('weeklyDayOff')})` : '')}
+                                        <option key={user.id} value={user.id} disabled={!!blockReason}>
+                                            {(user.name || user.username || user.email) +
+                                                (blockReason ? ` (${t(ASSIGNMENT_BLOCK_LABEL_KEY[blockReason])})` : '')}
                                         </option>
                                     );
                                 })}

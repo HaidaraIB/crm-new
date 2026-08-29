@@ -4,6 +4,9 @@
  * Also: daily working-hours window for urgent assignment (company local time).
  */
 
+import type { AssignmentBlockReason } from '../types';
+import type { translations } from '../constants';
+
 const SHORT_WD: Record<string, number> = {
     Mon: 0,
     Tue: 1,
@@ -104,6 +107,80 @@ export function isUserOnShiftForUrgent(
     if (isUserOnWeeklyDayOff(user, companyTimeZone)) return false;
     return isUserWithinWorkingHours(user, companyTimeZone, at);
 }
+
+/** YYYY-MM-DD "today" in the given IANA zone, comparable to the API's date strings. */
+export function companyLocalDateISO(timeZone: string, at: Date = new Date()): string {
+    const tz = (timeZone || 'UTC').trim() || 'UTC';
+    try {
+        // en-CA formats as YYYY-MM-DD, which sorts and compares lexicographically.
+        return new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).format(at);
+    } catch {
+        return at.toISOString().slice(0, 10);
+    }
+}
+
+export interface UserAvailabilityFields {
+    weekly_day_off?: number | null;
+    time_off_start_date?: string | null;
+    time_off_end_date?: string | null;
+    unavailable_until?: string | null;
+}
+
+/** True while today (company TZ) is inside the user's planned leave window, bounds inclusive. */
+export function isUserOnTimeOff(
+    user: UserAvailabilityFields,
+    companyTimeZone?: string | null,
+    at: Date = new Date()
+): boolean {
+    const start = user.time_off_start_date;
+    const end = user.time_off_end_date;
+    // A half-set window is config in progress, not open-ended leave.
+    if (!start || !end) return false;
+    const today = companyLocalDateISO(companyTimeZone?.trim() || 'UTC', at);
+    return start <= today && today <= end;
+}
+
+/** True while the ad-hoc "unavailable" timestamp is still in the future. */
+export function isUserTemporarilyUnavailable(
+    user: UserAvailabilityFields,
+    at: Date = new Date()
+): boolean {
+    if (!user.unavailable_until) return false;
+    const until = new Date(user.unavailable_until).getTime();
+    if (Number.isNaN(until)) return false;
+    return until > at.getTime();
+}
+
+/**
+ * Why this user cannot take a new assignment right now, or null if they can.
+ * Mirrors crm/availability.assignment_block_reason, including its precedence:
+ * planned leave beats the ad-hoc toggle, which beats the weekly day off.
+ */
+export function getAssignmentBlockReason(
+    user: UserAvailabilityFields,
+    companyTimeZone?: string | null,
+    at: Date = new Date()
+): AssignmentBlockReason | null {
+    if (isUserOnTimeOff(user, companyTimeZone, at)) return 'time_off';
+    if (isUserTemporarilyUnavailable(user, at)) return 'unavailable';
+    if (isUserOnWeeklyDayOff(user, companyTimeZone)) return 'weekly_day_off';
+    return null;
+}
+
+/** constants.ts key for a block reason, for labelling a disabled assignee option. */
+export const ASSIGNMENT_BLOCK_LABEL_KEY: Record<
+    AssignmentBlockReason,
+    keyof typeof translations.en
+> = {
+    time_off: 'onTimeOff',
+    unavailable: 'unavailableNow',
+    weekly_day_off: 'weeklyDayOff',
+};
 
 /** Normalize API time (HH:MM:SS) to HTML time input value (HH:MM). */
 export function toHtmlTimeValue(value: string | null | undefined): string {

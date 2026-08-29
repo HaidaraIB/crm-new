@@ -46,6 +46,21 @@ export const roleTracksWorkHours = (role?: string): boolean => {
   return true;
 };
 
+/**
+ * Whether this user's CRM usage is measured at all.
+ *
+ * Mirrors `user_is_work_tracked` server-side: the company owner is excluded by
+ * identity (they are the audience for these numbers, not their subject), other
+ * admins are not. Checked client-side too so no counter flashes before the first
+ * ping comes back inert.
+ */
+export const userTracksWorkHours = (
+  user?: { role?: string; is_company_owner?: boolean } | null,
+): boolean => {
+  if (!user || user.is_company_owner) return false;
+  return roleTracksWorkHours(user.role);
+};
+
 const KNOWN_ROLE_TOKENS: Record<string, AppRole> = {
   super_admin: 'Owner',
   admin: 'Owner',

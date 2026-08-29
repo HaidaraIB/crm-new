@@ -1,14 +1,31 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText, RefreshButton } from '../components/index';
+import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText, RefreshButton, Modal, NumberInput } from '../components/index';
 import { User } from '../types';
-import { useUsers, useReactivateEmployee, useWorkSessionSummary } from '../hooks/useQueries';
+import { useUsers, useReactivateEmployee, useSetUserAvailability, useWorkSessionSummary } from '../hooks/useQueries';
 import { getRoleTranslation, normalizeRole } from '../utils/roles';
 import { formatWorkedDuration } from '../utils/workHours';
 import { buildWaMeUrl } from '../utils/whatsappLaunch';
+import { UserAvailabilityBadge } from '../components/UserAvailabilityBadge';
+import { getAssignmentBlockReason } from '../utils/weekOff';
 
 const PAGE_SIZE_OPTIONS = [20, 50, 100];
+
+/** Preset lengths for the quick "pause new leads" toggle, matching the API's minute bounds. */
+const UNAVAILABLE_PRESETS: Array<{ minutes: number; labelKey: string }> = [
+    { minutes: 30, labelKey: 'unavailableFor30m' },
+    { minutes: 60, labelKey: 'unavailableFor1h' },
+    { minutes: 120, labelKey: 'unavailableFor2h' },
+    { minutes: 240, labelKey: 'unavailableFor4h' },
+    { minutes: 480, labelKey: 'unavailableFor8h' },
+];
+
+/** Mirrors MAX_UNAVAILABLE_MINUTES in accounts/employee_availability.py (24h). */
+const MAX_UNAVAILABLE_MINUTES = 24 * 60;
+
+/** Roles that are in the lead/arrival routing pool, and so have availability to manage. */
+const ROUTED_ROLES = new Set(['Employee', 'Doctor']);
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -119,7 +136,17 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
         hasSupervisorPermission,
     } = useAppContext();
     const reactivateMutation = useReactivateEmployee();
-    
+    const availabilityMutation = useSetUserAvailability();
+    const [isUnavailableModalOpen, setIsUnavailableModalOpen] = useState(false);
+    const [isAvailableConfirmOpen, setIsAvailableConfirmOpen] = useState(false);
+    // Nothing is applied on selection: a preset only fills the same pending duration
+    // the custom fields do, and Apply is the single commit point for both.
+    const [selectedPreset, setSelectedPreset] = useState<number | null>(null);
+    const [customAmount, setCustomAmount] = useState('');
+    const [customUnit, setCustomUnit] = useState<'minutes' | 'hours'>('hours');
+    const [customError, setCustomError] = useState('');
+    const companyTz = currentUser?.company?.timezone ?? 'UTC';
+
     const getUserDisplayNameLocal = (user: User): string => {
         if (user.name) return user.name;
         if (user.first_name || user.last_name) {
@@ -165,8 +192,68 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
         setIsViewUserModalOpen(true);
     };
 
+    const closeUnavailableModal = () => {
+        setIsUnavailableModalOpen(false);
+        setSelectedPreset(null);
+        setCustomAmount('');
+        setCustomError('');
+    };
+
+    const hasCustomAmount = customAmount.trim() !== '';
+
+    /**
+     * The pending duration in minutes, or an error key when what's typed can't be one.
+     * Presets are already valid by construction; only the custom fields can be wrong.
+     */
+    const resolvePendingMinutes = (): { minutes?: number; errorKey?: string } => {
+        if (hasCustomAmount) {
+            const amount = Number(customAmount.trim());
+            if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0) {
+                return { errorKey: 'unavailableCustomInvalid' };
+            }
+            const minutes = customUnit === 'hours' ? amount * 60 : amount;
+            // Same 1..1440 window the API enforces in employee_availability.py.
+            if (minutes > MAX_UNAVAILABLE_MINUTES) {
+                return { errorKey: 'unavailableCustomTooLong' };
+            }
+            return { minutes };
+        }
+        if (selectedPreset) return { minutes: selectedPreset };
+        return { errorKey: 'unavailableDurationRequired' };
+    };
+
+    const handleApplyUnavailable = () => {
+        const { minutes, errorKey } = resolvePendingMinutes();
+        if (minutes === undefined) {
+            setCustomError(t(errorKey as any));
+            return;
+        }
+        setCustomError('');
+        void handleSetAvailability(minutes);
+    };
+
+    const handleSetAvailability = async (durationMinutes: number) => {
+        try {
+            await availabilityMutation.mutateAsync({ id: user.id, durationMinutes });
+            closeUnavailableModal();
+            setIsAvailableConfirmOpen(false);
+            setSuccessMessage(
+                (durationMinutes > 0 ? t('markedUnavailableSuccess') : t('markedAvailableSuccess'))
+                    .replace('{name}', getUserDisplayNameLocal(user))
+            );
+            setIsSuccessModalOpen(true);
+        } catch (error: any) {
+            alert(error?.message || t('errorSettingAvailability'));
+        }
+    };
+
+    // Deactivated users are out of routing entirely; availability is meaningless for them.
+    const showsAvailability =
+        user.is_active !== false && ROUTED_ROLES.has(normalizeRole(user.role) || '');
+    const isTemporarilyUnavailable = getAssignmentBlockReason(user, companyTz) === 'unavailable';
+
     return (
-        <Card className="relative text-center">
+        <Card className="relative text-center h-full flex flex-col">
             {isAdmin && (
                 <div className="absolute top-2 end-2">
                     <Dropdown trigger={
@@ -178,6 +265,17 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                         {isSupervisorUser ? null : !isUserAdmin ? (
                             <>
                                 <DropdownItem onClick={handleEdit}>{t('editEmployee')}</DropdownItem>
+                                {showsAvailability && (
+                                    isTemporarilyUnavailable ? (
+                                        <DropdownItem onClick={() => setIsAvailableConfirmOpen(true)}>
+                                            {t('markAvailable')}
+                                        </DropdownItem>
+                                    ) : (
+                                        <DropdownItem onClick={() => setIsUnavailableModalOpen(true)}>
+                                            {t('markUnavailable')}
+                                        </DropdownItem>
+                                    )
+                                )}
                                 {user.is_active !== false ? (
                                     <DropdownItem onClick={handleDeactivate}>{t('deactivateEmployee')}</DropdownItem>
                                 ) : (
@@ -189,7 +287,7 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                     </Dropdown>
                 </div>
             )}
-            <div className="flex flex-col items-center pt-4">
+            <div className="flex flex-1 flex-col items-center pt-4">
                 <Avatar src={user.avatar || ''} alt={getUserDisplayNameLocal(user)} className="w-20 h-20 mb-3" />
                 <h3 className="font-bold text-lg">{getUserDisplayNameLocal(user)}</h3>
                 {isAdmin && (
@@ -202,7 +300,16 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                         </span>
                     </div>
                 )}
-                <p className="text-sm text-gray-500 dark:text-gray-400">{getRoleTranslation(user.role, t, currentUser?.company?.specialization)}</p>
+                {/* Role and routing availability read as one fact ("a doctor who is
+                    taking leads"), so they share a line instead of stacking. */}
+                <div className="mt-0.5 flex flex-wrap items-center justify-center gap-2">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        {getRoleTranslation(user.role, t, currentUser?.company?.specialization)}
+                    </p>
+                    {isAdmin && showsAvailability && (
+                        <UserAvailabilityBadge user={user} companyTimeZone={companyTz} t={t} />
+                    )}
+                </div>
                 {isAdmin && workHours && (
                     <div className="mt-2 w-full rounded-lg bg-gray-50 dark:bg-gray-900/40 border border-gray-200 dark:border-gray-700 px-3 py-2">
                         <div className="flex items-center justify-center gap-4">
@@ -240,7 +347,8 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                         {user.is_active === false ? t('deactivated') : t('active')}
                     </span>
                 )}
-                <PhoneText as="p" className="text-sm mt-1">{user.phone}</PhoneText>
+                {/* Pinned to the bottom so the contact row lines up across a grid row. */}
+                <PhoneText as="p" className="text-sm mt-auto pt-1">{user.phone}</PhoneText>
                 {user.phone && (
                     <div className="flex items-center justify-center gap-2 mt-4">
                         <a 
@@ -262,6 +370,127 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                     </div>
                 )}
             </div>
+            <Modal
+                isOpen={isUnavailableModalOpen}
+                onClose={closeUnavailableModal}
+                title={`${t('markUnavailable')}: ${getUserDisplayNameLocal(user)}`}
+                maxWidth="sm"
+            >
+                <div className="space-y-4 text-start">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {t('markUnavailableHelp')}
+                    </p>
+                    <div>
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                            {t('unavailableDuration')}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                            {UNAVAILABLE_PRESETS.map(preset => {
+                                const isSelected = !hasCustomAmount && selectedPreset === preset.minutes;
+                                return (
+                                    <button
+                                        key={preset.minutes}
+                                        type="button"
+                                        aria-pressed={isSelected}
+                                        disabled={availabilityMutation.isPending}
+                                        onClick={() => {
+                                            // A preset and a typed length are the same field:
+                                            // picking one clears the other.
+                                            setSelectedPreset(preset.minutes);
+                                            setCustomAmount('');
+                                            setCustomError('');
+                                        }}
+                                        className={`px-3 py-2 text-sm font-semibold rounded-md border transition disabled:opacity-50 ${
+                                            isSelected
+                                                ? 'bg-primary-600 text-white border-primary-600'
+                                                : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:border-primary-400'
+                                        }`}
+                                    >
+                                        {t(preset.labelKey as any)}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div>
+                        <label
+                            htmlFor={`unavailable-custom-${user.id}`}
+                            className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
+                        >
+                            {t('unavailableCustomDuration')}
+                        </label>
+                        <div className="flex items-center gap-2">
+                            <NumberInput
+                                id={`unavailable-custom-${user.id}`}
+                                min={1}
+                                max={MAX_UNAVAILABLE_MINUTES}
+                                value={customAmount}
+                                onChange={(e) => {
+                                    setCustomAmount(e.target.value);
+                                    if (e.target.value.trim()) setSelectedPreset(null);
+                                    if (customError) setCustomError('');
+                                }}
+                                placeholder={t('unavailableCustomPlaceholder')}
+                                className="w-36"
+                            />
+                            <select
+                                aria-label={t('unavailableCustomDuration')}
+                                value={customUnit}
+                                onChange={(e) =>
+                                    setCustomUnit(e.target.value === 'minutes' ? 'minutes' : 'hours')
+                                }
+                                className="px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                            >
+                                <option value="minutes">{t('minutes')}</option>
+                                <option value="hours">{t('hours')}</option>
+                            </select>
+                        </div>
+                        <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                            {t('unavailableCustomHelp')}
+                        </p>
+                        {customError && (
+                            <p className="mt-1 text-xs text-red-500">{customError}</p>
+                        )}
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={closeUnavailableModal}>
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            disabled={
+                                availabilityMutation.isPending ||
+                                (!hasCustomAmount && selectedPreset === null)
+                            }
+                            onClick={handleApplyUnavailable}
+                        >
+                            {t('apply')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
+            <Modal
+                isOpen={isAvailableConfirmOpen}
+                onClose={() => setIsAvailableConfirmOpen(false)}
+                title={`${t('markAvailable')}: ${getUserDisplayNameLocal(user)}`}
+                maxWidth="sm"
+            >
+                <div className="space-y-4 text-start">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
+                        {t('markAvailableConfirm').replace('{name}', getUserDisplayNameLocal(user))}
+                    </p>
+                    <div className="flex justify-end gap-2">
+                        <Button variant="ghost" onClick={() => setIsAvailableConfirmOpen(false)}>
+                            {t('cancel')}
+                        </Button>
+                        <Button
+                            disabled={availabilityMutation.isPending}
+                            onClick={() => handleSetAvailability(0)}
+                        >
+                            {t('confirm')}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
         </Card>
     );
 };
@@ -421,7 +650,10 @@ export const UsersPage = () => {
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                         {filteredUsers.map(user => (
                             // FIX: Wrapped UserCard in a div with a key to resolve TypeScript error about key prop not being in UserCard's props.
-                            <div key={user.id}>
+                            // h-full so every card stretches to the tallest in its grid row:
+                            // optional badges (availability, work hours) otherwise leave
+                            // ragged cards side by side.
+                            <div key={user.id} className="h-full">
                                 <UserCard
                                     user={user}
                                     workHours={

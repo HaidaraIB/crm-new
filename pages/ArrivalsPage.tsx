@@ -1,9 +1,15 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, PageLoadingState, RefreshButton } from '../components/index';
+import { PageWrapper, Button, PageLoadingState, RefreshButton, FilterButton } from '../components/index';
+import { hasActiveFilters } from '../components/filters';
 import { PhoneText } from '../components/PhoneText';
 import { useLeadArrivals, useAcknowledgeLeadArrival } from '../hooks/useQueries';
 import { getTextDirection } from '../utils/textDirection';
+import {
+  DEFAULT_ARRIVAL_DRAWER_FILTERS,
+  arrivalFiltersToApiParams,
+  matchesArrivalSearch,
+} from '../utils/arrivalFilters';
 import type { LeadArrival, LeadArrivalStatus } from '../types';
 
 const STATUS_BADGE: Record<LeadArrivalStatus, { key: 'arrivalWaiting' | 'arrivalAcknowledged' | 'arrivalEscalated'; className: string }> = {
@@ -18,19 +24,25 @@ const STATUS_BADGE: Record<LeadArrivalStatus, { key: 'arrivalWaiting' | 'arrival
  * cooldown window doesn't clutter the board with duplicate entries.
  */
 export const ArrivalsPage = () => {
-  const { t } = useAppContext();
-  const [statusFilter, setStatusFilter] = useState<'all' | 'waiting' | 'acknowledged' | 'escalated'>('all');
+  const { t, arrivalFilters, setArrivalFilters, setIsArrivalsFilterDrawerOpen } = useAppContext();
+  const statusFilter = arrivalFilters.status;
 
-  const { data, isLoading, isFetching, refetch } = useLeadArrivals({
-    status: statusFilter === 'all' ? undefined : statusFilter,
-  });
+  const { data, isLoading, isFetching, refetch } = useLeadArrivals(
+    arrivalFiltersToApiParams(arrivalFilters),
+  );
   const acknowledgeMutation = useAcknowledgeLeadArrival();
 
   const results: LeadArrival[] = data?.results || [];
+  const search = arrivalFilters.search;
+  // Draft term: committed on submit only, never while typing — the board must not
+  // reshuffle under the front desk mid-word.
+  const [searchDraft, setSearchDraft] = useState(search);
 
   const grouped = useMemo(() => {
     const byClient = new Map<number, LeadArrival[]>();
     for (const arrival of results) {
+      // Client-side: the arrivals endpoint has no search param.
+      if (!matchesArrivalSearch(arrival, search)) continue;
       const list = byClient.get(arrival.client) || [];
       list.push(arrival);
       byClient.set(arrival.client, list);
@@ -43,19 +55,69 @@ export const ArrivalsPage = () => {
         return { latest: sorted[0], count: sorted.length };
       })
       .sort((a, b) => new Date(b.latest.announced_at).getTime() - new Date(a.latest.announced_at).getTime());
-  }, [results]);
+  }, [results, search]);
+
+  // Drawer-owned axes only: the search bar and status chips speak for themselves.
+  const isFiltered = hasActiveFilters(
+    { date: arrivalFilters.date, mine: arrivalFilters.mine },
+    DEFAULT_ARRIVAL_DRAWER_FILTERS,
+  );
+  /** Anything narrowing the board — decides which empty state to show. */
+  const isNarrowed = isFiltered || search.trim().length > 0;
 
   return (
     <PageWrapper
       title={t('arrivals') || 'Arrivals'}
-      actions={<RefreshButton onClick={() => refetch()} loading={isFetching} />}
+      actions={
+        <div className="flex flex-wrap items-center gap-2">
+          <RefreshButton onClick={() => refetch()} loading={isFetching} />
+          <FilterButton
+            onClick={() => setIsArrivalsFilterDrawerOpen(true)}
+            hasActiveFilters={isFiltered}
+          />
+        </div>
+      }
     >
       <div className="max-w-4xl mx-auto space-y-4">
+        <form
+          className="flex items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            setArrivalFilters((prev) => ({ ...prev, search: searchDraft.trim() }));
+          }}
+        >
+          <div className="relative flex-1">
+            <input
+              type="search"
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
+              placeholder={t('searchLeadByNameOrPhone')}
+              className="w-full h-9 ps-3 pe-8 text-sm bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+            />
+            {searchDraft && (
+              <button
+                type="button"
+                aria-label={t('clearFilters')}
+                className="absolute inset-y-0 end-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                onClick={() => {
+                  setSearchDraft('');
+                  setArrivalFilters((prev) => ({ ...prev, search: '' }));
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
+          <Button type="submit" disabled={searchDraft.trim() === search}>
+            {t('search')}
+          </Button>
+        </form>
+
         <div className="flex gap-2 flex-wrap">
           {(['all', 'waiting', 'acknowledged', 'escalated'] as const).map((s) => (
             <button
               key={s}
-              onClick={() => setStatusFilter(s)}
+              onClick={() => setArrivalFilters((prev) => ({ ...prev, status: s }))}
               className={`px-3 py-1.5 rounded-md text-sm font-medium border ${
                 statusFilter === s
                   ? 'bg-primary-600 text-white border-primary-600'
@@ -67,11 +129,39 @@ export const ArrivalsPage = () => {
           ))}
         </div>
 
+        {/* The board defaults to today, so a non-default day/scope has to stay visible
+            on the page — an empty board is otherwise read as "nobody arrived today". */}
+        {isFiltered && (
+          <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600 dark:text-gray-300">
+            {arrivalFilters.date && (
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-800">
+                {t('date')}: {arrivalFilters.date}
+              </span>
+            )}
+            {arrivalFilters.mine && (
+              <span className="rounded-full bg-gray-100 px-2.5 py-1 dark:bg-gray-800">
+                {t('arrivalScopeMine')}
+              </span>
+            )}
+            <button
+              type="button"
+              className="font-semibold text-primary-600 underline dark:text-primary-300"
+              onClick={() =>
+                setArrivalFilters((prev) => ({ ...prev, ...DEFAULT_ARRIVAL_DRAWER_FILTERS }))
+              }
+            >
+              {t('clearFilters')}
+            </button>
+          </div>
+        )}
+
         {isLoading ? (
           <PageLoadingState />
         ) : grouped.length === 0 ? (
           <p className="text-center text-gray-500 dark:text-gray-400 py-10">
-            {t('noArrivalsToday') || 'No arrivals today.'}
+            {isNarrowed
+              ? t('noArrivalsMatchFilters')
+              : t('noArrivalsToday') || 'No arrivals today.'}
           </p>
         ) : (
           <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-200 dark:divide-gray-700">

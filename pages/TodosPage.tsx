@@ -32,7 +32,7 @@ import {
     useCallMethods,
 } from '../hooks/useQueries';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
+import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 type FilterType = 'all' | string;
 type TaskTypeFilter = 'all' | 'deal_task' | 'client_task' | 'client_call';
@@ -137,7 +137,7 @@ export const TodosPage = () => {
     const [weekDays, setWeekDays] = useState<Date[]>([]);
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
     const [todosPageNumber, setTodosPageNumber] = useState(1);
-    const [todosPageSize, setTodosPageSize] = useState(20);
+    const [todosPageSize, setTodosPageSize] = usePersistedPageSize('todos');
     const [viewMode, setViewMode] = useEntityViewMode('todos');
     const isBoardView = viewMode === 'board';
 

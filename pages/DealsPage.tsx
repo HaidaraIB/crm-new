@@ -9,8 +9,7 @@ import { Deal } from '../types';
 import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
 import { exportToExcel } from '../utils/exportToExcel';
 import { withLatinDigits } from '../utils/dateUtils';
-
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
+import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -233,7 +232,7 @@ export const DealsPage = () => {
         setViewingDeal
     } = useAppContext();
     const [dealsPageNumber, setDealsPageNumber] = useState(1);
-    const [dealsPageSize, setDealsPageSize] = useState(20);
+    const [dealsPageSize, setDealsPageSize] = usePersistedPageSize('deals');
     const [viewMode, setViewMode] = useEntityViewMode('deals');
     const isBoardView = viewMode === 'board';
 

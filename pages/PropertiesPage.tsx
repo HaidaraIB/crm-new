@@ -11,10 +11,9 @@ import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProj
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { withLatinDigits } from '../utils/dateUtils';
+import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 type Tab = 'units' | 'projects' | 'developers';
-
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -243,9 +242,9 @@ export const PropertiesPage = () => {
     const [developersPageNumber, setDevelopersPageNumber] = useState(1);
     const [projectsPageNumber, setProjectsPageNumber] = useState(1);
     const [unitsPageNumber, setUnitsPageNumber] = useState(1);
-    const [developersPageSize, setDevelopersPageSize] = useState(20);
-    const [projectsPageSize, setProjectsPageSize] = useState(20);
-    const [unitsPageSize, setUnitsPageSize] = useState(20);
+    const [developersPageSize, setDevelopersPageSize] = usePersistedPageSize('properties:developers');
+    const [projectsPageSize, setProjectsPageSize] = usePersistedPageSize('properties:projects');
+    const [unitsPageSize, setUnitsPageSize] = usePersistedPageSize('properties:units');
 
     // Fetch data using React Query
     const { data: developersResponse, isLoading: developersLoading, isFetching: developersFetching, refetch: refetchDevelopers } = useDevelopers(developersPageNumber, undefined, developersPageSize);

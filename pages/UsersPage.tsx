@@ -9,8 +9,7 @@ import { formatWorkedDuration } from '../utils/workHours';
 import { buildWaMeUrl } from '../utils/whatsappLaunch';
 import { UserAvailabilityBadge } from '../components/UserAvailabilityBadge';
 import { getAssignmentBlockReason } from '../utils/weekOff';
-
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
+import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 /** Preset lengths for the quick "pause new leads" toggle, matching the API's minute bounds. */
 const UNAVAILABLE_PRESETS: Array<{ minutes: number; labelKey: string }> = [
@@ -499,7 +498,7 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
 export const UsersPage = () => {
     const { t, currentUser, setIsAddUserModalOpen, hasSupervisorPermission } = useAppContext();
     const [usersPageNumber, setUsersPageNumber] = useState(1);
-    const [usersPageSize, setUsersPageSize] = useState(20);
+    const [usersPageSize, setUsersPageSize] = usePersistedPageSize('users');
     
     // Fetch users using React Query
     const { data: usersResponse, isLoading: usersLoading, isFetching: usersFetching, error: usersError, refetch: refetchUsers } = useUsers(

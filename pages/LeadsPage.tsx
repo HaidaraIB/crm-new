@@ -25,8 +25,7 @@ import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { ARABIC_DATE_LOCALE, formatTimelineDate, withLatinDigits } from '../utils/dateUtils';
 import { MarqueeText } from '../components/MarqueeText';
-
-const PAGE_SIZE_OPTIONS = [20, 50, 100];
+import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 const LEADS_STATUS_TAB_STORAGE_KEY = 'crm:leadsStatusTab';
 const LEADS_SCROLL_STORAGE_KEY = 'crm:leadsScrollY';
@@ -95,7 +94,7 @@ export const LeadsPage = () => {
         [currentUser?.company?.specialization],
     );
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
-    const [leadsPageSize, setLeadsPageSize] = useState(20);
+    const [leadsPageSize, setLeadsPageSize] = usePersistedPageSize('leads');
     const [activeStatusFilter, setActiveStatusFilterState] = useState<Lead['status']>(() => readStoredStatusTab(currentPage));
     const [viewMode, setViewMode] = useEntityViewMode('leads');
     const isBoardView = viewMode === 'board';

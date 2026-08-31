@@ -192,10 +192,10 @@ export const ChatsPage: React.FC = () => {
     }
   }, [displayNameBlockedHint, composerAlert, t]);
 
-  // Never poll for a user whose WhatsApp access is off — every 3s tick would 403.
+  // Never poll for a user whose WhatsApp access is off — every tick would 403.
   const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
     enabled: chatsAllowed,
-    refetchInterval: chatsAllowed ? 3000 : false,
+    refetchInterval: chatsAllowed ? 6000 : false,
   });
 
   const selectedChatLeadId =
@@ -216,7 +216,7 @@ export const ChatsPage: React.FC = () => {
     clientId: selectedChatLeadId,
     phone: selectedChatPhone || undefined,
     enabled: !!selectedChatClient,
-    refetchInterval: selectedChatClient ? 5000 : false,
+    refetchInterval: selectedChatClient ? 6000 : false,
   });
 
   const { data: threadCallsData, refetch: refetchThreadCalls } = useQuery({
@@ -241,7 +241,7 @@ export const ChatsPage: React.FC = () => {
       !!selectedChatClient &&
       (typeof selectedChatLeadId === 'number' ||
         (!!selectedChatPhone && selectedChatPhone.replace(/\D/g, '').length >= 7)),
-    refetchInterval: selectedChatClient ? 5000 : false,
+    refetchInterval: selectedChatClient ? 6000 : false,
   });
 
   const threadCalls = useMemo(() => {

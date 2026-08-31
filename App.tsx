@@ -222,20 +222,29 @@ const TheApp = () => {
         }
     }, []);
 
+    // Entering maintenance does not need a poll to notice: every API call returns
+    // 503 `maintenance_mode`, and subscribeMaintenanceMode turns the first one
+    // into the banner. So this only checks once on mount.
     React.useEffect(() => {
         void checkMaintenanceStatus();
-        const intervalId = window.setInterval(() => {
-            void checkMaintenanceStatus();
-        }, 30000);
-        const unsubscribe = subscribeMaintenanceMode((message) => {
+        return subscribeMaintenanceMode((message) => {
             setIsMaintenanceMode(true);
             setMaintenanceMessage(message);
         });
-        return () => {
-            window.clearInterval(intervalId);
-            unsubscribe();
-        };
     }, [checkMaintenanceStatus]);
+
+    // Leaving maintenance is the case that does need polling — while the app is
+    // down there are no other requests to learn recovery from. Running it only in
+    // that state takes a fixed 120 req/hour off every normal session (this used to
+    // be an unconditional 30s interval that ran even on the login page), and lets
+    // it check more often during the outage, when it actually matters.
+    React.useEffect(() => {
+        if (!isMaintenanceMode) return;
+        const intervalId = window.setInterval(() => {
+            void checkMaintenanceStatus();
+        }, 15000);
+        return () => window.clearInterval(intervalId);
+    }, [isMaintenanceMode, checkMaintenanceStatus]);
 
     React.useEffect(() => {
         const syncOnline = () => setIsInternetOnline(navigator.onLine);

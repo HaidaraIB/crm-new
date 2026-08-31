@@ -422,6 +422,17 @@ async function apiRequest<T>(
     headers,
   });
 
+  // 304 Not Modified — the caller sent a conditional header and whatever it
+  // cached is still current. There is no body to read, and only the caller knows
+  // what its cached copy was, so surface it as a typed signal rather than an
+  // error to report. Checked before the branches below because a 304 is not
+  // `response.ok` and would otherwise be parsed as a failure.
+  if (response.status === 304) {
+    const notModified: Error & { code?: string } = new Error('Not modified.');
+    notModified.code = 'NOT_MODIFIED';
+    throw notModified;
+  }
+
   // 401: مفتاح API مفقود/غير صالح — لا نحاول refresh JWT (لن يُصلح المفتاح)
   if (response.status === 401 && retryOn401) {
     const errorData401 = await readJsonResponse(response);
@@ -6129,8 +6140,35 @@ export type SyncDigest = {
   version: string;
 };
 
+/**
+ * Last digest we received, kept so a 304 can resolve to data.
+ *
+ * The digest is the most-polled endpoint in the app. The server answers an
+ * unchanged digest with a bare 304 and does no database work at all — but only
+ * if we send back the version we last saw, so this is what makes that path
+ * reachable. Cleared on logout by resetSyncDigestCache().
+ */
+let lastSyncDigest: { version: string; data: SyncDigest } | null = null;
+
+export function resetSyncDigestCache(): void {
+  lastSyncDigest = null;
+}
+
 export async function getSyncDigestAPI(): Promise<SyncDigest> {
-  return apiRequest<SyncDigest>('/sync/digest/', { cache: 'no-store' });
+  const cached = lastSyncDigest;
+  try {
+    const data = await apiRequest<SyncDigest>('/sync/digest/', {
+      cache: 'no-store',
+      ...(cached ? { headers: { 'If-None-Match': `"${cached.version}"` } } : {}),
+    });
+    lastSyncDigest = { version: data.version, data };
+    return data;
+  } catch (error) {
+    if ((error as { code?: string })?.code === 'NOT_MODIFIED' && cached) {
+      return cached.data;
+    }
+    throw error;
+  }
 }
 
 export async function getNotificationsAPI(params?: { page?: number; page_size?: number; read?: boolean }) {

@@ -12,7 +12,7 @@ import { getInventoryTerminologyOverride } from '../utils/inventoryTerminologyBy
 import { formatStageName, getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
-import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI } from '../services/api';
+import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI, resetSyncDigestCache } from '../services/api';
 import { normalizeRole, roleReportsPresence, userTracksWorkHours } from '../utils/roles';
 import { navigateToPage, NavigateToPageOptions } from '../utils/routing';
 import { DEFAULT_CALL_FILTERS, callFiltersToQuery } from '../utils/callFilters';
@@ -1174,8 +1174,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       localStorage.removeItem('pendingUserData');
       localStorage.removeItem('isCompanySubscriptionInactive');
       clearImpersonation();
+      resetSyncDigestCache(); // Drop the conditional-request state with the session.
       sessionStorage.clear(); // Clear session storage as well
-      
+
       setCurrentUserState(null);
       setIsCompanySubscriptionInactive(false);
       setDataLoaded(false); // إعادة تعيين dataLoaded عند تسجيل الخروج

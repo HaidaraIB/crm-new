@@ -453,7 +453,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   const convQuery = useQuery({
     queryKey: ['tenant-chat-conversations'],
     queryFn: () => getTenantChatConversationsAPI(),
-    refetchInterval: 8000,
+    refetchInterval: 10000,
   });
 
   const eligibleQuery = useQuery({
@@ -470,9 +470,14 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
         page_size: 100,
       }),
     enabled: selectedId != null,
-    /** Faster poll while a thread is open so new messages appear quickly (was 5s). */
+    /**
+     * Poll while a thread is open so new messages appear quickly. 3s rather than
+     * the 1.5s this used to run at: each poll re-serializes up to 100 rows, and
+     * at 1.5s a single open thread was 40 of those a minute per viewer — a real
+     * cost on a 2-vCPU box once several people are chatting at once.
+     */
     refetchInterval: () =>
-      typeof document !== 'undefined' && document.hidden ? false : 1500,
+      typeof document !== 'undefined' && document.hidden ? false : 3000,
   });
 
   const peerPresenceQuery = useQuery({
@@ -486,8 +491,9 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
       }
     },
     enabled: selectedId != null,
+    /** 2.5s: a typing indicator does not need sub-second latency, and this ran at 1200ms. */
     refetchInterval: () =>
-      typeof document !== 'undefined' && document.hidden ? false : 1200,
+      typeof document !== 'undefined' && document.hidden ? false : 2500,
   });
 
   const startConvMutation = useMutation({

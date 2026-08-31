@@ -22,7 +22,7 @@ import {
 import { getWhatsAppCallsAPI, type WhatsAppCallRecord } from '../services/api';
 import { ChatVoicePlayer } from '../components/chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
-import { useLead, useWhatsAppLiveCalls } from '../hooks/useQueries';
+import { useLead, useSyncDigest, useWhatsAppLiveCalls } from '../hooks/useQueries';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { WhatsAppLiveCallsPanel } from '../components/whatsapp/WhatsAppLiveCallsPanel';
 import { WhatsAppAgentStatusControl } from '../components/whatsapp/WhatsAppAgentStatusControl';
@@ -198,10 +198,36 @@ export const CallsPage: React.FC = () => {
   const canSeeCallErrorLogs = role === 'Owner';
   const canManageHours = canSeeSupervisorTabs;
 
+  // Reads the shared digest cache (the app-wide poller owns the interval) purely
+  // to know whether anything is ringing right now.
+  const { data: callsDigest } = useSyncDigest({
+    enabled: Boolean(currentUser) && canSeeSupervisorTabs,
+    refetchInterval: false,
+  });
+
   const { data: liveCalls = [], refetch: refetchLiveCalls, isFetching: isLiveFetching } =
     useWhatsAppLiveCalls({
       enabled: Boolean(currentUser) && canSeeSupervisorTabs,
-      refetchInterval: 2_000,
+      /**
+       * 2s only while something is actually live.
+       *
+       * This poll used to run at a flat 2s for as long as a supervisor had the
+       * page open — 1,800 req/hour each, almost all of it reporting an empty
+       * list. The global listener already gates itself on the digest this way;
+       * this one did not, so a supervisor with a ringing call ran both 2s loops
+       * at once against two different endpoints.
+       *
+       * Reads the raw response rather than the selected list so an answered
+       * in-progress call keeps the fast interval too, not just a ringing one.
+       * Backing off to 8s when idle is safe because the digest (polled every 5s
+       * app-wide) flips `whatsapp_calls_pending` first, which pulls this straight
+       * back to 2s — a new call is never more than one digest poll away.
+       */
+      refetchInterval: (query) =>
+        (query.state.data?.results?.length ?? 0) > 0 ||
+        (callsDigest?.whatsapp_calls_pending ?? 0) > 0
+          ? 2_000
+          : 8_000,
       includeAnswered: true,
     });
 

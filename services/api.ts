@@ -379,10 +379,14 @@ function isAccountTemporarilyInactiveForbidden(
   return (errorMessage || '').toLowerCase().includes('account is temporarily inactive');
 }
 
+/** Lets a caller read the response ETag without exposing the whole Response. */
+type EtagSink = { etag: string | null };
+
 async function apiRequest<T>(
   endpoint: string,
   options: RequestInit = {},
-  retryOn401: boolean = true
+  retryOn401: boolean = true,
+  etagSink?: EtagSink
 ): Promise<T> {
   // Another tab took the shared CRM session — do not refresh or wipe tokens.
   if (typeof window !== 'undefined' && isTabSuperseded()) {
@@ -422,6 +426,10 @@ async function apiRequest<T>(
     headers,
   });
 
+  if (etagSink) {
+    etagSink.etag = response.headers.get('ETag');
+  }
+
   // 304 Not Modified — the caller sent a conditional header and whatever it
   // cached is still current. There is no body to read, and only the caller knows
   // what its cached copy was, so surface it as a typed signal rather than an
@@ -457,7 +465,7 @@ async function apiRequest<T>(
         });
         await refreshTokenPromise;
       }
-      return apiRequest<T>(endpoint, options, false);
+      return apiRequest<T>(endpoint, options, false, etagSink);
     } catch (refreshError) {
       // Do not wipe shared tokens if another tab already owns the session.
       if (isTabSuperseded()) {
@@ -6003,9 +6011,35 @@ export async function getTenantChatMessagesAPI(
   if (params?.after_id != null) search.set('after_id', String(params.after_id));
   if (params?.around_id != null) search.set('around_id', String(params.around_id));
   const q = search.toString();
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: TenantChatMessage[] }>(
-    `/tenant-chat/conversations/${conversationId}/messages/${q ? `?${q}` : ''}`
-  );
+  const path = `/tenant-chat/conversations/${conversationId}/messages/${q ? `?${q}` : ''}`;
+  type Payload = {
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: TenantChatMessage[];
+  };
+
+  const cached = tenantChatMessageCache.get(path);
+  const sink: EtagSink = { etag: null };
+  try {
+    const data = await apiRequest<Payload>(
+      path,
+      cached ? { headers: { 'If-None-Match': cached.etag } } : {},
+      true,
+      sink
+    );
+    if (sink.etag) {
+      rememberTenantChatMessages(path, sink.etag, data);
+    }
+    return data;
+  } catch (error) {
+    if ((error as { code?: string })?.code === 'NOT_MODIFIED' && cached) {
+      // Same reference as last time, so React Query treats it as unchanged and
+      // the thread does not re-render.
+      return cached.data as Payload;
+    }
+    throw error;
+  }
 }
 
 export async function sendTenantChatMessageAPI(
@@ -6146,12 +6180,36 @@ export type SyncDigest = {
  * The digest is the most-polled endpoint in the app. The server answers an
  * unchanged digest with a bare 304 and does no database work at all — but only
  * if we send back the version we last saw, so this is what makes that path
- * reachable. Cleared on logout by resetSyncDigestCache().
+ * reachable. Cleared on logout by resetConditionalRequestCaches().
  */
 let lastSyncDigest: { version: string; data: SyncDigest } | null = null;
 
-export function resetSyncDigestCache(): void {
+/**
+ * Last chat-thread response per request URL, for the same 304 trick.
+ *
+ * Keyed by full path, so each conversation and each set of paging/anchor params
+ * gets its own entry. Scroll-back anchors would otherwise accumulate one entry
+ * per jump for the life of the tab, hence the cap — the polled request (no
+ * anchor) is the one that matters and it stays hot.
+ */
+const TENANT_CHAT_CACHE_MAX = 40;
+const tenantChatMessageCache = new Map<string, { etag: string; data: unknown }>();
+
+function rememberTenantChatMessages(path: string, etag: string, data: unknown): void {
+  // Re-insert so the most recently used entry is last in iteration order.
+  tenantChatMessageCache.delete(path);
+  tenantChatMessageCache.set(path, { etag, data });
+  while (tenantChatMessageCache.size > TENANT_CHAT_CACHE_MAX) {
+    const oldest = tenantChatMessageCache.keys().next().value;
+    if (oldest === undefined) break;
+    tenantChatMessageCache.delete(oldest);
+  }
+}
+
+/** Drop all conditional-request state. Call when the session identity changes. */
+export function resetConditionalRequestCaches(): void {
   lastSyncDigest = null;
+  tenantChatMessageCache.clear();
 }
 
 export async function getSyncDigestAPI(): Promise<SyncDigest> {

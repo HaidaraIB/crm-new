@@ -1,6 +1,7 @@
 import type { ChatBubbleMessage } from '../components/whatsapp/ChatMessageBubble';
 import type { ChatStatusVariant } from '../components/whatsapp/ChatStatusSeparator';
 import type { ChatThreadCall } from '../components/whatsapp/ChatCallBubble';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from './dateUtils';
 
 export type WhatsAppThreadItem =
   | { kind: 'status'; id: string; variant: ChatStatusVariant; label: string }
@@ -17,11 +18,14 @@ function dayKey(iso: string | undefined): string | null {
 function formatStatusDate(iso: string, language: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleDateString(language === 'ar' ? 'ar' : 'en-GB', {
-    day: 'numeric',
-    month: 'short',
-    year: 'numeric',
-  });
+  return d.toLocaleDateString(
+    language === 'ar' ? ARABIC_DATE_LOCALE : 'en-GB',
+    withLatinDigits({
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric',
+    })
+  );
 }
 
 function formatDayChip(

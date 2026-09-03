@@ -16,6 +16,7 @@ import {
     validateNameField,
 } from '../../utils/formValidation';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+import { roleHasScheduleSettings } from '../../utils/roles';
 
 const ADD_USER_DOM_ID_MAP: Record<string, string> = {
     name: 'add-user-name',
@@ -24,6 +25,7 @@ const ADD_USER_DOM_ID_MAP: Record<string, string> = {
     password: 'add-user-password',
     phone: 'add-user-phone',
     role: 'add-user-role',
+    workEndTime: 'add-user-work-end',
 };
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -94,7 +96,7 @@ export const AddUserModal = () => {
             newErrors.role = t('roleRequired') || 'Role is required';
         }
 
-        if (formData.role === 'employee' || formData.role === 'doctor') {
+        if (roleHasScheduleSettings(formData.role)) {
             const start = formData.workStartTime.trim();
             const end = formData.workEndTime.trim();
             if ((start && !end) || (!start && end)) {
@@ -155,23 +157,18 @@ export const AddUserModal = () => {
                 role: formData.role,
                 company_id: companyIdNumber,
             };
-            if (
-                formData.role === 'employee' ||
-                formData.role === 'data_entry' ||
-                formData.role === 'doctor' ||
-                formData.role === 'reception'
-            ) {
+            if (roleHasScheduleSettings(formData.role)) {
                 userData.weekly_day_off =
                     formData.weeklyDayOff === '' ? null : parseInt(formData.weeklyDayOff, 10);
+                const start = formData.workStartTime.trim();
+                const end = formData.workEndTime.trim();
+                userData.work_start_time = start || null;
+                userData.work_end_time = end || null;
             }
             if (formData.role === 'employee' || formData.role === 'doctor') {
                 userData.can_delete_clients = formData.canDeleteClients;
                 userData.whatsapp_chat_enabled = formData.whatsappChatEnabled;
                 userData.whatsapp_call_enabled = formData.whatsappCallEnabled;
-                const start = formData.workStartTime.trim();
-                const end = formData.workEndTime.trim();
-                userData.work_start_time = start || null;
-                userData.work_end_time = end || null;
             }
 
             await createUserMutation.mutateAsync(userData);
@@ -370,7 +367,7 @@ export const AddUserModal = () => {
                     </Select>
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>
-                {(formData.role === 'employee' || formData.role === 'data_entry' || formData.role === 'doctor' || formData.role === 'reception') && (
+                {roleHasScheduleSettings(formData.role) && (
                     <div>
                         <Label htmlFor="add-user-weekly-day-off">{t('weeklyDayOff')}</Label>
                         <Select
@@ -390,7 +387,7 @@ export const AddUserModal = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
                     </div>
                 )}
-                {(formData.role === 'employee' || formData.role === 'doctor') && (
+                {roleHasScheduleSettings(formData.role) && (
                     <div>
                         <Label htmlFor="add-user-work-start">{t('workingHours')}</Label>
                         <div className="grid grid-cols-2 gap-3">

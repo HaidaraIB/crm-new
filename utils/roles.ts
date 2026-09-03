@@ -1,3 +1,4 @@
+import type { Page } from '../types';
 import { isMedicalSpecialization } from './medicalTranslationOverrides';
 
 export type AppRole =
@@ -125,6 +126,25 @@ export const getRoleTranslation = (
   return translationKey ? t(translationKey) : t('employee');
 };
 
+/**
+ * Home page of a role: the first page it should land on after login, and the page any
+ * "go back to the app" redirect should target. Must stay a page the role's own
+ * `canAccessPage` branch allows — otherwise the disallowed page is put in the URL and
+ * immediately replaced, which is exactly the flash this exists to prevent.
+ * Roles with no Dashboard (call center, data entry, reception) get their own home.
+ */
+export const getRoleLandingPage = (role?: string): Page => {
+  switch (normalizeRole(role)) {
+    case 'CallCenter':
+      return 'Call Center';
+    case 'DataEntry':
+    case 'Reception':
+      return 'All Leads';
+    default:
+      return 'Dashboard';
+  }
+};
+
 export type ApiRole =
   | 'admin'
   | 'supervisor'
@@ -144,6 +164,19 @@ export const normalizeRoleForApi = (role?: string): ApiRole => {
   if (appRole === 'CallCenter') return 'call_center';
   return 'employee';
 };
+
+const SCHEDULE_SETTING_ROLES: ReadonlySet<ApiRole> = new Set([
+  'employee',
+  'data_entry',
+  'reception',
+  'doctor',
+  'call_center',
+  'supervisor',
+]);
+
+/** Weekly day off and working hours apply to every company staff role (not admin). */
+export const roleHasScheduleSettings = (role?: string): boolean =>
+  SCHEDULE_SETTING_ROLES.has(normalizeRoleForApi(role));
 
 /** True only for `data_entry` (restricted UI / no assignee) — not reception or doctor. */
 export const isDataEntryOnlyRole = (role?: string): boolean => normalizeRole(role) === 'DataEntry';

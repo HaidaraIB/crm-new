@@ -22,7 +22,8 @@ import {
 import { getWhatsAppCallsAPI, type WhatsAppCallRecord } from '../services/api';
 import { ChatVoicePlayer } from '../components/chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
-import { useLead, useSyncDigest, useWhatsAppLiveCalls } from '../hooks/useQueries';
+import { queryKeys, useLead, useSyncDigest, useWhatsAppLiveCalls } from '../hooks/useQueries';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { WhatsAppLiveCallsPanel } from '../components/whatsapp/WhatsAppLiveCallsPanel';
 import { WhatsAppAgentStatusControl } from '../components/whatsapp/WhatsAppAgentStatusControl';
@@ -209,19 +210,21 @@ export const CallsPage: React.FC = () => {
     useWhatsAppLiveCalls({
       enabled: Boolean(currentUser) && canSeeSupervisorTabs,
       /**
-       * 2s only while something is actually live.
+       * 2s only while something is actually live; otherwise nothing at all.
        *
-       * This poll used to run at a flat 2s for as long as a supervisor had the
-       * page open — 1,800 req/hour each, almost all of it reporting an empty
-       * list. The global listener already gates itself on the digest this way;
-       * this one did not, so a supervisor with a ringing call ran both 2s loops
-       * at once against two different endpoints.
+       * The idle tick is gone rather than merely slowed. A call that starts,
+       * ends, or changes hands writes its row, which moves the `calls` slice, and
+       * the effect below refetches this query — so an idle supervisor learns
+       * about a new ring from the digest they were already polling, not from a
+       * request of their own. This used to run at a flat 2s for as long as the
+       * page was open (~1,800 req/hour each, almost all reporting an empty list),
+       * then at 8s idle.
        *
-       * Reads the raw response rather than the selected list so an answered
-       * in-progress call keeps the fast interval too, not just a ringing one.
-       * Backing off to 8s when idle is safe because the digest (polled every 5s
-       * app-wide) flips `whatsapp_calls_pending` first, which pulls this straight
-       * back to 2s — a new call is never more than one digest poll away.
+       * The 2s tick stays while a call is genuinely in progress: duration and
+       * peer state move faster than a 5s digest cycle, and someone watching a
+       * live call is the one case where the extra requests buy something. Reads
+       * the raw response rather than the selected list so an answered call keeps
+       * the fast interval too, not just a ringing one.
        */
       refetchInterval: (query) =>
         (query.state.data?.results?.length ?? 0) > 0 ||
@@ -230,6 +233,21 @@ export const CallsPage: React.FC = () => {
           : 8_000,
       includeAnswered: true,
     });
+
+  /**
+   * One subscription refreshes all three queries on this page the instant the
+   * server says a call row changed, ahead of their own intervals.
+   *
+   * The intervals stay as the floor. They are cheap now — every one of these
+   * endpoints sends an ETag, so an unchanged poll is a 304 with no SQL behind
+   * it — and removing them made the page depend entirely on the digest's 5s
+   * tick, which is slower than the 2s a supervisor watching a live call needs.
+   */
+  useInvalidateOnSliceChange(
+    'calls',
+    [queryKeys.whatsappCallsLive, ['whatsappCalls', 'list'], ['whatsappCalls', 'counts']],
+    { enabled: Boolean(currentUser) }
+  );
 
   const liveCount = useMemo(() => {
     const now = Date.now();

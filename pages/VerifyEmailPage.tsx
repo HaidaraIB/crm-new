@@ -11,6 +11,7 @@ import {
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { validateEmailField, validateOtpCodeField } from '../utils/formValidation';
+import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 
 const PRE_LOGIN_EMAIL_RESEND_COOLDOWN_KEY = 'preLoginVerifyEmailResendCooldown';
 const RESEND_COOLDOWN_SEC = 60;
@@ -93,8 +94,9 @@ export const VerifyEmailPage = () => {
     const schedulePostVerifyRedirect = useCallback(() => {
         redirectTimeoutRef.current = setTimeout(() => {
             if (isLoggedIn) {
-                navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Dashboard');
-                setCurrentPage('Dashboard');
+                const landingPage = getRoleLandingPage(currentUser?.role);
+                navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
+                setCurrentPage(landingPage);
             } else {
                 sessionStorage.removeItem('prelogin_username');
                 sessionStorage.removeItem('prelogin_password');
@@ -102,7 +104,7 @@ export const VerifyEmailPage = () => {
                 setCurrentPage('Login');
             }
         }, 2000);
-    }, [isLoggedIn, currentUser?.company?.name, currentUser?.company?.domain, setCurrentPage]);
+    }, [isLoggedIn, currentUser?.role, currentUser?.company?.name, currentUser?.company?.domain, currentUser?.company?.specialization, setCurrentPage]);
 
     const refreshUserIfLoggedIn = useCallback(async () => {
         if (!isLoggedIn) return;
@@ -113,7 +115,7 @@ export const VerifyEmailPage = () => {
                 name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
                 username: userData.username,
                 email: userData.email,
-                role: userData.role === 'admin' ? 'Owner' : 'Employee',
+                role: normalizeRole(userData.role),
                 phone: userData.phone || '',
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
                 emailVerified: userData.email_verified || userData.is_email_verified || false,
@@ -336,8 +338,9 @@ export const VerifyEmailPage = () => {
             redirectTimeoutRef.current = null;
         }
         if (isLoggedIn) {
-            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Dashboard');
-            setCurrentPage('Dashboard');
+            const landingPage = getRoleLandingPage(currentUser?.role);
+            navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
+            setCurrentPage(landingPage);
         } else {
             sessionStorage.removeItem('prelogin_username');
             sessionStorage.removeItem('prelogin_password');

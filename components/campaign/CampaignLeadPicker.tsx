@@ -6,6 +6,7 @@ import { getLeadsAPI } from '../../services/api';
 import type { LeadApiFilters } from '../../types';
 import { getUserDisplayName, User } from '../../types';
 import { usersForOperationalEmployeeLists } from '../../utils/roles';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
 import { leadHasPhone, resolveLeadPhoneRaw } from '../../utils/smsSendHelpers';
 import { Button, Loader, PhoneText } from '../index';
 import { getStatusSurfaceStyles } from '../LeadStatusDropdown';
@@ -109,10 +110,13 @@ function datePresetRange(preset: DatePreset): { from: string; to: string } {
 function formatShortDate(iso: string, language: string): string {
     if (!iso) return '';
     try {
-        return new Date(iso + 'T00:00:00').toLocaleDateString(language === 'ar' ? 'ar' : 'en', {
-            month: 'short',
-            day: 'numeric',
-        });
+        return new Date(iso + 'T00:00:00').toLocaleDateString(
+            language === 'ar' ? ARABIC_DATE_LOCALE : 'en',
+            withLatinDigits({
+                month: 'short',
+                day: 'numeric',
+            }),
+        );
     } catch {
         return iso;
     }

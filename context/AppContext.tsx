@@ -13,7 +13,8 @@ import { formatStageName, getStageDisplayLabel, getStageCategory } from '../util
 import { formatDateToLocal, parseUTCDate } from '../utils/dateUtils';
 import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI, resetConditionalRequestCaches } from '../services/api';
-import { normalizeRole, roleReportsPresence, userTracksWorkHours } from '../utils/roles';
+import { sendRealtime } from '../hooks/useRealtimeChannel';
+import { getRoleLandingPage, normalizeRole, roleReportsPresence, userTracksWorkHours } from '../utils/roles';
 import { navigateToPage, NavigateToPageOptions } from '../utils/routing';
 import { DEFAULT_CALL_FILTERS, callFiltersToQuery } from '../utils/callFilters';
 import { DEFAULT_ARRIVAL_FILTERS } from '../utils/arrivalFilters';
@@ -36,11 +37,13 @@ const getCompanyId = (company: any): number | null => {
 /**
  * Pick the first page in a "generally safe" priority list that the current role can
  * actually access, so callers don't need a hardcoded fallback per role (and new roles
- * are covered automatically). `Profile` is allowed by every role's `canAccessPage`
- * branch, so it's the guaranteed terminal fallback.
+ * are covered automatically). The role's own home page comes first (a call center user
+ * belongs on Call Center, not on the Profile page the generic list used to end at);
+ * `Profile` is allowed by every role's `canAccessPage` branch, so it stays the
+ * guaranteed terminal fallback.
  */
-export const resolveFallbackPage = (canAccessPage: (page: Page) => boolean): Page => {
-  const priority: Page[] = ['Dashboard', 'All Leads', 'Profile'];
+export const resolveFallbackPage = (canAccessPage: (page: Page) => boolean, role?: string): Page => {
+  const priority: Page[] = [getRoleLandingPage(role), 'Dashboard', 'All Leads', 'Profile'];
   return priority.find(canAccessPage) ?? 'Profile';
 };
 
@@ -1136,6 +1139,11 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     let cancelled = false;
     const sendHeartbeat = async () => {
       if (cancelled) return;
+      // Over the socket when there is one: presence is the thing a live
+      // connection already proves, and a frame costs a fraction of an
+      // authenticated POST. The server marks the user online immediately on
+      // connect, so this only has to keep the marker from expiring.
+      if (sendRealtime({ action: 'heartbeat' })) return;
       try {
         await sendPresenceHeartbeatAPI('web');
       } catch {
@@ -1144,7 +1152,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     };
 
     sendHeartbeat();
-    const interval = setInterval(sendHeartbeat, 60 * 1000);
+    // 45s, inside the server's 90s live-presence TTL, so one dropped frame does
+    // not blink the user offline for everyone watching.
+    const interval = setInterval(sendHeartbeat, 45 * 1000);
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
         sendHeartbeat();

@@ -4,6 +4,8 @@ import { useAppContext } from '../context/AppContext';
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PaymentResultBanner } from '../components/index';
 import { loginAPI, getCurrentUserAPI } from '../services/api';
 import { AuthHero } from '../components/AuthHero';
+import { getRoleLandingPage, normalizeRole } from '../utils/roles';
+import { getCompanyRoute } from '../utils/routing';
 
 export const LoginPage = () => {
     // Check if this is a logout redirect and clear any remaining data
@@ -211,7 +213,11 @@ export const LoginPage = () => {
                 name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
                 username: userData.username,
                 email: userData.email,
-                role: userData.role === 'admin' ? 'Owner' : userData.role === 'supervisor' ? 'Supervisor' : 'Employee',
+                // Every API role must map through normalizeRole. Hardcoding only
+                // admin/supervisor stored roles like `call_center` as "Employee", so the
+                // reload below booted with Employee permissions and painted the Dashboard
+                // before /users/me corrected the role and bounced the user elsewhere.
+                role: normalizeRole(userData.role),
                 phone: userData.phone || '',
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
                 company: userData.company ? {
@@ -240,8 +246,17 @@ export const LoginPage = () => {
             sessionStorage.removeItem('prelogin_username');
             sessionStorage.removeItem('prelogin_password');
             setIsLoggedIn(true);
-            setCurrentPage('Dashboard');
-            window.location.href = '/dashboard';
+            // Land on the role's own home page (Dashboard for most, Call Center for the
+            // call center role) and go straight to its company-scoped URL, so the first
+            // frame after the reload is already the right page — no Dashboard in between.
+            const landingPage = getRoleLandingPage(frontendUser.role);
+            setCurrentPage(landingPage);
+            window.location.href = getCompanyRoute(
+                frontendUser.company?.name,
+                frontendUser.company?.domain,
+                landingPage,
+                frontendUser.company?.specialization,
+            );
         } catch (error: any) {
             console.error('❌ Login error:', error);
             const errorMessage = error.message || '';

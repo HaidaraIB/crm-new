@@ -44,7 +44,13 @@ export const WhatsAppTeamCallStatusPanel: React.FC<Props> = ({ t }) => {
 
   useEffect(() => {
     void load();
-    const id = window.setInterval(() => void load({ silent: true }), 15_000);
+    /**
+     * 60s. A supervisor's view of who is Ready or Away — informational, and it
+     * changes when a colleague clicks their own control, not continuously. The
+     * local status event below still refreshes this immediately for changes made
+     * in this tab.
+     */
+    const id = window.setInterval(() => void load({ silent: true }), 60_000);
     const onStatus = () => {
       void load({ silent: true });
     };

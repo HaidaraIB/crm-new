@@ -89,7 +89,16 @@ export function PbxSettingsForm({
   } = useQuery({
     queryKey: ['pbxHealth'],
     queryFn: getPbxHealthAPI,
-    refetchInterval: 15000,
+    /**
+     * 60s, and there is a manual refresh button next to it.
+     *
+     * This is a connectivity probe on a settings form — it reaches out to the
+     * customer's PBX, so each tick is an outbound request from the API box, not
+     * just a cheap read. At 15s an admin who left this tab open generated 240
+     * probes an hour against their own hardware to answer a question that only
+     * changes when someone edits the connection.
+     */
+    refetchInterval: 60000,
     enabled: !pbxPolicyDisabled,
   });
 

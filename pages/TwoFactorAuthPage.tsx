@@ -9,6 +9,8 @@ import {
     type RequestTwoFactorAuthResponse,
 } from '../services/api';
 import { validateOtpCodeField } from '../utils/formValidation';
+import { getRoleLandingPage, normalizeRole } from '../utils/roles';
+import { getCompanyRoute } from '../utils/routing';
 
 export const TwoFactorAuthPage = () => {
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
@@ -244,7 +246,9 @@ export const TwoFactorAuthPage = () => {
                 name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
                 username: userData.username,
                 email: userData.email,
-                role: userData.role === 'admin' ? 'Owner' : userData.role === 'supervisor' ? 'Supervisor' : 'Employee',
+                // Same rule as LoginPage: every API role goes through normalizeRole, so a
+                // role without a Dashboard is never stored (and booted) as "Employee".
+                role: normalizeRole(userData.role),
                 phone: userData.phone || '',
                 avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
                 company: userData.company ? {
@@ -292,10 +296,16 @@ export const TwoFactorAuthPage = () => {
             setCurrentUser(frontendUser);
             if (frontendUser.language) setLanguage(frontendUser.language);
             setIsLoggedIn(true);
-            setCurrentPage('Dashboard');
-            
+            const landingPage = getRoleLandingPage(frontendUser.role);
+            setCurrentPage(landingPage);
+
             // Use window.location for immediate redirect to ensure state is applied
-            window.location.href = '/dashboard';
+            window.location.href = getCompanyRoute(
+                frontendUser.company?.name,
+                frontendUser.company?.domain,
+                landingPage,
+                frontendUser.company?.specialization,
+            );
         } catch (error: any) {
             const errorMessage = error.message || '';
             // Check if it's an account temporarily inactive error (for employees)

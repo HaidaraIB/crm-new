@@ -14,6 +14,8 @@ import {
   getWhatsAppCallDetailAPI,
   detectMicPermissionErrorCode,
 } from '../services/api';
+import { useRealtimeConnected } from './useRealtimeChannel';
+import { useSliceVersion } from './useSliceVersion';
 
 export type CallSessionPhase =
   | 'idle'
@@ -31,7 +33,19 @@ const TERMINAL_CALL_STATUSES = new Set([
   'failed',
 ]);
 
+/**
+ * Fallback cadence while a call is in progress.
+ *
+ * This poll exists to notice a *remote* hangup — the local side knows when it
+ * ends. With no socket it stays at the original 2s, because a call UI stuck on a
+ * call the peer already dropped is the worst failure this hook has.
+ *
+ * With the socket delivering, every call-row write moves the `calls` slice and
+ * the effect below refetches immediately, so the timer is only a backstop and
+ * can run three times slower.
+ */
 const ACTIVE_STATUS_POLL_MS = 2_000;
+const ACTIVE_STATUS_POLL_REALTIME_MS = 6_000;
 const ICE_DISCONNECT_GRACE_MS = 2_500;
 
 function preferOpus(sdp: string): string {
@@ -270,7 +284,18 @@ export function useWhatsAppCallSession() {
     [finalizeAfterRemoteHangup]
   );
 
-  // Poll CRM call status while in-session so Meta terminate webhooks end the agent UI.
+  /**
+   * Watch CRM call status while in-session, so a Meta terminate webhook ends the
+   * agent's UI rather than leaving it on a call the peer already dropped.
+   *
+   * `callsVersion` is the live part: any write to a call row moves the `calls`
+   * slice, which arrives over the socket, and including it here re-runs the
+   * effect — which refetches immediately. The interval below is only the
+   * backstop, and runs slower while that faster path is proven healthy.
+   */
+  const realtimeConnected = useRealtimeConnected();
+  const callsVersion = useSliceVersion('calls');
+
   useEffect(() => {
     if (phase !== 'active' && phase !== 'ringing' && phase !== 'connecting') return;
     const callId = activeCall?.id;
@@ -291,13 +316,24 @@ export function useWhatsAppCallSession() {
       }
     };
 
+    // Fires on mount and again whenever `callsVersion` moves, which is what
+    // turns a socket frame into an immediate status refresh.
     void tick();
-    const id = window.setInterval(tick, ACTIVE_STATUS_POLL_MS);
+    const id = window.setInterval(
+      tick,
+      realtimeConnected ? ACTIVE_STATUS_POLL_REALTIME_MS : ACTIVE_STATUS_POLL_MS
+    );
     return () => {
       cancelled = true;
       window.clearInterval(id);
     };
-  }, [phase, activeCall?.id, finalizeAfterRemoteHangup]);
+  }, [
+    phase,
+    activeCall?.id,
+    finalizeAfterRemoteHangup,
+    callsVersion,
+    realtimeConnected,
+  ]);
 
   const createPeer = async () => {
     const pc = new RTCPeerConnection({
@@ -451,7 +487,17 @@ export function useWhatsAppCallSession() {
         attachRemoteEndWatchers(pc, created.id);
         setPhase('ringing');
 
-        // Poll until the customer answers (answer SDP + answered status).
+        /**
+         * Poll until the customer answers (answer SDP + answered status).
+         *
+         * Deliberately left on a 1s timer rather than moved to the socket. This
+         * is WebRTC signalling, not a status display: it exists to apply the
+         * answer SDP to the peer connection, and applying it late degrades call
+         * setup. It also runs for seconds — until answered or terminal — not for
+         * the length of a call, so there is little to save, and it lives inside
+         * this negotiation closure rather than an effect, so making it reactive
+         * would mean restructuring the flow. Not an oversight.
+         */
         pollAnswerRef.current = window.setInterval(async () => {
           try {
             const detail = await getWhatsAppCallDetailAPI(created.id);

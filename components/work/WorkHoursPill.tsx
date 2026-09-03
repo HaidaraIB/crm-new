@@ -13,13 +13,16 @@ import { userTracksWorkHours } from '../../utils/roles';
  */
 export const WorkHoursPill = () => {
   const { t, currentUser } = useAppContext();
-  const { state, todaySeconds } = useWorkSessionSnapshot();
+  const { state, todaySeconds, hydrated } = useWorkSessionSnapshot();
 
   const trackingEnabled =
     Boolean(currentUser?.company?.work_hours_tracking_enabled) &&
     userTracksWorkHours(currentUser);
 
-  if (!trackingEnabled || state === 'off') return null;
+  // Hidden until the first ping lands. Tracking switches on the moment the profile
+  // loads, but the total is 0 until the server answers — and a confident "0h" shown
+  // to someone who has been working since morning reads as a broken feature.
+  if (!trackingEnabled || state === 'off' || !hydrated) return null;
 
   const isPaused = state === 'paused';
   const label = t('workTrackingTodayLabel') || 'Working hours today';

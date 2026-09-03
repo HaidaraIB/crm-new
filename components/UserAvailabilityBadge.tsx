@@ -1,5 +1,6 @@
 import React from 'react';
 import type { User } from '../types';
+import { withLatinDigits } from '../utils/latinNumerals';
 import { getAssignmentBlockReason } from '../utils/weekOff';
 
 /**
@@ -44,7 +45,10 @@ export const UserAvailabilityBadge = ({
             until && !Number.isNaN(until.getTime())
                 ? t('unavailableUntil').replace(
                       '{time}',
-                      until.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+                      until.toLocaleTimeString(
+                          undefined,
+                          withLatinDigits({ hour: '2-digit', minute: '2-digit' }),
+                      )
                   )
                 : t('unavailableNow');
     } else {

@@ -14,11 +14,11 @@ import { WorkIdleModal } from './WorkIdleModal';
  * Renders nothing until the user actually goes idle.
  */
 export const WorkSessionTrackerHost = () => {
-  const { state, todaySeconds, idleTimeoutMinutes, resume } = useWorkSessionTracker();
+  const { state, todaySeconds, idleTimeoutMinutes, resume, hydrated } = useWorkSessionTracker();
 
   useEffect(() => {
-    setWorkSessionSnapshot({ state, todaySeconds });
-  }, [state, todaySeconds]);
+    setWorkSessionSnapshot({ state, todaySeconds, hydrated });
+  }, [state, todaySeconds, hydrated]);
 
   return (
     <WorkIdleModal

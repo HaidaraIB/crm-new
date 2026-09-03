@@ -24,7 +24,13 @@ import {
 import { ChatPendingAttachmentChip } from '../components/chat/ChatPendingAttachmentChip';
 import { ChatVoiceRecordingBar } from '../components/chat/ChatVoiceRecordingBar';
 import { AttachmentSourceModal } from '../components/modals/AttachmentSourceModal';
-import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';import {
+import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
+import { queryKeys } from '../hooks/useQueries';
+import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
+import { useConversationPresence } from '../hooks/useConversationPresence';
+import { useConversationThreadSync } from '../hooks/useConversationThreadSync';
+import {
   getTenantChatConversationsAPI,
   getTenantChatEligibleUsersAPI,
   getTenantChatMessagesAPI,
@@ -229,6 +235,27 @@ function computeMsgFloatingMenuGeom(
 }
 
 const THREAD_SCROLL_NEAR_BOTTOM_PX = 80;
+
+/** Messages per request, for the tail window and for each older page alike. */
+const THREAD_PAGE_SIZE = 100;
+
+/** Distance from the top at which the next older page is fetched. */
+const THREAD_LOAD_OLDER_PX = 240;
+
+/**
+ * Cap on history pages walked back to reveal a quoted or pinned message.
+ *
+ * The walk is sequential rather than a single `around_id` window on purpose. An
+ * anchored window would land the reader in the right place in one request, but
+ * everything between that window and the tail would be missing from a transcript
+ * that gives no sign of it — scroll down from the revealed message and messages
+ * are silently skipped. Paging keeps the thread contiguous; the cap is what stops
+ * a pin from the beginning of a very long conversation walking indefinitely.
+ */
+const MAX_REVEAL_PAGES = 20;
+
+/** How long a jumped-to message stays tinted. Matches crm_mobile's controller. */
+const MESSAGE_HIGHLIGHT_MS = 1200;
 
 function isNearThreadScrollBottom(scroller: HTMLElement): boolean {
   return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < THREAD_SCROLL_NEAR_BOTTOM_PX;
@@ -437,6 +464,17 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   /** Last message id in the open thread — used to stick scroll to bottom when “live” tail grows. */
   const lastMessageTailIdForScrollRef = useRef<number | null>(null);
   /**
+   * Which conversation the tail refs above describe.
+   *
+   * The reset on `selectedId` below is a passive effect, and passive effects run
+   * *after* layout effects — so the tail effect sees the previous thread's
+   * pinned/tail state on the commit that switches conversations. When the new
+   * thread has cached messages (nothing to wait for) that stale state decided
+   * where it opened: switch away from a thread you had scrolled up in, and the
+   * next one opened at that same offset instead of at its own tail.
+   */
+  const tailScrollConvIdRef = useRef<number | null>(null);
+  /**
    * True while the user is following the live tail (last scroll was at/near bottom). After a new
    * message renders, scrollHeight grows but scrollTop is unchanged, so isNearThreadScrollBottom
    * alone would be false until we jump — this ref keeps tail-follow working.
@@ -447,13 +485,77 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
    * Otherwise a transient scroll event can clear pinnedToBottomRef before onLoad, and onIntrinsicLayout bails.
    */
   const pendingTailSnapAfterMediaRef = useRef(false);
+  /**
+   * Older pages, held outside React Query.
+   *
+   * The query above owns the tail and refetches it on a timer, on a slice
+   * change, and on a realtime frame; folding history into the same cache entry
+   * would mean every one of those refetches either discarded what the user had
+   * scrolled back through or had to re-request all of it. Keeping history in
+   * component state lets the live window stay live and the history stay put.
+   */
+  const [olderMessages, setOlderMessages] = useState<TenantChatMessage[]>([]);
+  const [hasOlderMessages, setHasOlderMessages] = useState(false);
+  const [loadingOlderMessages, setLoadingOlderMessages] = useState(false);
+  /** True across a whole multi-page walk back to a quoted or pinned message. */
+  const [revealingMessage, setRevealingMessage] = useState(false);
+  /**
+   * The message a jump just landed on, tinted so it can be found.
+   *
+   * Centring it in the viewport is not enough of a cue on a dense transcript,
+   * and a jump can now arrive from hundreds of messages away with no sense of
+   * having travelled. crm_mobile flashes the row for the same reason.
+   */
+  const [highlightedMessageId, setHighlightedMessageId] = useState<number | null>(null);
+  const highlightTimerRef = useRef<number | null>(null);
+  /** Mirrors of the two above, for the scroll handler — it must not re-bind per render. */
+  const loadingOlderRef = useRef(false);
+  const hasOlderRef = useRef(false);
+  hasOlderRef.current = hasOlderMessages;
+  /** Which conversation `hasOlderMessages` was seeded for, so a refetch cannot re-seed it. */
+  const olderSeededForRef = useRef<number | null>(null);
+  /**
+   * Scroll geometry captured just before older rows are prepended.
+   *
+   * Prepending moves everything below it down by the height of what arrived, so
+   * without restoring the offset the reader is thrown backwards through the
+   * history they were reading.
+   */
+  const prependAnchorRef = useRef<{ height: number; top: number } | null>(null);
   /** Max composer height (px) before scrolling; still shows full text via internal scroll. */
   const COMPOSER_MAX_H = 240;
+
+  /**
+   * The slice subscription is an *accelerator*, not the mechanism.
+   *
+   * It refetches the moment the server says team chat changed, which is faster
+   * than any interval. But it is layered on top of the polls below rather than
+   * replacing them: an earlier version deleted the intervals and relied on this
+   * alone, which broke two ways — the digest only ticks every 5s (30s with the
+   * socket up), so an open thread lagged; and with the app-wide 60s staleTime,
+   * reopening the dialog served minute-old cache without refetching at all, so
+   * the badge counted messages the thread never showed.
+   *
+   * Both endpoints send ETags now (sync/conditional.py), so an unchanged poll
+   * costs one Redis read and no SQL. That is what makes keeping them affordable.
+   */
+  useInvalidateOnSliceChange('tenant_chat', [
+    ['tenant-chat-conversations'],
+    ['tenant-chat-messages'],
+  ]);
+
+  // Backed off while the socket is delivering: the slice subscription above
+  // refetches the instant the server says team chat changed, so these timers are
+  // the backstop for a socket that is open but silently not delivering.
+  const realtimeConnected = useRealtimeConnected();
 
   const convQuery = useQuery({
     queryKey: ['tenant-chat-conversations'],
     queryFn: () => getTenantChatConversationsAPI(),
-    refetchInterval: 10000,
+    refetchInterval: realtimeConnected ? 40000 : 10000,
+    // Overrides the app-wide 60s default: reopening the dialog must show the
+    // messages the badge is counting, not a cached list from a minute ago.
+    staleTime: 0,
   });
 
   const eligibleQuery = useQuery({
@@ -462,23 +564,59 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     enabled: newChatOpen,
   });
 
+  /**
+   * The *newest* page, not the first one.
+   *
+   * With `ordering: 'created_at'` and no anchor this endpoint pages from the
+   * beginning of the thread, so a conversation longer than one page opened on
+   * its oldest messages and never showed the ones being sent — the tail simply
+   * was not in the response. Descending order makes page 1 the tail in a single
+   * request; `messages` below sorts it back into reading order, and `next` being
+   * present is what says older pages exist.
+   */
   const messagesQuery = useQuery({
     queryKey: ['tenant-chat-messages', selectedId],
     queryFn: () =>
       getTenantChatMessagesAPI(selectedId!, {
-        ordering: 'created_at',
-        page_size: 100,
+        ordering: '-created_at',
+        page_size: THREAD_PAGE_SIZE,
       }),
     enabled: selectedId != null,
     /**
-     * Poll while a thread is open so new messages appear quickly. 3s rather than
-     * the 1.5s this used to run at: each poll re-serializes up to 100 rows, and
-     * at 1.5s a single open thread was 40 of those a minute per viewer — a real
-     * cost on a 2-vCPU box once several people are chatting at once.
+     * 3s while the thread is open and visible. This is the surface the user is
+     * looking at, so it is the one place a timer still earns its keep — and with
+     * the endpoint's ETag an unchanged poll is a 304 with no queries behind it.
+     * Paused while hidden; the slice subscription above delivers sooner when the
+     * digest or socket reports a change.
      */
-    refetchInterval: () =>
-      typeof document !== 'undefined' && document.hidden ? false : 3000,
+    refetchInterval: () => {
+      if (typeof document !== 'undefined' && document.hidden) return false;
+      return realtimeConnected ? 30000 : 3000;
+    },
+    staleTime: 0,
   });
+
+  /**
+   * Presence over the socket, with the HTTP query below as the floor.
+   *
+   * `socketPeers` is authoritative while `presenceOverSocket` is true; the query
+   * result is what the UI falls back to otherwise. Both are merged in
+   * `peerPresence` further down so the rendering code sees one shape.
+   */
+  const {
+    peers: socketPeers,
+    sendPresence: sendPresenceOverSocket,
+    socketDelivering: presenceOverSocket,
+  } = useConversationPresence(selectedId ?? null);
+
+  /**
+   * New messages and read receipts for the open thread, over the same socket.
+   *
+   * Read state is the case the digest cannot express: a cursor moving produces
+   * no message, so the `tenant_chat` slice does not budge, and the blue tick had
+   * to wait for the 30s poll below or for the next message to arrive.
+   */
+  useConversationThreadSync(selectedId ?? null);
 
   const peerPresenceQuery = useQuery({
     queryKey: ['tenant-chat-peer-presence', selectedId],
@@ -491,9 +629,21 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
       }
     },
     enabled: selectedId != null,
-    /** 2.5s: a typing indicator does not need sub-second latency, and this ran at 1200ms. */
-    refetchInterval: () =>
-      typeof document !== 'undefined' && document.hidden ? false : 2500,
+    /**
+     * 2.5s normally; 30s once the socket is carrying presence.
+     *
+     * Presence now arrives over the socket (useConversationPresence) whichever
+     * transport the peer used to report it — the server fans out an HTTP-posted
+     * state to the same conversation group, so a peer on mobile is covered too.
+     * The poll is backed off rather than removed: a
+     * socket that is open yet silently not delivering is a failure the client
+     * cannot detect on its own, and this is the only thing that would notice.
+     * Paused while hidden either way.
+     */
+    refetchInterval: () => {
+      if (typeof document !== 'undefined' && document.hidden) return false;
+      return presenceOverSocket ? 30000 : 2500;
+    },
   });
 
   const startConvMutation = useMutation({
@@ -611,7 +761,11 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   useEffect(() => {
     if (selectedId == null) return;
     const convId = selectedId;
+    // Socket first; HTTP only when there is no connection to send on. The server
+    // writes the same cache either way, so a colleague still polling sees this
+    // user's state regardless of which transport carried it.
     const post = (a: TenantChatPeerPresenceAction) => {
+      if (sendPresenceOverSocket(a)) return;
       void postTenantChatPeerPresenceAPI(convId, a).catch(() => {});
     };
     post(derivedLocalPresence);
@@ -623,7 +777,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
       if (interval) window.clearInterval(interval);
       if (derivedLocalPresence !== 'idle') post('idle');
     };
-  }, [selectedId, derivedLocalPresence]);
+  }, [selectedId, derivedLocalPresence, sendPresenceOverSocket]);
 
   const conversations = useMemo(() => {
     const raw = convQuery.data?.results ?? [];
@@ -640,11 +794,24 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   );
 
   const messages: TenantChatMessage[] = useMemo(() => {
-    const raw = messagesQuery.data?.results ?? [];
-    return [...raw].sort(
-      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
-    );
-  }, [messagesQuery.data]);
+    const tail = messagesQuery.data?.results ?? [];
+    // Tail last, so it wins on id collisions: it is the freshly fetched copy and
+    // carries the current read receipt, while a history page is a snapshot from
+    // whenever it was scrolled to.
+    const byId = new Map<number, TenantChatMessage>();
+    for (const m of olderMessages) byId.set(m.id, m);
+    for (const m of tail) byId.set(m.id, m);
+    return [...byId.values()].sort((a, b) => {
+      const delta = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      // Id as the tiebreak: two messages can share a timestamp, and an unstable
+      // order there would let rows swap places on any refetch.
+      return delta !== 0 ? delta : a.id - b.id;
+    });
+  }, [messagesQuery.data, olderMessages]);
+
+  /** Oldest row currently held — the anchor the next older page is fetched before. */
+  const firstLoadedMessageIdRef = useRef<number | null>(null);
+  firstLoadedMessageIdRef.current = messages.length > 0 ? messages[0].id : null;
 
   const mediaAlbum = useMemo(
     () =>
@@ -691,9 +858,41 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
 
   const currentUserId = currentUser?.id ?? null;
 
+  /**
+   * Presence as the label code should see it, whichever transport carried it.
+   *
+   * A DM is resolved entirely from the socket — the only thing missing from a
+   * frame is the peer's name, and for a DM that is already on `selected`. A
+   * group needs a name per member, which a frame does not carry, so there the
+   * socket is used as a trigger to refetch immediately (see the effect below)
+   * rather than as the source of truth. Both end up instant; only the group
+   * pays one round trip for the names.
+   */
+  const presenceData = useMemo(() => {
+    const queryData = peerPresenceQuery.data;
+    if (!presenceOverSocket || !selected || selected.kind === 'company_group') {
+      return queryData;
+    }
+    const peer = socketPeers.find((p) => p.userId !== currentUserId);
+    return {
+      peer_user_id: peer?.userId ?? 0,
+      activity: (peer?.state ?? null) as TenantChatPeerPresenceAction | null,
+    };
+  }, [peerPresenceQuery.data, presenceOverSocket, selected, socketPeers, currentUserId]);
+
+  // Group threads: a frame tells us *that* somebody's state changed; the endpoint
+  // tells us who they are. Refetching on the frame keeps names correct without
+  // waiting out the 15s backed-off poll.
+  useEffect(() => {
+    if (!presenceOverSocket || selected?.kind !== 'company_group' || selectedId == null) return;
+    queryClient.invalidateQueries({
+      queryKey: ['tenant-chat-peer-presence', selectedId],
+    });
+  }, [socketPeers, presenceOverSocket, selected?.kind, selectedId, queryClient]);
+
   const peerPresenceLabel = useMemo(() => {
     if (!selected) return null;
-    const pr = peerPresenceQuery.data;
+    const pr = presenceData;
     if (!pr) return null;
     if ('mode' in pr && pr.mode === 'group') {
       const peers = pr.peers || [];
@@ -736,7 +935,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     if (act === 'recording_voice') return fill('teamChatPeerRecording');
     if (act === 'sending_message') return fill('teamChatPeerSending');
     return null;
-  }, [peerPresenceQuery.data, selected, t]);
+  }, [presenceData, selected, t]);
 
   useEffect(() => {
     if (selectedId == null) {
@@ -836,7 +1035,88 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     lastMessageTailIdForScrollRef.current = null;
     pinnedToBottomRef.current = true;
     pendingTailSnapAfterMediaRef.current = false;
+    setOlderMessages([]);
+    setHasOlderMessages(false);
+    setLoadingOlderMessages(false);
+    setRevealingMessage(false);
+    if (highlightTimerRef.current) {
+      window.clearTimeout(highlightTimerRef.current);
+      highlightTimerRef.current = null;
+    }
+    setHighlightedMessageId(null);
+    loadingOlderRef.current = false;
+    olderSeededForRef.current = null;
+    prependAnchorRef.current = null;
   }, [selectedId]);
+
+  /**
+   * Whether this thread has history behind its tail page.
+   *
+   * Seeded once per conversation from the tail response — in descending order a
+   * `next` link means older messages — and owned by [loadOlderMessages] from
+   * then on, which learns it from each window's `has_older`. Re-reading `next`
+   * on every refetch would keep resurrecting it after the history had in fact
+   * been exhausted.
+   */
+  useEffect(() => {
+    if (selectedId == null || olderSeededForRef.current === selectedId) return;
+    const data = messagesQuery.data;
+    if (!data) return;
+    olderSeededForRef.current = selectedId;
+    setHasOlderMessages(Boolean(data.next));
+  }, [selectedId, messagesQuery.data]);
+
+  /**
+   * Fetch one page of history.
+   *
+   * Returns the oldest message id now held, or null if nothing was prepended —
+   * a value rather than void because [revealAndScrollToMessage] walks this in a
+   * loop and cannot read the answer off a ref: the state these updates land in
+   * has not committed by the time the promise resolves.
+   */
+  const loadOlderMessages = useCallback(async (): Promise<number | null> => {
+    const sc = messagesScrollRef.current;
+    const conversationId = selectedIdRef.current;
+    if (!sc || conversationId == null) return null;
+    if (loadingOlderRef.current || !hasOlderRef.current) return null;
+    const oldest = firstLoadedMessageIdRef.current;
+    if (oldest == null) return null;
+
+    loadingOlderRef.current = true;
+    setLoadingOlderMessages(true);
+    // Captured before the request, not after it resolves: an incoming message
+    // can grow the transcript while this is in flight, and the offset has to be
+    // measured against the same layout the restore is applied to.
+    const anchor = { height: sc.scrollHeight, top: sc.scrollTop };
+    try {
+      const page = await getTenantChatMessagesAPI(conversationId, {
+        ordering: 'created_at',
+        page_size: THREAD_PAGE_SIZE,
+        before_id: oldest,
+      });
+      // The user may have switched threads while this was in flight; the state
+      // it would land in belongs to a conversation that is no longer open.
+      if (selectedIdRef.current !== conversationId) return null;
+      const rows = page.results ?? [];
+      setHasOlderMessages(Boolean(page.has_older));
+      if (rows.length === 0) return null;
+      prependAnchorRef.current = anchor;
+      setOlderMessages((previous) => {
+        const byId = new Map<number, TenantChatMessage>();
+        for (const m of rows) byId.set(m.id, m);
+        for (const m of previous) byId.set(m.id, m);
+        return [...byId.values()];
+      });
+      return rows.reduce((lowest, m) => (m.id < lowest ? m.id : lowest), rows[0].id);
+    } catch {
+      // Left as-is rather than marked exhausted: the next scroll to the top
+      // retries, which is the right outcome for a dropped request.
+      return null;
+    } finally {
+      loadingOlderRef.current = false;
+      setLoadingOlderMessages(false);
+    }
+  }, []);
 
   const pinnedInThread = selected?.pinned_messages ?? [];
 
@@ -882,6 +1162,11 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
         .then((d) => {
           readCursorRef.current = d.last_read_message_id ?? pid;
           queryClient.invalidateQueries({ queryKey: ['tenant-chat-conversations'] });
+          // Also the digest: the header's Team Chat badge reads tenant_chat_unread
+          // from there, not from the conversation list. Without this the count the
+          // user just cleared by reading the thread stays on screen until the next
+          // digest poll — which reads as "the badge is stuck".
+          queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
           requestAnimationFrame(() => processThreadScrollRef.current());
         })
         .catch(() => {});
@@ -903,13 +1188,79 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     processThreadScrollRef.current();
   }, []);
 
+  /**
+   * Jump to a quoted, forwarded, or pinned message, loading history to reach it.
+   *
+   * The target is frequently not on screen — a reply quote points at whatever it
+   * answered, and a pin can point at anything in the thread — and until the tail
+   * window gained history behind it, a click on one of those that had scrolled
+   * out of the loaded page simply did nothing at all.
+   *
+   * Message ids rise with time within a conversation, so "the oldest row held is
+   * at or below the target" is an exact stop condition: past that point the
+   * target is either loaded or not in this thread, and no further page can
+   * change the answer. That, not the page cap, is what normally ends the walk.
+   */
+  const highlightMessage = useCallback((messageId: number) => {
+    if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    setHighlightedMessageId(messageId);
+    highlightTimerRef.current = window.setTimeout(() => {
+      highlightTimerRef.current = null;
+      setHighlightedMessageId(null);
+    }, MESSAGE_HIGHLIGHT_MS);
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (highlightTimerRef.current) window.clearTimeout(highlightTimerRef.current);
+    },
+    []
+  );
+
+  const revealAndScrollToMessage = useCallback(
+    async (messageId: number) => {
+      setMsgActionsOpenId(null);
+
+      const focus = () => {
+        const el = document.getElementById(`tenant-chat-msg-${messageId}`);
+        if (!el) return false;
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        highlightMessage(messageId);
+        window.setTimeout(() => processThreadScrollRef.current(), 450);
+        return true;
+      };
+
+      if (focus()) return;
+
+      const conversationId = selectedIdRef.current;
+      if (conversationId == null) return;
+
+      setRevealingMessage(true);
+      try {
+        let oldest = firstLoadedMessageIdRef.current;
+        for (let page = 0; page < MAX_REVEAL_PAGES; page++) {
+          if (selectedIdRef.current !== conversationId) return;
+          if (oldest != null && oldest <= messageId) break;
+          const next = await loadOlderMessages();
+          // null means the history ran out, the request failed, or a scroll had
+          // a page already in flight. Any of the three: stop rather than spin.
+          if (next == null) break;
+          oldest = next;
+        }
+      } finally {
+        setRevealingMessage(false);
+      }
+
+      if (selectedIdRef.current !== conversationId) return;
+      // One frame for the prepend to commit, a second for the scroll restore
+      // that runs in layout after it — only then is the row's position final.
+      requestAnimationFrame(() => requestAnimationFrame(() => focus()));
+    },
+    [loadOlderMessages, highlightMessage]
+  );
+
   const scrollToMessageAnchor = (messageId: number) => {
-    document.getElementById(`tenant-chat-msg-${messageId}`)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'center',
-    });
-    setMsgActionsOpenId(null);
-    window.setTimeout(() => processThreadScrollRef.current(), 450);
+    void revealAndScrollToMessage(messageId);
   };
 
   /**
@@ -920,6 +1271,12 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
    */
   useLayoutEffect(() => {
     if (selectedId == null || messagesQuery.isLoading) return;
+    if (tailScrollConvIdRef.current !== selectedId) {
+      tailScrollConvIdRef.current = selectedId;
+      lastMessageTailIdForScrollRef.current = null;
+      pinnedToBottomRef.current = true;
+      pendingTailSnapAfterMediaRef.current = false;
+    }
     const sc = messagesScrollRef.current;
     if (!sc || messages.length === 0) {
       lastMessageTailIdForScrollRef.current = null;
@@ -960,6 +1317,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
     const onScroll = () => {
       pinnedToBottomRef.current = isNearThreadScrollBottom(sc);
       processThreadScroll();
+      if (sc.scrollTop <= THREAD_LOAD_OLDER_PX) void loadOlderMessages();
     };
     sc.addEventListener('scroll', onScroll, { passive: true });
     const ro = new ResizeObserver(() => {
@@ -975,7 +1333,26 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
       sc.removeEventListener('scroll', onScroll);
       ro.disconnect();
     };
-  }, [processThreadScroll, selectedId, messages.length, messagesQuery.isLoading]);
+  }, [processThreadScroll, selectedId, messages.length, messagesQuery.isLoading, loadOlderMessages]);
+
+  /**
+   * Hold the reader's place across a prepend.
+   *
+   * Runs in layout, before the browser paints the taller transcript, so the
+   * correction is never visible as a jump. Declared ahead of the tail-follow
+   * effect below only for readability — that one returns early when the last
+   * message id is unchanged, which is exactly the case here.
+   */
+  useLayoutEffect(() => {
+    const anchor = prependAnchorRef.current;
+    if (!anchor) return;
+    prependAnchorRef.current = null;
+    const sc = messagesScrollRef.current;
+    if (!sc) return;
+    const grew = sc.scrollHeight - anchor.height;
+    if (grew <= 0) return;
+    sc.scrollTop = anchor.top + grew;
+  }, [messages]);
 
   const scrollThreadToBottom = useCallback(() => {
     const sc = messagesScrollRef.current;
@@ -1372,6 +1749,20 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
               ) : null}
 
               <div className="relative flex min-h-0 flex-1 flex-col">
+                {/*
+                  Overlaid rather than placed in the transcript: a spinner in the
+                  flow would add its own height above the reader on the way in and
+                  take it away again on the way out, which is two jolts on top of
+                  the prepend this is announcing.
+                */}
+                {loadingOlderMessages || revealingMessage ? (
+                  <div
+                    className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center"
+                    aria-hidden="true"
+                  >
+                    <span className="inline-block size-5 animate-spin rounded-full border-2 border-primary border-t-transparent bg-transparent" />
+                  </div>
+                ) : null}
                 <div
                   ref={messagesScrollRef}
                   className="custom-scrollbar min-h-0 flex-1 overflow-y-auto bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-gray-100/80 via-gray-50 to-transparent px-3 py-4 dark:from-gray-900 dark:via-gray-950 dark:to-transparent sm:px-5"
@@ -1409,7 +1800,14 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                             return (
                               <div
                                 key={m.id}
-                                className={`group flex min-w-0 w-full touch-pan-y ${mine ? 'justify-end' : 'justify-start'}`}
+                                // Tint sits on the full-width row, not the bubble,
+                                // so it reads as "this one" without competing with
+                                // the bubble's own colour. Background only — any
+                                // padding here would shift the transcript the
+                                // moment a jump lands.
+                                className={`group flex min-w-0 w-full touch-pan-y rounded-xl transition-colors duration-300 ${
+                                  highlightedMessageId === m.id ? 'bg-primary/15' : 'bg-transparent'
+                                } ${mine ? 'justify-end' : 'justify-start'}`}
                                 onDoubleClick={(e) => {
                                   e.preventDefault();
                                   setReplyToMessage(m);

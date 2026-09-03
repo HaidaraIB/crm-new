@@ -769,24 +769,9 @@ export const useSyncDigest = (
   });
 };
 
-/** Sidebar badge: unread inbound WhatsApp messages in the caller's ACL scope. */
-export const useWhatsAppUnreadCount = (
-  options?: Omit<UseQueryOptions<{ unread_count: number }, Error, number>, 'queryKey' | 'queryFn'> & {
-    enabled?: boolean;
-  }
-) => {
-  const { refetchInterval = 15_000, enabled = true, ...rest } = options || {};
-  return useQuery<{ unread_count: number }, Error, number>({
-    queryKey: queryKeys.whatsAppUnreadCount,
-    queryFn: getWhatsAppUnreadCountAPI,
-    staleTime: 5 * 1000,
-    refetchOnWindowFocus: true,
-    refetchInterval,
-    enabled,
-    select: (d) => d?.unread_count ?? 0,
-    ...rest,
-  });
-};
+// useWhatsAppUnreadCount removed: the sidebar badge reads `whatsapp_unread` from
+// the sync digest, which every tab already polls. This hook had no call sites and
+// would have added a second 15s request for a number the digest carries for free.
 
 /** Inbound ringing calls the agent can answer (from pending endpoint). */
 export function selectAnswerableLiveCalls(
@@ -843,26 +828,9 @@ export const useWhatsAppLiveCalls = (
   });
 };
 
-/** Sidebar badge: count of answerable inbound ringing WhatsApp calls. */
-export const useWhatsAppLiveCallsCount = (
-  options?: Omit<
-    UseQueryOptions<{ results: WhatsAppCallRecord[] }, Error, number>,
-    'queryKey' | 'queryFn'
-  > & { enabled?: boolean }
-) => {
-  const { refetchInterval = 2_000, enabled = true, ...rest } = options || {};
-  return useQuery<{ results: WhatsAppCallRecord[] }, Error, number>({
-    queryKey: queryKeys.whatsappCallsLive,
-    queryFn: getWhatsAppCallsPendingAPI,
-    staleTime: 1_000,
-    refetchOnWindowFocus: true,
-    refetchInterval,
-    refetchIntervalInBackground: false,
-    enabled,
-    select: (d) => selectAnswerableLiveCalls(d?.results).length,
-    ...rest,
-  });
-};
+// useWhatsAppLiveCallsCount removed: no call sites, and its 2s default would have
+// been the single most expensive poll in the app. The sidebar badge reads
+// `whatsapp_calls_pending` from the digest instead.
 
 export const useMarkWhatsAppConversationRead = () => {
   const queryClient = useQueryClient();
@@ -876,24 +844,8 @@ export const useMarkWhatsAppConversationRead = () => {
   });
 };
 
-/** Sidebar badge: published news newer than the user's last_read_at. */
-export const useNewsUnreadCount = (
-  options?: Omit<UseQueryOptions<{ unread_count: number }, Error, number>, 'queryKey' | 'queryFn'> & {
-    enabled?: boolean;
-  }
-) => {
-  const { refetchInterval = 60_000, enabled = true, ...rest } = options || {};
-  return useQuery<{ unread_count: number }, Error, number>({
-    queryKey: queryKeys.newsUnreadCount,
-    queryFn: getNewsUnreadCountAPI,
-    staleTime: 15 * 1000,
-    refetchOnWindowFocus: true,
-    refetchInterval,
-    enabled,
-    select: (d) => d?.unread_count ?? 0,
-    ...rest,
-  });
-};
+// useNewsUnreadCount removed: no call sites; the badge reads `news_unread` from
+// the digest.
 
 export const useMarkNewsRead = () => {
   const queryClient = useQueryClient();

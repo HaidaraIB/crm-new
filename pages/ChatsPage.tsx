@@ -14,7 +14,9 @@ import { ShareLocationModal } from '../components/modals/ShareLocationModal';
 import { WhatsAppChatLayout, type ChatBubbleMessage } from '../components/whatsapp/WhatsAppChatLayout';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { useAppContext } from '../context/AppContext';
-import { useConnectedAccounts, useMarkWhatsAppConversationRead, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
+import { queryKeys, useConnectedAccounts, useMarkWhatsAppConversationRead, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
+import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
 import { useWhatsAppConnected } from '../hooks/useWhatsAppConnected';
 import {
@@ -192,10 +194,39 @@ export const ChatsPage: React.FC = () => {
     }
   }, [displayNameBlockedHint, composerAlert, t]);
 
-  // Never poll for a user whose WhatsApp access is off — every tick would 403.
+  /**
+   * Slice subscriptions accelerate the polls below; they do not replace them.
+   *
+   * Splitting the counters is what makes this worth having: the conversation
+   * list and open thread move on `chat` (any message), the thread's call history
+   * on `calls`, so an incoming message no longer refetches call history and a
+   * call no longer refetches messages.
+   *
+   * The 6s intervals stay as the floor. Relying on the slice alone meant waiting
+   * for the 5s digest tick, and — with the app-wide 60s staleTime — reopening a
+   * thread could serve minute-old cache. All three endpoints send ETags now, so
+   * an unchanged poll is a 304.
+   *
+   * Gated on `chatsAllowed`: without it a slice moving for a colleague would
+   * fire requests that come back 403 for a user whose WhatsApp access is off.
+   */
+  useInvalidateOnSliceChange(
+    'chat',
+    [queryKeys.whatsAppConversations, ['whatsappChatMessages']],
+    { enabled: chatsAllowed }
+  );
+  useInvalidateOnSliceChange('calls', [['whatsappCalls', 'thread']], {
+    enabled: chatsAllowed,
+  });
+
+  // Same reasoning as Team Chat: the slice subscriptions above deliver sooner,
+  // so these intervals are the backstop rather than the mechanism.
+  const realtimeConnected = useRealtimeConnected();
+  const chatPollMs = realtimeConnected ? 30000 : 6000;
+
   const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
     enabled: chatsAllowed,
-    refetchInterval: chatsAllowed ? 6000 : false,
+    refetchInterval: chatsAllowed ? chatPollMs : false,
   });
 
   const selectedChatLeadId =
@@ -216,7 +247,7 @@ export const ChatsPage: React.FC = () => {
     clientId: selectedChatLeadId,
     phone: selectedChatPhone || undefined,
     enabled: !!selectedChatClient,
-    refetchInterval: selectedChatClient ? 6000 : false,
+    refetchInterval: selectedChatClient ? chatPollMs : false,
   });
 
   const { data: threadCallsData, refetch: refetchThreadCalls } = useQuery({
@@ -241,7 +272,7 @@ export const ChatsPage: React.FC = () => {
       !!selectedChatClient &&
       (typeof selectedChatLeadId === 'number' ||
         (!!selectedChatPhone && selectedChatPhone.replace(/\D/g, '').length >= 7)),
-    refetchInterval: selectedChatClient ? 6000 : false,
+    refetchInterval: selectedChatClient ? chatPollMs : false,
   });
 
   const threadCalls = useMemo(() => {

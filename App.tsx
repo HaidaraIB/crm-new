@@ -6,6 +6,8 @@ import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extra
 import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotifications';
 import { useWhatsAppAwayNotifications } from './hooks/useWhatsAppAwayNotifications';
 import { useSyncDigest } from './hooks/useQueries';
+import { useRealtimeChannel } from './hooks/useRealtimeChannel';
+import { useWebPush } from './hooks/useWebPush';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, SuccessModal, AlertModal, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
@@ -21,6 +23,7 @@ import { fetchMaintenanceStatusAPI } from './services/api';
 import { subscribeMaintenanceMode } from './utils/maintenanceMode';
 import type { MaintenanceRetryResult } from './utils/maintenanceDisplay';
 import { hasRecentPaymentSuccess } from './utils/paymentFeedback';
+import { getRoleLandingPage } from './utils/roles';
 import {
     ensurePaymentSuccessLocation,
     isGatewayPaymentReturnSearch,
@@ -153,30 +156,46 @@ const TheApp = () => {
     // losing the page the user actually navigated to. Deferring that effect until the first
     // pathname parse has run avoids acting on the stale default.
     const [initialPathResolved, setInitialPathResolved] = React.useState(false);
+    // The page this role calls home. Every "we don't know where to send them" branch below
+    // uses it instead of a hardcoded 'Dashboard', so a role without a Dashboard is never
+    // routed through one on its way to the page it can actually see.
+    const landingPage = React.useMemo<Page>(() => getRoleLandingPage(currentUser?.role), [currentUser?.role]);
     useTeamChatAwayNotifications();
     useWhatsAppAwayNotifications();
-    useSyncDigest({ enabled: Boolean(isLoggedIn && currentUser) });
+    // The app's single poll. Everything else that needs to know something changed
+    // reads this one query's cache (see useSliceVersion), so this interval is the
+    // whole background cost of an idle tab. The realtime channel, when connected,
+    // pushes changes as they happen and slows this to a heartbeat; with no socket
+    // it stays at the original 5s and nothing else changes.
+    const { digestInterval } = useRealtimeChannel(Boolean(isLoggedIn && currentUser));
+    // Out-of-app reach: the socket above only helps while a tab is open. No-ops
+    // unless Firebase is configured and the user has already granted permission.
+    useWebPush(Boolean(isLoggedIn && currentUser));
+    useSyncDigest({
+        enabled: Boolean(isLoggedIn && currentUser),
+        refetchInterval: digestInterval,
+    });
     // Page actually rendered below — never the raw (possibly disallowed) `currentPage`,
     // so an unauthorized page never mounts even for one frame. See sync effect further
     // down, which keeps `currentPage`/the URL consistent with this after the fact.
     const pageToRender = React.useMemo<Page>(() => {
         if (!currentUser || canAccessPage(currentPage)) return currentPage;
-        return resolveFallbackPage(canAccessPage);
+        return resolveFallbackPage(canAccessPage, currentUser.role);
     }, [currentPage, currentUser, canAccessPage]);
     React.useEffect(() => {
         if (!isLoggedIn || currentPage !== 'Team Chat') return;
         setIsTeamChatDialogOpen(true);
-        setCurrentPage('Dashboard');
+        setCurrentPage(landingPage);
         if (currentUser?.company) {
             window.history.replaceState(
                 {},
                 '',
-                getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard'),
+                getCompanyRoute(currentUser.company.name, currentUser.company.domain, landingPage, currentUser.company.specialization),
             );
         } else {
-            window.history.replaceState({}, '', '/dashboard');
+            window.history.replaceState({}, '', getCompanyRoute(undefined, undefined, landingPage));
         }
-    }, [isLoggedIn, currentPage, currentUser, setCurrentPage, setIsTeamChatDialogOpen]);
+    }, [isLoggedIn, currentPage, currentUser, landingPage, setCurrentPage, setIsTeamChatDialogOpen]);
     const isPublicLegalPath = (path: string): boolean => {
         const normalizedPath = path.replace(/\/+$/, '') || '/';
         return normalizedPath === '/data-deletion-policy' || normalizedPath === '/data-deletion' || normalizedPath.endsWith('/data-deletion-policy') || normalizedPath.endsWith('/data-deletion')
@@ -448,9 +467,9 @@ const TheApp = () => {
 
             if (isTeamChatPath) {
                 setIsTeamChatDialogOpen(true);
-                const restorePage: Page = currentPage === 'Team Chat' ? 'Dashboard' : currentPage;
+                const restorePage: Page = currentPage === 'Team Chat' ? landingPage : currentPage;
                 if (currentPage === 'Team Chat') {
-                    setCurrentPage('Dashboard');
+                    setCurrentPage(landingPage);
                 }
                 const restorePath =
                     currentUser?.company
@@ -475,14 +494,10 @@ const TheApp = () => {
                 console.log('[App] checkPathname - setting currentPage to:', matchedPage);
                 setCurrentPage(matchedPage);
             } else if (!matchedPage && pageFromPath && pageFromPath !== '') {
-                console.warn('[App] checkPathname - No match found, redirecting to Dashboard. currentPath:', currentPath);
-                if (currentUser?.company) {
-                    const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                    window.history.replaceState({}, '', withCurrentSearchAndHash(dashboardRoute));
-                } else {
-                    window.history.replaceState({}, '', withCurrentSearchAndHash('/dashboard'));
-                }
-                setCurrentPage('Dashboard');
+                console.warn('[App] checkPathname - No match found, redirecting to home page. currentPath:', currentPath);
+                const homeRoute = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
+                window.history.replaceState({}, '', withCurrentSearchAndHash(homeRoute));
+                setCurrentPage(landingPage);
             }
         };
 
@@ -500,7 +515,7 @@ const TheApp = () => {
             window.removeEventListener('popstate', checkPathname);
             clearTimeout(timeout);
         };
-    }, [isLoggedIn, currentPage, setCurrentPage, currentUser, selectedLead, setIsTeamChatDialogOpen]);
+    }, [isLoggedIn, currentPage, setCurrentPage, currentUser, landingPage, selectedLead, setIsTeamChatDialogOpen]);
 
     // Keep `currentPage` state and the URL bar consistent with `pageToRender` (the page
     // actually mounted, computed above). Not a security check — `pageToRender` already
@@ -707,15 +722,11 @@ const TheApp = () => {
             'arrivals': 'Arrivals',
         };
 
-        // Handle root path - redirect to /subdomain/dashboard
+        // Handle root path - redirect to the role's home page under /subdomain/
         if (pathnameToCheck === '/' || pathnameToCheck === '') {
-            if (currentUser?.company) {
-                const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                window.history.replaceState({}, '', withSearch(dashboardRoute));
-            } else {
-                window.history.replaceState({}, '', withSearch('/dashboard'));
-            }
-            setCurrentPage('Dashboard');
+            const homeRoute = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
+            window.history.replaceState({}, '', withSearch(homeRoute));
+            setCurrentPage(landingPage);
             return;
         }
         
@@ -750,9 +761,9 @@ const TheApp = () => {
 
         if (isTeamChatPath) {
             setIsTeamChatDialogOpen(true);
-            const restorePage: Page = currentPage === 'Team Chat' ? 'Dashboard' : currentPage;
+            const restorePage: Page = currentPage === 'Team Chat' ? landingPage : currentPage;
             if (currentPage === 'Team Chat') {
-                setCurrentPage('Dashboard');
+                setCurrentPage(landingPage);
             }
             const restorePath =
                 currentUser?.company
@@ -777,17 +788,13 @@ const TheApp = () => {
             console.log('[App] Setting currentPage to:', matchedPage, 'from:', currentPage);
             setCurrentPage(matchedPage);
         } else if (!matchedPage && pageFromPath && pageFromPath !== '') {
-            // If pathname doesn't match any route, redirect to dashboard
-            console.warn('[App] No match found, redirecting to Dashboard. pageFromPath:', pageFromPath);
-            if (currentUser?.company) {
-                const dashboardRoute = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'Dashboard');
-                window.history.replaceState({}, '', withSearch(dashboardRoute));
-            } else {
-                window.history.replaceState({}, '', withSearch('/dashboard'));
-            }
-            setCurrentPage('Dashboard');
+            // If pathname doesn't match any route, redirect to the role's home page
+            console.warn('[App] No match found, redirecting to home page. pageFromPath:', pageFromPath);
+            const homeRoute = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
+            window.history.replaceState({}, '', withSearch(homeRoute));
+            setCurrentPage(landingPage);
         }
-    }, [isLoggedIn, currentPage, setCurrentPage, selectedLead, setIsTeamChatDialogOpen]);
+    }, [isLoggedIn, currentPage, setCurrentPage, landingPage, selectedLead, setIsTeamChatDialogOpen]);
     
     React.useEffect(() => {
         // Skip if already processed

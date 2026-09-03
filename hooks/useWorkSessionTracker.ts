@@ -34,6 +34,15 @@ export interface WorkSessionTracker {
   todaySeconds: number;
   idleTimeoutMinutes: number;
   resume: () => void;
+  /**
+   * False until the first ping has returned a real total.
+   *
+   * Tracking turns on as soon as the user profile loads, but `todaySeconds` is 0
+   * until the server answers. Rendering that gap shows a confident "0h" to
+   * someone who has been working all morning, which reads as the feature being
+   * broken rather than as "still loading".
+   */
+  hydrated: boolean;
 }
 
 /**
@@ -66,6 +75,7 @@ export const useWorkSessionTracker = (): WorkSessionTracker => {
 
   const [state, setState] = useState<WorkSessionState>('off');
   const [todaySeconds, setTodaySeconds] = useState(0);
+  const [hydrated, setHydrated] = useState(false);
   const [idleTimeoutMinutes, setIdleTimeoutMinutes] = useState(configuredIdleMinutes);
 
   const lastActivityRef = useRef(Date.now());
@@ -123,6 +133,7 @@ export const useWorkSessionTracker = (): WorkSessionTracker => {
         setIdleTimeoutMinutes(status.idle_timeout_minutes);
       }
       setTodaySeconds(status.today_seconds ?? 0);
+      setHydrated(true);
       // The pill reads this cache key, so it refreshes for free on every ping.
       queryClient.setQueryData(queryKeys.workSessionToday, status);
       if (status.tracking_enabled === false) {
@@ -219,5 +230,5 @@ export const useWorkSessionTracker = (): WorkSessionTracker => {
     };
   }, [enabled, applyStatus, setTrackerState]);
 
-  return { state, todaySeconds, idleTimeoutMinutes, resume };
+  return { state, todaySeconds, idleTimeoutMinutes, resume, hydrated };
 };

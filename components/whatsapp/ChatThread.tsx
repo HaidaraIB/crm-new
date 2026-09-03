@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import { PhoneText, isPhoneLike, RefreshButton } from '../index';
 import { RefreshIcon, PhoneIcon, ListIcon } from '../icons';
 import {
@@ -20,6 +20,16 @@ import type { MessageTemplateType } from '../../services/api';
 import { translations } from '../../constants';
 import { buildWhatsAppThreadItems } from '../../utils/whatsappThreadItems';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
+
+/** Slack under the divider when opening on unread, so the last read message stays visible above it. */
+const NEW_DIVIDER_TOP_GAP_PX = 24;
+const THREAD_NEAR_BOTTOM_PX = 80;
+/**
+ * How long after opening a conversation the transcript is still considered to be
+ * settling: long enough to cover the cached render being replaced by the fetch
+ * (`refetchOnMount: 'always'`) and the blob media in it resolving to real heights.
+ */
+const OPEN_SETTLE_MS = 1500;
 
 type Props = {
   t: (key: keyof typeof translations.en) => string;
@@ -63,10 +73,12 @@ export const ChatThread: React.FC<Props> = ({
   composerProps,
   emptyHint,
 }) => {
-  const bottomRef = useRef<HTMLDivElement | null>(null);
+  const scrollerRef = useRef<HTMLDivElement | null>(null);
+  /** Inner transcript column: its height grows as blob media resolves, so it is observed too. */
+  const scrollerContentRef = useRef<HTMLDivElement | null>(null);
   const newDividerRef = useRef<HTMLDivElement | null>(null);
-  const scrolledToNewRef = useRef<string>('');
   const chatKey = `${selectedClient?.id ?? ''}|${selectedClient?.phone_number ?? ''}|${selectedClient?.manual_phone ?? ''}`;
+  const hasSelection = !!selectedClient;
 
   const threadItems = useMemo(
     () =>
@@ -79,21 +91,134 @@ export const ChatThread: React.FC<Props> = ({
     [messages, threadCalls, language, t, newMessagesBeforeApiId]
   );
 
-  useEffect(() => {
-    scrolledToNewRef.current = '';
-  }, [chatKey]);
+  const lastThreadItem = threadItems[threadItems.length - 1];
+  const tailKey = lastThreadItem
+    ? lastThreadItem.kind === 'message'
+      ? `m:${lastThreadItem.msg.id}`
+      : lastThreadItem.id
+    : '';
 
-  useEffect(() => {
-    const newKey = `${chatKey}:${newMessagesBeforeApiId ?? ''}`;
-    if (newMessagesBeforeApiId && newDividerRef.current && scrolledToNewRef.current !== newKey) {
-      scrolledToNewRef.current = newKey;
-      newDividerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  /**
+   * Where this thread should sit *until the user scrolls it themselves*, or null
+   * once they have.
+   *
+   * It has to be a standing instruction rather than a one-shot scroll. Media in
+   * these bubbles is fetched into a blob URL, so every image and video renders as
+   * a one-line placeholder first and only grows to its real height a few hundred
+   * milliseconds later. A single scroll issued on open therefore targets an
+   * offset that is about to stop being the bottom of the transcript, which is how
+   * the thread ended up parked mid-conversation. The ResizeObserver below
+   * re-applies this anchor every time the transcript changes height.
+   */
+  const openAnchorRef = useRef<'divider' | 'bottom' | null>('bottom');
+  const anchorChatKeyRef = useRef<string>('');
+  /** Set while we are moving the scroller ourselves, so our own scroll events do not read as the user taking over. */
+  const programmaticScrollRef = useRef(false);
+  /** True while the viewport is following the tail, so late media growth keeps it there. */
+  const pinnedToBottomRef = useRef(true);
+  const lastTailKeyRef = useRef<string>('');
+  /** When this conversation was opened — bounds the settle window below. */
+  const openedAtRef = useRef(0);
+
+  const setScrollTop = useCallback((sc: HTMLDivElement, top: number) => {
+    programmaticScrollRef.current = true;
+    // Always an instant jump, never `behavior: 'smooth'`. A smooth scroll animates
+    // toward an offset captured when it started, so anything that grows the
+    // transcript mid-animation (media resolving, a poll landing) leaves it short
+    // — and a second smooth scroll cancels the first outright.
+    sc.scrollTop = top;
+    requestAnimationFrame(() => {
+      programmaticScrollRef.current = false;
+    });
+  }, []);
+
+  const applyOpenAnchor = useCallback(() => {
+    const sc = scrollerRef.current;
+    if (!sc) return;
+    const divider = newDividerRef.current;
+    if (openAnchorRef.current === 'divider' && divider) {
+      // Divider near the top of the viewport, so the unread messages it marks
+      // read downward from it. Centring it (what this used to do) left the
+      // newest message halfway up the screen with dead space below, which is
+      // indistinguishable from the thread having stopped scrolling halfway.
+      const offset =
+        sc.scrollTop + (divider.getBoundingClientRect().top - sc.getBoundingClientRect().top);
+      const top = Math.max(0, Math.min(offset - NEW_DIVIDER_TOP_GAP_PX, sc.scrollHeight - sc.clientHeight));
+      setScrollTop(sc, top);
       return;
     }
-    if (!newMessagesBeforeApiId || scrolledToNewRef.current === newKey) {
-      bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setScrollTop(sc, sc.scrollHeight);
+  }, [setScrollTop]);
+
+  useLayoutEffect(() => {
+    if (anchorChatKeyRef.current !== chatKey) {
+      anchorChatKeyRef.current = chatKey;
+      openAnchorRef.current = 'bottom';
+      pinnedToBottomRef.current = true;
+      lastTailKeyRef.current = '';
+      openedAtRef.current = Date.now();
     }
-  }, [messages.length, chatKey, newMessagesBeforeApiId, threadItems.length]);
+    // The unread id is captured by ChatsPage a commit after the messages land, so
+    // the anchor starts at the tail and upgrades to the divider when there is one.
+    if (openAnchorRef.current !== null) {
+      openAnchorRef.current = newMessagesBeforeApiId ? 'divider' : 'bottom';
+    }
+  }, [chatKey, newMessagesBeforeApiId]);
+
+  useLayoutEffect(() => {
+    const sc = scrollerRef.current;
+    if (!sc || threadItems.length === 0) return;
+    const prevTailKey = lastTailKeyRef.current;
+    lastTailKeyRef.current = tailKey;
+    const tailGrew = prevTailKey !== '' && tailKey !== prevTailKey;
+
+    // A message arriving *after* the thread has settled means the opening
+    // position has been superseded — follow the tail, exactly as before. Inside
+    // the settle window a longer tail is still part of opening (the cached
+    // transcript being replaced by the refetch), so the anchor keeps precedence;
+    // otherwise a thread with unread would be yanked off its divider by the
+    // very fetch that discovered the unread.
+    if (tailGrew && Date.now() - openedAtRef.current > OPEN_SETTLE_MS) {
+      openAnchorRef.current = null;
+    }
+
+    if (openAnchorRef.current !== null) {
+      applyOpenAnchor();
+      return;
+    }
+    if (tailGrew) {
+      pinnedToBottomRef.current = true;
+      setScrollTop(sc, sc.scrollHeight);
+    }
+  }, [chatKey, newMessagesBeforeApiId, tailKey, threadItems.length, applyOpenAnchor, setScrollTop]);
+
+  useEffect(() => {
+    const sc = scrollerRef.current;
+    if (!sc) return;
+    const onScroll = () => {
+      if (programmaticScrollRef.current) return;
+      // The user has taken over — stop re-imposing the opening position.
+      openAnchorRef.current = null;
+      pinnedToBottomRef.current =
+        sc.scrollHeight - sc.scrollTop - sc.clientHeight < THREAD_NEAR_BOTTOM_PX;
+    };
+    sc.addEventListener('scroll', onScroll, { passive: true });
+    const ro = new ResizeObserver(() => {
+      if (openAnchorRef.current !== null) {
+        applyOpenAnchor();
+        return;
+      }
+      if (pinnedToBottomRef.current) setScrollTop(sc, sc.scrollHeight);
+    });
+    ro.observe(sc);
+    if (scrollerContentRef.current) ro.observe(scrollerContentRef.current);
+    return () => {
+      sc.removeEventListener('scroll', onScroll);
+      ro.disconnect();
+    };
+    // `hasSelection` is what mounts/unmounts the scroller; `chatKey` covers
+    // switching between two conversations without it unmounting in between.
+  }, [applyOpenAnchor, setScrollTop, chatKey, hasSelection]);
 
   if (!selectedClient) {
     return (
@@ -170,11 +295,12 @@ export const ChatThread: React.FC<Props> = ({
       </div>
 
       <div
+        ref={scrollerRef}
         className={`flex min-h-0 flex-1 flex-col overflow-y-auto custom-scrollbar ${WA_THREAD_WALLPAPER}`}
         dir="ltr"
         lang="und"
       >
-        <div className="mt-auto flex flex-col space-y-2 px-3 py-2">
+        <div ref={scrollerContentRef} className="mt-auto flex flex-col space-y-2 px-3 py-2">
           {threadItems.map((item) => {
             if (item.kind === 'status') {
               return (
@@ -216,7 +342,6 @@ export const ChatThread: React.FC<Props> = ({
               />
             );
           })}
-          <div ref={bottomRef} />
         </div>
       </div>
 

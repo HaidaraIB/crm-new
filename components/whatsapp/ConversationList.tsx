@@ -14,6 +14,7 @@ import {
   WA_LIST_HOVER,
 } from './whatsappChatTheme';
 import { translations } from '../../constants';
+import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
 import { localizeWhatsAppMessageBody } from '../../utils/whatsappMessageBodyDisplay';
 
 export type ConversationRow = {
@@ -37,11 +38,14 @@ function formatListTime(iso: string | null | undefined, language: string): strin
   if (!iso) return '';
   try {
     const d = new Date(iso);
-    return d.toLocaleTimeString(language === 'ar' ? 'ar' : 'en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
+    return d.toLocaleTimeString(
+      language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
+      withLatinDigits({
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true,
+      })
+    );
   } catch {
     return '';
   }

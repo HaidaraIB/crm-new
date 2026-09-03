@@ -2148,7 +2148,8 @@ export const IntegrationsPage = () => {
                 const expiresHint =
                     result.expires_at != null && Number(result.expires_at) > 0
                         ? ` ${t('metaTokenExpiresAt') || 'Token expires'}: ${new Date(Number(result.expires_at) * 1000).toLocaleString(
-                              language === 'ar' ? ARABIC_DATE_LOCALE : undefined
+                              language === 'ar' ? ARABIC_DATE_LOCALE : undefined,
+                              withLatinDigits(),
                           )}`
                         : '';
                 setSuccessMessage(
@@ -3766,7 +3767,8 @@ export const IntegrationsPage = () => {
                                 <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {t('metaTokenExpiresAt') || 'Token expires'}:{' '}
                                     {new Date(Number(metaHealthData.token.expires_at) * 1000).toLocaleString(
-                                        language === 'ar' ? ARABIC_DATE_LOCALE : undefined
+                                        language === 'ar' ? ARABIC_DATE_LOCALE : undefined,
+                                        withLatinDigits(),
                                     )}
                                 </div>
                             )}

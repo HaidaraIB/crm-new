@@ -11,6 +11,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
 import { useWhatsAppCallSession } from '../../hooks/useWhatsAppCallSession';
 import { queryKeys, useSyncDigest, useWhatsAppLiveCalls } from '../../hooks/useQueries';
+import { useRealtimeConnected } from '../../hooks/useRealtimeChannel';
+import { useInvalidateOnSliceChange } from '../../hooks/useSliceVersion';
 import {
   getWhatsAppCallPermissionsAPI,
   resolveLocalizedApiError,
@@ -110,9 +112,30 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
   });
   const pendingHint = (digest?.whatsapp_calls_pending ?? 0) > 0;
 
+  /**
+   * The global incoming-call listener.
+   *
+   * Only runs at all while something is pending or a call is in progress — the
+   * digest flips `pendingHint` first. Once running it polls fast, because a ring
+   * the agent never sees is a lost customer.
+   *
+   * 2s with no socket, 6s with one: every call-row write moves the `calls` slice,
+   * and the subscription below refetches on it, so the timer is the backstop
+   * rather than the mechanism.
+   */
+  const realtimeConnected = useRealtimeConnected();
+  const listenerActive =
+    Boolean(currentUser) &&
+    (pendingHint || sessionBusy || Boolean(toastCall) || Boolean(waitingCall));
+
   const { data: liveInbound = [] } = useWhatsAppLiveCalls({
-    enabled: Boolean(currentUser) && (pendingHint || sessionBusy || Boolean(toastCall) || Boolean(waitingCall)),
-    refetchInterval: 2_000,
+    enabled: listenerActive,
+    refetchInterval: realtimeConnected ? 6_000 : 2_000,
+  });
+
+  // Refresh the moment the server says a call row changed, ahead of the timer.
+  useInvalidateOnSliceChange('calls', [queryKeys.whatsappCallsLive], {
+    enabled: listenerActive,
   });
 
   useEffect(() => {

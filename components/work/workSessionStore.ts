@@ -12,9 +12,11 @@ import type { WorkSessionState } from '../../hooks/useWorkSessionTracker';
 export interface WorkSessionSnapshot {
   state: WorkSessionState;
   todaySeconds: number;
+  /** False until the first ping returns; the pill hides rather than showing a bogus 0h. */
+  hydrated: boolean;
 }
 
-const INITIAL: WorkSessionSnapshot = { state: 'off', todaySeconds: 0 };
+const INITIAL: WorkSessionSnapshot = { state: 'off', todaySeconds: 0, hydrated: false };
 
 let snapshot: WorkSessionSnapshot = INITIAL;
 const listeners = new Set<() => void>();
@@ -30,7 +32,13 @@ const getSnapshot = () => snapshot;
 
 export const setWorkSessionSnapshot = (next: WorkSessionSnapshot) => {
   // Identity must stay stable when nothing changed, or useSyncExternalStore loops.
-  if (snapshot.state === next.state && snapshot.todaySeconds === next.todaySeconds) return;
+  if (
+    snapshot.state === next.state &&
+    snapshot.todaySeconds === next.todaySeconds &&
+    snapshot.hydrated === next.hydrated
+  ) {
+    return;
+  }
   snapshot = next;
   listeners.forEach((listener) => listener());
 };

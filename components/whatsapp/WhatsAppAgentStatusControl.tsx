@@ -52,7 +52,14 @@ export const WhatsAppAgentStatusControl: React.FC<Props> = ({ t, onStatusChange 
 
   useEffect(() => {
     void refresh();
-    const id = window.setInterval(() => void refresh(), 30_000);
+    /**
+     * 60s. This shows the user their *own* Ready/Away state, and their own
+     * changes already update it instantly — the control fires
+     * WHATSAPP_CALL_AGENT_STATUS_EVENT, which every panel listens for. The poll
+     * exists only to catch a change made elsewhere (another device, or an admin),
+     * which is rare enough not to warrant twice the requests.
+     */
+    const id = window.setInterval(() => void refresh(), 60_000);
     return () => window.clearInterval(id);
   }, []);
 

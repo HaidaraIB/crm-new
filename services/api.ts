@@ -3726,7 +3726,7 @@ export const getWhatsAppMessagesAPI = async (params: {
     parts.push(`phone=${encodeURIComponent(phone)}`);
   }
   if (parts.length === 1) return [];
-  const res = await apiRequest<
+  const res = await conditionalGet<
     { results?: LeadWhatsAppMessageResponse[] } | LeadWhatsAppMessageResponse[]
   >(`/integrations/whatsapp/messages/?${parts.join('&')}`);
   if (Array.isArray(res)) return res;
@@ -3800,7 +3800,7 @@ export const getWhatsAppConversationsAPI = async (): Promise<
     unread_count?: number;
   }>
 > => {
-  return apiRequest<any[]>(`/integrations/whatsapp/conversations/`);
+  return conditionalGet<any[]>(`/integrations/whatsapp/conversations/`);
 };
 
 /** GET /api/integrations/whatsapp/unread-count/ — scoped to assignee for staff. */
@@ -4022,20 +4022,20 @@ export const getWhatsAppCallsAPI = async (params?: {
   if (params?.limit != null) q.set('limit', String(params.limit));
   if (params?.offset != null) q.set('offset', String(params.offset));
   const qs = q.toString();
-  return apiRequest(`/integrations/whatsapp/calls/${qs ? `?${qs}` : ''}`);
+  return conditionalGet(`/integrations/whatsapp/calls/${qs ? `?${qs}` : ''}`);
 };
 
 export const getWhatsAppCallsPendingAPI = async (): Promise<{
   results: WhatsAppCallRecord[];
 }> => {
-  return apiRequest('/integrations/whatsapp/calls/pending/');
+  return conditionalGet('/integrations/whatsapp/calls/pending/');
 };
 
 export const getWhatsAppCallsLiveAPI = async (): Promise<{
   results: WhatsAppCallRecord[];
   count?: number;
 }> => {
-  return apiRequest('/integrations/whatsapp/calls/live/');
+  return conditionalGet('/integrations/whatsapp/calls/live/');
 };
 
 export const getWhatsAppCallDetailAPI = async (id: number): Promise<WhatsAppCallRecord> => {
@@ -5976,7 +5976,7 @@ export async function getTenantChatConversationsAPI(params?: { page?: number; pa
   if (params?.page != null) search.set('page', String(params.page));
   if (params?.page_size != null) search.set('page_size', String(params.page_size));
   const q = search.toString();
-  return apiRequest<{ count: number; next: string | null; previous: string | null; results: TenantChatConversation[] }>(
+  return conditionalGet<{ count: number; next: string | null; previous: string | null; results: TenantChatConversation[] }>(
     `/tenant-chat/conversations/${q ? `?${q}` : ''}`
   );
 }
@@ -6017,29 +6017,17 @@ export async function getTenantChatMessagesAPI(
     next: string | null;
     previous: string | null;
     results: TenantChatMessage[];
+    /**
+     * Only sent by the anchored branches (before_id / after_id / around_id),
+     * which return a window rather than a page and so cannot express "there is
+     * more" through `next`/`previous`.
+     */
+    has_older?: boolean;
+    has_newer?: boolean;
+    anchor_id?: number;
   };
 
-  const cached = tenantChatMessageCache.get(path);
-  const sink: EtagSink = { etag: null };
-  try {
-    const data = await apiRequest<Payload>(
-      path,
-      cached ? { headers: { 'If-None-Match': cached.etag } } : {},
-      true,
-      sink
-    );
-    if (sink.etag) {
-      rememberTenantChatMessages(path, sink.etag, data);
-    }
-    return data;
-  } catch (error) {
-    if ((error as { code?: string })?.code === 'NOT_MODIFIED' && cached) {
-      // Same reference as last time, so React Query treats it as unchanged and
-      // the thread does not re-render.
-      return cached.data as Payload;
-    }
-    throw error;
-  }
+  return conditionalGet<Payload>(path);
 }
 
 export async function sendTenantChatMessageAPI(
@@ -6172,7 +6160,39 @@ export type SyncDigest = {
   /** Company-wide unacknowledged arrivals today; non-zero only for front desk / owner / manage_leads supervisors. */
   arrivals_waiting: number;
   version: string;
+  /**
+   * Per-slice change counters — the digest as a change feed.
+   *
+   * Each is a monotonic integer the server bumps when that slice's data changes.
+   * A view watches the slice it cares about and refetches once when the number
+   * moves, instead of running its own timer. See useSliceVersion.
+   *
+   * Optional because a client can outlive a server that predates the field; the
+   * hook treats a missing object as "never changes", which degrades to the
+   * pre-existing behaviour rather than to a refetch storm.
+   */
+  versions?: SyncSliceVersions;
 };
+
+/** Slice names the server reports in SyncDigest.versions. */
+export type SyncSliceVersions = {
+  /** Platform-wide: news posts. */
+  global: number;
+  /** This user alone: notifications, read cursors. */
+  user: number;
+  /** Any company-visible change — moves whenever any slice below moves. */
+  company: number;
+  /** Inbound/outbound WhatsApp messages. */
+  chat: number;
+  /** WhatsApp call rows, including ring/answer/end transitions. */
+  calls: number;
+  /** Walk-in lead arrivals and their recipient lists. */
+  arrivals: number;
+  /** Internal team-chat messages. */
+  tenant_chat: number;
+};
+
+export type SyncSliceName = keyof SyncSliceVersions;
 
 /**
  * Last digest we received, kept so a 304 can resolve to data.
@@ -6185,31 +6205,72 @@ export type SyncDigest = {
 let lastSyncDigest: { version: string; data: SyncDigest } | null = null;
 
 /**
- * Last chat-thread response per request URL, for the same 304 trick.
+ * Last response per request URL, for endpoints that support conditional GETs.
  *
- * Keyed by full path, so each conversation and each set of paging/anchor params
- * gets its own entry. Scroll-back anchors would otherwise accumulate one entry
- * per jump for the life of the tab, hence the cap — the polled request (no
- * anchor) is the one that matters and it stays hot.
+ * Keyed by full path, so each conversation, filter set and page gets its own
+ * entry — a token is only valid for the exact request that produced it, and the
+ * server rejects one presented against different params. Scroll-back anchors and
+ * filter combinations would otherwise accumulate an entry per variation for the
+ * life of the tab, hence the cap; the polled requests are the ones that matter
+ * and they stay hot.
  */
-const TENANT_CHAT_CACHE_MAX = 40;
-const tenantChatMessageCache = new Map<string, { etag: string; data: unknown }>();
+const CONDITIONAL_CACHE_MAX = 120;
+const conditionalCache = new Map<string, { etag: string; data: unknown }>();
 
-function rememberTenantChatMessages(path: string, etag: string, data: unknown): void {
+function rememberConditional(path: string, etag: string, data: unknown): void {
   // Re-insert so the most recently used entry is last in iteration order.
-  tenantChatMessageCache.delete(path);
-  tenantChatMessageCache.set(path, { etag, data });
-  while (tenantChatMessageCache.size > TENANT_CHAT_CACHE_MAX) {
-    const oldest = tenantChatMessageCache.keys().next().value;
+  conditionalCache.delete(path);
+  conditionalCache.set(path, { etag, data });
+  while (conditionalCache.size > CONDITIONAL_CACHE_MAX) {
+    const oldest = conditionalCache.keys().next().value;
     if (oldest === undefined) break;
-    tenantChatMessageCache.delete(oldest);
+    conditionalCache.delete(oldest);
   }
 }
 
-/** Drop all conditional-request state. Call when the session identity changes. */
+/**
+ * GET that sends `If-None-Match` and resolves a 304 from cache.
+ *
+ * On a match the server returns a bare 304 having done no database work, and we
+ * return the *same object reference* as last time — which is what makes this
+ * invisible to React Query: an identical reference is treated as unchanged, so
+ * nothing re-renders.
+ *
+ * Safe to call for any endpoint; one that does not send an ETag simply never
+ * populates the cache and this behaves as a plain GET.
+ */
+async function conditionalGet<T>(path: string): Promise<T> {
+  const cached = conditionalCache.get(path);
+  const sink: EtagSink = { etag: null };
+  try {
+    const data = await apiRequest<T>(
+      path,
+      cached ? { headers: { 'If-None-Match': cached.etag } } : {},
+      true,
+      sink
+    );
+    if (sink.etag) {
+      rememberConditional(path, sink.etag, data);
+    }
+    return data;
+  } catch (error) {
+    if ((error as { code?: string })?.code === 'NOT_MODIFIED' && cached) {
+      return cached.data as T;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Drop all conditional-request state. Call when the session identity changes.
+ *
+ * Not optional on logout: tokens are scoped to the user who fetched them, so a
+ * cached entry surviving into the next session could be replayed for someone
+ * else's data.
+ */
 export function resetConditionalRequestCaches(): void {
   lastSyncDigest = null;
-  tenantChatMessageCache.clear();
+  conditionalCache.clear();
 }
 
 export async function getSyncDigestAPI(): Promise<SyncDigest> {
@@ -6227,6 +6288,27 @@ export async function getSyncDigestAPI(): Promise<SyncDigest> {
     }
     throw error;
   }
+}
+
+/**
+ * Register this browser's push token.
+ *
+ * `platform: 'web'` is what lets the server target browsers only — without it the
+ * token is indistinguishable from a phone's and a desktop-only event would buzz
+ * the same person's mobile. Same endpoint the mobile app uses.
+ */
+export async function updateFcmTokenAPI(
+  fcmToken: string,
+  options?: { platform?: 'web' | 'android' | 'ios'; language?: string }
+): Promise<{ success?: boolean }> {
+  return apiRequest('/users/update-fcm-token/', {
+    method: 'POST',
+    body: JSON.stringify({
+      fcm_token: fcmToken,
+      platform: options?.platform ?? 'web',
+      ...(options?.language ? { language: options.language } : {}),
+    }),
+  });
 }
 
 export async function getNotificationsAPI(params?: { page?: number; page_size?: number; read?: boolean }) {

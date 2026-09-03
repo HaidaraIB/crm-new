@@ -8,7 +8,7 @@ import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import { useUpdateUser } from '../../hooks/useQueries';
-import { normalizeRoleForApi } from '../../utils/roles';
+import { normalizeRoleForApi, roleHasScheduleSettings } from '../../utils/roles';
 import { validateEmailField, validatePhoneField, validatePasswordField, validateNameField } from '../../utils/formValidation';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
@@ -73,23 +73,18 @@ export const EditUserModal = () => {
             payload.password = state.password;
         }
 
-        if (
-            roleToSend === 'employee' ||
-            roleToSend === 'data_entry' ||
-            roleToSend === 'doctor' ||
-            roleToSend === 'reception'
-        ) {
+        if (roleHasScheduleSettings(roleToSend)) {
             payload.weekly_day_off =
                 state.weeklyDayOff === '' ? null : parseInt(state.weeklyDayOff, 10);
+            const start = state.workStartTime.trim();
+            const end = state.workEndTime.trim();
+            payload.work_start_time = start || null;
+            payload.work_end_time = end || null;
         }
         if (roleToSend === 'employee' || roleToSend === 'doctor') {
             payload.can_delete_clients = state.canDeleteClients;
             payload.whatsapp_chat_enabled = state.whatsappChatEnabled;
             payload.whatsapp_call_enabled = state.whatsappCallEnabled;
-            const start = state.workStartTime.trim();
-            const end = state.workEndTime.trim();
-            payload.work_start_time = start || null;
-            payload.work_end_time = end || null;
         }
 
         return payload;
@@ -215,7 +210,7 @@ export const EditUserModal = () => {
         const passwordError = validatePasswordField(formState.password, t, { required: false });
         if (passwordError) newErrors.password = passwordError;
 
-        if (formState.role === 'employee' || formState.role === 'doctor') {
+        if (roleHasScheduleSettings(formState.role)) {
             const start = formState.workStartTime.trim();
             const end = formState.workEndTime.trim();
             if ((start && !end) || (!start && end)) {
@@ -448,7 +443,7 @@ export const EditUserModal = () => {
                     </div>
                 )}
                 {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
-                    (formState.role === 'employee' || formState.role === 'data_entry' || formState.role === 'doctor' || formState.role === 'reception') && (
+                    roleHasScheduleSettings(formState.role) && (
                     <div>
                         <Label htmlFor="edit-user-weeklyDayOff">{t('weeklyDayOff')}</Label>
                         <Select
@@ -472,7 +467,7 @@ export const EditUserModal = () => {
                     handled by "Mark unavailable" on the employee card, which expires by
                     itself instead of leaving a date window to remember to clear. */}
                 {normalizeRoleForApi(selectedUser.role) !== 'admin' &&
-                    (formState.role === 'employee' || formState.role === 'doctor') && (
+                    roleHasScheduleSettings(formState.role) && (
                     <div>
                         <Label htmlFor="edit-user-workStartTime">{t('workingHours')}</Label>
                         <div className="grid grid-cols-2 gap-3">

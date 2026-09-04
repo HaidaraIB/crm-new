@@ -3,6 +3,8 @@
  * URL is the source of truth; storage is backup for gateway redirects / FIB.
  */
 
+import { clearPaymentAccessToken } from './paymentAuth';
+
 export const PENDING_SUBSCRIPTION_ID_KEY = 'pendingSubscriptionId';
 export const FIB_LATEST_SUBSCRIPTION_ID_KEY = 'fibPaymentLatestSubscriptionId';
 const FIB_DATA_PREFIX = 'fibPaymentData:';
@@ -95,6 +97,9 @@ export function clearFibPaymentSession(subscriptionId?: string | number | null):
 export function clearPaymentSessionHandoff(subscriptionId?: string | number | null): void {
   clearPendingSubscriptionId();
   clearFibPaymentSession(subscriptionId);
+  // The checkout-only token exists solely to get through this flow; once the
+  // flow is over it is dead weight. A new one is minted on the next login.
+  clearPaymentAccessToken();
 }
 
 /**

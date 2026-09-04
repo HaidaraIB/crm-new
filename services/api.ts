@@ -275,6 +275,44 @@ export type LoginVerificationAction = {
   description?: string;
 };
 
+/**
+ * `subscriptionId` / `paymentToken` from an inactive-subscription login error.
+ *
+ * The unified envelope nests both under `error.details`, but the older login
+ * shapes put them at the top level, so check both. `paymentToken` is the
+ * checkout-only credential the backend mints for an owner whose subscription
+ * lapsed — without it they cannot authenticate to pay at all.
+ */
+function readLoginErrorMeta(errorData: unknown): {
+  subscriptionId?: string;
+  paymentToken?: string;
+} {
+  const meta: { subscriptionId?: string; paymentToken?: string } = {};
+  if (errorData == null || typeof errorData !== 'object') return meta;
+
+  const sources: Record<string, unknown>[] = [errorData as Record<string, unknown>];
+  const envelope = errorData as Record<string, unknown>;
+  if (envelope.error && typeof envelope.error === 'object') {
+    sources.push(envelope.error as Record<string, unknown>);
+  }
+  const details = getErrorDetailsFromBody(errorData);
+  if (details && typeof details === 'object' && !Array.isArray(details)) {
+    sources.push(details as Record<string, unknown>);
+  }
+
+  for (const source of sources) {
+    if (meta.subscriptionId == null) {
+      const sid = source.subscriptionId ?? source.subscription_id;
+      // The backend stringifies a missing id as "None" (DRF ErrorDetail coercion).
+      if (sid != null && sid !== '' && sid !== 'None') meta.subscriptionId = String(sid);
+    }
+    if (meta.paymentToken == null && typeof source.paymentToken === 'string' && source.paymentToken) {
+      meta.paymentToken = source.paymentToken;
+    }
+  }
+  return meta;
+}
+
 function throwApiError(errorData: unknown, fallbackMessage: string): never {
   const message = getErrorMessageFromBody(errorData) || fallbackMessage;
   const err: Error & {
@@ -282,6 +320,7 @@ function throwApiError(errorData: unknown, fallbackMessage: string): never {
     code?: string;
     fields?: Record<string, unknown>;
     subscriptionId?: string;
+    paymentToken?: string;
     hint?: string;
     actions?: LoginVerificationAction[];
     changeCredentialsNote?: string;
@@ -293,24 +332,17 @@ function throwApiError(errorData: unknown, fallbackMessage: string): never {
   if (code) err.code = code;
   attachErrorFields(err, errorData);
   const raw = errorData as Record<string, unknown> | null;
-  let sid = raw && (raw.subscriptionId ?? raw.subscription_id);
   if (raw && raw.success === false && raw.error && typeof raw.error === 'object') {
     const er = raw.error as Record<string, unknown>;
-    if (sid == null) {
-      sid = er.subscriptionId ?? er.subscription_id;
-    }
-    const details = er.details;
-    if (sid == null && details && typeof details === 'object' && !Array.isArray(details)) {
-      const d = details as Record<string, unknown>;
-      sid = d.subscriptionId ?? d.subscription_id;
-    }
     if (typeof er.hint === 'string') err.hint = er.hint;
     if (Array.isArray(er.actions)) err.actions = er.actions as LoginVerificationAction[];
     if (typeof er.change_credentials_note === 'string') err.changeCredentialsNote = er.change_credentials_note;
     if (typeof er.verify_email_url === 'string') err.verifyEmailUrl = er.verify_email_url;
     if (typeof er.verify_phone_url === 'string') err.verifyPhoneUrl = er.verify_phone_url;
   }
-  if (sid != null) err.subscriptionId = String(sid);
+  const meta = readLoginErrorMeta(errorData);
+  if (meta.subscriptionId) err.subscriptionId = meta.subscriptionId;
+  if (meta.paymentToken) err.paymentToken = meta.paymentToken;
   throw err;
 }
 
@@ -1777,8 +1809,10 @@ export const requestTwoFactorAuthAPI = async (
         isInactiveSubscriptionForbidden(String(apiCode || ''), msg)
       ) {
         const subscriptionError: any = new Error(getApiErrorMessage(raw, 'SUBSCRIPTION_INACTIVE'));
+        const meta = readLoginErrorMeta(raw);
         subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
-        subscriptionError.subscriptionId = raw?.subscriptionId ?? raw?.subscription_id;
+        subscriptionError.subscriptionId = meta.subscriptionId;
+        subscriptionError.paymentToken = meta.paymentToken;
         subscriptionError.status = response.status;
         throw subscriptionError;
       }
@@ -1878,8 +1912,10 @@ export const verifyTwoFactorAuthAPI = async (payload: {
       isInactiveSubscriptionForbidden(String(apiCode || ''), msg)
     ) {
       const subscriptionError: any = new Error(getApiErrorMessage(raw, 'SUBSCRIPTION_INACTIVE'));
+      const meta = readLoginErrorMeta(raw);
       subscriptionError.code = 'SUBSCRIPTION_INACTIVE';
-      subscriptionError.subscriptionId = (raw as any)?.subscriptionId ?? (raw as any)?.subscription_id;
+      subscriptionError.subscriptionId = meta.subscriptionId;
+      subscriptionError.paymentToken = meta.paymentToken;
       throw subscriptionError;
     }
 

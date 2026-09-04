@@ -10,3 +10,4 @@ export { ViewModeToggle } from './ViewModeToggle';
 export { KanbanBoard } from './KanbanBoard';
 export { KanbanColumn } from './KanbanColumn';
 export { KanbanCardShell } from './KanbanCardShell';
+export { reconcileKanbanColumns } from './reconcileColumns';

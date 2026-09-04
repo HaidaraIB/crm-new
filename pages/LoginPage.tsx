@@ -6,6 +6,7 @@ import { loginAPI, getCurrentUserAPI } from '../services/api';
 import { AuthHero } from '../components/AuthHero';
 import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
+import { clearPaymentAccessToken, storePaymentAccessToken } from '../utils/paymentAuth';
 
 export const LoginPage = () => {
     // Check if this is a logout redirect and clear any remaining data
@@ -238,6 +239,8 @@ export const LoginPage = () => {
 
             localStorage.setItem('accessToken', accessToken);
             localStorage.setItem('refreshToken', refreshToken);
+            // A real session supersedes any leftover checkout-only token.
+            clearPaymentAccessToken();
             localStorage.removeItem('currentUser');
             localStorage.setItem('currentUser', JSON.stringify(frontendUser));
             localStorage.setItem('isLoggedIn', 'true');
@@ -271,6 +274,9 @@ export const LoginPage = () => {
             } 
             // Check if it's a subscription inactive error (for admins)
             else if (isSubscriptionInactiveError(errorCode, errorMessage)) {
+                // Login issued no session, but the backend mints a checkout-only
+                // token here so the owner can still reach the payment page.
+                storePaymentAccessToken(error.paymentToken);
                 const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
                 if (subId) {
                     setSubscriptionId(String(subId));

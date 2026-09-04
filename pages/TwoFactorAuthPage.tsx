@@ -11,6 +11,7 @@ import {
 import { validateOtpCodeField } from '../utils/formValidation';
 import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
+import { storePaymentAccessToken } from '../utils/paymentAuth';
 
 export const TwoFactorAuthPage = () => {
     const { setIsLoggedIn, setCurrentUser, setCurrentPage, t, language, setLanguage, theme, setTheme, isLoggedIn, setIsCompanySubscriptionInactive } = useAppContext();
@@ -314,6 +315,9 @@ export const TwoFactorAuthPage = () => {
             } 
             // Check if it's a subscription inactive error (for admins)
             else if (error.code === 'SUBSCRIPTION_INACTIVE' || errorMessage === 'SUBSCRIPTION_INACTIVE') {
+                // Checkout-only token: the completePayment link below is the only
+                // route left for an owner who cannot finish signing in.
+                storePaymentAccessToken(error.paymentToken);
                 const subId = error.subscriptionId || localStorage.getItem('pendingSubscriptionId');
                 if (subId) {
                     setSubscriptionId(parseInt(subId));

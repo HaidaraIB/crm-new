@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
 import { Button, SectionLoadingState } from '../index';
-import { KanbanBoard, type KanbanColumnDef, type KanbanMoveEvent } from '../kanban';
+import {
+    KanbanBoard,
+    reconcileKanbanColumns,
+    type KanbanColumnDef,
+    type KanbanMoveEvent,
+} from '../kanban';
 import { DealKanbanCard, type DealKanbanCardModel } from './DealKanbanCard';
 import { getDealsAPI, patchDealAPI } from '../../services/api';
 import { queryKeys } from '../../hooks/useQueries';
@@ -138,9 +143,12 @@ export const DealsKanbanView = ({
 
     const seedToken = filtersKey;
     const seededTokenRef = useRef('');
+    /** Ids seen on page 1 at the last seed/reconcile — lets us detect deletions. */
+    const firstPageIdsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         seededTokenRef.current = '';
+        firstPageIdsRef.current = new Set();
         setItemsByColumn({});
         setColumnPages({});
         setHasMoreByColumn({});
@@ -165,36 +173,73 @@ export const DealsKanbanView = ({
 
     useEffect(() => {
         if (!enabled) return;
-        if (seededTokenRef.current === seedToken) return;
         if (!columnQueries.every((q) => q.isSuccess || q.isError)) return;
 
-        const nextItems: Record<string, DealKanbanCardModel[]> = {};
-        const nextHasMore: Record<string, boolean> = {};
-        const nextCounts: Record<string, number> = {};
+        const freshItems: Record<string, DealKanbanCardModel[]> = {};
+        const freshHasMore: Record<string, boolean> = {};
+        const freshCounts: Record<string, number> = {};
 
         DEAL_STAGE_ORDER.forEach((stage, index) => {
             const query = columnQueries[index];
             if (!query?.isSuccess || !query.data) {
-                nextItems[stage] = [];
-                nextHasMore[stage] = false;
-                nextCounts[stage] = 0;
+                freshItems[stage] = [];
+                freshHasMore[stage] = false;
+                freshCounts[stage] = 0;
                 return;
             }
             const mapped = (query.data.results || [])
                 .map(normalizeDeal)
                 .filter((d) => matchesClientFilters(d, dealFilters, isRealEstate));
-            nextItems[stage] = mapped;
-            nextHasMore[stage] = Boolean(query.data.next);
-            nextCounts[stage] = query.data.count ?? mapped.length;
+            freshItems[stage] = mapped;
+            freshHasMore[stage] = Boolean(query.data.next);
+            freshCounts[stage] = query.data.count ?? mapped.length;
         });
 
-        setItemsByColumn(nextItems);
-        setHasMoreByColumn(nextHasMore);
-        setCountsByColumn(nextCounts);
-        setColumnPages({});
-        seededTokenRef.current = seedToken;
+        const collectFirstPageIds = () => {
+            const ids = new Set<string>();
+            Object.values(freshItems).forEach((list) =>
+                list.forEach((deal) => ids.add(String(deal.id))),
+            );
+            return ids;
+        };
+
+        if (seededTokenRef.current !== seedToken) {
+            setItemsByColumn(freshItems);
+            setHasMoreByColumn(freshHasMore);
+            setCountsByColumn(freshCounts);
+            setColumnPages({});
+            firstPageIdsRef.current = collectFirstPageIds();
+            seededTokenRef.current = seedToken;
+            return;
+        }
+
+        // Refetch after a delete/edit elsewhere: fold server truth back into the board
+        // without discarding load-more pages. Skipped mid-drag so the optimistic card
+        // isn't snapped back by a refetch that raced the PATCH.
+        if (movingId) return;
+
+        const prevFirstPageIds = firstPageIdsRef.current;
+        setItemsByColumn(
+            (prev) =>
+                reconcileKanbanColumns({
+                    current: prev,
+                    fresh: freshItems,
+                    prevFirstPageIds,
+                    getItemId: (deal) => deal.id,
+                }).next,
+        );
+        setHasMoreByColumn((prev) => {
+            const next = { ...prev };
+            Object.entries(freshHasMore).forEach(([stage, hasMore]) => {
+                // Columns showing extra pages keep the flag from their last load-more.
+                if ((columnPages[stage] ?? 1) <= 1) next[stage] = hasMore;
+            });
+            return next;
+        });
+        setCountsByColumn(freshCounts);
+        firstPageIdsRef.current = collectFirstPageIds();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataStamp, enabled, seedToken]);
+    }, [dataStamp, enabled, seedToken, movingId]);
 
     const columns: KanbanColumnDef[] = useMemo(
         () =>

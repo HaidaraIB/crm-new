@@ -2,7 +2,12 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQueries, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
 import { Button, SectionLoadingState } from '../index';
-import { KanbanBoard, type KanbanColumnDef, type KanbanMoveEvent } from '../kanban';
+import {
+    KanbanBoard,
+    reconcileKanbanColumns,
+    type KanbanColumnDef,
+    type KanbanMoveEvent,
+} from '../kanban';
 import { LeadKanbanCard, type LeadKanbanCardModel } from './LeadKanbanCard';
 import { getLeadsAPI, patchLeadAPI } from '../../services/api';
 import { queryKeys } from '../../hooks/useQueries';
@@ -126,9 +131,12 @@ export const LeadsKanbanView = ({
     /** Bumps when filters/statuses change so page-1 queries can re-seed local state. */
     const seedToken = `${filtersKey}|${statusIdsKey}`;
     const seededTokenRef = useRef('');
+    /** Ids seen on page 1 at the last seed/reconcile — lets us detect deletions. */
+    const firstPageIdsRef = useRef<Set<string>>(new Set());
 
     useEffect(() => {
         seededTokenRef.current = '';
+        firstPageIdsRef.current = new Set();
         setItemsByColumn({});
         setColumnPages({});
         setHasMoreByColumn({});
@@ -151,33 +159,69 @@ export const LeadsKanbanView = ({
 
     useEffect(() => {
         if (!enabled) return;
-        if (seededTokenRef.current === seedToken) return;
         if (visibleStatuses.length === 0) return;
         if (!columnQueries.every((q) => q.isSuccess || q.isError)) return;
 
-        const nextItems: Record<string, LeadKanbanCardModelWithMeta[]> = {};
-        const nextHasMore: Record<string, boolean> = {};
+        const freshItems: Record<string, LeadKanbanCardModelWithMeta[]> = {};
+        const freshHasMore: Record<string, boolean> = {};
 
         visibleStatuses.forEach((status, index) => {
             const query = columnQueries[index];
             const colKey = String(status.id);
             if (!query?.isSuccess || !query.data) {
-                nextItems[colKey] = [];
-                nextHasMore[colKey] = false;
+                freshItems[colKey] = [];
+                freshHasMore[colKey] = false;
                 return;
             }
-            nextItems[colKey] = (query.data.results || []).map((raw: any) =>
+            freshItems[colKey] = (query.data.results || []).map((raw: any) =>
                 toLeadCard(raw, status.id, status.name),
             );
-            nextHasMore[colKey] = Boolean(query.data.next);
+            freshHasMore[colKey] = Boolean(query.data.next);
         });
 
-        setItemsByColumn(nextItems);
-        setHasMoreByColumn(nextHasMore);
-        setColumnPages({});
-        seededTokenRef.current = seedToken;
+        const collectFirstPageIds = () => {
+            const ids = new Set<string>();
+            Object.values(freshItems).forEach((list) =>
+                list.forEach((lead) => ids.add(String(lead.id))),
+            );
+            return ids;
+        };
+
+        if (seededTokenRef.current !== seedToken) {
+            setItemsByColumn(freshItems);
+            setHasMoreByColumn(freshHasMore);
+            setColumnPages({});
+            firstPageIdsRef.current = collectFirstPageIds();
+            seededTokenRef.current = seedToken;
+            return;
+        }
+
+        // Refetch after a delete/edit elsewhere: fold server truth back into the board
+        // without discarding load-more pages. Skipped mid-drag so the optimistic card
+        // isn't snapped back by a refetch that raced the PATCH.
+        if (movingId) return;
+
+        const prevFirstPageIds = firstPageIdsRef.current;
+        setItemsByColumn(
+            (prev) =>
+                reconcileKanbanColumns({
+                    current: prev,
+                    fresh: freshItems,
+                    prevFirstPageIds,
+                    getItemId: (lead) => lead.id,
+                }).next,
+        );
+        setHasMoreByColumn((prev) => {
+            const next = { ...prev };
+            Object.entries(freshHasMore).forEach(([colKey, hasMore]) => {
+                // Columns showing extra pages keep the flag from their last load-more.
+                if ((columnPages[colKey] ?? 1) <= 1) next[colKey] = hasMore;
+            });
+            return next;
+        });
+        firstPageIdsRef.current = collectFirstPageIds();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataStamp, enabled, seedToken]);
+    }, [dataStamp, enabled, seedToken, movingId]);
 
     const columns: KanbanColumnDef[] = useMemo(
         () =>

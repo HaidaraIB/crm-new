@@ -181,7 +181,16 @@ export function resolveLocalizedApiError(
       : undefined;
   const rawCode = legacyKey || getApiErrorCode(data) || e?.code;
   const micCode = detectMicPermissionErrorCode(e);
-  const code = micCode || rawCode;
+  const apiMessage = getApiErrorMessage(data, '') || (typeof e?.message === 'string' ? e.message : '');
+  // Some endpoints historically put the business key in `message` while leaving
+  // `code` as the generic "error" — prefer a snake_case message as the lookup key.
+  const messageAsKey =
+    apiMessage &&
+    /^[a-z][a-z0-9_]+$/.test(apiMessage) &&
+    (!rawCode || rawCode === 'error')
+      ? apiMessage
+      : undefined;
+  const code = micCode || messageAsKey || rawCode;
   const details = getApiErrorDetails(data);
   let metaMsg = '';
   if (details && typeof details === 'object' && details !== null) {
@@ -198,8 +207,10 @@ export function resolveLocalizedApiError(
     }
   }
   const base =
-    (typeof e?.message === 'string' && e.message) ||
-    getApiErrorMessage(data, '') ||
+    (typeof e?.message === 'string' && e.message && !/^[a-z][a-z0-9_]+$/.test(e.message)
+      ? e.message
+      : '') ||
+    (apiMessage && !/^[a-z][a-z0-9_]+$/.test(apiMessage) ? apiMessage : '') ||
     fallback;
   // Prefer CRM fallback over raw browser/Meta English when we have a better fallback.
   if (micCode && t) {
@@ -3821,10 +3832,21 @@ export const getWhatsAppContactByPhoneAPI = async (
 
 /**
  * GET /api/integrations/whatsapp/conversations/
- * قائمة العملاء الذين لديهم محادثات واتساب (مركز المراسلات)
+ * Filterable conversation list with sidebar counts (Mujeb-style rail).
  */
-export const getWhatsAppConversationsAPI = async (): Promise<
-  Array<{
+export const getWhatsAppConversationsAPI = async (params?: {
+  status?: string;
+  assignment?: string;
+  agent?: number;
+  starred?: boolean;
+  unreplied?: boolean;
+  search?: string;
+  ordering?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{
+  count: number;
+  results: Array<{
     id: number;
     name: string;
     phone_number: string;
@@ -3832,11 +3854,65 @@ export const getWhatsAppConversationsAPI = async (): Promise<
     lead_company_name?: string;
     last_message_at?: string | null;
     last_message_preview?: string;
+    last_message_direction?: string;
     assigned_to_id?: number | null;
     unread_count?: number;
-  }>
-> => {
-  return conditionalGet<any[]>(`/integrations/whatsapp/conversations/`);
+    status?: string;
+    snoozed_until?: string | null;
+    is_starred?: boolean;
+    is_unsubscribed?: boolean;
+  }>;
+  status_counts: Record<string, number>;
+  assignment_counts: {
+    all: number;
+    mine: number;
+    unassigned: number;
+    starred: number;
+    unreplied: number;
+  };
+}> => {
+  const q = new URLSearchParams();
+  if (params?.status) q.set('status', params.status);
+  if (params?.assignment) q.set('assignment', params.assignment);
+  if (params?.agent != null) q.set('agent', String(params.agent));
+  if (params?.starred) q.set('starred', '1');
+  if (params?.unreplied) q.set('unreplied', '1');
+  if (params?.search) q.set('search', params.search);
+  if (params?.ordering) q.set('ordering', params.ordering);
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  if (params?.offset != null) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return conditionalGet(
+    `/integrations/whatsapp/conversations/${qs ? `?${qs}` : ''}`
+  );
+};
+
+/** POST /api/integrations/whatsapp/conversations/state/ */
+export const updateWhatsAppConversationStateAPI = async (params: {
+  clientId: number;
+  status?: string;
+  snoozedUntil?: string | null;
+  isStarred?: boolean;
+  isUnsubscribed?: boolean;
+}): Promise<{
+  client_id: number;
+  status: string;
+  snoozed_until: string | null;
+  is_starred: boolean;
+  is_unsubscribed: boolean;
+  status_changed_at?: string | null;
+}> => {
+  const body: Record<string, string | number | boolean | null> = {
+    client: params.clientId,
+  };
+  if (params.status !== undefined) body.status = params.status;
+  if (params.snoozedUntil !== undefined) body.snoozed_until = params.snoozedUntil;
+  if (params.isStarred !== undefined) body.is_starred = params.isStarred;
+  if (params.isUnsubscribed !== undefined) body.is_unsubscribed = params.isUnsubscribed;
+  return apiRequest(`/integrations/whatsapp/conversations/state/`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 };
 
 /** GET /api/integrations/whatsapp/unread-count/ — scoped to assignee for staff. */

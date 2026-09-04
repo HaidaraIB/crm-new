@@ -8,6 +8,7 @@ import { PageWrapper, Button, Modal } from '../components/index';
 import {
   ChatBubbleIcon,
   CheckIcon,
+  UsersIcon,
   ChevronDownIcon,
   MicrophoneIcon,
   PaperclipIcon,
@@ -1508,7 +1509,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
           <div className="border-b border-gray-200/80 dark:border-gray-700 p-3">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[11px] font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
-                {t('teamChat') || 'Team Chat'}
+                {t('teamChat')}
               </p>
               {totalUnread > 0 ? (
                 <span
@@ -1772,9 +1773,27 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                     <span className="inline-block size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
                   </div>
                 ) : messages.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-sm text-gray-500 dark:text-gray-400">
-                    <ChatBubbleIcon className="mb-2 size-8 opacity-40" />
-                    {t('teamChatNoMessagesYet')}
+                  <div
+                    className="flex min-h-full flex-col items-center justify-center py-16 text-center"
+                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                  >
+                    <div className="mb-4 flex size-20 items-center justify-center rounded-full bg-primary/15 text-primary">
+                      {selected && tenantChatConvIsGroup(selected) ? (
+                        <UsersIcon className="size-10 opacity-90" aria-hidden />
+                      ) : (
+                        <ChatBubbleIcon className="size-10 opacity-90" aria-hidden />
+                      )}
+                    </div>
+                    <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                      {t('teamChatEmptyTitle')}
+                    </p>
+                    <p className="mt-1.5 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+                      {t(
+                        selected && tenantChatConvIsGroup(selected)
+                          ? 'teamChatEmptyGroupHint'
+                          : 'teamChatEmptyDirectHint'
+                      )}
+                    </p>
                   </div>
                 ) : (
                   <div ref={messagesScrollContentRef} className="mx-auto flex max-w-3xl flex-col gap-3">

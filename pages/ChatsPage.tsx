@@ -11,10 +11,19 @@ import {
 } from '../components/chat/chatMediaAlbum';
 import { StartNewConversationModal } from '../components/modals/StartNewConversationModal';
 import { ShareLocationModal } from '../components/modals/ShareLocationModal';
-import { WhatsAppChatLayout, type ChatBubbleMessage } from '../components/whatsapp/WhatsAppChatLayout';
+import { ChatFilterRail } from '../components/whatsapp/ChatFilterRail';
+import { WhatsAppChatLayout, type ChatBubbleMessage, type ConversationListAction } from '../components/whatsapp/WhatsAppChatLayout';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { useAppContext } from '../context/AppContext';
-import { queryKeys, useConnectedAccounts, useMarkWhatsAppConversationRead, useWhatsAppChatMessages, useWhatsAppConversations } from '../hooks/useQueries';
+import {
+  queryKeys,
+  useConnectedAccounts,
+  useMarkWhatsAppConversationRead,
+  useUpdateWhatsAppConversationState,
+  useUsers,
+  useWhatsAppChatMessages,
+  useWhatsAppConversations,
+} from '../hooks/useQueries';
 import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
 import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
@@ -34,10 +43,16 @@ import {
   type MessageTemplateType,
   type WhatsAppCallRecord,
 } from '../services/api';
+import type { WhatsAppChatFilters } from '../types';
 import { getUserDisplayName } from '../types';
 import { compressImageForChat } from '../utils/compressImageForChat';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { normalizeRole } from '../utils/roles';
+import { normalizeRole, usersForOperationalEmployeeLists } from '../utils/roles';
+import {
+  DEFAULT_WHATSAPP_CHAT_FILTERS,
+  whatsappChatFiltersAreDefault,
+  whatsappChatFiltersToApiParams,
+} from '../utils/whatsappChatFilters';
 import {
   buildManualClientForPhone,
   isManualChatClient,
@@ -104,10 +119,51 @@ export const ChatsPage: React.FC = () => {
   const senderName = currentUser ? getUserDisplayName(currentUser) : '';
   const role = normalizeRole(currentUser?.role);
   const isStaff = role === 'Employee' || role === 'Doctor';
+  const isOwner = role === 'Owner';
+  const canDeleteWhatsAppHistory = isOwner;
+  const canSeeAllLeads =
+    role === 'Owner' ||
+    role === 'Reception' ||
+    role === 'DataEntry' ||
+    (role === 'Supervisor' && hasSupervisorPermission('can_manage_leads'));
   const chatAccessAllowed =
     role === 'Supervisor'
       ? hasSupervisorPermission('can_manage_whatsapp_chats')
       : currentUser?.whatsapp_chat_enabled !== false;
+
+  const [chatFilters, setChatFilters] = useState<WhatsAppChatFilters>(DEFAULT_WHATSAPP_CHAT_FILTERS);
+  const [searchDraft, setSearchDraft] = useState('');
+  const updateConversationState = useUpdateWhatsAppConversationState();
+  /** Keeps header status/star when a change moves the chat out of the active list filter. */
+  const [threadStateOverride, setThreadStateOverride] = useState<{
+    clientId: number;
+    status?: string;
+    isStarred?: boolean;
+    isUnsubscribed?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!isStaff) return;
+    setChatFilters((prev) =>
+      prev.assignment === 'all' && !prev.agent
+        ? prev
+        : { ...prev, assignment: 'all', agent: '' }
+    );
+  }, [isStaff]);
+
+  useEffect(() => {
+    const tmr = window.setTimeout(() => {
+      setChatFilters((prev) =>
+        prev.search === searchDraft ? prev : { ...prev, search: searchDraft }
+      );
+    }, 300);
+    return () => window.clearTimeout(tmr);
+  }, [searchDraft]);
+
+  const apiParams = useMemo(
+    () => whatsappChatFiltersToApiParams(chatFilters),
+    [chatFilters]
+  );
 
   const showAlert = (message: string, variant: 'info' | 'warning' | 'error' = 'info') => {
     setAlertMessage(message);
@@ -212,7 +268,7 @@ export const ChatsPage: React.FC = () => {
    */
   useInvalidateOnSliceChange(
     'chat',
-    [queryKeys.whatsAppConversations, ['whatsappChatMessages']],
+    [['whatsAppConversations'], ['whatsappChatMessages']],
     { enabled: chatsAllowed }
   );
   useInvalidateOnSliceChange('calls', [['whatsappCalls', 'thread']], {
@@ -224,11 +280,37 @@ export const ChatsPage: React.FC = () => {
   const realtimeConnected = useRealtimeConnected();
   const chatPollMs = realtimeConnected ? 30000 : 6000;
 
-  const { data: conversationsList = [], refetch: refetchConversations } = useWhatsAppConversations({
+  const {
+    data: conversationsPayload,
+    refetch: refetchConversations,
+  } = useWhatsAppConversations(apiParams, {
     enabled: chatsAllowed,
     refetchInterval: chatsAllowed ? chatPollMs : false,
   });
 
+  const conversationsList = conversationsPayload?.results ?? [];
+  const statusCounts = conversationsPayload?.status_counts ?? {};
+  const assignmentCounts = conversationsPayload?.assignment_counts ?? {};
+
+  const { data: usersResponse } = useUsers(undefined, { enabled: canSeeAllLeads });
+  const agentInitialsById = useMemo(() => {
+    const map = new Map<number, string>();
+    const base = usersResponse?.results ?? usersResponse ?? [];
+    const list = usersForOperationalEmployeeLists(
+      Array.isArray(base) ? base : [],
+      currentUser ?? null
+    );
+    for (const u of list as any[]) {
+      const name = getUserDisplayName(u) || '';
+      const parts = name.trim().split(/\s+/).filter(Boolean);
+      const initials =
+        parts.length >= 2
+          ? `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase()
+          : (name.slice(0, 2) || '?').toUpperCase();
+      map.set(u.id, initials);
+    }
+    return map;
+  }, [usersResponse, currentUser]);
   const selectedChatLeadId =
     selectedChatClient && typeof selectedChatClient.id === 'number' ? selectedChatClient.id : undefined;
   const selectedChatPhone = selectedChatClient ? normalizeChatPhone(selectedChatClient) : '';
@@ -519,11 +601,26 @@ export const ChatsPage: React.FC = () => {
         name: c.name,
         phone_number: c.phone_number || '',
         lead_company_name: c.lead_company_name || '',
+        assigned_to_id: c.assigned_to_id ?? null,
+        status: c.status || 'open',
+        snoozed_until: c.snoozed_until ?? null,
+        is_starred: Boolean(c.is_starred),
+        is_unsubscribed: Boolean(c.is_unsubscribed),
       },
       lastMessagePreview: c.last_message_preview || '',
       lastMessageAt: c.last_message_at || null,
       unreadCount: Number(c.unread_count) > 0 ? Number(c.unread_count) : 0,
+      status: c.status || 'open',
+      snoozedUntil: c.snoozed_until ?? null,
+      isStarred: Boolean(c.is_starred),
+      isUnsubscribed: Boolean(c.is_unsubscribed),
+      assignedToId: c.assigned_to_id ?? null,
+      assignedToInitials:
+        c.assigned_to_id != null ? agentInitialsById.get(c.assigned_to_id) : undefined,
     }));
+    if (!whatsappChatFiltersAreDefault(chatFilters) || isStaff) {
+      return fromApi;
+    }
     const extra = extraConversations.filter((e) => {
       const ep = normalizeChatPhone(e.client);
       return !fromApi.some((a) => {
@@ -538,10 +635,120 @@ export const ChatsPage: React.FC = () => {
         lastMessagePreview: '',
         lastMessageAt: null,
         unreadCount: 0,
+        status: 'open',
+        snoozedUntil: null,
+        isStarred: false,
+        isUnsubscribed: false,
+        assignedToId: null,
       })),
     ];
-  }, [conversationsList, extraConversations]);
+  }, [conversationsList, extraConversations, chatFilters, isStaff, agentInitialsById]);
 
+  const selectedConversationMeta = useMemo(() => {
+    if (!selectedChatClient || typeof selectedChatClient.id !== 'number') return null;
+    return conversations.find((c) => c.client.id === selectedChatClient.id) ?? null;
+  }, [conversations, selectedChatClient]);
+
+  useEffect(() => {
+    setThreadStateOverride(null);
+  }, [selectedChatClient?.id]);
+
+  const threadStatusForHeader = useMemo(() => {
+    const clientId =
+      selectedChatClient && typeof selectedChatClient.id === 'number'
+        ? selectedChatClient.id
+        : null;
+    if (
+      clientId != null &&
+      threadStateOverride?.clientId === clientId &&
+      threadStateOverride.status
+    ) {
+      return threadStateOverride.status;
+    }
+    return selectedConversationMeta?.status || 'open';
+  }, [selectedChatClient, selectedConversationMeta, threadStateOverride]);
+
+  const threadStarredForHeader = useMemo(() => {
+    const clientId =
+      selectedChatClient && typeof selectedChatClient.id === 'number'
+        ? selectedChatClient.id
+        : null;
+    if (
+      clientId != null &&
+      threadStateOverride?.clientId === clientId &&
+      threadStateOverride.isStarred !== undefined
+    ) {
+      return threadStateOverride.isStarred;
+    }
+    return Boolean(selectedConversationMeta?.isStarred);
+  }, [selectedChatClient, selectedConversationMeta, threadStateOverride]);
+
+  const threadUnsubscribedForHeader = useMemo(() => {
+    const clientId =
+      selectedChatClient && typeof selectedChatClient.id === 'number'
+        ? selectedChatClient.id
+        : null;
+    if (
+      clientId != null &&
+      threadStateOverride?.clientId === clientId &&
+      threadStateOverride.isUnsubscribed !== undefined
+    ) {
+      return threadStateOverride.isUnsubscribed;
+    }
+    return Boolean(selectedConversationMeta?.isUnsubscribed);
+  }, [selectedChatClient, selectedConversationMeta, threadStateOverride]);
+
+  const patchThreadOverride = (
+    clientId: number,
+    patch: { status?: string; isStarred?: boolean; isUnsubscribed?: boolean }
+  ) => {
+    setThreadStateOverride((prev) => ({
+      clientId,
+      status: patch.status ?? (prev?.clientId === clientId ? prev.status : undefined),
+      isStarred:
+        patch.isStarred ?? (prev?.clientId === clientId ? prev.isStarred : undefined),
+      isUnsubscribed:
+        patch.isUnsubscribed ??
+        (prev?.clientId === clientId ? prev.isUnsubscribed : undefined),
+    }));
+  };
+
+  const applyConversationAction = (
+    client: any,
+    action: ConversationListAction
+  ) => {
+    if (typeof client?.id !== 'number' || client.id <= 0) return;
+    if (action.type === 'delete') {
+      handleDeleteConversation(client);
+      return;
+    }
+    if (action.type === 'status') {
+      patchThreadOverride(client.id, { status: action.status });
+      updateConversationState.mutate({ clientId: client.id, status: action.status });
+      return;
+    }
+    if (action.type === 'snooze') {
+      patchThreadOverride(client.id, { status: 'snoozed' });
+      updateConversationState.mutate({
+        clientId: client.id,
+        status: 'snoozed',
+        snoozedUntil: action.snoozedUntil,
+      });
+      return;
+    }
+    if (action.type === 'star') {
+      patchThreadOverride(client.id, { isStarred: action.starred });
+      updateConversationState.mutate({ clientId: client.id, isStarred: action.starred });
+      return;
+    }
+    if (action.type === 'unsubscribe') {
+      patchThreadOverride(client.id, { isUnsubscribed: action.unsubscribed });
+      updateConversationState.mutate({
+        clientId: client.id,
+        isUnsubscribed: action.unsubscribed,
+      });
+    }
+  };
   const formatChatTime = () =>
     new Date().toLocaleTimeString(
       language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
@@ -1064,6 +1271,10 @@ export const ChatsPage: React.FC = () => {
     const run = async () => {
       try {
         if (msg.apiId) {
+          if (!canDeleteWhatsAppHistory) {
+            showAlert(t('whatsappDeleteForbidden'), 'error');
+            return;
+          }
           await deleteWhatsAppMessageAPI(msg.apiId);
           await refetchLeadWhatsApp();
         } else if (selectedChatClient) {
@@ -1128,7 +1339,28 @@ export const ChatsPage: React.FC = () => {
         <h1 className="text-lg font-bold text-gray-900 dark:text-gray-100 sm:text-xl">{t('chats')}</h1>
         <PageHelpVideoButton pageKey="chats" />
       </div>
-      <div className="min-h-0 flex-1">
+      <div className="lg:hidden shrink-0">
+        <ChatFilterRail
+          filters={chatFilters}
+          onChange={setChatFilters}
+          statusCounts={statusCounts}
+          assignmentCounts={assignmentCounts}
+          t={t}
+          variant="chips"
+        />
+      </div>
+      <div className="flex min-h-0 flex-1 gap-3">
+        <div className="hidden lg:flex lg:shrink-0">
+          <ChatFilterRail
+            filters={chatFilters}
+            onChange={setChatFilters}
+            statusCounts={statusCounts}
+            assignmentCounts={assignmentCounts}
+            t={t}
+            variant="rail"
+          />
+        </div>
+        <div className="min-h-0 min-w-0 flex-1">
         <WhatsAppChatLayout
           t={t}
           language={language}
@@ -1136,7 +1368,34 @@ export const ChatsPage: React.FC = () => {
           selectedClient={selectedChatClient}
           onSelectClient={selectChatClient}
           onStartNew={() => setIsStartNewOpen(true)}
-          onDeleteConversation={handleDeleteConversation}
+          onDeleteConversation={
+            canDeleteWhatsAppHistory ? handleDeleteConversation : undefined
+          }
+          onConversationAction={applyConversationAction}
+          search={searchDraft}
+          onSearchChange={setSearchDraft}
+          unreplied={chatFilters.unreplied}
+          onUnrepliedChange={(value) =>
+            setChatFilters((prev) => ({ ...prev, unreplied: value }))
+          }
+          conversationStatus={threadStatusForHeader}
+          isStarred={threadStarredForHeader}
+          isUnsubscribed={threadUnsubscribedForHeader}
+          onThreadStatusChange={(payload) => {
+            if (!selectedChatClient || typeof selectedChatClient.id !== 'number') return;
+            patchThreadOverride(selectedChatClient.id, {
+              status: payload.status,
+              isStarred: payload.isStarred,
+              isUnsubscribed: payload.isUnsubscribed,
+            });
+            updateConversationState.mutate({
+              clientId: selectedChatClient.id,
+              status: payload.status,
+              snoozedUntil: payload.snoozedUntil,
+              isStarred: payload.isStarred,
+              isUnsubscribed: payload.isUnsubscribed,
+            });
+          }}
           messages={threadMessages}
           threadCalls={threadCalls}
           newMessagesBeforeApiId={newMessagesBeforeApiId}
@@ -1149,6 +1408,10 @@ export const ChatsPage: React.FC = () => {
           onWhatsAppCall={() => {
             if (!selectedChatClient || !whatsappCalling) return;
             if (whatsappCalling.isStartingOutbound) return;
+            if (whatsappSendBlocked) {
+              showAlert(t('whatsappReconnectRequired'), 'warning');
+              return;
+            }
             const phone =
               selectedChatClient.phone_number ||
               selectedChatClient.phone ||
@@ -1166,6 +1429,7 @@ export const ChatsPage: React.FC = () => {
               whatsappCalling?.phase === 'connecting' ||
               whatsappCalling?.phase === 'ringing'
           )}
+          whatsappCallBlocked={whatsappSendBlocked}
           onViewCalls={() => {
             if (!selectedChatClient) return;
             const id =
@@ -1248,6 +1512,7 @@ export const ChatsPage: React.FC = () => {
             },
           }}
         />
+        </div>
       </div>
       <StartNewConversationModal
         isOpen={isStartNewOpen}

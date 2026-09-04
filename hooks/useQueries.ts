@@ -17,8 +17,9 @@ import {
   getCampaignsAPI, getChannelsAPI, getStagesAPI, getStatusesAPI, getTagsAPI, getCallMethodsAPI, getVisitTypesAPI,
   getCurrentUserAPI, getActivitiesAPI, getWorkSessionTodayAPI, getWorkSessionSummaryAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
-  getLeadFormsAPI, selectLeadFormAPI, getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
-  getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI, getWhatsAppCallsPendingAPI, getWhatsAppCallsLiveAPI,
+  getLeadFormsAPI, selectLeadFormAPI,   getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
+  getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI, updateWhatsAppConversationStateAPI,
+  getWhatsAppCallsPendingAPI, getWhatsAppCallsLiveAPI,
   getNewsUnreadCountAPI, markNewsReadAPI,
   getSyncDigestAPI,
   type SyncDigest,
@@ -118,7 +119,8 @@ export const queryKeys = {
   leadWhatsAppMessages: (leadId?: number) => ['leadWhatsAppMessages', leadId] as const,
   whatsappChatMessages: (clientId?: number, phone?: string) =>
     ['whatsappChatMessages', clientId ?? null, phone ?? ''] as const,
-  whatsAppConversations: ['whatsAppConversations'] as const,
+  whatsAppConversations: (params?: Record<string, unknown>) =>
+    ['whatsAppConversations', params ?? {}] as const,
   whatsAppUnreadCount: ['whatsAppUnreadCount'] as const,
   /** Pending / live WhatsApp Cloud Calling rings (shared by Calls page, sidebar, toast). */
   whatsappCallsLive: ['whatsappCalls', 'live'] as const,
@@ -735,20 +737,74 @@ export const useWhatsAppChatMessages = (
 };
 
 export const useWhatsAppConversations = (
-  options?: Omit<UseQueryOptions<any[], Error>, 'queryKey' | 'queryFn'> & {
+  params?: {
+    status?: string;
+    assignment?: string;
+    agent?: number;
+    starred?: boolean;
+    unreplied?: boolean;
+    search?: string;
+    ordering?: string;
+    limit?: number;
+    offset?: number;
+  },
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'> & {
     refetchInterval?: number | false;
     enabled?: boolean;
   }
 ) => {
   const { refetchInterval = false, enabled = true, ...rest } = options || {};
   return useQuery({
-    queryKey: queryKeys.whatsAppConversations,
-    queryFn: getWhatsAppConversationsAPI,
+    queryKey: queryKeys.whatsAppConversations(params as Record<string, unknown> | undefined),
+    queryFn: () => getWhatsAppConversationsAPI(params),
     staleTime: 3 * 1000,
     refetchOnWindowFocus: true,
     refetchInterval,
     enabled,
     ...rest,
+  });
+};
+
+export const useUpdateWhatsAppConversationState = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateWhatsAppConversationStateAPI,
+    onMutate: async (vars) => {
+      await queryClient.cancelQueries({ queryKey: ['whatsAppConversations'] });
+      const previous = queryClient.getQueriesData({ queryKey: ['whatsAppConversations'] });
+      queryClient.setQueriesData({ queryKey: ['whatsAppConversations'] }, (old: any) => {
+        if (!old || !Array.isArray(old?.results)) return old;
+        const clientId = Number(vars.clientId);
+        return {
+          ...old,
+          results: old.results.map((row: any) => {
+            if (Number(row.id) !== clientId) return row;
+            return {
+              ...row,
+              ...(vars.status !== undefined ? { status: vars.status } : {}),
+              ...(vars.snoozedUntil !== undefined
+                ? { snoozed_until: vars.snoozedUntil }
+                : {}),
+              ...(vars.isStarred !== undefined ? { is_starred: vars.isStarred } : {}),
+              ...(vars.isUnsubscribed !== undefined
+                ? { is_unsubscribed: vars.isUnsubscribed }
+                : {}),
+            };
+          }),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _vars, ctx) => {
+      ctx?.previous?.forEach(([key, data]: [any, any]) => {
+        queryClient.setQueryData(key, data);
+      });
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['whatsAppConversations'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppUnreadCount });
+      queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
+    },
   });
 };
 
@@ -839,7 +895,7 @@ export const useMarkWhatsAppConversationRead = () => {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppUnreadCount });
       queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
-      queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
+      queryClient.invalidateQueries({ queryKey: ['whatsAppConversations'] });
     },
   });
 };
@@ -2018,7 +2074,7 @@ export const useDisconnectConnectedAccount = (options?: UseMutationOptions<void,
     mutationFn: (id: number) => disconnectIntegrationAccountAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
+      queryClient.invalidateQueries({ queryKey: ['whatsAppConversations'] });
       queryClient.invalidateQueries({ queryKey: ['whatsappChatMessages'] });
     },
     ...options,

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ConversationList, type ConversationRow } from './ConversationList';
+import { ConversationList, type ConversationRow, type ConversationListAction } from './ConversationList';
 import { ChatThread } from './ChatThread';
 import type { ChatBubbleMessage } from './ChatMessageBubble';
 import type { ChatThreadCall } from './ChatCallBubble';
@@ -15,6 +15,20 @@ type Props = {
   onSelectClient: (client: any) => void;
   onStartNew: () => void;
   onDeleteConversation?: (client: any) => void;
+  onConversationAction?: (client: any, action: ConversationListAction) => void;
+  search: string;
+  onSearchChange: (value: string) => void;
+  unreplied: boolean;
+  onUnrepliedChange: (value: boolean) => void;
+  conversationStatus?: string;
+  isStarred?: boolean;
+  isUnsubscribed?: boolean;
+  onThreadStatusChange?: (payload: {
+    status?: string;
+    snoozedUntil?: string;
+    isStarred?: boolean;
+    isUnsubscribed?: boolean;
+  }) => void;
   messages: ChatBubbleMessage[];
   threadCalls?: ChatThreadCall[];
   newMessagesBeforeApiId?: number | null;
@@ -22,6 +36,7 @@ type Props = {
   onRefreshMessages?: () => void;
   onWhatsAppCall?: () => void;
   isWhatsAppCalling?: boolean;
+  whatsappCallBlocked?: boolean;
   onViewCalls?: () => void;
   onDeleteMessage?: (msg: ChatBubbleMessage) => void;
   onResendMessage?: (msg: ChatBubbleMessage) => void;
@@ -40,6 +55,11 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         onSelect={props.onSelectClient}
         onStartNew={props.onStartNew}
         onDeleteConversation={props.onDeleteConversation}
+        onConversationAction={props.onConversationAction}
+        search={props.search}
+        onSearchChange={props.onSearchChange}
+        unreplied={props.unreplied}
+        onUnrepliedChange={props.onUnrepliedChange}
         t={props.t}
         language={props.language}
       />
@@ -54,6 +74,7 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         onRefresh={props.onRefreshMessages}
         onWhatsAppCall={props.onWhatsAppCall}
         isWhatsAppCalling={props.isWhatsAppCalling}
+        whatsappCallBlocked={props.whatsappCallBlocked}
         onViewCalls={props.onViewCalls}
         onDeleteMessage={props.onDeleteMessage}
         onResendMessage={props.onResendMessage}
@@ -61,9 +82,13 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         resendingMessageId={props.resendingMessageId}
         onOpenMedia={props.onOpenMedia}
         composerProps={props.composerProps}
+        conversationStatus={props.conversationStatus}
+        isStarred={props.isStarred}
+        isUnsubscribed={props.isUnsubscribed}
+        onThreadStatusChange={props.onThreadStatusChange}
       />
     </div>
   );
 };
 
-export type { ConversationRow, ChatBubbleMessage, SessionInfo, MessageTemplateType, ChatThreadCall };
+export type { ConversationRow, ChatBubbleMessage, SessionInfo, MessageTemplateType, ChatThreadCall, ConversationListAction };

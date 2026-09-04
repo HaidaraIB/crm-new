@@ -20,7 +20,7 @@ import { registerWebPush, subscribeToPushMessages, type PushData } from '../serv
 
 /** Backend `invalidate` key -> the query keys it affects. */
 const INVALIDATION_MAP: Record<string, QueryKey[]> = {
-  'whatsapp:conversations': [queryKeys.whatsAppConversations, ['whatsappChatMessages']],
+  'whatsapp:conversations': [['whatsAppConversations'], ['whatsappChatMessages']],
   'whatsapp:calls': [queryKeys.whatsappCallsLive, ['whatsappCalls']],
   'tenant_chat:messages': [['tenant-chat-conversations'], ['tenant-chat-messages']],
   'crm:leads': [['leads'], ['dashboardSummary']],

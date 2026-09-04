@@ -443,6 +443,57 @@ export interface CallFilters {
   search: string;
 }
 
+/** Fixed WhatsApp conversation triage statuses (Mujeb-style). */
+export type WhatsAppConversationStatus =
+  | 'open'
+  | 'pending'
+  | 'spam'
+  | 'invalid'
+  | 'done'
+  | 'snoozed';
+
+/** WhatsApp Chats inbox filters (rail + list header). */
+export interface WhatsAppChatFilters {
+  /** all | open | pending | spam | invalid | done | snoozed | unread | unsubscribed */
+  status: string;
+  /** all | mine | unassigned */
+  assignment: string;
+  /** '' | user id string (company-wide viewers only) */
+  agent: string;
+  starred: boolean;
+  unreplied: boolean;
+  search: string;
+}
+
+export interface WhatsAppConversation {
+  id: number;
+  name: string;
+  phone_number: string;
+  lead_company_name?: string;
+  last_message_at?: string | null;
+  last_message_preview?: string;
+  last_message_direction?: string;
+  assigned_to_id?: number | null;
+  unread_count?: number;
+  status: WhatsAppConversationStatus | string;
+  snoozed_until?: string | null;
+  is_starred?: boolean;
+  is_unsubscribed?: boolean;
+}
+
+export interface WhatsAppConversationsResponse {
+  count: number;
+  results: WhatsAppConversation[];
+  status_counts: Record<string, number>;
+  assignment_counts: {
+    all: number;
+    mine: number;
+    unassigned: number;
+    starred: number;
+    unreplied: number;
+  };
+}
+
 /** Arrivals board filters (toolbar status chips + filter drawer). */
 export interface ArrivalFilters {
   /** Toolbar status axis: all | waiting | acknowledged | escalated */

@@ -42,7 +42,7 @@ export function useWhatsAppAwayNotifications(): void {
 
     if (unreadBumped) {
       playIncomingChatSound();
-      void queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppConversations });
+      void queryClient.invalidateQueries({ queryKey: ['whatsAppConversations'] });
     }
 
     prevUnreadTotalRef.current = total;

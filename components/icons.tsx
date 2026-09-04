@@ -305,7 +305,10 @@ export const NewspaperIcon = (props: React.SVGProps<SVGSVGElement>) => (
     </svg>
 );
 
-/** Refresh / reload */
+/** Refresh / reload — Lucide rotate-cw */
 export const RefreshIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M4 4v5h5"/><path d="M20 20v-5h-5"/><path d="M4 4a14.95 14.95 0 0 1 14.22 3.22m1.56 3.56A14.953 14.953 0 0 1 4 20"/></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+        <path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" />
+        <path d="M21 3v5h-5" />
+    </svg>
 );

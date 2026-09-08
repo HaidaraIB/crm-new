@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText, BulkActionBar } from '../components/index';
 import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
@@ -10,7 +10,7 @@ import SendSMSModal from '../components/modals/SendSMSModal';
 import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
 import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
 import { Lead, LeadApiFilters, Status, User } from '../types';
-import { useLeads, useLeadStatusCounts, useDeleteLead, usePatchLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
+import { useLeads, useLeadStatusCounts, useDeleteLead, useBulkDeleteLeads, usePatchLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
 import { pbxDialAPI, getPbxDialStatusAPI, getLeadsAPI } from '../services/api';
 import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
 import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
@@ -98,6 +98,10 @@ export const LeadsPage = () => {
     const [activeStatusFilter, setActiveStatusFilterState] = useState<Lead['status']>(() => readStoredStatusTab(currentPage));
     const [viewMode, setViewMode] = useEntityViewMode('leads');
     const isBoardView = viewMode === 'board';
+    /** `ids` = explicit checkbox set; `all_matching` = every lead matching current filters minus excludes */
+    const [leadSelectionMode, setLeadSelectionMode] = useState<'ids' | 'all_matching'>('ids');
+    const [excludedLeadIds, setExcludedLeadIds] = useState<Set<number>>(() => new Set());
+    const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
 
     // Re-sync the persisted tab when switching between Leads-family pages (Fresh/Hot/Cold/My/...)
     // that share this component without unmounting it.
@@ -209,6 +213,19 @@ export const LeadsPage = () => {
         setLeadsPageNumber(1);
     }, [currentPage, apiFilters, leadsPageSize]);
 
+    const clearLeadSelection = () => {
+        setCheckedLeadIds(new Set());
+        setLeadSelectionMode('ids');
+        setExcludedLeadIds(new Set());
+    };
+
+    // Filters / section change invalidates "matching" selection; keep page cherry-picks across pagination only.
+    useEffect(() => {
+        clearLeadSelection();
+        // Intentionally only when filter scope changes — not page number.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentPage, apiFilters]);
+
     // Persist scroll position of the app's scroll container so returning to this
     // page (e.g. after viewing a lead) restores where the user left off.
     const scrollRestoredForPageRef = useRef<string | null>(null);
@@ -295,6 +312,7 @@ export const LeadsPage = () => {
     
     // Delete lead mutation
     const deleteLeadMutation = useDeleteLead();
+    const bulkDeleteLeadsMutation = useBulkDeleteLeads();
     
     // Sparse status PATCH (avoid full-body PUT false edit events)
     const updateLeadMutation = usePatchLead();
@@ -559,31 +577,98 @@ export const LeadsPage = () => {
         return isAdmin || isSupervisorWithLeads || isAssignedEmployee;
     };
 
+    const canBulkDelete =
+        normalizeRole(currentUser?.role) === 'Owner' ||
+        Boolean(currentUser?.can_delete_clients);
+
     // FIX: Convert page title to camelCase to match translation keys and cast to the correct type.
     const pageTitleKey = (currentPage.charAt(0).toLowerCase() + currentPage.slice(1).replace(/\s/g, '')) as Parameters<typeof t>[0];
     const pageTitle = t(pageTitleKey);
-    
+
+    const isLeadSelected = (leadId: number) => {
+        if (leadSelectionMode === 'all_matching') {
+            return !excludedLeadIds.has(leadId);
+        }
+        return checkedLeadIds.has(leadId);
+    };
+
     const handleCheckChange = (leadId: number, isChecked: boolean) => {
-        setCheckedLeadIds(prev => {
-            const newSet = new Set(prev);
-            if(isChecked) {
-                newSet.add(leadId);
-            } else {
-                newSet.delete(leadId);
-            }
-            return newSet;
+        if (leadSelectionMode === 'all_matching') {
+            setExcludedLeadIds((prev) => {
+                const next = new Set(prev);
+                if (isChecked) next.delete(leadId);
+                else next.add(leadId);
+                return next;
+            });
+            return;
+        }
+        setCheckedLeadIds((prev) => {
+            const next = new Set(prev);
+            if (isChecked) next.add(leadId);
+            else next.delete(leadId);
+            return next;
         });
     };
 
     const handleSelectAll = (isChecked: boolean) => {
-        if(isChecked) {
-            setCheckedLeadIds(new Set(normalizedLeads.map(l => l.id)));
+        if (isChecked) {
+            setLeadSelectionMode('ids');
+            setExcludedLeadIds(new Set());
+            setCheckedLeadIds(new Set(normalizedLeads.map((l) => l.id)));
         } else {
-            setCheckedLeadIds(new Set());
+            clearLeadSelection();
         }
     };
-    
-    const isAllSelected = normalizedLeads.length > 0 && checkedLeadIds.size === normalizedLeads.length;
+
+    const handleSelectAllMatching = () => {
+        setLeadSelectionMode('all_matching');
+        setExcludedLeadIds(new Set());
+        setCheckedLeadIds(new Set());
+    };
+
+    const selectedLeadCount =
+        leadSelectionMode === 'all_matching'
+            ? Math.max(0, totalLeadsCount - excludedLeadIds.size)
+            : checkedLeadIds.size;
+
+    const isAllSelected =
+        normalizedLeads.length > 0 && normalizedLeads.every((l) => isLeadSelected(l.id));
+    const isSomeSelected =
+        normalizedLeads.some((l) => isLeadSelected(l.id)) && !isAllSelected;
+
+    useEffect(() => {
+        if (selectAllCheckboxRef.current) {
+            selectAllCheckboxRef.current.indeterminate = isSomeSelected;
+        }
+    }, [isSomeSelected]);
+
+    const handleBulkDelete = () => {
+        if (selectedLeadCount <= 0) return;
+        const countLabel = String(selectedLeadCount);
+        setConfirmDeleteConfig({
+            title: t('deleteLeads'),
+            message: t('confirmDeleteLeadsCount').replace('{count}', countLabel),
+            showWarning: true,
+            successMessage: t('leadsDeletedSuccessfully').replace('{count}', countLabel),
+            onConfirm: async () => {
+                if (leadSelectionMode === 'all_matching') {
+                    await bulkDeleteLeadsMutation.mutateAsync({
+                        select_all: true,
+                        filters: apiFilters,
+                        exclude_ids: Array.from(excludedLeadIds),
+                        expected_count: selectedLeadCount,
+                    });
+                } else {
+                    await bulkDeleteLeadsMutation.mutateAsync({
+                        client_ids: Array.from(checkedLeadIds),
+                        expected_count: selectedLeadCount,
+                    });
+                }
+                clearLeadSelection();
+            },
+        });
+        setIsConfirmDeleteModalOpen(true);
+    };
 
     if (!isBoardView && leadsLoading) {
         return (
@@ -647,14 +732,34 @@ export const LeadsPage = () => {
                             window.history.pushState({}, '', '/create-lead');
                             setCurrentPage('CreateLead');
                         }} className="w-full sm:w-auto shrink-0"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
+                        {canBulkDelete && !isBoardView && (
+                            <Button
+                                variant="danger"
+                                onClick={handleBulkDelete}
+                                disabled={selectedLeadCount === 0}
+                                loading={bulkDeleteLeadsMutation.isPending}
+                                className="w-full sm:w-auto shrink-0"
+                                title={t('bulkDelete')}
+                            >
+                                {t('bulkDelete')}
+                                {selectedLeadCount > 0 ? ` (${selectedLeadCount})` : ''}
+                            </Button>
+                        )}
                         {isAdmin && (
                             <div className="flex w-full flex-none flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
                                 <Button
                                     variant="secondary"
                                     onClick={() => setIsAssignLeadModalOpen(true)}
-                                    disabled={checkedLeadIds.size === 0}
+                                    disabled={
+                                        checkedLeadIds.size === 0 ||
+                                        leadSelectionMode === 'all_matching'
+                                    }
                                     className="min-w-0 flex-1 sm:flex-initial sm:w-auto"
-                                    title={t('assignLead')}
+                                    title={
+                                        leadSelectionMode === 'all_matching'
+                                            ? t('clearSelection')
+                                            : t('assignLead')
+                                    }
                                 >
                                     {t('assignLead')}
                                 </Button>
@@ -800,6 +905,37 @@ export const LeadsPage = () => {
                 </div>
             ) : (
             <Card>
+                {!isDataEntryUser && leadSelectionMode === 'all_matching' && selectedLeadCount > 0 && (
+                    <div className="mb-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
+                        <span>
+                            {t('allMatchingSelected').replace('{count}', String(selectedLeadCount))}
+                        </span>{' '}
+                        <button
+                            type="button"
+                            className="font-semibold text-primary underline-offset-2 hover:underline"
+                            onClick={clearLeadSelection}
+                        >
+                            {t('clearSelection')}
+                        </button>
+                    </div>
+                )}
+                {!isDataEntryUser &&
+                    leadSelectionMode === 'ids' &&
+                    isAllSelected &&
+                    totalLeadsCount > normalizedLeads.length && (
+                    <div className="mb-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
+                        <span>
+                            {t('allOnPageSelected').replace('{count}', String(normalizedLeads.length))}
+                        </span>{' '}
+                        <button
+                            type="button"
+                            className="font-semibold text-primary underline-offset-2 hover:underline"
+                            onClick={handleSelectAllMatching}
+                        >
+                            {t('selectAllMatchingFilters').replace('{count}', String(totalLeadsCount))}
+                        </button>
+                    </div>
+                )}
                 <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
                     <div className="min-w-full block">
                         <div className="overflow-hidden">
@@ -807,7 +943,16 @@ export const LeadsPage = () => {
                                 <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                                     <tr>
                                         {!isDataEntryUser && (
-                                        <th scope="col" className="p-2 sm:p-4 text-center whitespace-nowrap"><input type="checkbox" onChange={(e) => handleSelectAll(e.target.checked)} checked={isAllSelected} className="rounded" /></th>
+                                        <th scope="col" className="p-2 sm:p-4 text-center whitespace-nowrap">
+                                            <input
+                                                ref={selectAllCheckboxRef}
+                                                type="checkbox"
+                                                onChange={(e) => handleSelectAll(e.target.checked)}
+                                                checked={isAllSelected}
+                                                className="rounded"
+                                                aria-label={t('selectAll')}
+                                            />
+                                        </th>
                                         )}
                                         <th scope="col" className="px-4 sm:px-6 py-3 text-center whitespace-nowrap">{t('name')}</th>
                                         <th scope="col" className="px-4 sm:px-6 py-3 hidden lg:table-cell text-center whitespace-nowrap">{t('leadCompanyName')}</th>
@@ -847,7 +992,15 @@ export const LeadsPage = () => {
                                         return (
                                             <tr key={lead.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                                 {!isDataEntryUser && (
-                                                <td className="p-2 sm:p-4 text-center"><input type="checkbox" checked={checkedLeadIds.has(lead.id)} onChange={(e) => handleCheckChange(lead.id, e.target.checked)} className="rounded" /></td>
+                                                <td className="p-2 sm:p-4 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={isLeadSelected(lead.id)}
+                                                        onChange={(e) => handleCheckChange(lead.id, e.target.checked)}
+                                                        className="rounded"
+                                                        aria-label={lead.name}
+                                                    />
+                                                </td>
                                                 )}
                                                 <td className="px-4 sm:px-6 py-4 font-medium text-gray-900 dark:text-gray-100 text-center">
                                                     <div className="mx-auto w-full max-w-[220px] min-w-0">
@@ -1193,6 +1346,37 @@ export const LeadsPage = () => {
                         </Button>
                     </div>
                 </div>
+                {!isDataEntryUser && !isBoardView && (
+                    <BulkActionBar
+                        selectedCount={selectedLeadCount}
+                        selectedLabel={t('selectedCount').replace('{count}', String(selectedLeadCount))}
+                        clearLabel={t('clearSelection')}
+                        onClear={clearLeadSelection}
+                        className="mt-4"
+                    >
+                        {isAdmin && (
+                            <Button
+                                variant="secondary"
+                                onClick={() => setIsAssignLeadModalOpen(true)}
+                                disabled={
+                                    leadSelectionMode === 'all_matching' ||
+                                    checkedLeadIds.size === 0
+                                }
+                            >
+                                {t('assignLead')}
+                            </Button>
+                        )}
+                        {canBulkDelete && (
+                            <Button
+                                variant="danger"
+                                onClick={handleBulkDelete}
+                                loading={bulkDeleteLeadsMutation.isPending}
+                            >
+                                {t('bulkDelete')}
+                            </Button>
+                        )}
+                    </BulkActionBar>
+                )}
             </Card>
             )}
 

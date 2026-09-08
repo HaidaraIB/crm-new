@@ -2718,6 +2718,49 @@ export const bulkAssignLeadsAPI = async (clientIds: number[], userId: number | n
   });
 };
 
+export type BulkDeleteLeadsPayload =
+  | {
+      client_ids: number[];
+      expected_count?: number;
+    }
+  | {
+      select_all: true;
+      filters?: LeadApiFilters;
+      exclude_ids?: number[];
+      expected_count?: number;
+    };
+
+/**
+ * Bulk hard-delete clients by IDs or all matching list filters.
+ * POST /api/clients/bulk_delete/
+ * For select_all, filters are sent as the same query string as GET /clients/.
+ */
+export const bulkDeleteLeadsAPI = async (payload: BulkDeleteLeadsPayload) => {
+  const queryParams = new URLSearchParams();
+  if ('select_all' in payload && payload.select_all) {
+    appendLeadApiFilters(queryParams, payload.filters);
+  }
+  const qs = queryParams.toString();
+  const path = qs ? `/clients/bulk_delete/?${qs}` : '/clients/bulk_delete/';
+
+  const body =
+    'select_all' in payload && payload.select_all
+      ? {
+          select_all: true,
+          exclude_ids: payload.exclude_ids ?? [],
+          ...(payload.expected_count != null ? { expected_count: payload.expected_count } : {}),
+        }
+      : {
+          client_ids: payload.client_ids,
+          ...(payload.expected_count != null ? { expected_count: payload.expected_count } : {}),
+        };
+
+  return apiRequest<{ deleted_count: number }>(path, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+};
+
 // ==================== Deals APIs ====================
 
 /**

@@ -25,6 +25,7 @@ import {
   type SyncDigest,
   type WhatsAppCallRecord,
   createLeadAPI, updateLeadAPI, patchLeadAPI, deleteLeadAPI,
+  bulkDeleteLeadsAPI,
   announceLeadArrivalAPI, acknowledgeLeadArrivalAPI, getLeadArrivalsAPI, getPendingLeadArrivalsAPI,
   createUserAPI, updateUserAPI, deleteUserAPI,
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
@@ -1053,6 +1054,23 @@ export const useDeleteLead = (options?: UseMutationOptions<void, Error, number>)
       queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+    },
+    ...options,
+  });
+};
+
+export const useBulkDeleteLeads = (
+  options?: UseMutationOptions<{ deleted_count: number }, Error, Parameters<typeof bulkDeleteLeadsAPI>[0]>
+) => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof bulkDeleteLeadsAPI>[0]) => bulkDeleteLeadsAPI(payload),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+      queryClient.invalidateQueries({ queryKey: ['leadStatusCounts'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
+      queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+      return data;
     },
     ...options,
   });

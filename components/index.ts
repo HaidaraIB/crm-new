@@ -19,6 +19,7 @@ export * from './Header';
 export * from './NotificationsDialog';
 export * from './Sidebar';
 export * from './Loader';
+export * from './bulk/BulkActionBar';
 
 // New components
 export * from './modals/AddActionModal';

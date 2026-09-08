@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText, BulkActionBar } from '../components/index';
 import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
-import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon } from '../components/icons';
+import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon, UserPlusIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
@@ -725,74 +725,43 @@ export const LeadsPage = () => {
                             className="w-full sm:w-auto shrink-0"
                         />
                         {!isDataEntryUser && (
-                        <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" disabled={isExportingLeads || totalLeadsCount === 0} title={t('exportLeads') || 'Export to Excel'}><span className="sm:hidden">{isExportingLeads ? (t('loading') || 'Loading...') : t('export')}</span><span className="hidden sm:inline">{isExportingLeads ? (t('loading') || 'Loading...') : (t('exportLeads') || 'Export to Excel')}</span></Button>
+                        <Button variant="secondary" onClick={handleExportLeads} className="w-full sm:w-auto shrink-0" loading={isExportingLeads} loadingText={t('processing')} disabled={totalLeadsCount === 0} title={t('exportLeads')}><span className="sm:hidden">{t('export')}</span><span className="hidden sm:inline">{t('exportLeads')}</span></Button>
                         )}
                         <Button variant="secondary" onClick={() => setIsImportLeadsModalOpen(true)} className="w-full sm:w-auto shrink-0" title={t('importLeads') || 'Import from Excel'}><span className="sm:hidden">{t('import')}</span><span className="hidden sm:inline">{t('importLeads') || 'Import from Excel'}</span></Button>
                         <Button onClick={() => {
                             window.history.pushState({}, '', '/create-lead');
                             setCurrentPage('CreateLead');
                         }} className="w-full sm:w-auto shrink-0"><PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('addLead')}</span></Button>
-                        {canBulkDelete && !isBoardView && (
-                            <Button
-                                variant="danger"
-                                onClick={handleBulkDelete}
-                                disabled={selectedLeadCount === 0}
-                                loading={bulkDeleteLeadsMutation.isPending}
-                                className="w-full sm:w-auto shrink-0"
-                                title={t('bulkDelete')}
-                            >
-                                {t('bulkDelete')}
-                                {selectedLeadCount > 0 ? ` (${selectedLeadCount})` : ''}
-                            </Button>
-                        )}
                         {isAdmin && (
-                            <div className="flex w-full flex-none flex-wrap gap-2 sm:w-auto sm:flex-nowrap">
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => setIsAssignLeadModalOpen(true)}
-                                    disabled={
-                                        checkedLeadIds.size === 0 ||
-                                        leadSelectionMode === 'all_matching'
-                                    }
-                                    className="min-w-0 flex-1 sm:flex-initial sm:w-auto"
-                                    title={
-                                        leadSelectionMode === 'all_matching'
-                                            ? t('clearSelection')
-                                            : t('assignLead')
-                                    }
-                                >
-                                    {t('assignLead')}
-                                </Button>
-                                <Button
-                                    variant="secondary"
-                                    onClick={() => {
-                                        setConfirmDeleteConfig({
-                                            title: t('assignUnassigned') || 'Assign Unassigned',
-                                            message: t('confirmAssignUnassigned') || 'Are you sure you want to assign all unassigned clients?',
-                                            itemName: '',
-                                            confirmButtonText: t('assignUnassigned') || 'Assign',
-                                            confirmButtonVariant: 'primary' as const,
-                                            showWarning: false,
-                                            showSuccessMessage: false, // Don't show default success message, mutation will handle it
-                                            onConfirm: async () => {
-                                                try {
-                                                    await assignUnassignedMutation.mutateAsync();
-                                                } catch (error: any) {
-                                                    console.error('Error assigning unassigned clients:', error);
-                                                    throw error;
-                                                }
-                                            },
-                                        });
-                                        setIsConfirmDeleteModalOpen(true);
-                                    }}
-                                    disabled={assignUnassignedMutation.isPending}
-                                    loading={assignUnassignedMutation.isPending}
-                                    className="min-w-0 flex-1 sm:flex-initial sm:w-auto"
-                                    title={t('assignUnassigned') || 'Assign Unassigned'}
-                                >
-                                    {t('assignUnassigned') || 'Assign Unassigned'}
-                                </Button>
-                            </div>
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setConfirmDeleteConfig({
+                                        title: t('assignUnassigned') || 'Assign Unassigned',
+                                        message: t('confirmAssignUnassigned') || 'Are you sure you want to assign all unassigned clients?',
+                                        itemName: '',
+                                        confirmButtonText: t('assignUnassigned') || 'Assign',
+                                        confirmButtonVariant: 'primary' as const,
+                                        showWarning: false,
+                                        showSuccessMessage: false, // Don't show default success message, mutation will handle it
+                                        onConfirm: async () => {
+                                            try {
+                                                await assignUnassignedMutation.mutateAsync();
+                                            } catch (error: any) {
+                                                console.error('Error assigning unassigned clients:', error);
+                                                throw error;
+                                            }
+                                        },
+                                    });
+                                    setIsConfirmDeleteModalOpen(true);
+                                }}
+                                disabled={assignUnassignedMutation.isPending}
+                                loading={assignUnassignedMutation.isPending}
+                                className="w-full sm:w-auto shrink-0"
+                                title={t('assignUnassigned') || 'Assign Unassigned'}
+                            >
+                                {t('assignUnassigned') || 'Assign Unassigned'}
+                            </Button>
                         )}
                     </div>
             }
@@ -904,38 +873,7 @@ export const LeadsPage = () => {
                     />
                 </div>
             ) : (
-            <Card>
-                {!isDataEntryUser && leadSelectionMode === 'all_matching' && selectedLeadCount > 0 && (
-                    <div className="mb-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
-                        <span>
-                            {t('allMatchingSelected').replace('{count}', String(selectedLeadCount))}
-                        </span>{' '}
-                        <button
-                            type="button"
-                            className="font-semibold text-primary underline-offset-2 hover:underline"
-                            onClick={clearLeadSelection}
-                        >
-                            {t('clearSelection')}
-                        </button>
-                    </div>
-                )}
-                {!isDataEntryUser &&
-                    leadSelectionMode === 'ids' &&
-                    isAllSelected &&
-                    totalLeadsCount > normalizedLeads.length && (
-                    <div className="mb-3 rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-gray-800 dark:text-gray-200">
-                        <span>
-                            {t('allOnPageSelected').replace('{count}', String(normalizedLeads.length))}
-                        </span>{' '}
-                        <button
-                            type="button"
-                            className="font-semibold text-primary underline-offset-2 hover:underline"
-                            onClick={handleSelectAllMatching}
-                        >
-                            {t('selectAllMatchingFilters').replace('{count}', String(totalLeadsCount))}
-                        </button>
-                    </div>
-                )}
+            <Card className={selectedLeadCount > 0 ? 'pb-28' : undefined}>
                 <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
                     <div className="min-w-full block">
                         <div className="overflow-hidden">
@@ -1350,9 +1288,34 @@ export const LeadsPage = () => {
                     <BulkActionBar
                         selectedCount={selectedLeadCount}
                         selectedLabel={t('selectedCount').replace('{count}', String(selectedLeadCount))}
+                        badgeLabel={
+                            leadSelectionMode === 'all_matching'
+                                ? t('matchingFiltersBadge')
+                                : undefined
+                        }
+                        statusActionLabel={
+                            leadSelectionMode === 'ids' &&
+                            isAllSelected &&
+                            totalLeadsCount > normalizedLeads.length
+                                ? t('selectAllMatchingShort').replace('{count}', String(totalLeadsCount))
+                                : undefined
+                        }
+                        statusActionTitle={
+                            leadSelectionMode === 'ids' &&
+                            isAllSelected &&
+                            totalLeadsCount > normalizedLeads.length
+                                ? t('selectAllMatchingFilters').replace('{count}', String(totalLeadsCount))
+                                : undefined
+                        }
+                        onStatusAction={
+                            leadSelectionMode === 'ids' &&
+                            isAllSelected &&
+                            totalLeadsCount > normalizedLeads.length
+                                ? handleSelectAllMatching
+                                : undefined
+                        }
                         clearLabel={t('clearSelection')}
                         onClear={clearLeadSelection}
-                        className="mt-4"
                     >
                         {isAdmin && (
                             <Button
@@ -1362,7 +1325,10 @@ export const LeadsPage = () => {
                                     leadSelectionMode === 'all_matching' ||
                                     checkedLeadIds.size === 0
                                 }
+                                className="!h-8 shrink-0 whitespace-nowrap !rounded-full border border-gray-300 bg-white px-3 dark:border-white/20 dark:bg-white/10 dark:text-white dark:hover:bg-white/15"
+                                title={t('assignLead')}
                             >
+                                <UserPlusIcon className="h-4 w-4 shrink-0" />
                                 {t('assignLead')}
                             </Button>
                         )}
@@ -1371,7 +1337,10 @@ export const LeadsPage = () => {
                                 variant="danger"
                                 onClick={handleBulkDelete}
                                 loading={bulkDeleteLeadsMutation.isPending}
+                                className="!h-8 shrink-0 whitespace-nowrap !rounded-full px-3"
+                                title={t('bulkDelete')}
                             >
+                                <TrashIcon className="h-4 w-4 shrink-0" />
                                 {t('bulkDelete')}
                             </Button>
                         )}

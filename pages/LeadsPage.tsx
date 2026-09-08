@@ -577,9 +577,7 @@ export const LeadsPage = () => {
         return isAdmin || isSupervisorWithLeads || isAssignedEmployee;
     };
 
-    const canBulkDelete =
-        normalizeRole(currentUser?.role) === 'Owner' ||
-        Boolean(currentUser?.can_delete_clients);
+    const canBulkDelete = normalizeRole(currentUser?.role) === 'Owner';
 
     // FIX: Convert page title to camelCase to match translation keys and cast to the correct type.
     const pageTitleKey = (currentPage.charAt(0).toLowerCase() + currentPage.slice(1).replace(/\s/g, '')) as Parameters<typeof t>[0];

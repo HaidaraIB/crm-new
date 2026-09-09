@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -162,9 +163,7 @@ export const EditSupplierModal = () => {
         <Modal isOpen={isEditSupplierModalOpen} onClose={handleClose} title={t('editSupplier') || 'Edit Supplier'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {errors._general && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                        {errors._general}
-                    </div>
+                    <Alert variant="error">{errors._general}</Alert>
                 )}
                 <div>
                     <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
@@ -234,7 +233,7 @@ export const EditSupplierModal = () => {
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('saveChanges')}</Button>
+                    <Button type="submit" loading={loading} loadingText={t('saving')}>{t('saveChanges')}</Button>
                 </div>
             </form>
         </Modal>

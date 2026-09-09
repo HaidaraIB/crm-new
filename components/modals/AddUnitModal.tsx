@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Alert } from '../Alert';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -200,9 +201,7 @@ export const AddUnitModal = () => {
         <Modal isOpen={isAddUnitModalOpen} onClose={handleClose} title={t('addNewUnit')}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {errors._general && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                        {errors._general}
-                    </div>
+                    <Alert variant="error">{errors._general}</Alert>
                 )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>

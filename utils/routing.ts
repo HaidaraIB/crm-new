@@ -231,7 +231,7 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
     'patients', 'all-patients', 'fresh-patients', 'hot-patients', 'cold-patients', 'my-patients', 'rotated-patients',
     'create-patient', 'edit-patient', 'view-patient',
     'terms-of-service', 'terms', 'privacy-policy', 'privacy', 'data-deletion-policy', 'data-deletion',
-    'call-center', 'arrivals',
+    'call-center', 'arrivals', 'inbox',
   ];
   
   // If first part is a known route, no company in path

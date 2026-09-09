@@ -7,6 +7,12 @@ type LoaderProps = {
   size?: 'sm' | 'md' | 'lg';
   tone?: 'default' | 'light' | 'muted';
   label?: string;
+  /**
+   * Render as decoration only (no role/aria-live). Use inside buttons and other
+   * controls that already announce their own busy state, so screen readers
+   * don't hear the status twice.
+   */
+  presentational?: boolean;
 };
 
 export const Loader = ({
@@ -15,25 +21,34 @@ export const Loader = ({
     size = 'md',
     tone = 'default',
     label = 'Loading',
+    presentational = false,
 }: LoaderProps) => {
-    const heightClass = size === 'sm' ? 'h-4' : size === 'lg' ? 'h-10' : 'h-6';
-    const barClass = size === 'sm' ? 'w-1' : size === 'lg' ? 'w-2' : 'w-1.5';
+    const sizeClass = size === 'sm' ? 'h-4 w-4' : size === 'lg' ? 'h-10 w-10' : 'h-6 w-6';
+    // currentColor lets one spinner sit on primary, danger, ghost, light and dark
+    // surfaces without extra variants.
+    // Note: `foreground` is a neutral that reads on page/card backgrounds. It must not
+    // use --primary-foreground, which is the *on-primary* contrast colour (near-white
+    // for the brand purple) and left bare loaders invisible on light backgrounds.
     const colorClass =
         tone === 'light'
-            ? 'bg-white/90'
+            ? 'text-white'
             : tone === 'muted'
-              ? 'bg-gray-400 dark:bg-gray-500'
+              ? 'text-gray-400 dark:text-gray-500'
               : variant === 'primary'
-                ? 'bg-primary'
-                : 'bg-primary-foreground';
+                ? 'text-primary'
+                : 'text-gray-500 dark:text-gray-400';
 
     return (
-        <div className={`inline-flex items-center justify-center gap-1 rtl:space-x-reverse ${heightClass} ${className}`} role="status" aria-live="polite" aria-label={label}>
-            <span className={`h-2/3 ${barClass} ${colorClass} rounded-full animate-bounce-loader`} style={{ animationDelay: '0s' }} />
-            <span className={`h-full ${barClass} ${colorClass} rounded-full animate-bounce-loader`} style={{ animationDelay: '0.1s' }} />
-            <span className={`h-2/3 ${barClass} ${colorClass} rounded-full animate-bounce-loader`} style={{ animationDelay: '0.2s' }} />
-            <span className={`h-full ${barClass} ${colorClass} rounded-full animate-bounce-loader`} style={{ animationDelay: '0.3s' }} />
-            <span className={`h-2/3 ${barClass} ${colorClass} rounded-full animate-bounce-loader`} style={{ animationDelay: '0.4s' }} />
-        </div>
+        <span
+            className={`inline-flex items-center justify-center ${colorClass} ${className}`}
+            {...(presentational
+                ? { 'aria-hidden': true }
+                : { role: 'status', 'aria-live': 'polite', 'aria-label': label })}
+        >
+            <svg className={`animate-spin ${sizeClass}`} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2.5" className="opacity-20" />
+                <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+            </svg>
+        </span>
     );
 };

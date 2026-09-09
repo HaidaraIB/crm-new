@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { SectionLoadingState } from '../components/SectionLoadingState';
 import {
   PageWrapper,
   Card,
@@ -246,7 +247,7 @@ export const LibraryPage = () => {
         {error && <p className="mb-4 text-sm text-red-600 dark:text-red-400">{error}</p>}
 
         {loading ? (
-          <p className="text-gray-500 dark:text-gray-400">{t('loading') || 'Loading…'}</p>
+          <SectionLoadingState />
         ) : files.length === 0 ? (
           <p className="text-gray-500 dark:text-gray-400">
             {t('libraryEmpty') || 'No files in the library yet.'}

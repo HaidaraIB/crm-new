@@ -20,6 +20,10 @@ export * from './NotificationsDialog';
 export * from './Sidebar';
 export * from './Loader';
 export * from './bulk/BulkActionBar';
+// Named export only: `AlertVariant` would otherwise collide with the modal's
+// narrower variant union re-exported from ./modals/AlertModal.
+export { Alert } from './Alert';
+export * from './ToastHost';
 
 // New components
 export * from './modals/AddActionModal';
@@ -90,7 +94,6 @@ export * from './modals/EditProductCategoryModal';
 export * from './modals/AddSupplierModal';
 export * from './modals/EditSupplierModal';
 export * from './modals/ViewDealModal';
-export * from './modals/SuccessModal';
 export * from './modals/AlertModal';
 export * from './modals/EmailVerificationModal';
 export * from './modals/AddChannelModal';

@@ -18,6 +18,9 @@ import {
   getCurrentUserAPI, getActivitiesAPI, getWorkSessionTodayAPI, getWorkSessionSummaryAPI,
   getConnectedAccountsAPI, createConnectedAccountAPI, updateConnectedAccountAPI, deleteConnectedAccountAPI, disconnectIntegrationAccountAPI, testConnectionAPI,
   getLeadFormsAPI, selectLeadFormAPI,   getLeadSMSMessagesAPI, getLeadWhatsAppMessagesAPI, getWhatsAppMessagesAPI, getWhatsAppConversationsAPI,
+  getSocialConversationsAPI, getSocialMessagesAPI, getSocialSendWindowAPI, getLeadSocialMessagesAPI,
+  sendSocialMessageAPI, sendSocialMediaAPI, updateSocialConversationStateAPI,
+  markSocialConversationReadAPI, convertSocialConversationAPI,
   getWhatsAppUnreadCountAPI, markWhatsAppConversationReadAPI, updateWhatsAppConversationStateAPI,
   getWhatsAppCallsPendingAPI, getWhatsAppCallsLiveAPI,
   getNewsUnreadCountAPI, markNewsReadAPI,
@@ -66,7 +69,7 @@ import {
   dismissAIInsightAPI,
   runAIAnalysisAPI,
 } from '../services/api';
-import type { MissionBarSummary, DashboardSummary, ReportQueryParams, CallReportResponse } from '../services/api';
+import type { MissionBarSummary, DashboardSummary, ReportQueryParams, CallReportResponse, LeadSocialMessageResponse } from '../services/api';
 
 // ==================== Query Keys ====================
 export const queryKeys = {
@@ -118,10 +121,17 @@ export const queryKeys = {
   connectedAccounts: (platform?: string) => ['connectedAccounts', platform] as const,
   leadSMSMessages: (leadId?: number) => ['leadSMSMessages', leadId] as const,
   leadWhatsAppMessages: (leadId?: number) => ['leadWhatsAppMessages', leadId] as const,
+  leadSocialMessages: (leadId?: number) => ['leadSocialMessages', leadId] as const,
   whatsappChatMessages: (clientId?: number, phone?: string) =>
     ['whatsappChatMessages', clientId ?? null, phone ?? ''] as const,
   whatsAppConversations: (params?: Record<string, unknown>) =>
     ['whatsAppConversations', params ?? {}] as const,
+  socialConversations: (params?: Record<string, unknown>) =>
+    ['socialConversations', params ?? {}] as const,
+  socialMessages: (conversationId?: number) =>
+    ['socialMessages', conversationId ?? null] as const,
+  socialSendWindow: (conversationId?: number) =>
+    ['socialSendWindow', conversationId ?? null] as const,
   whatsAppUnreadCount: ['whatsAppUnreadCount'] as const,
   /** Pending / live WhatsApp Cloud Calling rings (shared by Calls page, sidebar, toast). */
   whatsappCallsLive: ['whatsappCalls', 'live'] as const,
@@ -714,6 +724,27 @@ export const useLeadWhatsAppMessages = (
     queryFn: () => getLeadWhatsAppMessagesAPI(leadId!),
     enabled: !!leadId,
     staleTime: 1 * 60 * 1000, // 1 minute
+    ...options,
+  });
+};
+
+/**
+ * Instagram DM / Messenger messages on this lead, for the timeline.
+ *
+ * Scoped by the inbox ACL, which is narrower than lead access: reception and
+ * data entry can open a lead and get 403 here. That is the expected answer, not
+ * a failure, so it never retries and the caller renders no social entries.
+ */
+export const useLeadSocialMessages = (
+  leadId: number | undefined,
+  options?: Omit<UseQueryOptions<LeadSocialMessageResponse[], Error>, 'queryKey' | 'queryFn'>
+) => {
+  return useQuery({
+    queryKey: queryKeys.leadSocialMessages(leadId),
+    queryFn: () => getLeadSocialMessagesAPI(leadId!),
+    enabled: !!leadId,
+    staleTime: 1 * 60 * 1000, // 1 minute, same as the WhatsApp source
+    retry: false,
     ...options,
   });
 };
@@ -2068,6 +2099,9 @@ export const useUpdateConnectedAccount = (options?: UseMutationOptions<any, Erro
     onSuccess: () => {
       // Invalidate all connected accounts queries
       queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+      // The Inbox account is renamed through this same modal but reads from its
+      // own endpoint, so it needs its own invalidation to pick the new name up.
+      queryClient.invalidateQueries({ queryKey: ['socialInboxConnections'] });
     },
     ...options,
   });
@@ -2236,3 +2270,157 @@ export const useAddStage = useCreateStage;
 export const useAddStatus = useCreateStatus;
 export const useAddTag = useCreateTag;
 
+
+// ============================================================================
+// Omni-Channel Inbox - Instagram Direct + Facebook Messenger
+//
+// The `inbox` sync slice is the primary refresh signal (see
+// useInvalidateOnSliceChange in the page); refetchInterval is only a backstop
+// for when the realtime socket is down.
+// ============================================================================
+
+export const useSocialConversations = (
+  params?: {
+    channel?: string;
+    status?: string;
+    assignment?: string;
+    agent?: number;
+    converted?: string;
+    starred?: boolean;
+    unreplied?: boolean;
+    search?: string;
+    ordering?: string;
+    limit?: number;
+    offset?: number;
+  },
+  options?: { refetchInterval?: number | false; enabled?: boolean }
+) => {
+  const { refetchInterval = false, enabled = true } = options || {};
+  return useQuery({
+    queryKey: queryKeys.socialConversations(params as Record<string, unknown> | undefined),
+    queryFn: () => getSocialConversationsAPI(params),
+    staleTime: 3 * 1000,
+    refetchOnWindowFocus: true,
+    refetchInterval,
+    enabled,
+  });
+};
+
+export const useSocialMessages = (
+  conversationId?: number,
+  options?: { refetchInterval?: number | false; enabled?: boolean }
+) => {
+  const { refetchInterval = false, enabled = true } = options || {};
+  return useQuery({
+    queryKey: queryKeys.socialMessages(conversationId),
+    queryFn: () => getSocialMessagesAPI(conversationId as number),
+    enabled: enabled && typeof conversationId === 'number',
+    staleTime: 3 * 1000,
+    refetchInterval,
+  });
+};
+
+/**
+ * staleTime 0: the window is time-sensitive and the composer's enabled state
+ * depends on it, so never serve a cached answer.
+ */
+export const useSocialSendWindow = (conversationId?: number, enabled = true) =>
+  useQuery({
+    queryKey: queryKeys.socialSendWindow(conversationId),
+    queryFn: () => getSocialSendWindowAPI(conversationId as number),
+    enabled: enabled && typeof conversationId === 'number',
+    staleTime: 0,
+  });
+
+export const useSendSocialMessage = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: sendSocialMessageAPI,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.socialMessages(variables.conversationId),
+      });
+      queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+    },
+  });
+};
+
+export const useSendSocialMedia = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: sendSocialMediaAPI,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.socialMessages(variables.conversationId),
+      });
+      queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+    },
+  });
+};
+
+export const useUpdateSocialConversationState = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: updateSocialConversationStateAPI,
+    // Optimistic: triage should feel instant, and the slice bump reconciles.
+    onMutate: async (variables) => {
+      await queryClient.cancelQueries({ queryKey: ['socialConversations'] });
+      const previous = queryClient.getQueriesData({ queryKey: ['socialConversations'] });
+      queryClient.setQueriesData({ queryKey: ['socialConversations'] }, (old: any) => {
+        if (!old || !Array.isArray(old.results)) return old;
+        return {
+          ...old,
+          results: old.results.map((row: any) =>
+            row.id === variables.conversationId
+              ? {
+                  ...row,
+                  ...(variables.status !== undefined ? { status: variables.status } : {}),
+                  ...(variables.isStarred !== undefined
+                    ? { is_starred: variables.isStarred }
+                    : {}),
+                  ...(variables.isUnsubscribed !== undefined
+                    ? { is_unsubscribed: variables.isUnsubscribed }
+                    : {}),
+                }
+              : row
+          ),
+        };
+      });
+      return { previous };
+    },
+    onError: (_err, _variables, context: any) => {
+      context?.previous?.forEach(([key, data]: [any, any]) =>
+        queryClient.setQueryData(key, data)
+      );
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+    },
+  });
+};
+
+export const useMarkSocialConversationRead = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: markSocialConversationReadAPI,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+      queryClient.invalidateQueries({ queryKey: ['syncDigest'] });
+    },
+  });
+};
+
+export const useConvertSocialConversation = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: convertSocialConversationAPI,
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.socialMessages(variables.conversationId),
+      });
+      // A new lead now exists, so every lead list is stale.
+      queryClient.invalidateQueries({ queryKey: ['leads'] });
+    },
+  });
+};

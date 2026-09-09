@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, PlanEntitlementsSummary, PaymentResultBanner } from '../components/index';
+import { PageWrapper, Card, Button, Loader, Alert, PaymentGatewaySelector, PlanEntitlementsSummary, PaymentResultBanner } from '../components/index';
 import {
     getPublicPlansAPI,
     createPaymentSessionAPI,
@@ -45,7 +45,7 @@ export const ChangePlanPage = () => {
     const [selectedGateway, setSelectedGateway] = useState<number | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
-    /** Subscription's current plan id — selection of this plan is blocked. */
+    /** Subscription's current plan id â€” selection of this plan is blocked. */
     const [currentPlanId, setCurrentPlanId] = useState<number | null>(null);
     const [freeTrialConsumed, setFreeTrialConsumed] = useState(false);
     const [preview, setPreview] = useState<{
@@ -316,9 +316,7 @@ export const ChangePlanPage = () => {
                     </p>
 
                     {errors.general && (
-                        <div className="mb-6 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
-                            {errors.general}
-                        </div>
+                        <Alert variant="error" className="mb-6">{errors.general}</Alert>
                     )}
 
                     {/* Billing Cycle Toggle */}
@@ -349,7 +347,7 @@ export const ChangePlanPage = () => {
 
                     {selectedPlan && subscriptionId && (
                         <div className="mb-6 p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-sm">
-                            {previewLoading && <span className="text-gray-500">{t('loading') || 'Loading…'}</span>}
+                            {previewLoading && <span className="text-gray-500">{t('loading') || 'Loadingâ€¦'}</span>}
                             {!previewLoading && preview?.error && (
                                 <p className="text-amber-700 dark:text-amber-300">{preview.error}</p>
                             )}
@@ -377,14 +375,12 @@ export const ChangePlanPage = () => {
                     {/* Plans List */}
                     {plansLoading && (
                         <div className="flex justify-center py-8">
-                            <Loader variant="primary" className="h-12" />
+                            <Loader size="lg" variant="primary" />
                         </div>
                     )}
 
                     {plansError && !plansLoading && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md">
-                            {plansError}
-                        </div>
+                        <Alert variant="error">{plansError}</Alert>
                     )}
 
                     {!plansLoading && !plansError && plans.length === 0 && (
@@ -529,7 +525,7 @@ export const ChangePlanPage = () => {
                             }
                             className="min-w-[150px]"
                         >
-                            {isProcessing ? (t('loadingPaymentLink') || 'Loading...') : (t('changePlan') || 'Change Plan')}
+                            {t('changePlan')}
                         </Button>
                     </div>
                 </Card>

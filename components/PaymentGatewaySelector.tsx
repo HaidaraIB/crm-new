@@ -1,6 +1,8 @@
+import { Alert } from './Alert';
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { getPublicPaymentGatewaysAPI } from '../services/api';
+import { Loader } from './Loader';
 
 interface PaymentGateway {
   id: number;
@@ -109,7 +111,7 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
           {t('selectPaymentMethod') || 'Select Payment Method'}
         </label>
         <div className="flex items-center justify-center p-4 border border-gray-300 dark:border-gray-600 rounded-lg">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+          <Loader size="md" variant="primary" />
         </div>
       </div>
     );
@@ -118,9 +120,7 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
   if (error) {
     return (
       <div className={`${className}`}>
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md">
-          {error}
-        </div>
+        <Alert variant="error">{error}</Alert>
       </div>
     );
   }
@@ -128,9 +128,7 @@ export const PaymentGatewaySelector: React.FC<PaymentGatewaySelectorProps> = ({
   if (gateways.length === 0) {
     return (
       <div className={`${className}`}>
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 text-yellow-600 dark:text-yellow-300 px-4 py-3 rounded-md">
-          {t('noPaymentGatewaysAvailable') || 'No payment gateways available'}
-        </div>
+        <Alert variant="warning">{t('noPaymentGatewaysAvailable') || 'No payment gateways available'}</Alert>
       </div>
     );
   }

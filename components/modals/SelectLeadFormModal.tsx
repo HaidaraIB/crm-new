@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
@@ -140,9 +141,7 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} title={t('selectLeadForm') || 'Select Lead Form'}>
       <div className="space-y-4">
         {errors.general && (
-          <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
-            {errors.general}
-          </div>
+          <Alert variant="error">{errors.general}</Alert>
         )}
         {pages.length > 1 && (
           <div>
@@ -169,12 +168,10 @@ export const SelectLeadFormModal: React.FC<SelectLeadFormModalProps> = ({
 
         {loadingForms ? (
           <div className="flex items-center justify-center py-8">
-            <Loader variant="primary" className="h-8" />
+            <Loader size="md" variant="primary" />
           </div>
         ) : leadFormsError && errorMessage ? (
-          <div className="rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 p-4 text-sm text-red-700 dark:text-red-300">
-            {errorMessage}
-          </div>
+          <Alert variant="error">{errorMessage}</Alert>
         ) : leadForms.length === 0 ? (
           <div className="text-center py-8 text-gray-500 dark:text-gray-400">
             {t('noLeadFormsFound') || 'No lead forms found for this page'}

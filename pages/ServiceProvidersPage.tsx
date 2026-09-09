@@ -15,7 +15,7 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
     const formatRating = (rating: number | undefined | null): string => {
         if (rating === undefined || rating === null || isNaN(Number(rating))) return '-';
         const num = Number(rating);
-        return `⭐ ${num.toFixed(1)}`;
+        return `â­ ${num.toFixed(1)}`;
     };
     
     return (
@@ -201,7 +201,7 @@ export const ServiceProvidersPage = () => {
         return (
             <PageWrapper title={t('serviceProviders')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
+                    <Loader size="lg" variant="primary"/>
                 </div>
             </PageWrapper>
         );

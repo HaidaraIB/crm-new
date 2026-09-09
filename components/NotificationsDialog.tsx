@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { Button } from './Button';
+import { Loader } from './Loader';
 import {
   deleteAllNotificationsAPI,
   deleteNotificationAPI,
@@ -316,7 +317,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
           {listQuery.isLoading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500 dark:text-gray-300">
-              <span className="inline-block size-6 animate-spin rounded-full border-2 border-primary border-t-transparent dark:border-primary-300 dark:border-t-transparent" />
+              <Loader size="md" variant="primary" />
               {t('searchEllipsis')}
             </div>
           ) : listQuery.isError ? (

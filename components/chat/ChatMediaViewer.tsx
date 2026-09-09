@@ -10,6 +10,7 @@ import {
 } from '../icons';
 import type { ChatMediaAlbumItem } from './chatMediaAlbum';
 import { ChatMediaThumb } from './ChatMediaThumb';
+import { Loader } from '../Loader';
 import { translations } from '../../constants';
 import {
   chatMediaBinaryUrlIdentity,
@@ -355,7 +356,7 @@ export const ChatMediaViewer: React.FC<Props> = ({ items, initialIndex, onClose,
 
         <div className="relative z-10 flex h-full w-full max-w-5xl flex-col items-center justify-center px-12 py-2 sm:px-16">
           {loading ? (
-            <span className="size-10 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+            <Loader size="lg" tone="light" />
           ) : failed || !blobUrl ? (
             <p className="text-sm text-white/70">{t('chatMediaCouldNotLoad')}</p>
           ) : item.kind === 'image' ? (

@@ -161,6 +161,9 @@ export const Sidebar = () => {
         refetchInterval: false,
     });
     const whatsappUnreadCount = chatsNavVisible ? (digest?.whatsapp_unread ?? 0) : 0;
+    // null means the inbox is gated for this user (plan/policy/role) — distinct
+    // from zero unread, so no badge rather than a '0'.
+    const socialInboxUnreadCount = digest?.social_inbox_unread ?? 0;
     const callsNavVisible =
         !isDataEntryUser &&
         !isReceptionUser &&
@@ -330,6 +333,7 @@ export const Sidebar = () => {
                         return (
                             item.name === 'Call Center' ||
                             item.name === 'Arrivals' ||
+                            item.name === 'Inbox' ||
                             item.name === 'Support Center' ||
                             item.name === 'User Guide' ||
                             item.name === 'News' ||
@@ -413,7 +417,9 @@ export const Sidebar = () => {
                                 badgeCount={
                                     item.name === 'Chats'
                                         ? whatsappUnreadCount
-                                        : item.name === 'Calls'
+                                        : item.name === 'Inbox'
+                                          ? socialInboxUnreadCount
+                                          : item.name === 'Calls'
                                           ? liveCallsCount
                                           : item.name === 'News'
                                             ? newsUnreadCount
@@ -422,7 +428,9 @@ export const Sidebar = () => {
                                 badgeAriaLabel={
                                     item.name === 'Chats' && whatsappUnreadCount > 0
                                         ? `${whatsappUnreadCount} unread`
-                                        : item.name === 'Calls' && liveCallsCount > 0
+                                        : item.name === 'Inbox' && socialInboxUnreadCount > 0
+                                          ? `${socialInboxUnreadCount} unread`
+                                          : item.name === 'Calls' && liveCallsCount > 0
                                           ? t('liveCallsBadgeAria').replace(
                                                 '{n}',
                                                 String(liveCallsCount)

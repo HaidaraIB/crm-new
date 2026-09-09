@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Alert } from '../components/Alert';
 import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
@@ -443,9 +444,7 @@ export const TwoFactorAuthPage = () => {
                             </div>
                         )}
                         {success && (
-                            <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                                {success}
-                            </div>
+                            <Alert variant="success">{success}</Alert>
                         )}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">

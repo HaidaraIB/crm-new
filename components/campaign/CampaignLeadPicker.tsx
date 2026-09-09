@@ -227,7 +227,7 @@ function MultiSelectDropdown({
             <button type="button" onClick={() => onOpenChange(!open)} className={dropdownBtnClass(active, open)}>
                 <span>{label}</span>
                 {active && <span className="opacity-80">({selected.length})</span>}
-                <span className="text-[10px] opacity-70">▾</span>
+                <span className="text-[10px] opacity-70">â–¾</span>
             </button>
             {open && (
                 <div
@@ -267,7 +267,7 @@ function MultiSelectDropdown({
                             );
                         })}
                         {visible.length === 0 && (
-                            <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{searchPlaceholder || '—'}</p>
+                            <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{searchPlaceholder || 'â€”'}</p>
                         )}
                     </div>
                 </div>
@@ -308,7 +308,7 @@ function SelectedChip({
                 className="opacity-70 hover:opacity-100 leading-none"
                 aria-label={removeLabel}
             >
-                ×
+                Ã—
             </button>
         </span>
     );
@@ -491,7 +491,7 @@ export function CampaignLeadPicker({
         if (activeDatePreset === 'last30') return t('campaignDateLast30');
         if (activeDatePreset === 'thisMonth') return t('campaignDateThisMonth');
         if (filters.createdAtFrom && filters.createdAtTo) {
-            return `${formatShortDate(filters.createdAtFrom, language)} – ${formatShortDate(filters.createdAtTo, language)}`;
+            return `${formatShortDate(filters.createdAtFrom, language)} â€“ ${formatShortDate(filters.createdAtTo, language)}`;
         }
         if (filters.createdAtFrom) return `${t('fromDate')}: ${formatShortDate(filters.createdAtFrom, language)}`;
         if (filters.createdAtTo) return `${t('toDate')}: ${formatShortDate(filters.createdAtTo, language)}`;
@@ -733,7 +733,7 @@ export function CampaignLeadPicker({
                             className={dropdownBtnClass(dateActive, openDropdown === 'date')}
                         >
                             <span>{dateActive ? dateLabel : t('dates')}</span>
-                            <span className="text-[10px] opacity-70">▾</span>
+                            <span className="text-[10px] opacity-70">â–¾</span>
                         </button>
                         {openDropdown === 'date' && (
                             <div
@@ -800,7 +800,7 @@ export function CampaignLeadPicker({
                             className={dropdownBtnClass(!filters.withPhoneOnly || filters.assignedToMe, openDropdown === 'more')}
                         >
                             {t('campaignMoreFilters')}
-                            <span className="text-[10px] opacity-70">▾</span>
+                            <span className="text-[10px] opacity-70">â–¾</span>
                         </button>
                         {openDropdown === 'more' && (
                             <div
@@ -883,7 +883,7 @@ export function CampaignLeadPicker({
             <div className="border border-gray-200 dark:border-gray-600 rounded-lg overflow-y-auto custom-scrollbar flex-1 min-h-[200px] max-h-[320px] bg-white dark:bg-gray-800/50">
                 {campaignLeadsLoading ? (
                     <div className="flex justify-center py-8">
-                        <Loader variant="primary" className="h-8" />
+                        <Loader size="md" variant="primary" />
                     </div>
                 ) : campaignLeads.length === 0 ? (
                     <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">{t('noLeadsFound')}</p>
@@ -917,7 +917,7 @@ export function CampaignLeadPicker({
                                             className="rounded border-gray-300 dark:border-gray-600 text-primary shrink-0"
                                         />
                                         {/* `text-primary` (primary-500) is too dark on the dark-mode
-                                            tint — step up to primary-200, same rule as the page tabs. */}
+                                            tint â€” step up to primary-200, same rule as the page tabs. */}
                                         <div className="w-9 h-9 rounded-full bg-primary/20 dark:bg-primary/30 flex items-center justify-center text-primary-700 dark:text-primary-100 font-semibold text-sm shrink-0">
                                             {displayTitle.charAt(0)}
                                         </div>

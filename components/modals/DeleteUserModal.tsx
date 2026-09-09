@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -62,15 +63,11 @@ export const DeleteUserModal = () => {
         }} title={t('deleteEmployee')}>
             <div className="space-y-4">
                 {isSupervisorTarget ? (
-                    <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 px-4 py-3 rounded-md text-sm">
-                        {t('supervisorsDeleteFromEmployeesPageOnly')}
-                    </div>
+                    <Alert variant="warning">{t('supervisorsDeleteFromEmployeesPageOnly')}</Alert>
                 ) : (
                     <>
                         {errorMessage && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                                {errorMessage}
-                            </div>
+                            <Alert variant="error">{errorMessage}</Alert>
                         )}
                         <p>{t('confirmDeleteEmployee1')} <span className="font-bold">{displayName}</span>{t('confirmDeleteEmployee2')}</p>
                     </>

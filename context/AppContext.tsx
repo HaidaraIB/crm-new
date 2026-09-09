@@ -1,6 +1,8 @@
 
 
-import React, { useState, useEffect, useCallback, createContext, useContext, ReactNode } from 'react';
+import React, { useState, useEffect, useCallback, useRef, createContext, useContext, ReactNode } from 'react';
+import type { Toast } from '../components/ToastHost';
+import type { AlertVariant } from '../components/Alert';
 import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ArrivalFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
 import {
@@ -348,11 +350,18 @@ export interface AppContextType {
   isEmailVerificationModalOpen: boolean;
   setIsEmailVerificationModalOpen: (isOpen: boolean) => void;
 
-  // Success Modal state
+  // Success feedback. Kept as a two-call API (`setSuccessMessage` then
+  // `setIsSuccessModalOpen(true)`) for the ~90 existing call sites, but it now
+  // raises a non-blocking toast instead of a centred modal.
   isSuccessModalOpen: boolean;
   setIsSuccessModalOpen: (isOpen: boolean) => void;
   successMessage: string;
   setSuccessMessage: (message: string) => void;
+
+  // Toasts (non-blocking feedback stack, rendered by <ToastHost/>)
+  toasts: Toast[];
+  showToast: (message: ReactNode, options?: { variant?: AlertVariant; durationMs?: number }) => void;
+  dismissToast: (id: number) => void;
 
   // Alert Modal state (info / warning / error messages instead of browser alert)
   isAlertModalOpen: boolean;
@@ -819,9 +828,13 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // Email Verification Modal state
   const [isEmailVerificationModalOpen, setIsEmailVerificationModalOpen] = useState(false);
 
-  // Success Modal state
-  const [isSuccessModalOpen, setIsSuccessModalOpen] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
+  // Success feedback -> toast (see setIsSuccessModalOpen below)
+  const [successMessage, setSuccessMessageState] = useState('');
+  const successMessageRef = useRef('');
+
+  // Toast stack
+  const [toasts, setToasts] = useState<Toast[]>([]);
+  const toastIdRef = useRef(0);
 
   // Alert Modal state (replaces browser alert for app-styled messages)
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false);
@@ -1319,6 +1332,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       switch (page) {
         case 'Call Center':
         case 'Arrivals':
+        // The omni-channel inbox is this role's core surface: triage Instagram /
+        // Messenger DMs and convert the interested ones into assigned leads.
+        case 'Inbox':
         case 'CreateLead':
         case 'Profile':
         case 'Support Center':
@@ -1336,6 +1352,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       // Messaging Center is now allowed too, but restricted staff only ever see the
       // submit-for-approval flow inside it (own-leads-only audience, no instant send) —
       // see IntegrationsPage.tsx's isRestrictedCampaignRole branch.
+      // Inbox is allowed; the API scopes it to converted leads assigned to them.
       if (page === 'Library') return false;
       // WhatsApp access is a per-user toggle the owner controls; without it the
       // Chats page can only 403 (and poll the server doing so).
@@ -1401,6 +1418,10 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         // Supervisor keeps the owner's unrestricted instant-send flow (no
         // approval gate, no own-leads-only audience limit).
         return true;
+      // Omni-channel inbox is permission-gated for supervisors, mirroring how
+      // WhatsApp chats work — the backend enforces the same flag.
+      case 'Inbox':
+        return p('can_manage_social_inbox');
       case 'Marketing':
       case 'Campaigns':
       case 'Integrations':
@@ -1506,6 +1527,49 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     setAlertVariant(variant);
     setIsAlertModalOpen(true);
   };
+
+  const MAX_TOASTS = 3;
+
+  const showToast = useCallback(
+    (message: ReactNode, options?: { variant?: AlertVariant; durationMs?: number }) => {
+      const id = ++toastIdRef.current;
+      const toast: Toast = {
+        id,
+        message,
+        variant: options?.variant ?? 'info',
+        durationMs: options?.durationMs ?? 4000,
+      };
+      // Keep the stack shallow so it never covers the page; oldest drops out.
+      setToasts((prev) => [...prev.slice(-(MAX_TOASTS - 1)), toast]);
+    },
+    [],
+  );
+
+  const dismissToast = useCallback((id: number) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
+
+  const setSuccessMessage = useCallback((message: string) => {
+    // Mirrored into a ref so setIsSuccessModalOpen can read it in the same tick:
+    // call sites do setSuccessMessage(msg) immediately followed by
+    // setIsSuccessModalOpen(true), and state wouldn't have flushed yet.
+    successMessageRef.current = message;
+    setSuccessMessageState(message);
+  }, []);
+
+  /**
+   * Success feedback used to open a blocking centred modal that auto-closed
+   * after 2s. It now raises a toast, so the user is never interrupted — the
+   * two-call shape is preserved to avoid touching ~90 call sites.
+   */
+  const setIsSuccessModalOpen = useCallback(
+    (isOpen: boolean) => {
+      if (!isOpen) return;
+      const message = successMessageRef.current;
+      if (message) showToast(message, { variant: 'success' });
+    },
+    [showToast],
+  );
 
   const t = (key: keyof typeof translations.en) => {
     const table = (language === 'ar' ? translations.ar : translations.en) as typeof translations.en;
@@ -1670,8 +1734,9 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     selectLeadFormConfig, setSelectLeadFormConfig,
     isChangePasswordModalOpen, setIsChangePasswordModalOpen,
     isEmailVerificationModalOpen, setIsEmailVerificationModalOpen,
-    isSuccessModalOpen, setIsSuccessModalOpen,
+    isSuccessModalOpen: false, setIsSuccessModalOpen,
     successMessage, setSuccessMessage,
+    toasts, showToast, dismissToast,
     isAlertModalOpen, setIsAlertModalOpen,
     alertMessage, setAlertMessage,
     alertVariant, setAlertVariant,

@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -204,9 +205,7 @@ export const ManageIntegrationAccountModal = () => {
         >
             <div className="space-y-4">
                 {errors.general && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
-                        {errors.general}
-                    </div>
+                    <Alert variant="error">{errors.general}</Alert>
                 )}
                 {cannotAddSecond && (
                     <p className="text-sm text-amber-800 dark:text-amber-200 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-md px-3 py-2">

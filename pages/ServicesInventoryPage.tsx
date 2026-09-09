@@ -155,7 +155,7 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
                                         <PhoneText>{provider.phone}</PhoneText>
                                     </td>
                                     <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{provider.email}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.rating ? `⭐ ${provider.rating}` : '-'}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.rating ? `â­ ${provider.rating}` : '-'}</td>
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
@@ -337,7 +337,7 @@ export const ServicesInventoryPage = () => {
         return (
             <PageWrapper title={t('services')} actions={pageActions}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
+                    <Loader size="lg" variant="primary"/>
                 </div>
             </PageWrapper>
         );

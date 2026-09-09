@@ -19,8 +19,8 @@ type LeadSearchSelectProps = {
 
 /**
  * Searchable single-select for picking a lead/client (e.g. on the deal form).
- * Replaces a plain <select> — which only ever showed the first page of leads
- * and had no way to search — with a combobox that searches leads server-side
+ * Replaces a plain <select> â€” which only ever showed the first page of leads
+ * and had no way to search â€” with a combobox that searches leads server-side
  * as the user types, mirroring TagMultiSelect's interaction pattern.
  */
 export const LeadSearchSelect = ({
@@ -135,7 +135,7 @@ export const LeadSearchSelect = ({
                     <div className="custom-scrollbar max-h-56 overflow-y-auto p-1">
                         {isFetching ? (
                             <div className="flex justify-center py-4">
-                                <Loader variant="primary" className="h-6" />
+                                <Loader size="md" variant="primary" />
                             </div>
                         ) : options.length === 0 ? (
                             <p className="px-3 py-4 text-center text-xs text-gray-500 dark:text-gray-400">

@@ -1,0 +1,156 @@
+---
+description: Omni-Channel Inbox (Instagram DM + Messenger) — page architecture, ACL, messaging window, convert-once semantics
+globs: pages/InboxPage.tsx,components/modals/ConvertConversationModal.tsx,components/integrations/SocialInboxSection.tsx,components/chat/InboxFilterRail.tsx,services/api.ts,hooks/useQueries.ts
+alwaysApply: false
+---
+
+# Omni-Channel Inbox
+
+Instagram Direct + Facebook Messenger for the CALL_CENTER role. Sibling of the
+WhatsApp Chats page, deliberately **not** merged with it.
+
+## What makes this different from WhatsApp Chats
+
+- **A conversation is not a lead.** WhatsApp auto-creates a `Client` per inbound
+  phone number (`ensure_client_for_whatsapp_phone`). The inbox does not: a DM
+  creates `SocialContact` + `SocialConversation` only. `conversation.client` is
+  `null` until an agent explicitly converts. Never add auto-creation here — most
+  DMs are never worth a lead, and each one would charge the plan's `max_clients`
+  quota.
+- **A different Meta app.** `META_INBOX_*` settings, its own client id/secret,
+  webhook verify token, and App Review lifecycle. The webhook signature is bound
+  to `META_INBOX_CLIENT_SECRET` with **no** fallback to `META_CLIENT_SECRET`.
+- **CALL_CENTER is allowed here and denied on WhatsApp.** Both rules are live at
+  once and are pinned by `CRM-api-1/tests/test_call_center_permissions.py`. Do not
+  "harmonize" them.
+
+## Access control (backend-enforced, never client-only)
+
+| Role | Sees |
+|---|---|
+| Owner / Admin | every company conversation |
+| CALL_CENTER | every company conversation; may convert |
+| Supervisor + `can_manage_social_inbox` | every company conversation |
+| Employee / Doctor | only conversations whose converted lead is assigned to them |
+| Reception / Data Entry | nothing (403) |
+
+Unconverted DMs and `conversation.assigned_to` are **not** a visibility grant
+for employee/doctor. If the lead is later reassigned, they lose the thread.
+
+A conversation the viewer may not see answers **404, never 403** — a 403 would
+confirm it exists. Keep it that way.
+
+## Messaging window — stricter than WhatsApp
+
+There are no approved templates to reopen a closed thread. Only two states send:
+
+- within 24h of the last **inbound** message → `messaging_type: RESPONSE`
+- 24h–7d → `messaging_type: MESSAGE_TAG` + `tag: HUMAN_AGENT`, **and only when
+  `META_INBOX_HUMAN_AGENT_TAG_ENABLED` is on** (requires Meta approval of the
+  Human Agent feature)
+
+Outside that the API refuses with `social_outside_window` **before any Graph
+call**, and deletes the pending row so a blocked attempt does not litter the
+thread. The composer must render disabled from `GET /inbox/window/` rather than
+letting an agent type a message that will be rejected. Never auto-send outside
+the window — abusing the tag risks app-level enforcement against the whole app.
+
+## Convert to lead
+
+- Once only. A second attempt returns `409 social_already_converted` with the
+  existing `client_id`; the UI shows the lead chip instead of erroring.
+- **Phone is optional and must stay optional.** Instagram/Messenger carry no
+  phone number. The created `Client` usually has `phone_number = None` and no
+  `ClientPhoneNumber` row. That is safe against `uniq_company_phone_normalized`
+  (the constraint is conditional on a non-empty normalized value). Never
+  fabricate a placeholder number — it would consume the company-wide unique key.
+- If a phone *is* supplied and matches an existing lead, the conversation links
+  to that lead (`duplicate: true`) rather than forking a second one.
+- Assignment reuses `crm/assignment.py`; notifications reuse
+  `notify_lead_assignment_change` + `notify_owner_new_lead`, so an inbox lead
+  behaves like every other inbound source.
+
+## Freshness
+
+The `inbox` sync slice is the primary refresh signal via
+`useInvalidateOnSliceChange('inbox', …)`. `refetchInterval` is a backstop for a
+dropped socket only — do not shorten it to compensate for a slice that is not
+bumping; fix the bump instead. Bulk `update()` writes fire no `post_save`, so
+mark-read bumps the slice explicitly (see `social_mark_conversation_read`).
+
+## Page split
+
+`pages/InboxPage.tsx` is the conversation UI. `components/integrations/
+SocialInboxSection.tsx` is **connect/disconnect only** — no conversation UI in
+Integrations, mirroring the WhatsApp precedent in `whatsapp-chats.mdc`.
+
+### Shared chat primitives — reuse, do not import WA layout
+
+Inbox reuses `components/chat/*` **as-is** (`ChatBlobMedia`, `ChatMediaViewer`,
+`ChatConversationStatusMenu`, `ChatPendingAttachmentChip`,
+`ChatVoiceRecordingBar`, `useChatVoiceRecorder`, `AttachmentSourceModal`,
+`InboxFilterRail`) plus `whatsappChatTheme` tokens. Filter chrome (rail vs
+chips, Channel vs Status sections) lives in `InboxFilterRail` and shares
+visual tokens with WhatsApp via `components/chat/chatFilterRailChrome.tsx` —
+never import `ChatFilterRail` itself. Thread status uses the same colored-dot
+menu as WhatsApp Chats (open/pending/spam/invalid/done, snooze, star,
+unsubscribe) — never a bare `<select>`. It must **not** import `ChatComposer`,
+`ChatFilterRail`, `WhatsAppChatLayout`, `ConversationList`, `ChatThread`, or
+`ChatMessageBubble` — those carry WhatsApp templates, lead-phone rows, and
+calling. Keep the social send-window alerts and convert header Inbox-owned.
+
+On the Meta page it renders as the **"Instagram & Messenger" tab**, beside "Lead
+Ads" (`metaTab` state in `IntegrationsPage.tsx`). It deliberately reuses the Lead
+Ads account-row shape — `Card p-0` + `divide-y` list, `IntegrationPlatformIcon` +
+name + status pill, then `Connect` / `Edit` / `Disconnect` — so the two tabs
+differ in content, not in furniture. The header's "Add New Account" button is
+shown on both tabs and branches on `metaTab` to create the right platform.
+
+### The account actions belong to the page, not the section
+
+`onConnect` / `onEdit` / `onDisconnect` are passed in from `IntegrationsPage`.
+The section owns only the per-Page rows. This is not decoration:
+
+- **Connect must go through `openConnectPopup`.** Assigning `window.location` to
+  the authorization URL works, but it throws the owner out of the CRM mid-task
+  and there is then no opener for `OAuthCallbackPage` to `postMessage` back to —
+  which is the handshake that refreshes the row in place. The popup is the
+  mechanism, not a preference.
+- **The inbox account is a separate query** (`socialInboxConnections`) from
+  `connectedAccounts`. Anything that can change an account — OAuth success,
+  OAuth failure, popup closed, rename, disconnect — has to invalidate both, or a
+  freshly connected Page stays invisible until a manual reload. Use
+  `invalidateAccountQueries()`.
+- `handleDelete` resolves the account from `accounts` **or** the inbox query, so
+  both tabs disconnect through the same confirm-then-revoke path.
+
+A Page with no linked Instagram account is a supported setup (Messenger-only), so
+`ig_user_id` is nullable and the UI shows an "Instagram not linked" state rather
+than treating it as an error.
+
+## The lead Timeline is a third surface
+
+A converted conversation also appears on the lead's Timeline as a `social_thread`
+card. It reads from its **own** endpoint —
+`GET /integrations/inbox/lead-messages/?client=` via `useLeadSocialMessages` —
+not from the Inbox conversation queries, because the timeline needs every message
+across every conversation on the lead and none of the thread metadata.
+
+- **That endpoint is gated on the inbox ACL, not on lead access.** Reception and
+  data entry can open a lead and get **403** there. That is correct — they get
+  nothing from the inbox by design — so `useLeadSocialMessages` sets
+  `retry: false` and the timeline simply carries no social entries for them.
+  Do not "fix" this by widening the endpoint's permission; that would put DM
+  bodies in front of roles the inbox deliberately excludes.
+- Rows carry `conversation` and `channel`, and
+  `collapseConsecutiveSocialThreads` breaks a group when the conversation
+  changes. A lead can hold an Instagram DM and a Messenger thread at once;
+  grouping purely on adjacency would file two strangers under one heading.
+- Any change here is bound by `lead-timeline-parity.mdc` — web and Flutter in
+  one change set.
+
+## Strings
+
+Every user-facing string goes in `constants.ts` under both `en` and `ar` and is
+rendered via `t()`. Check for an existing key before adding one — `viewLead` and
+`unassigned` already exist and must not be duplicated.

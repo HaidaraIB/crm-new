@@ -379,8 +379,8 @@ export function PbxSettingsForm({
 
         {errors.general ? <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p> : null}
         {success ? <p className="text-sm text-green-600 dark:text-green-400">{t('savedSuccessfully')}</p> : null}
-        <Button onClick={handleSave} disabled={saving || pbxPolicyDisabled}>
-          {saving ? t('saving') : t('save')}
+        <Button onClick={handleSave} loading={saving} loadingText={t('saving')} disabled={pbxPolicyDisabled}>
+          {t('save')}
         </Button>
       </Card>
 
@@ -428,8 +428,8 @@ export function PbxSettingsForm({
           <div className="pt-2 border-t border-gray-200 dark:border-gray-700 space-y-2">
             <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{t('pbxDownloadConnector')}</p>
             <p className="text-sm text-gray-600 dark:text-gray-400">{t('pbxDownloadConnectorHint')}</p>
-            <Button variant="secondary" onClick={handleDownloadConnector} disabled={downloading || pbxPolicyDisabled}>
-              {downloading ? t('saving') : t('pbxDownloadConnector')}
+            <Button variant="secondary" onClick={handleDownloadConnector} loading={downloading} loadingText={t('processing')} disabled={pbxPolicyDisabled}>
+              {t('pbxDownloadConnector')}
             </Button>
           </div>
         </Card>

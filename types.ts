@@ -23,6 +23,7 @@ export type Page =
   | 'News'
   | 'Call Center'
   | 'Arrivals'
+  | 'Inbox'
   // Auth / onboarding pages
   | 'Login' | 'Register' | 'ForgotPassword' | 'ResetPassword'
   | 'VerifyEmail' | 'VerifyPhone' | 'TwoFactorAuth'
@@ -149,6 +150,7 @@ export interface SupervisorPermissionsMap {
   can_manage_settings: boolean;
   can_manage_whatsapp_chats: boolean;
   can_manage_whatsapp_calls: boolean;
+  can_manage_social_inbox: boolean;
 }
 
 export interface SupervisorPermissionPayload {
@@ -289,6 +291,9 @@ export interface TimelineWhatsAppThreadMessage {
   user: string;
 }
 
+/** Instagram Direct / Facebook Messenger. */
+export type TimelineSocialChannel = 'instagram' | 'messenger';
+
 /** A tag as referenced from a timeline entry; color falls back when the tag was deleted. */
 export interface TimelineTagRef {
   name: string;
@@ -303,7 +308,7 @@ export interface TimelineEntry {
   details: string;
   date: string;
   timestamp: number; // For sorting
-  type?: 'action' | 'event' | 'call' | 'visit' | 'field_visit' | 'location_update' | 'sms' | 'whatsapp' | 'whatsapp_thread';
+  type?: 'action' | 'event' | 'call' | 'visit' | 'field_visit' | 'location_update' | 'sms' | 'whatsapp' | 'whatsapp_thread' | 'social' | 'social_thread';
   stage?: string; // Optional: formatted stage name for better display
   color?: string; // Optional: color for the stage or event
   oldValue?: string;
@@ -319,10 +324,18 @@ export interface TimelineEntry {
   locationPhotoUrl?: string; // Optional: client location photo for field visits
   recordingUrl?: string; // Optional: PBX / WhatsApp call recording playback URL
   recordingStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'skipped' | string;
-  /** Direction for individual WhatsApp timeline rows (before thread collapse). */
+  /** Direction for individual WhatsApp / social timeline rows (before thread collapse). */
   direction?: 'inbound' | 'outbound';
-  /** Messages inside a collapsed WhatsApp conversation block. */
+  /** Messages inside a collapsed WhatsApp or social conversation block. */
   messages?: TimelineWhatsAppThreadMessage[];
+  /** Which network a `social` / `social_thread` row came from. */
+  socialChannel?: TimelineSocialChannel;
+  /**
+   * Conversation this social row belongs to. A lead can hold an Instagram DM
+   * and a Messenger thread at once, so this — not adjacency alone — decides
+   * which rows collapse together.
+   */
+  socialConversationId?: number;
 }
 
 export interface ClientTask {

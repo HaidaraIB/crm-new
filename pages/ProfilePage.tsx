@@ -2,6 +2,7 @@
 
 
 import React, { useState, useEffect } from 'react';
+import { Alert } from '../components/Alert';
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
 import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal, LegalLinks, PaymentResultBanner } from '../components/index';
@@ -407,7 +408,7 @@ export const ProfilePage = () => {
         return (
             <PageWrapper title={t('profile')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
+                    <Loader size="lg" variant="primary"/>
                 </div>
             </PageWrapper>
         );
@@ -692,8 +693,8 @@ export const ProfilePage = () => {
                 )}
                 
                 <div className="flex justify-end">
-                    <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>
-                        {isSaving ? (t('saving') || 'Saving...') : t('saveProfile')}
+                    <Button onClick={handleSave} loading={isSaving} loadingText={t('saving')}>
+                        {t('saveProfile')}
                     </Button>
                 </div>
                 
@@ -724,9 +725,7 @@ export const ProfilePage = () => {
             >
                 <div className="space-y-4">
                     {errors.general && (
-                        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
-                            {errors.general}
-                        </div>
+                        <Alert variant="error">{errors.general}</Alert>
                     )}
                     <p className="text-gray-600 dark:text-gray-400">
                         {t('selectPaymentMethodForRenewal') || 'Select a payment method to renew your subscription'}
@@ -755,9 +754,10 @@ export const ProfilePage = () => {
                         <Button
                             onClick={handleRenewSubscription}
                             loading={isRenewing}
-                            disabled={!selectedGateway || isRenewing}
+                            loadingText={t('processing')}
+                            disabled={!selectedGateway}
                         >
-                            {isRenewing ? (t('processing') || 'Processing...') : (t('proceedToPayment') || 'Proceed to Payment')}
+                            {t('proceedToPayment')}
                         </Button>
                     </div>
                 </div>

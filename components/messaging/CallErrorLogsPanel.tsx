@@ -296,7 +296,7 @@ export function CallErrorLogsPanel() {
               <Button type="button" variant="secondary" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
                 {isFetchingNextPage ? (
                   <>
-                    <Loader variant="primary" className="w-4 h-4 me-2" />
+                    <Loader size="sm" variant="primary" className="me-2" />
                     {t('loading')}
                   </>
                 ) : (

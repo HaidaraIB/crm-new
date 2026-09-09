@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
@@ -115,9 +116,7 @@ export const AssignLeadModal = () => {
             <Modal isOpen={isAssignLeadModalOpen && !showConfirmDialog} onClose={handleClose} title={t('assignLead')}>
                 <div className="space-y-4">
                     {errors.general && (
-                        <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
-                            {errors.general}
-                        </div>
+                        <Alert variant="error">{errors.general}</Alert>
                     )}
                     <div>
                         <p>{t('leadsCount')}: <span className="font-bold">{checkedLeadIds.size}</span></p>

@@ -43,7 +43,7 @@ type Props = {
 const COMPOSER_MIN_H_PX = 32;
 const COMPOSER_MAX_H_PX = 160;
 
-/** Caret/base direction from UI language when empty, else first strong letter (ar → rtl, en → ltr). */
+/** Caret/base direction from UI language when empty, else first strong letter (ar â†’ rtl, en â†’ ltr). */
 function composerTextDir(text: string, uiIsRtl: boolean): 'ltr' | 'rtl' {
   for (const ch of text) {
     const code = ch.codePointAt(0);
@@ -211,7 +211,7 @@ export const ChatComposer: React.FC<Props> = ({
               onClick={onSendTemplate}
             >
               {chatTemplateSending ? (
-                <Loader variant="primary" className="h-3.5 w-3.5" />
+                <Loader size="sm" variant="primary" />
               ) : (
                 t('sendTemplateMessage') || 'Send template'
               )}

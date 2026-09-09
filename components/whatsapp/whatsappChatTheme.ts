@@ -35,4 +35,4 @@ export const WA_ALERT_INFO =
 export const WA_INPUT_SHELL =
   'min-w-0 flex-1 rounded-3xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 px-2 shadow-sm';
 export const WA_LAYOUT_SHELL =
-  'flex flex-col md:flex-row min-h-[560px] h-[calc(100vh-11rem)] rounded-xl overflow-hidden border border-gray-200 dark:border-gray-800 shadow-sm bg-white dark:bg-gray-900';
+  'flex h-full min-h-0 flex-col overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm dark:border-gray-800 dark:bg-gray-900 md:flex-row';

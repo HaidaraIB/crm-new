@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { SectionLoadingState } from '../components/SectionLoadingState';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, RefreshButton, ArrowLeftIcon, YouTubeEmbed } from '../components/index';
@@ -196,9 +197,7 @@ export const UserGuidePage = () => {
             {t('userGuideBack') || 'Back to articles'}
           </button>
           {detailQuery.isLoading ? (
-            <div className="py-12 text-center text-gray-500 dark:text-gray-400">
-              {t('loading') || 'Loading...'}
-            </div>
+            <SectionLoadingState className="py-12" />
           ) : detailQuery.isError || !detail ? (
             <div className="py-12 text-center text-red-600 dark:text-red-400">
               {t('somethingWentWrong') || 'Failed to load.'}
@@ -232,9 +231,7 @@ export const UserGuidePage = () => {
           )}
         </div>
       ) : listQuery.isLoading || categoriesQuery.isLoading ? (
-        <div className="py-12 text-center text-gray-500 dark:text-gray-400">
-          {t('loading') || 'Loading...'}
-        </div>
+        <SectionLoadingState className="py-12" />
       ) : listQuery.isError ? (
         <div className="py-12 text-center text-red-600 dark:text-red-400">
           {t('somethingWentWrong') || 'Failed to load.'}

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Alert } from '../Alert';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
@@ -176,9 +177,7 @@ export const AddChannelModal = () => {
         <Modal isOpen={isAddChannelModalOpen} onClose={handleClose} title={t('addChannel') || 'Add Channel'}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {errors._general && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                        {errors._general}
-                    </div>
+                    <Alert variant="error">{errors._general}</Alert>
                 )}
                 <div>
                     <Label htmlFor="name">{t('name')} <span className="text-red-500">*</span></Label>
@@ -242,7 +241,7 @@ export const AddChannelModal = () => {
                 </div>
                 <div className={`flex ${language === 'ar' ? 'flex-row-reverse' : ''} justify-end gap-2`}>
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>
-                    <Button type="submit" disabled={loading}>{loading ? t('loading') || 'Loading...' : t('submit')}</Button>
+                    <Button type="submit" loading={loading} loadingText={t('saving')}>{t('submit')}</Button>
                 </div>
             </form>
         </Modal>

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { translations } from '../constants';
 import { withLatinDigits } from '../utils/dateUtils';
-import { PageWrapper, Button, Modal } from '../components/index';
+import { PageWrapper, Button, Modal, Loader } from '../components/index';
 import {
   ChatBubbleIcon,
   CheckIcon,
@@ -1532,7 +1532,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
           <div className="custom-scrollbar flex-1 overflow-y-auto">
             {convQuery.isLoading ? (
               <div className="flex items-center justify-center gap-2 p-8 text-sm text-gray-500 dark:text-gray-400">
-                <span className="inline-block size-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                <Loader size="sm" variant="primary" />
                 {t('searchEllipsis')}
               </div>
             ) : conversations.length === 0 ? (
@@ -1761,7 +1761,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                     className="pointer-events-none absolute inset-x-0 top-2 z-20 flex justify-center"
                     aria-hidden="true"
                   >
-                    <span className="inline-block size-5 animate-spin rounded-full border-2 border-primary border-t-transparent bg-transparent" />
+                    <Loader size="sm" variant="primary" />
                   </div>
                 ) : null}
                 <div
@@ -1770,7 +1770,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                 >
                 {messagesQuery.isLoading ? (
                   <div className="flex justify-center py-12">
-                    <span className="inline-block size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    <Loader size="md" variant="primary" />
                   </div>
                 ) : messages.length === 0 ? (
                   <div
@@ -2307,7 +2307,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
         <div className="max-h-[min(22rem,50vh)] overflow-y-auto custom-scrollbar sm:max-h-96">
           {eligibleQuery.isLoading ? (
             <div className="flex justify-center py-12">
-              <span className="inline-block size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <Loader size="md" variant="primary" />
             </div>
           ) : (eligibleQuery.data?.results?.length ?? 0) === 0 ? (
             <div className="rounded-2xl border border-dashed border-gray-300 bg-gray-50/90 px-5 py-10 text-center text-sm text-gray-500 dark:border-gray-600 dark:bg-gray-900/60 dark:text-gray-400">

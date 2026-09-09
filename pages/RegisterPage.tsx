@@ -1,8 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
-import { Button, Input, PhoneInput, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PlanEntitlementsSummary } from '../components/index';
+import { Button, Input, PhoneInput, Alert, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PlanEntitlementsSummary } from '../components/index';
 import {
     registerCompanyAPI,
     getPublicPlansAPI,
@@ -1005,9 +1004,7 @@ export const RegisterPage = () => {
                         </div>
 
                         {errors.general && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                                {errors.general}
-                            </div>
+                            <Alert variant="error">{errors.general}</Alert>
                         )}
 
                         <div className="space-y-6">
@@ -1402,9 +1399,7 @@ export const RegisterPage = () => {
 
                                         {plansError && !plansLoading && (
                                             <div className="space-y-2">
-                                                <div className="text-sm text-red-600 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 rounded-md">
-                                                    {plansError}
-                                                </div>
+                                                <Alert variant="error">{plansError}</Alert>
                                                 <button
                                                     type="button"
                                                     className="text-sm text-primary-600 dark:text-primary-400 hover:underline"

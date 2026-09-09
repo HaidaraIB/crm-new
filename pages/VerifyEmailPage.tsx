@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Button, MoonIcon, SunIcon, Input } from '../components/index';
+import { Button, MoonIcon, SunIcon, Input, Loader } from '../components/index';
 import { AuthHero } from '../components/AuthHero';
 import {
     verifyEmailAPI,
@@ -473,7 +473,7 @@ export const VerifyEmailPage = () => {
 
                         {!manualEmail && isVerifying ? (
                             <div className="text-center py-8">
-                                <div className="inline-block animate-spin rounded-full h-12 w-12 border-4 border-primary-500 border-t-transparent" />
+                                <Loader size="lg" variant="primary" />
                                 <p className="mt-4 text-secondary">{t('verifying')}</p>
                             </div>
                         ) : null}

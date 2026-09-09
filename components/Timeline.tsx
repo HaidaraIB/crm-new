@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Lead, TimelineEntry as TimelineEntryType, TimelineTagRef } from '../types';
 import { getStatusSurfaceStyles } from './LeadStatusDropdown';
-import { ClockIcon, PhoneIcon, MapPinIcon, WhatsappIcon, SmsIcon } from './icons';
+import { ClockIcon, PhoneIcon, MapPinIcon, WhatsappIcon, SmsIcon, InstagramIcon, MessengerIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
 import { translations } from '../constants';
 import {
@@ -51,6 +51,10 @@ function getTypeChipLabel(
         case 'whatsapp':
         case 'whatsapp_thread':
             return t('whatsapp');
+        case 'social':
+        case 'social_thread':
+            // The network, not "Inbox" — an owner thinks in Instagram/Messenger.
+            return entry.socialChannel === 'messenger' ? t('messenger') : t('instagram');
         case 'sms':
             return t('smsSent');
         case 'call':
@@ -75,18 +79,35 @@ function showActionSubtitle(entry: TimelineEntryType, chipLabel: string): boolea
     if (!entry.action?.trim()) return false;
     if (entry.type === 'whatsapp') return true;
     if (entry.type === 'whatsapp_thread') return false;
+    if (entry.type === 'social') return true;
+    if (entry.type === 'social_thread') return false;
     if (entry.type === 'action') return false;
     if (entry.type === 'event' && (entry.oldValue || entry.newValue)) return false;
     if (entry.type === 'location_update') return false;
     return entry.action !== chipLabel;
 }
 
-function TypeIcon({ type, className }: { type?: TimelineEntryType['type']; className?: string }) {
+function TypeIcon({
+    type,
+    channel,
+    className,
+}: {
+    type?: TimelineEntryType['type'];
+    channel?: TimelineEntryType['socialChannel'];
+    className?: string;
+}) {
     const cn = className || 'w-4 h-4';
     switch (type) {
         case 'whatsapp':
         case 'whatsapp_thread':
             return <WhatsappIcon className={cn} />;
+        case 'social':
+        case 'social_thread':
+            return channel === 'messenger' ? (
+                <MessengerIcon className={cn} />
+            ) : (
+                <InstagramIcon className={cn} />
+            );
         case 'sms':
             return <SmsIcon className={cn} />;
         case 'call':
@@ -179,6 +200,102 @@ function WhatsAppThreadBody({
                         className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
                     >
                         {t('whatsappTimelineOpenChat')}
+                    </button>
+                )}
+            </div>
+        </div>
+    );
+}
+
+/**
+ * Expandable Instagram DM / Messenger conversation block.
+ *
+ * Same behaviour as `WhatsAppThreadBody` — collapsed by default, latest-message
+ * preview with a direction cue, per-message lines when expanded — because a
+ * timeline that presents two chat channels two different ways is harder to read
+ * than either one alone. It is a separate component rather than a prop on that
+ * one so the WhatsApp card keeps its own copy and colours without a branch on
+ * every line.
+ */
+function SocialThreadBody({
+    entry,
+    t,
+    onOpenInbox,
+}: {
+    entry: TimelineEntryType;
+    t: (key: keyof typeof translations.en) => string;
+    onOpenInbox?: () => void;
+}) {
+    const [expanded, setExpanded] = useState(false);
+    const messages = entry.messages || [];
+    const countLabel = t('socialTimelineMessagesCount').replace(
+        '{count}',
+        String(messages.length || 1)
+    );
+    const latestDirection = messages.length
+        ? messages[messages.length - 1].direction
+        : entry.direction;
+    const previewCue = latestDirection === 'inbound' ? '←' : '→';
+
+    return (
+        <div className="mt-2 space-y-2">
+            <p className="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                {t('socialTimelineConversation')}
+                <span className="ms-2 text-xs font-medium text-gray-500 dark:text-gray-400 tabular-nums">
+                    {countLabel}
+                </span>
+            </p>
+            {entry.details && !expanded && (
+                <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
+                    <span className="text-gray-400 dark:text-gray-500 me-1.5" aria-hidden="true">
+                        {previewCue}
+                    </span>
+                    {entry.details}
+                </p>
+            )}
+            {expanded && messages.length > 0 && (
+                <ul className="space-y-1.5 rounded-lg border border-pink-200/70 dark:border-pink-800/50 bg-white/60 dark:bg-gray-900/40 px-2.5 py-2 max-h-64 overflow-y-auto">
+                    {messages.map((msg) => (
+                        <li
+                            key={msg.id}
+                            className="flex gap-2 text-sm text-gray-700 dark:text-gray-200 min-w-0"
+                        >
+                            <span
+                                className="shrink-0 text-gray-400 dark:text-gray-500 w-4 text-center"
+                                aria-hidden="true"
+                            >
+                                {msg.direction === 'inbound' ? '←' : '→'}
+                            </span>
+                            <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">
+                                {msg.body}
+                            </span>
+                            <time
+                                className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap self-start"
+                                dateTime={new Date(msg.timestamp).toISOString()}
+                            >
+                                {msg.date}
+                            </time>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <div className="flex flex-wrap items-center gap-2 pt-0.5">
+                {messages.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => setExpanded((v) => !v)}
+                        className="text-xs font-medium text-pink-700 hover:text-pink-800 dark:text-pink-300 dark:hover:text-pink-200"
+                    >
+                        {expanded ? t('socialTimelineCollapse') : t('socialTimelineExpand')}
+                    </button>
+                )}
+                {onOpenInbox && (
+                    <button
+                        type="button"
+                        onClick={onOpenInbox}
+                        className="text-xs font-medium text-primary-600 hover:text-primary-700 dark:text-primary-400 dark:hover:text-primary-300"
+                    >
+                        {t('socialTimelineOpenInbox')}
                     </button>
                 )}
             </div>
@@ -328,6 +445,9 @@ function chipColorClass(type?: TimelineEntryType['type']): string {
         case 'whatsapp':
         case 'whatsapp_thread':
             return 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200';
+        case 'social':
+        case 'social_thread':
+            return 'bg-pink-100 text-pink-800 dark:bg-pink-900/40 dark:text-pink-200';
         case 'sms':
             return 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200';
         case 'call':
@@ -357,6 +477,12 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
         }
         openLeadInChatsPage(chatLead);
     };
+
+    // Straight to the Inbox list rather than to the conversation. Deep-linking a
+    // thread would need the Inbox to accept and honour a preselected id, and a
+    // link that silently lands on the wrong thread is worse than one that lands
+    // on the list.
+    const openInbox = () => goToPage('Inbox');
 
     const sortedHistory = useMemo(() => {
         const copy = [...history];
@@ -461,7 +587,11 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                             <span
                                                 className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-semibold ${chipColorClass(entry.type)}`}
                                             >
-                                                <TypeIcon type={entry.type} className="w-3.5 h-3.5 shrink-0" />
+                                                <TypeIcon
+                                                    type={entry.type}
+                                                    channel={entry.socialChannel}
+                                                    className="w-3.5 h-3.5 shrink-0"
+                                                />
                                                 {chipLabel}
                                             </span>
                                             {entry.stage && (
@@ -496,11 +626,12 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                         </time>
                                     </div>
 
-                                    {entry.type !== 'whatsapp_thread' && (
-                                        <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
-                                            {entry.user}
-                                        </p>
-                                    )}
+                                    {entry.type !== 'whatsapp_thread' &&
+                                        entry.type !== 'social_thread' && (
+                                            <p className="mt-2 text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">
+                                                {entry.user}
+                                            </p>
+                                        )}
 
                                     {entry.fieldLabel && (
                                         <p className="mt-1.5 text-sm font-semibold text-gray-700 dark:text-gray-200">
@@ -519,6 +650,14 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                             entry={entry}
                                             t={t}
                                             onOpenChats={openLeadInChats}
+                                        />
+                                    )}
+
+                                    {entry.type === 'social_thread' && (
+                                        <SocialThreadBody
+                                            entry={entry}
+                                            t={t}
+                                            onOpenInbox={openInbox}
                                         />
                                     )}
 
@@ -589,7 +728,8 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                     {entry.details &&
                                         !entry.tagChanges &&
                                         entry.type !== 'location_update' &&
-                                        entry.type !== 'whatsapp_thread' && (
+                                        entry.type !== 'whatsapp_thread' &&
+                                        entry.type !== 'social_thread' && (
                                         <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words">
                                             {entry.details}
                                         </p>

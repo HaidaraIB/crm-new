@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowDownToLineIcon, PlayIcon } from '../icons';
+import { Loader } from '../Loader';
 import { ChatVoicePlayer } from './ChatVoicePlayer';
 import { translations } from '../../constants';
 import {
@@ -166,7 +167,7 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
         >
           <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-black/50 text-white shadow-md">
             {lazyLoading ? (
-              <span className="size-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              <Loader size="sm" tone="light" />
             ) : (
               <ArrowDownToLineIcon className="size-5" aria-hidden />
             )}

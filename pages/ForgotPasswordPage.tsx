@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Alert } from '../components/Alert';
 import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
@@ -82,15 +83,11 @@ export const ForgotPasswordPage = () => {
                     </div>
                     <div className="space-y-6">
                         {errors.general && (
-                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                                {errors.general}
-                            </div>
+                            <Alert variant="error">{errors.general}</Alert>
                         )}
                         {success ? (
                             <>
-                                <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                                    {t('passwordResetEmailSent') || 'If the email exists, a password reset link has been sent to your email address. Please check your inbox.'}
-                                </div>
+                                <Alert variant="success">{t('passwordResetEmailSent') || 'If the email exists, a password reset link has been sent to your email address. Please check your inbox.'}</Alert>
                                 <div className="space-y-4 pt-4 border-t border-gray-200 dark:border-gray-700">
                                     <div className="text-center">
                                         <p className="text-sm text-secondary mb-4">

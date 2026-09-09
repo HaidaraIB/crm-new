@@ -3,6 +3,7 @@ import { Supervisor } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { EyeIcon, EyeOffIcon } from '../../components/icons';
 import { Input } from '../../components/Input';
+import { Button } from '../../components/Button';
 import { PhoneInput } from '../../components/PhoneInput';
 import {
   validateEmailField,
@@ -440,12 +441,12 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4">
-            <button type="button" onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-md dark:border-gray-600 dark:text-gray-300">
+            <Button type="button" variant="secondary" onClick={onClose}>
               {t('cancel')}
-            </button>
-            <button type="submit" disabled={isLoading} className="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-700 disabled:opacity-50">
-              {isLoading ? t('saving') : t('save')}
-            </button>
+            </Button>
+            <Button type="submit" loading={isLoading} loadingText={t('saving')}>
+              {t('save')}
+            </Button>
           </div>
         </form>
       </div>

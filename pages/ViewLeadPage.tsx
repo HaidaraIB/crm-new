@@ -6,7 +6,7 @@ import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowL
 import SendSMSModal from '../components/modals/SendSMSModal';
 import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
-import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels, useTags } from '../hooks/useQueries';
+import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useLeadSocialMessages, useChannels, useTags } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
 import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
@@ -34,6 +34,7 @@ import {
     timelineEventActorFallback,
 } from '../utils/timelineEvents';
 import { localizeWhatsAppMessageBody } from '../utils/whatsappMessageBodyDisplay';
+import { localizeSocialMessageBody } from '../utils/socialMessageBodyDisplay';
 import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
 import { normalizeRole } from '../utils/roles';
@@ -77,6 +78,68 @@ function collapseConsecutiveWhatsAppThreads(
                 id: g.id,
                 direction: g.direction === 'inbound' ? 'inbound' : 'outbound',
                 body: localizeWhatsAppMessageBody(g.details || '', t),
+                date: g.date,
+                timestamp: g.timestamp,
+                user: g.user,
+            })),
+        });
+    }
+    return result;
+}
+
+/**
+ * Collapse consecutive social rows (after chronological sort) into thread cards.
+ *
+ * Same shape as the WhatsApp collapse above, with one deliberate difference: a
+ * change of conversation also breaks the group. WhatsApp lumps a lead's numbers
+ * together because a thread there is identified by the lead; a social thread is
+ * identified by a person on a network, and a lead can carry an Instagram DM and
+ * a Messenger thread at once. Merging those would put two strangers' messages
+ * under one heading.
+ */
+function collapseConsecutiveSocialThreads(
+    entries: TimelineEntry[],
+    t: (key: keyof typeof translations.en) => string,
+): TimelineEntry[] {
+    const sorted = [...entries].sort((a, b) => a.timestamp - b.timestamp);
+    const result: TimelineEntry[] = [];
+    let i = 0;
+    while (i < sorted.length) {
+        const entry = sorted[i];
+        if (entry.type !== 'social') {
+            result.push(entry);
+            i += 1;
+            continue;
+        }
+        const conversationId = entry.socialConversationId;
+        const group: TimelineEntry[] = [entry];
+        i += 1;
+        while (
+            i < sorted.length &&
+            sorted[i].type === 'social' &&
+            sorted[i].socialConversationId === conversationId
+        ) {
+            group.push(sorted[i]);
+            i += 1;
+        }
+        const latest = group[group.length - 1];
+        const earliest = group[0];
+        result.push({
+            id: `social-thread-${earliest.id}-${latest.id}`,
+            type: 'social_thread',
+            user: latest.user,
+            avatar: latest.avatar || '',
+            action: t('socialTimelineConversation'),
+            details: latest.details || '',
+            date: latest.date,
+            timestamp: latest.timestamp,
+            stage: latest.stage || earliest.stage,
+            socialChannel: latest.socialChannel,
+            socialConversationId: conversationId,
+            messages: group.map((g) => ({
+                id: g.id,
+                direction: g.direction === 'inbound' ? 'inbound' : 'outbound',
+                body: g.details || '',
                 date: g.date,
                 timestamp: g.timestamp,
                 user: g.user,
@@ -155,6 +218,9 @@ export const ViewLeadPage = () => {
     
     const { data: leadSMSMessages = [], refetch: refetchLeadSMS } = useLeadSMSMessages(leadId ?? undefined);
     const { data: leadWhatsAppMessages = [] } = useLeadWhatsAppMessages(leadId ?? undefined);
+    // 403 for roles without inbox access (reception, data entry) — the hook does
+    // not retry and the timeline simply carries no social entries for them.
+    const { data: leadSocialMessages = [] } = useLeadSocialMessages(leadId ?? undefined);
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
@@ -269,7 +335,7 @@ export const ViewLeadPage = () => {
         );
     };
 
-    /** Inline tag edit — patches immediately so users never open the Edit page for a tag. */
+    /** Inline tag edit â€” patches immediately so users never open the Edit page for a tag. */
     const handleTagsChange = async (nextTagIds: number[]) => {
         if (!displayLead) return;
         setIsUpdatingTags(true);
@@ -301,7 +367,7 @@ export const ViewLeadPage = () => {
         return statusMap[status] || status.toLowerCase();
     };
 
-    // دالة لتحويل stage إلى نص جميل
+    // Ø¯Ø§Ù„Ø© Ù„ØªØ­ÙˆÙŠÙ„ stage Ø¥Ù„Ù‰ Ù†Øµ Ø¬Ù…ÙŠÙ„
     const formatStage = (stage: string): string => {
         // Try to translate using status translation keys first
         const translationKey = getStatusTranslationKey(stage);
@@ -372,7 +438,7 @@ export const ViewLeadPage = () => {
         if (duration) parts.push(`${duration}s`);
 
         const legacyNotes = (cc.notes as string) || '';
-        return parts.length ? parts.join(' · ') : legacyNotes;
+        return parts.length ? parts.join(' Â· ') : legacyNotes;
     };
 
     const formatWhatsAppCallSummary = (cc: Record<string, unknown>): string => {
@@ -390,7 +456,7 @@ export const ViewLeadPage = () => {
         if (duration) {
             parts.push(t('callDurationSeconds').replace('{n}', String(duration)));
         }
-        return parts.join(' · ');
+        return parts.join(' Â· ');
     };
 
     const pollPbxDialStatus = async (commandId: number) => {
@@ -477,13 +543,13 @@ export const ViewLeadPage = () => {
         }
     };
     
-    // تحويل ClientTasks إلى TimelineEntries
+    // ØªØ­ÙˆÙŠÙ„ ClientTasks Ø¥Ù„Ù‰ TimelineEntries
     const leadClientTasks = displayLead ? clientTasks.filter(ct => {
         const clientId = ct.client || ct.clientId;
         return clientId === displayLead.id;
     }) : [];
 
-    // تصفية المكالمات للعميل المحتمل المحدد
+    // ØªØµÙÙŠØ© Ø§Ù„Ù…ÙƒØ§Ù„Ù…Ø§Øª Ù„Ù„Ø¹Ù…ÙŠÙ„ Ø§Ù„Ù…Ø­ØªÙ…Ù„ Ø§Ù„Ù…Ø­Ø¯Ø¯
     const leadClientCalls = displayLead ? clientCalls.filter(cc => {
         const clientId = cc.client || cc.clientId;
         return clientId === displayLead.id;
@@ -721,7 +787,7 @@ export const ViewLeadPage = () => {
             if (ce.event_type === 'location_update') {
                 translatedDetails = '';
             } else if (ce.event_type === 're_assignment') {
-                const hoursMatch = ce.notes?.match(/(\d+)\s*ساعة/);
+                const hoursMatch = ce.notes?.match(/(\d+)\s*Ø³Ø§Ø¹Ø©/);
                 const hours = hoursMatch?.[1] || String(currentUser?.company?.re_assign_hours ?? 24);
                 translatedDetails = t('autoReassignedFromTo')
                     .replace('{from}', oldFormatted || t('unassigned'))
@@ -817,6 +883,43 @@ export const ViewLeadPage = () => {
             };
         });
 
+        // Format Instagram DM / Messenger messages
+        const socialEntries = leadSocialMessages.map((msg) => {
+            const isInbound = msg.direction === 'inbound';
+            const actor = resolveTimelineActor({
+                createdById: msg.created_by,
+                createdByUsername: msg.created_by_username || '',
+                users,
+                t,
+                fallback: isInbound ? 'contact' : 'system',
+                // These channels carry no phone number — the handle is the identity.
+                contactName: msg.contact_name || leadContactName,
+                contactPhone: '',
+            });
+            // Meta's own timestamp when we have it: `created_at` is when the
+            // webhook reached us, which drifts on a redelivery.
+            const at = msg.sent_at || msg.created_at;
+            return {
+                id: `social-${msg.id}`,
+                type: 'social' as const,
+                user: actor.name,
+                avatar: actor.avatar || '',
+                action: isInbound ? t('socialReceived') : t('socialSent'),
+                details: localizeSocialMessageBody(
+                    msg.body,
+                    msg.attachment_kind,
+                    msg.is_voice_note,
+                    t,
+                ),
+                date: formatTimelineDate(at, lang),
+                timestamp: new Date(at).getTime(),
+                stage: msg.contact_name,
+                direction: isInbound ? ('inbound' as const) : ('outbound' as const),
+                socialChannel: msg.channel,
+                socialConversationId: msg.conversation,
+            };
+        });
+
         const merged: TimelineEntry[] = [
             ...actions,
             ...calls,
@@ -825,9 +928,13 @@ export const ViewLeadPage = () => {
             ...events,
             ...smsEntries,
             ...waEntries,
+            ...socialEntries,
         ];
-        return collapseConsecutiveWhatsAppThreads(merged, t);
-    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, channels, tags, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
+        return collapseConsecutiveSocialThreads(
+            collapseConsecutiveWhatsAppThreads(merged, t),
+            t,
+        );
+    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, leadSocialMessages, users, t, stages, statuses, channels, tags, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
 
     const isResolvingLead = Boolean(leadId) && !displayLead && (leadLoading || leadFetching) && !leadError;
 
@@ -835,7 +942,7 @@ export const ViewLeadPage = () => {
         return (
             <PageWrapper title={t('leads')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
+                    <Loader size="lg" variant="primary"/>
                 </div>
             </PageWrapper>
         );
@@ -969,15 +1076,15 @@ export const ViewLeadPage = () => {
                     <div className="space-y-4">
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('leadCompanyName')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || '—'}</p>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || 'â€”'}</p>
                         </div>
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('profession')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : '—'}</p>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : 'â€”'}</p>
                         </div>
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('residence')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : '—'}</p>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : 'â€”'}</p>
                         </div>
                         {hasLeadLocation && (
                             <div className="overflow-hidden md:col-span-1">
@@ -1003,13 +1110,13 @@ export const ViewLeadPage = () => {
                                 <div>
                                     <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedDeveloper') || 'Developer'}</label>
                                     <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
-                                        {((displayLead as Lead).interestedDeveloperName ?? (displayLead as any).interested_developer_name) || '—'}
+                                        {((displayLead as Lead).interestedDeveloperName ?? (displayLead as any).interested_developer_name) || 'â€”'}
                                     </p>
                                 </div>
                                 <div>
                                     <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedProject') || 'Project'}</label>
                                     <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
-                                        {((displayLead as Lead).interestedProjectName ?? (displayLead as any).interested_project_name) || '—'}
+                                        {((displayLead as Lead).interestedProjectName ?? (displayLead as any).interested_project_name) || 'â€”'}
                                     </p>
                                 </div>
                                 <div>
@@ -1020,7 +1127,7 @@ export const ViewLeadPage = () => {
                                             const uc = (displayLead as Lead).interestedUnitCode ?? (displayLead as any).interested_unit_code;
                                             if (un && uc) return `${un} (${uc})`;
                                             if (un) return un;
-                                            return '—';
+                                            return 'â€”';
                                         })()}
                                     </p>
                                 </div>
@@ -1065,7 +1172,7 @@ export const ViewLeadPage = () => {
                                     >
                                         {whatsappCalling.isStartingOutbound ||
                                         whatsappCalling.phase === 'connecting' ? (
-                                            <Loader size="sm" variant="primary" className="!h-3.5" />
+                                            <Loader size="sm" variant="primary" />
                                         ) : (
                                             <PhoneIcon className="h-3.5 w-3.5" />
                                         )}
@@ -1153,7 +1260,7 @@ export const ViewLeadPage = () => {
                                     const isUpdating = updatingLeadId === displayLead.id;
 
                                     if (availableStatuses.length === 0) {
-                                        return <LeadStatusBadge name="—" size="md" />;
+                                        return <LeadStatusBadge name="â€”" size="md" />;
                                     }
 
                                     return (
@@ -1354,7 +1461,7 @@ export const ViewLeadPage = () => {
                                     {metaQualificationSentAt && !metaQualificationError && (
                                         <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                                             {t('metaQualificationSent')}
-                                            {metaQualificationSentAt ? ` · ${formatDateTimeToLocal(metaQualificationSentAt)}` : ''}
+                                            {metaQualificationSentAt ? ` Â· ${formatDateTimeToLocal(metaQualificationSentAt)}` : ''}
                                         </p>
                                     )}
                                     {metaQualificationErrorText && (

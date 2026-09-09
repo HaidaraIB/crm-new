@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { SectionLoadingState } from '../SectionLoadingState';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { FileTextIcon, MicrophoneIcon } from '../icons';
@@ -180,7 +181,7 @@ export const AttachmentSourceModal: React.FC<Props> = ({
           </Button>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           {loading ? (
-            <p className="text-sm text-gray-500">{t('loading') || 'Loading…'}</p>
+            <SectionLoadingState className="py-6" />
           ) : files.length === 0 ? (
             <p className="text-sm text-gray-500">
               {t('libraryPickEmpty') || 'No files in the library.'}

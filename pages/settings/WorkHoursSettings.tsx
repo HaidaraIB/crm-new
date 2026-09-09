@@ -183,8 +183,8 @@ export const WorkHoursSettings = () => {
                     )}
 
                     <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>
-                            {isSaving ? (t('saving') || 'Saving...') : t('saveSettings')}
+                        <Button onClick={handleSave} loading={isSaving} loadingText={t('saving')}>
+                            {t('saveSettings')}
                         </Button>
                     </div>
                 </div>

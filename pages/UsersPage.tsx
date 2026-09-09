@@ -295,7 +295,7 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                         <span className="text-xs text-gray-600 dark:text-gray-300">
                             {user.is_online
                                 ? `${t('online') || 'Online'} (${getPresenceSourceLabel(user.last_seen_source, t)})`
-                                : `${t('offline') || 'Offline'} • ${t('lastSeen') || 'Last seen'} ${formatLastSeenRelative(user.last_seen_at, t)}`}
+                                : `${t('offline') || 'Offline'} â€¢ ${t('lastSeen') || 'Last seen'} ${formatLastSeenRelative(user.last_seen_at, t)}`}
                         </span>
                     </div>
                 )}
@@ -530,7 +530,7 @@ export const UsersPage = () => {
     const currentRole = normalizeRole(currentUser?.role);
     const isAdmin = currentRole === 'Owner' || (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_users'));
 
-    // One aggregate for the whole team, joined into the cards by user id — the API
+    // One aggregate for the whole team, joined into the cards by user id â€” the API
     // returns 403 for anyone else, so don't ask unless this viewer may see it.
     const workHoursEnabled = Boolean(currentUser?.company?.work_hours_tracking_enabled) && isAdmin;
     const {
@@ -557,7 +557,7 @@ export const UsersPage = () => {
         return (
             <PageWrapper title={`${t('employees')}: ${userCount}`}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
+                    <Loader size="lg" variant="primary"/>
                 </div>
             </PageWrapper>
         );
@@ -588,7 +588,7 @@ export const UsersPage = () => {
                     <div className="flex w-full sm:w-auto items-center gap-2">
                         <RefreshButton
                             onClick={() => {
-                                // Every query this page renders has to be listed here —
+                                // Every query this page renders has to be listed here â€”
                                 // the button refetches what it is told to, nothing more.
                                 void refetchUsers();
                                 if (workHoursEnabled) void refetchWorkHours();

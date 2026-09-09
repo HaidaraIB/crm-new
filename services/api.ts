@@ -3980,6 +3980,342 @@ export const markWhatsAppConversationReadAPI = async (params: {
   );
 };
 
+const INBOX_CONVERSATIONS_PATH = '/integrations/inbox/conversations/';
+const INBOX_CONNECTIONS_PATH = '/integrations/inbox/connections/';
+
+// ============================================================================
+// Omni-Channel Inbox - Instagram Direct + Facebook Messenger
+//
+// Separate from the WhatsApp chat API above: a conversation here is its own row
+// (not a Lead), and stays lead-less until an agent converts it.
+// ============================================================================
+
+export type SocialChannel = 'instagram' | 'messenger';
+
+export interface SocialContactPayload {
+  id: number;
+  external_id: string;
+  name: string;
+  username: string;
+  display_name: string;
+  profile_pic_url: string;
+}
+
+export interface SocialConversationPayload {
+  id: number;
+  channel: SocialChannel;
+  status: string;
+  is_starred: boolean;
+  is_unsubscribed: boolean;
+  snoozed_until: string | null;
+  unread_count: number;
+  last_message_at: string | null;
+  last_message_direction: string;
+  last_message_preview: string;
+  last_inbound_at: string | null;
+  contact: SocialContactPayload;
+  connection: { id: number; page_name: string; ig_username: string };
+  assigned_to: { id: number; username: string; full_name: string } | null;
+  /** Non-null once converted - renders the "Lead #N" chip and disables convert. */
+  client: { id: number; name: string } | null;
+  converted_at: string | null;
+  created_at: string;
+}
+
+export interface SocialMessagePayload {
+  id: number;
+  direction: 'inbound' | 'outbound';
+  body: string;
+  external_message_id: string;
+  is_echo: boolean;
+  is_read: boolean;
+  reaction: string;
+  delivery_status: string | null;
+  delivery_error: string | null;
+  error_key: string;
+  attachment_kind: string | null;
+  attachment_mime: string;
+  attachment_size: number | null;
+  attachment_width: number | null;
+  attachment_height: number | null;
+  original_filename: string;
+  has_attachment: boolean;
+  is_voice_note: boolean;
+  location_latitude: string | null;
+  location_longitude: string | null;
+  location_name: string;
+  location_address: string;
+  created_by_username: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+export interface SocialSendWindow {
+  open: boolean;
+  mode: 'response' | 'human_agent' | 'closed';
+  last_inbound_at: string | null;
+  expires_at: string | null;
+  human_agent_available: boolean;
+}
+
+export interface SocialConversationsResponse {
+  results: SocialConversationPayload[];
+  count: number;
+  limit: number;
+  offset: number;
+  status_counts: Record<string, number>;
+  assignment_counts: Record<string, number>;
+}
+
+/** GET /api/integrations/inbox/conversations/ (ETag-cached). */
+export const getSocialConversationsAPI = async (params?: {
+  channel?: string;
+  status?: string;
+  assignment?: string;
+  agent?: number;
+  converted?: string;
+  starred?: boolean;
+  unreplied?: boolean;
+  search?: string;
+  ordering?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<SocialConversationsResponse> => {
+  const q = new URLSearchParams();
+  if (params?.channel && params.channel !== 'all') q.set('channel', params.channel);
+  if (params?.status && params.status !== 'all') q.set('status', params.status);
+  if (params?.assignment && params.assignment !== 'all') q.set('assignment', params.assignment);
+  if (params?.agent != null) q.set('agent', String(params.agent));
+  if (params?.converted) q.set('converted', params.converted);
+  if (params?.starred) q.set('starred', '1');
+  if (params?.unreplied) q.set('unreplied', '1');
+  if (params?.search) q.set('search', params.search);
+  if (params?.ordering) q.set('ordering', params.ordering);
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  if (params?.offset != null) q.set('offset', String(params.offset));
+  const qs = q.toString();
+  return conditionalGet(INBOX_CONVERSATIONS_PATH + (qs ? '?' + qs : ''));
+};
+
+/**
+ * One social message as the lead Timeline needs it — narrower than
+ * `SocialMessagePayload`, which is the Inbox thread's shape.
+ */
+export interface LeadSocialMessageResponse {
+  id: number;
+  /** A lead can hold several conversations; the timeline groups on this. */
+  conversation: number;
+  channel: SocialChannel;
+  contact_name: string;
+  direction: 'inbound' | 'outbound';
+  body: string;
+  attachment_kind: string | null;
+  is_voice_note: boolean;
+  created_by: number | null;
+  created_by_username: string | null;
+  sent_at: string | null;
+  created_at: string;
+}
+
+/**
+ * GET /api/integrations/inbox/lead-messages/?client=
+ *
+ * The timeline's social source, mirroring `getWhatsAppMessagesAPI`. Scoped by
+ * the inbox ACL, so roles without inbox access get 403 — callers treat that as
+ * "no social entries" rather than an error, since it is the expected answer for
+ * reception and data entry viewing a lead.
+ */
+export const getLeadSocialMessagesAPI = async (
+  clientId: number,
+  limit = 200
+): Promise<LeadSocialMessageResponse[]> => {
+  const res = await conditionalGet<{ results: LeadSocialMessageResponse[] }>(
+    `/integrations/inbox/lead-messages/?client=${clientId}&limit=${limit}`
+  );
+  return res?.results ?? [];
+};
+
+/** GET /api/integrations/inbox/conversations/<id>/messages/ - oldest-first. */
+export const getSocialMessagesAPI = async (
+  conversationId: number,
+  limit = 200
+): Promise<{ results: SocialMessagePayload[]; conversation: SocialConversationPayload }> => {
+  return conditionalGet(
+    INBOX_CONVERSATIONS_PATH + conversationId + '/messages/?limit=' + limit
+  );
+};
+
+/** POST /api/integrations/inbox/send/ */
+export const sendSocialMessageAPI = async (params: {
+  conversationId: number;
+  text: string;
+  clientTempId?: string;
+}): Promise<{ message: SocialMessagePayload; client_temp_id?: string }> => {
+  return apiRequest('/integrations/inbox/send/', {
+    method: 'POST',
+    body: JSON.stringify({
+      conversation: params.conversationId,
+      text: params.text,
+      client_temp_id: params.clientTempId,
+    }),
+  });
+};
+
+/** POST /api/integrations/inbox/send-media/ (multipart). */
+export const sendSocialMediaAPI = async (params: {
+  conversationId: number;
+  file: File;
+  text?: string;
+  kind?: string;
+}): Promise<{ message: SocialMessagePayload }> => {
+  const form = new FormData();
+  form.append('conversation', String(params.conversationId));
+  form.append('file', params.file);
+  if (params.text) form.append('text', params.text);
+  if (params.kind) form.append('kind', params.kind);
+  return apiRequest('/integrations/inbox/send-media/', { method: 'POST', body: form });
+};
+
+/** GET /api/integrations/inbox/window/ - drives the composer's enabled state. */
+export const getSocialSendWindowAPI = async (
+  conversationId: number
+): Promise<SocialSendWindow> => {
+  return apiRequest('/integrations/inbox/window/?conversation=' + conversationId);
+};
+
+/** POST /api/integrations/inbox/conversations/state/ */
+export const updateSocialConversationStateAPI = async (params: {
+  conversationId: number;
+  status?: string;
+  snoozedUntil?: string | null;
+  isStarred?: boolean;
+  isUnsubscribed?: boolean;
+}): Promise<{ conversation: SocialConversationPayload }> => {
+  const body: Record<string, string | number | boolean | null> = {
+    conversation: params.conversationId,
+  };
+  if (params.status !== undefined) body.status = params.status;
+  if (params.snoozedUntil !== undefined) body.snoozed_until = params.snoozedUntil;
+  if (params.isStarred !== undefined) body.is_starred = params.isStarred;
+  if (params.isUnsubscribed !== undefined) body.is_unsubscribed = params.isUnsubscribed;
+  return apiRequest(INBOX_CONVERSATIONS_PATH + 'state/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
+};
+
+/** POST /api/integrations/inbox/conversations/mark-read/ */
+export const markSocialConversationReadAPI = async (
+  conversationId: number
+): Promise<{ marked: number; conversation_id: number }> => {
+  return apiRequest(INBOX_CONVERSATIONS_PATH + 'mark-read/', {
+    method: 'POST',
+    body: JSON.stringify({ conversation: conversationId }),
+  });
+};
+
+/** POST /api/integrations/inbox/conversations/<id>/convert/ */
+export const convertSocialConversationAPI = async (params: {
+  conversationId: number;
+  name?: string;
+  phone?: string;
+  assignedTo?: number | null;
+  autoAssign?: boolean;
+  statusId?: number | null;
+  priority?: string;
+  type?: string;
+  communicationWayId?: number | null;
+  campaignId?: number | null;
+  notes?: string;
+}): Promise<{
+  client_id: number;
+  client_name: string;
+  assigned_to_id: number | null;
+  duplicate: boolean;
+  conversation: SocialConversationPayload;
+}> => {
+  return apiRequest(INBOX_CONVERSATIONS_PATH + params.conversationId + '/convert/', {
+    method: 'POST',
+    body: JSON.stringify({
+      name: params.name,
+      phone: params.phone,
+      assigned_to: params.assignedTo ?? null,
+      auto_assign: params.autoAssign ?? true,
+      status_id: params.statusId ?? null,
+      priority: params.priority,
+      type: params.type,
+      communication_way_id: params.communicationWayId ?? null,
+      campaign_id: params.campaignId ?? null,
+      notes: params.notes,
+    }),
+  });
+};
+
+/** GET /api/integrations/inbox/unread-count/ */
+export const getSocialUnreadCountAPI = async (): Promise<{ unread: number }> => {
+  return apiRequest('/integrations/inbox/unread-count/');
+};
+
+/** Auth-gated attachment URL - media inherits the thread's ACL. */
+export const getSocialMessageAttachmentUrl = (messageId: number): string =>
+  BASE_URL + '/integrations/inbox/messages/' + messageId + '/attachment/';
+
+export interface MetaInboxConnectionPayload {
+  id: number;
+  page_id: string;
+  page_name: string;
+  ig_user_id: string | null;
+  ig_username: string;
+  status: string;
+  error_message: string | null;
+  instagram_subscribed: boolean;
+  messenger_subscribed: boolean;
+  subscribed_fields: string[];
+  last_webhook_at: string | null;
+}
+
+/** GET /api/integrations/inbox/connections/ - owner-only account configuration. */
+export const getSocialConnectionsAPI = async (): Promise<{
+  account: {
+    id: number;
+    name: string;
+    status: string;
+    external_account_name: string;
+    error_message: string | null;
+  } | null;
+  connections: MetaInboxConnectionPayload[];
+  available_pages: Array<{ id: string; name: string }>;
+}> => {
+  return apiRequest(INBOX_CONNECTIONS_PATH);
+};
+
+/** POST /api/integrations/inbox/connections/ */
+export const connectSocialPageAPI = async (
+  pageId: string
+): Promise<{ connection: MetaInboxConnectionPayload }> => {
+  return apiRequest(INBOX_CONNECTIONS_PATH, {
+    method: 'POST',
+    body: JSON.stringify({ page_id: pageId }),
+  });
+};
+
+/** DELETE /api/integrations/inbox/connections/<id>/ */
+export const disconnectSocialPageAPI = async (
+  connectionId: number
+): Promise<{ connection: MetaInboxConnectionPayload }> => {
+  return apiRequest(INBOX_CONNECTIONS_PATH + connectionId + '/', { method: 'DELETE' });
+};
+
+/** POST /api/integrations/inbox/connections/<id>/ - re-run the subscription health check. */
+export const checkSocialConnectionAPI = async (
+  connectionId: number
+): Promise<{
+  health: { ok: boolean; fields: string[]; error_key?: string };
+  connection: MetaInboxConnectionPayload;
+}> => {
+  return apiRequest(INBOX_CONNECTIONS_PATH + connectionId + '/', { method: 'POST' });
+};
+
 export type TemplateButtonPayload = {
   type: 'phone' | 'url' | 'reply' | 'call_permission_request';
   button_text: string;
@@ -6305,6 +6641,8 @@ export type AppNotification = {
 
 export type SyncDigest = {
   whatsapp_unread: number | null;
+  /** null when the inbox is gated (plan/policy/role) — distinct from 0 unread. */
+  social_inbox_unread: number | null;
   whatsapp_calls_pending: number | null;
   tenant_chat_unread: number;
   notifications_unread: number;
@@ -6345,6 +6683,8 @@ export type SyncSliceVersions = {
   arrivals: number;
   /** Internal team-chat messages. */
   tenant_chat: number;
+  /** Omni-channel inbox: Instagram DM + Messenger conversations and messages. */
+  inbox: number;
 };
 
 export type SyncSliceName = keyof SyncSliceVersions;

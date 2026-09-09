@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { SectionLoadingState } from '../components/SectionLoadingState';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Input, Button, Modal, TableHorizontalScroll, RefreshButton } from '../components/index';
@@ -215,9 +216,7 @@ export const SupportCenterPage = () => {
             />
           </div>
           {ticketsLoading ? (
-            <div className="p-6 text-gray-500 dark:text-gray-400 text-center">
-              {t('loading') || 'Loading...'}
-            </div>
+            <SectionLoadingState className="p-6" />
           ) : tickets.length === 0 ? (
             <div className="p-6 text-gray-500 dark:text-gray-400 text-center">
               {t('noDataAvailable') || 'No tickets yet.'}

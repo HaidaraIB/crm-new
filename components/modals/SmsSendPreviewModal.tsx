@@ -86,7 +86,7 @@ export const SmsSendPreviewModal = ({
                             {t('smsSendPreviewProvider') || 'Provider'}
                         </dt>
                         <dd className="mt-0.5 text-gray-900 dark:text-white">
-                            {settingsLoading ? (t('loading') || 'Loading…') : provider}
+                            {settingsLoading ? (t('loading') || 'Loadingâ€¦') : provider}
                         </dd>
                     </div>
                     <div>
@@ -94,7 +94,7 @@ export const SmsSendPreviewModal = ({
                             {t('smsSendPreviewSenderId') || 'Sender ID'}
                         </dt>
                         <dd className="mt-0.5 text-gray-900 dark:text-white">
-                            {settingsLoading ? (t('loading') || 'Loading…') : senderLabel}
+                            {settingsLoading ? (t('loading') || 'Loadingâ€¦') : senderLabel}
                         </dd>
                     </div>
                 </dl>
@@ -104,7 +104,7 @@ export const SmsSendPreviewModal = ({
                     </Button>
                     <Button onClick={onConfirm} disabled={confirming || settingsLoading} className={confirming ? 'min-w-[7rem]' : ''}>
                         {confirming ? (
-                            <Loader variant="foreground" className="h-5" />
+                            <Loader size="md" variant="foreground" />
                         ) : (
                             t('smsSendPreviewConfirm') || 'Confirm send'
                         )}

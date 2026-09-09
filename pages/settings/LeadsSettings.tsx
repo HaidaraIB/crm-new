@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Alert } from '../../components/Alert';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Card, Button, ToggleSwitch, NumberInput } from '../../components/index';
 import { useAppContext } from '../../context/AppContext';
@@ -71,14 +72,10 @@ export const LeadsSettings = () => {
                 <h2 className="text-xl font-semibold mb-4">{t('leadAssignmentSettings')}</h2>
                 <div className="space-y-6">
                     {errors.general && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                            {errors.general}
-                        </div>
+                        <Alert variant="error">{errors.general}</Alert>
                     )}
                     {successMessage && (
-                        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-600 dark:text-green-300 px-4 py-3 rounded-md text-sm">
-                            {successMessage}
-                        </div>
+                        <Alert variant="success">{successMessage}</Alert>
                     )}
                     <div className="flex items-center justify-between">
                         <div>
@@ -106,8 +103,8 @@ export const LeadsSettings = () => {
                     </div>
                 </div>
                  <div className="mt-6 flex justify-end">
-                    <Button onClick={handleSaveSettings} disabled={isSaving}>
-                        {isSaving ? t('saving') || 'Saving...' : t('saveSettings')}
+                    <Button onClick={handleSaveSettings} loading={isSaving} loadingText={t('saving')}>
+                        {t('saveSettings')}
                     </Button>
                 </div>
             </Card>

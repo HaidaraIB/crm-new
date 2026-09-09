@@ -1,0 +1,1453 @@
+
+
+import React, { useEffect, useMemo } from 'react';
+import { useAppContext } from '../context/AppContext';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TagMultiSelect, LeadContactPhoneList } from '../components/index';
+import SendSMSModal from '../components/modals/SendSMSModal';
+import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
+import { formatLeadBudget } from '../utils/budgetRange';
+import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useChannels, useTags } from '../hooks/useQueries';
+import { useQuery } from '@tanstack/react-query';
+import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
+import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
+import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
+import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
+import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
+import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
+import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
+import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
+import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
+import {
+    clientLocationEventTranslationKey,
+    parseLeadCoordinate,
+} from '../utils/leadLocation';
+import { BriefcaseIcon, MapPinIcon } from '../components/icons';
+import { Lead, TimelineEntry, Tag, User, Status, Stage } from '../types';
+import { mapApiLeadToDisplayLead } from '../utils/normalizeLead';
+import {
+    formatTimelineEventValuePair,
+    getEditFieldLabel,
+    getTimelineEventAction,
+    localizeTimelineEventNotes,
+    parseTagsChangeNotes,
+    resolveTimelineActor,
+    timelineEventActorFallback,
+} from '../utils/timelineEvents';
+import { localizeWhatsAppMessageBody } from '../utils/whatsappMessageBodyDisplay';
+import { translations } from '../constants';
+import { MarqueeText } from '../components/MarqueeText';
+import { normalizeRole } from '../utils/roles';
+import { getCompanyRoute, extractViewLeadIdFromPath } from '../utils/routing';
+import { getLeadsReturnPage } from '../utils/leadsReturnPage';
+
+/** Collapse consecutive WhatsApp rows (after chronological sort) into thread cards. */
+function collapseConsecutiveWhatsAppThreads(
+    entries: TimelineEntry[],
+    t: (key: keyof typeof translations.en) => string,
+): TimelineEntry[] {
+    const sorted = [...entries].sort((a, b) => a.timestamp - b.timestamp);
+    const result: TimelineEntry[] = [];
+    let i = 0;
+    while (i < sorted.length) {
+        const entry = sorted[i];
+        if (entry.type !== 'whatsapp') {
+            result.push(entry);
+            i += 1;
+            continue;
+        }
+        const group: TimelineEntry[] = [entry];
+        i += 1;
+        while (i < sorted.length && sorted[i].type === 'whatsapp') {
+            group.push(sorted[i]);
+            i += 1;
+        }
+        const latest = group[group.length - 1];
+        const earliest = group[0];
+        result.push({
+            id: `wa-thread-${earliest.id}-${latest.id}`,
+            type: 'whatsapp_thread',
+            user: latest.user,
+            avatar: latest.avatar || '',
+            action: t('whatsappTimelineConversation'),
+            details: localizeWhatsAppMessageBody(latest.details || '', t),
+            date: latest.date,
+            timestamp: latest.timestamp,
+            stage: latest.stage || earliest.stage,
+            messages: group.map((g) => ({
+                id: g.id,
+                direction: g.direction === 'inbound' ? 'inbound' : 'outbound',
+                body: localizeWhatsAppMessageBody(g.details || '', t),
+                date: g.date,
+                timestamp: g.timestamp,
+                user: g.user,
+            })),
+        });
+    }
+    return result;
+}
+
+export const ViewLeadPage = () => {
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered } = useAppContext();
+    
+    const canPbxDial = usePbxDialEnabled();
+    const whatsappCalling = useWhatsAppCallingOptional();
+    const openWhatsApp = useWhatsAppLeadAction();
+    const deleteLeadMutation = useDeleteLead();
+
+    const [updatingLeadId, setUpdatingLeadId] = React.useState<number | null>(null);
+    const [isUpdatingTags, setIsUpdatingTags] = React.useState(false);
+    const [sendSMSModal, setSendSMSModal] = React.useState<{ phone: string } | null>(null);
+    const [updatingMetaQualification, setUpdatingMetaQualification] = React.useState(false);
+
+    // Open the lead detail view at the top, instead of inheriting the leads list's scroll position
+    // (the app's main scroll container is shared across pages and is not reset on navigation).
+    useEffect(() => {
+        const container = document.querySelector('.app-main-scroll') as HTMLElement | null;
+        if (container) container.scrollTop = 0;
+    }, []);
+
+    // Get leadId from URL (view-lead/:id and medical view-patient/:id)
+    const leadIdFromUrl = extractViewLeadIdFromPath(window.location.pathname);
+    const leadId = leadIdFromUrl ?? selectedLead?.id;
+
+    // Fetch data using React Query hooks
+    const { data: usersResponse } = useUsers();
+    const users: User[] = usersResponse?.results || [];
+    
+    const { data: clientTasksResponse } = useClientTasks();
+    const clientTasks: Record<string, any>[] = clientTasksResponse?.results || [];
+    
+    const { data: clientCallsResponse } = useClientCalls();
+    const clientCalls: Record<string, any>[] = clientCallsResponse?.results || [];
+
+    const { data: clientVisitsResponse } = useClientVisits();
+    const clientVisits = clientVisitsResponse?.results || [];
+
+    const fieldVisitsAllowed = useFieldVisitAllowed();
+
+    const { data: clientFieldVisitsResponse } = useClientFieldVisits({
+        enabled: fieldVisitsAllowed,
+    });
+    const clientFieldVisits = clientFieldVisitsResponse?.results || [];
+    
+    const { data: callMethodsData } = useCallMethods();
+    const callMethods: { id: number; name?: string; color?: string }[] = Array.isArray(callMethodsData) 
+        ? callMethodsData 
+        : (callMethodsData?.results || []);
+
+    const { data: visitTypesData } = useVisitTypes();
+    const visitTypes = Array.isArray(visitTypesData)
+        ? visitTypesData
+        : (visitTypesData?.results || []);
+    
+    const { data: clientEventsResponse } = useClientEvents(leadId);
+    const clientEvents: Array<{
+        id: number;
+        event_type: string;
+        notes?: string;
+        old_value?: string | null;
+        new_value?: string | null;
+        created_by?: number | null;
+        created_by_username?: string;
+        created_at: string;
+        reason?: string;
+    }> = clientEventsResponse?.results || [];
+    
+    const { data: leadSMSMessages = [], refetch: refetchLeadSMS } = useLeadSMSMessages(leadId ?? undefined);
+    const { data: leadWhatsAppMessages = [] } = useLeadWhatsAppMessages(leadId ?? undefined);
+    
+    const { data: statusesData } = useStatuses();
+    // Handle both array response and object with results property
+    const statuses: Status[] = Array.isArray(statusesData)
+        ? statusesData
+        : (statusesData?.results || []);
+
+    const { requestStatusChange, reasonModalProps } = useStatusChangeReason(statuses);
+
+    const { data: channelsData } = useChannels();
+    const channels = Array.isArray(channelsData)
+        ? channelsData
+        : (channelsData?.results || []);
+
+    const { data: tagsData } = useTags();
+    const tags: Tag[] = Array.isArray(tagsData) ? tagsData : (tagsData?.results || []);
+
+    const { data: stagesData } = useStages();
+    const stages: Stage[] = Array.isArray(stagesData) 
+        ? stagesData 
+        : (stagesData?.results || []);
+    
+    const {
+        data: leadData,
+        isLoading: leadLoading,
+        isFetching: leadFetching,
+        isError: leadError,
+        refetch: refetchLead,
+    } = useLead(leadId);
+    const patchLeadMutation = usePatchLead();
+
+    // Find the current lead from the fetched lead detail (most up-to-date)
+    const currentLead = useMemo(() => {
+        if (leadData) {
+            return mapApiLeadToDisplayLead(leadData);
+        }
+        // Optimistic fallback while loading (e.g. navigated from list with selectedLead)
+        if (selectedLead?.id && (!leadId || selectedLead.id === leadId)) {
+            return selectedLead;
+        }
+        return null;
+    }, [leadData, selectedLead, leadId]);
+    
+    // Update selectedLead when currentLead is found from URL
+    useEffect(() => {
+        if (currentLead && leadId && currentLead.id === leadId && currentLead.id !== selectedLead?.id) {
+            setSelectedLead(currentLead);
+        }
+    }, [currentLead, leadId, selectedLead, setSelectedLead]);
+    
+    // Update selectedLead when currentLead changes (only once when data is loaded)
+    const hasUpdatedLead = React.useRef(false);
+    useEffect(() => {
+        if (currentLead && currentLead.id === selectedLead?.id && !hasUpdatedLead.current) {
+            // Only update if the data is actually different
+            const isDifferent = 
+                currentLead.name !== selectedLead.name ||
+                currentLead.status !== selectedLead.status ||
+                currentLead.communicationWay !== selectedLead.communicationWay ||
+                currentLead.priority !== selectedLead.priority ||
+                currentLead.type !== selectedLead.type;
+            
+            if (isDifferent) {
+                setSelectedLead(currentLead);
+                hasUpdatedLead.current = true;
+            }
+        }
+    }, [currentLead, selectedLead, setSelectedLead]);
+    
+    // Reset the ref when selectedLead.id changes
+    useEffect(() => {
+        hasUpdatedLead.current = false;
+    }, [selectedLead?.id]);
+
+    // Use currentLead instead of selectedLead for display
+    const displayLead = currentLead || selectedLead;
+
+    // Handle status change
+    const applyStatusChange = async (
+        targetLeadId: number,
+        newStatusId: number,
+        reason?: string
+    ) => {
+        setUpdatingLeadId(targetLeadId);
+        try {
+            const status = statuses.find(s => s.id === newStatusId);
+            if (!status) {
+                throw new Error('Status not found');
+            }
+
+            await patchLeadMutation.mutateAsync({
+                id: targetLeadId,
+                data: {
+                    status: status.id,
+                    ...(reason ? { status_change_reason: reason } : {}),
+                },
+            });
+
+            await refetchLead();
+        } catch (error) {
+            console.error('Error updating lead status:', error);
+            alert(t('errorUpdatingLeadStatus') || 'Failed to update lead status. Please try again.');
+        } finally {
+            setUpdatingLeadId(null);
+        }
+    };
+
+    // Statuses flagged in settings collect a written reason before the patch goes out.
+    const handleStatusChange = (targetLeadId: number, newStatusId: number) => {
+        requestStatusChange(newStatusId, (reason) =>
+            applyStatusChange(targetLeadId, newStatusId, reason)
+        );
+    };
+
+    /** Inline tag edit â€” patches immediately so users never open the Edit page for a tag. */
+    const handleTagsChange = async (nextTagIds: number[]) => {
+        if (!displayLead) return;
+        setIsUpdatingTags(true);
+        try {
+            await patchLeadMutation.mutateAsync({
+                id: displayLead.id,
+                data: { tags: nextTagIds },
+            });
+            await refetchLead();
+        } catch (error) {
+            console.error('Error updating lead tags:', error);
+            alert(t('failedToUpdateTags') || 'Failed to update tags. Please try again.');
+        } finally {
+            setIsUpdatingTags(false);
+        }
+    };
+
+    // Helper function to convert status to translation key
+    const getStatusTranslationKey = (status: string): string => {
+        const statusMap: Record<string, string> = {
+            'All': 'all',
+            'Untouched': 'untouched',
+            'Touched': 'touched',
+            'Following': 'following',
+            'Meeting': 'meeting',
+            'No Answer': 'noAnswer',
+            'Out Of Service': 'outOfService'
+        };
+        return statusMap[status] || status.toLowerCase();
+    };
+
+    // Ø¯Ø§Ù„Ø© Ù„ØªØ­ÙˆÙŠÙ„ stage Ø¥Ù„Ù‰ Ù†Øµ Ø¬Ù…ÙŠÙ„
+    const formatStage = (stage: string): string => {
+        // Try to translate using status translation keys first
+        const translationKey = getStatusTranslationKey(stage);
+        const translated = t(translationKey as any);
+        if (translated && translated !== translationKey) {
+            return translated;
+        }
+        
+        // Fallback to stage name as is
+        return stage;
+    };
+
+    const canDeleteLead = (lead: Lead) => {
+        const currentRole = normalizeRole(currentUser?.role);
+        const isAdmin = currentRole === 'Owner';
+        const canDelete = Boolean(currentUser?.can_delete_clients);
+        const isSupervisorWithLeads =
+            currentRole === 'Supervisor' &&
+            hasSupervisorPermission('can_manage_leads') &&
+            canDelete;
+        const isAssignedEmployee =
+            canDelete &&
+            (currentRole === 'Employee' || currentRole === 'Doctor') &&
+            lead.assignedTo === currentUser?.id;
+        return isAdmin || isSupervisorWithLeads || isAssignedEmployee;
+    };
+
+    const handleDeleteLead = (lead: Lead) => {
+        setConfirmDeleteConfig({
+            title: t('deleteLead') || 'Delete Lead',
+            message: t('confirmDeleteLead') || 'Are you sure you want to delete',
+            itemName: lead.name,
+            onConfirm: async () => {
+                try {
+                    await deleteLeadMutation.mutateAsync(lead.id);
+                    setSelectedLead(null);
+                    const returnPage = getLeadsReturnPage();
+                    if (currentUser?.company) {
+                        const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, returnPage, currentUser.company.specialization);
+                        window.history.pushState({}, '', route);
+                    } else {
+                        window.history.pushState({}, '', `/${returnPage.toLowerCase().replace(/\s+/g, '-')}`);
+                    }
+                    setCurrentPage(returnPage);
+                } catch (error: any) {
+                    console.error('Error deleting lead:', error);
+                    throw error;
+                }
+            },
+        });
+        setIsConfirmDeleteModalOpen(true);
+    };
+
+    const formatPbxCallSummary = (cc: Record<string, unknown>): string => {
+        const parts: string[] = [];
+        const direction = (cc.pbx_direction ?? cc.pbxDirection) as string | undefined;
+        if (direction === 'inbound') parts.push(t('inbound'));
+        else if (direction === 'outbound') parts.push(t('outbound'));
+        else if (direction === 'internal') parts.push(t('internal'));
+
+        const disposition = (cc.pbx_disposition ?? cc.pbxDisposition) as string | undefined;
+        if (disposition === 'answered') parts.push(t('answered'));
+        else if (disposition === 'no_answer') parts.push(t('missed'));
+        else if (disposition === 'busy') parts.push(t('busy'));
+        else if (disposition === 'failed') parts.push(t('callFailed'));
+
+        const duration = (cc.pbx_duration_sec ?? cc.pbxDurationSec) as number | undefined;
+        if (duration) parts.push(`${duration}s`);
+
+        const legacyNotes = (cc.notes as string) || '';
+        return parts.length ? parts.join(' Â· ') : legacyNotes;
+    };
+
+    const formatWhatsAppCallSummary = (cc: Record<string, unknown>): string => {
+        const parts: string[] = [t('whatsappCallMade')];
+        const direction = (cc.whatsapp_direction ?? cc.whatsappDirection) as string | undefined;
+        if (direction === 'inbound') parts.push(t('incoming'));
+        else if (direction === 'outbound') parts.push(t('outgoing'));
+        const status = (cc.whatsapp_call_status ?? cc.whatsappCallStatus) as string | undefined;
+        if (status) {
+            const key = `whatsappCallStatus_${String(status).toLowerCase()}` as Parameters<typeof t>[0];
+            const translated = t(key);
+            parts.push(translated === key ? String(status).replace(/_/g, ' ') : translated);
+        }
+        const duration = (cc.whatsapp_duration_sec ?? cc.whatsappDurationSec) as number | undefined;
+        if (duration) {
+            parts.push(t('callDurationSeconds').replace('{n}', String(duration)));
+        }
+        return parts.join(' Â· ');
+    };
+
+    const pollPbxDialStatus = async (commandId: number) => {
+        for (let attempt = 0; attempt < 15; attempt += 1) {
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+            try {
+                const status = await getPbxDialStatusAPI(commandId);
+                if (status.status === 'completed') {
+                    setSuccessMessage(t('pbxDialCompleted'));
+                    setIsSuccessModalOpen(true);
+                    return;
+                }
+                if (status.status === 'failed') {
+                    setAlertMessage(
+                        localizePbxResultMessage(status.result_message, t) || t('pbxDialFailed')
+                    );
+                    setAlertVariant('error');
+                    setIsAlertModalOpen(true);
+                    return;
+                }
+            } catch {
+                // keep polling until timeout
+            }
+        }
+    };
+
+    const handlePbxDial = async (phone: string) => {
+        if (!displayLead?.id) return;
+        try {
+            const result = await pbxDialAPI({ client: displayLead.id, phone_number: phone });
+            setSuccessMessage(t('pbxDialQueued'));
+            setIsSuccessModalOpen(true);
+            if (result?.id) {
+                void pollPbxDialStatus(result.id);
+            }
+        } catch (e: any) {
+            setAlertMessage(getLocalizedApiErrorMessage(e, t, 'pbxDialFailed'));
+            setAlertVariant('error');
+            setIsAlertModalOpen(true);
+        }
+    };
+
+    const integrationAccountId = displayLead?.integration_account ?? (displayLead as any)?.integrationAccount ?? null;
+    const isMetaLead = (displayLead?.source || (displayLead as any)?.source) === 'meta_lead_form';
+
+    const { data: metaIntegrationAccount } = useQuery({
+        queryKey: ['integrationAccount', integrationAccountId],
+        queryFn: () => getConnectedAccountAPI(integrationAccountId as number),
+        enabled: isMetaLead && !!integrationAccountId,
+    });
+    const metaPixelConfigured = Boolean(metaIntegrationAccount?.metadata?.pixel_id);
+    const metaLeadgenId = displayLead?.metaLeadgenId ?? (displayLead as any)?.meta_leadgen_id ?? null;
+    const metaQualificationStatus = displayLead?.metaQualificationStatus ?? (displayLead as any)?.meta_qualification_status ?? null;
+    const metaQualificationSentAt = displayLead?.metaQualificationSentAt ?? (displayLead as any)?.meta_qualification_sent_at ?? null;
+    const metaQualificationError = displayLead?.metaQualificationError ?? (displayLead as any)?.meta_qualification_error ?? null;
+    const metaQualificationDisabled = !metaLeadgenId || !metaPixelConfigured;
+
+    const metaQualificationErrorText = useMemo(() => {
+        if (!metaQualificationError) return null;
+        const err =
+            typeof metaQualificationError === 'string'
+                ? { key: metaQualificationError, message: '' }
+                : metaQualificationError;
+        if (err.key in translations.en) {
+            return t(err.key as keyof typeof translations.en);
+        }
+        return err.message || err.key;
+    }, [metaQualificationError, t, language]);
+
+    const handleMetaQualificationChange = async (newStatus: '' | 'qualified' | 'unqualified') => {
+        if (!displayLead?.id) return;
+        setUpdatingMetaQualification(true);
+        try {
+            await patchLeadMutation.mutateAsync({
+                id: displayLead.id,
+                data: { meta_qualification_status: newStatus === '' ? null : newStatus },
+            });
+            await refetchLead();
+        } catch (error) {
+            console.error('Error updating Meta qualification:', error);
+            alert(t('errorUpdatingLead') || 'Failed to update lead. Please try again.');
+        } finally {
+            setUpdatingMetaQualification(false);
+        }
+    };
+    
+    // ØªØ­ÙˆÙŠÙ„ ClientTasks Ø¥Ù„Ù‰ TimelineEntries
+    const leadClientTasks = displayLead ? clientTasks.filter(ct => {
+        const clientId = ct.client || ct.clientId;
+        return clientId === displayLead.id;
+    }) : [];
+
+    // ØªØµÙÙŠØ© Ø§Ù„Ù…ÙƒØ§Ù„Ù…Ø§Øª Ù„Ù„Ø¹Ù…ÙŠÙ„ Ø§Ù„Ù…Ø­ØªÙ…Ù„ Ø§Ù„Ù…Ø­Ø¯Ø¯
+    const leadClientCalls = displayLead ? clientCalls.filter(cc => {
+        const clientId = cc.client || cc.clientId;
+        return clientId === displayLead.id;
+    }) : [];
+
+    const leadClientVisits = displayLead ? clientVisits.filter((cv: { client?: number; clientId?: number }) => {
+        const clientId = cv.client || cv.clientId;
+        return clientId === displayLead.id;
+    }) : [];
+
+    const leadClientFieldVisits = displayLead ? clientFieldVisits.filter((cv: { client?: number; clientId?: number }) => {
+        const clientId = cv.client || cv.clientId;
+        return clientId === displayLead.id;
+    }) : [];
+
+    const leadLocationLat = displayLead
+        ? parseLeadCoordinate(
+              (displayLead as Lead).locationLatitude ?? (displayLead as any).location_latitude
+          )
+        : null;
+    const leadLocationLng = displayLead
+        ? parseLeadCoordinate(
+              (displayLead as Lead).locationLongitude ?? (displayLead as any).location_longitude
+          )
+        : null;
+    const hasLeadLocation = leadLocationLat != null && leadLocationLng != null;
+
+    const showVisitActions =
+        currentUser?.company?.specialization === 'real_estate' ||
+        currentUser?.company?.specialization === 'services' ||
+        currentUser?.company?.specialization === 'medical';
+
+    const timelineHistory = useMemo(() => {
+        if (!displayLead) return [];
+
+        const lang = (language === 'ar' ? 'ar' : 'en') as 'en' | 'ar';
+        const formatDetailDateTime = (dateString: string | null | undefined) =>
+            formatTimelineDetailDateTime(dateString, lang);
+        const leadContactName = displayLead.name || displayLead.leadCompanyName || '';
+        const leadContactPhone =
+            displayLead.phone ||
+            displayLead.phoneNumbers?.find((p) => p.is_primary)?.phone_number ||
+            displayLead.phoneNumbers?.[0]?.phone_number ||
+            '';
+
+        // Format Actions (ClientTasks)
+        const actions = leadClientTasks.map(ct => {
+            const user = users.find(u => u.id === (ct.created_by || ct.createdBy));
+            const stageName = ct.stage_name || ct.stage;
+            const stageConfig = stages.find(s => s.name === stageName || s.id.toString() === (ct.stage?.toString() || ''));
+            const formattedStage = formatStage(stageName || '');
+            
+            return {
+                id: `action-${ct.id}`,
+                type: 'action',
+                user: user?.name || ct.created_by_username || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('stageUpdated'),
+                details: ct.notes || '',
+                date: formatTimelineDate(ct.created_at || ct.createdAt, lang),
+                timestamp: new Date(ct.created_at || ct.createdAt).getTime(),
+                stage: formattedStage,
+                color: stageConfig?.color,
+            };
+        });
+
+        // Format Calls (ClientCalls)
+        const calls = leadClientCalls.map(cc => {
+            const user = users.find(u => u.id === (cc.created_by || cc.createdBy));
+            const callMethod = callMethods.find(cm => cm.id === (cc.call_method || cc.callMethod));
+            const callMethodName = callMethod?.name || cc.call_method_name || t('call') || 'Call';
+            
+            // Use call_datetime if available, otherwise use created_at
+            const callDate = cc.call_datetime || cc.created_at || cc.createdAt;
+            const timestamp = new Date(callDate).getTime();
+
+            const callDateTimeFormatted = formatDetailDateTime(callDate);
+            const followUpDateFormatted = formatDetailDateTime(cc.follow_up_date);
+            const isPbxCall = cc.source === 'pbx';
+            const isWhatsAppCall = cc.source === 'whatsapp';
+            const recordingUrl = isWhatsAppCall
+                ? ((cc.whatsapp_recording_url ?? cc.whatsappRecordingUrl) as string | undefined)
+                : isPbxCall
+                  ? ((cc.pbx_recording_url ?? cc.pbxRecordingUrl) as string | undefined)
+                  : undefined;
+            const recordingStatus = isWhatsAppCall
+                ? ((cc.whatsapp_recording_status ?? cc.whatsappRecordingStatus) as string | undefined)
+                : isPbxCall
+                  ? ((cc.pbx_recording_status ?? cc.pbxRecordingStatus) as string | undefined)
+                  : undefined;
+
+            return {
+                id: `call-${cc.id}`,
+                type: 'call',
+                user: user?.name || cc.created_by_username || t('unknown'),
+                avatar: user?.avatar || '',
+                action: isPbxCall
+                    ? formatPbxCallSummary(cc)
+                    : isWhatsAppCall
+                      ? formatWhatsAppCallSummary(cc)
+                      : t('callMade'),
+                details: isPbxCall
+                    ? ''
+                    : isWhatsAppCall
+                      ? ((cc.notes as string) || '').includes('\n')
+                          ? ((cc.notes as string).split('\n').slice(1).join('\n') || '')
+                          : ''
+                      : (cc.notes || ''),
+                date: formatTimelineDate(callDate, lang),
+                timestamp: timestamp,
+                stage: isPbxCall
+                    ? t('pbxCallSource')
+                    : isWhatsAppCall
+                      ? t('whatsappCallSource')
+                      : callMethodName,
+                color: isPbxCall ? '#4f46e5' : isWhatsAppCall ? '#16a34a' : callMethod?.color,
+                callDatetime: callDateTimeFormatted,
+                followUpDate: followUpDateFormatted,
+                recordingUrl: recordingUrl || undefined,
+                recordingStatus: recordingStatus || undefined,
+            };
+        });
+
+        const visits = leadClientVisits.map((cv: Record<string, unknown>) => {
+            const user = users.find(u => u.id === (cv.created_by || cv.createdBy));
+            const vt = visitTypes.find((x: { id: number }) => x.id === (cv.visit_type as number));
+            const visitTypeName = vt?.name || (cv.visit_type_name as string) || (t('visit') as string) || 'Visit';
+
+            const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
+            const timestamp = new Date(visitDateRaw).getTime();
+
+            const visitDt = formatDetailDateTime(visitDateRaw);
+            const upcoming = formatDetailDateTime(cv.upcoming_visit_date as string | undefined);
+
+            return {
+                id: `visit-${cv.id}`,
+                type: 'visit' as const,
+                user: user?.name || (cv.created_by_username as string) || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('visitLogged'),
+                details: (cv.summary as string) || '',
+                date: formatTimelineDate(visitDateRaw, lang),
+                timestamp,
+                stage: visitTypeName,
+                color: vt?.color,
+                callDatetime: visitDt,
+                followUpDate: upcoming || undefined,
+            };
+        });
+
+        const fieldVisits = fieldVisitsAllowed
+            ? leadClientFieldVisits.map((cv: Record<string, unknown>) => {
+            const user = users.find(u => u.id === (cv.created_by || cv.createdBy));
+            const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
+            const timestamp = new Date(visitDateRaw).getTime();
+
+            const visitDt = formatDetailDateTime(visitDateRaw);
+            const upcoming = formatDetailDateTime(cv.upcoming_visit_date as string | undefined);
+
+            return {
+                id: `field-visit-${cv.id}`,
+                type: 'field_visit' as const,
+                user: user?.name || (cv.created_by_username as string) || t('unknown'),
+                avatar: user?.avatar || '',
+                action: t('fieldVisitLogged'),
+                details: (cv.summary as string) || '',
+                date: formatTimelineDate(visitDateRaw, lang),
+                timestamp,
+                callDatetime: visitDt,
+                followUpDate: upcoming || undefined,
+                locationPhotoUrl:
+                    (cv.client_location_photo_url as string | undefined) ||
+                    (cv.clientLocationPhotoUrl as string | undefined) ||
+                    undefined,
+            };
+        })
+            : [];
+
+        // Format Events (ClientEvents)
+        const eventFormatCtx = { t, users, statuses, channels };
+
+        const events = clientEvents.map(ce => {
+            const actor = resolveTimelineActor({
+                createdById: ce.created_by,
+                createdByUsername: ce.created_by_username,
+                users,
+                t,
+                fallback: timelineEventActorFallback(ce),
+                contactName: leadContactName,
+                contactPhone: leadContactPhone,
+            });
+            const actionText =
+                ce.event_type === 'location_update'
+                    ? t(clientLocationEventTranslationKey(ce.notes))
+                    : getTimelineEventAction(ce.event_type, t, ce.notes, ce.old_value, ce.new_value);
+
+            const editFieldLabel =
+                ce.event_type === 'edit'
+                    ? getEditFieldLabel(ce.notes, t, ce.old_value, ce.new_value)
+                    : undefined;
+
+            // Resolve tag names back to their configured colors. A tag deleted
+            // since the event was logged simply renders with the default color.
+            const toTagRefs = (names: string[]) =>
+                names.map((name) => ({
+                    name,
+                    color: tags.find((tag) => tag.name === name)?.color,
+                }));
+            const parsedTagChange =
+                ce.event_type === 'tags_change' ? parseTagsChangeNotes(ce.notes) : null;
+            const tagChanges = parsedTagChange
+                ? {
+                      added: toTagRefs(parsedTagChange.added),
+                      removed: toTagRefs(parsedTagChange.removed),
+                  }
+                : undefined;
+
+            let eventColor: string | undefined;
+            if (ce.event_type === 'status_change') {
+                const statusConfig = statuses.find(
+                    (s) => s.name === ce.new_value || s.id.toString() === ce.new_value
+                );
+                if (statusConfig) eventColor = statusConfig.color;
+            }
+
+            const { oldFormatted, newFormatted } = formatTimelineEventValuePair(
+                ce.old_value,
+                ce.new_value,
+                eventFormatCtx,
+                ce.event_type,
+                ce.notes
+            );
+
+            let translatedDetails = '';
+            if (ce.event_type === 'location_update') {
+                translatedDetails = '';
+            } else if (ce.event_type === 're_assignment') {
+                const hoursMatch = ce.notes?.match(/(\d+)\s*Ø³Ø§Ø¹Ø©/);
+                const hours = hoursMatch?.[1] || String(currentUser?.company?.re_assign_hours ?? 24);
+                translatedDetails = t('autoReassignedFromTo')
+                    .replace('{from}', oldFormatted || t('unassigned'))
+                    .replace('{to}', newFormatted || t('unassigned'))
+                    .replace('{hours}', hours);
+            } else {
+                translatedDetails = localizeTimelineEventNotes(ce.notes, ce.event_type, t);
+            }
+
+            const showValuePair =
+                ce.event_type !== 'location_update' &&
+                ce.event_type !== 'tags_change' &&
+                (oldFormatted != null || newFormatted != null);
+            const suppressDetailsWithPair =
+                showValuePair &&
+                ['edit', 'status_change', 'assignment', 'created'].includes(ce.event_type);
+            const detailsOnly = translatedDetails && !suppressDetailsWithPair;
+
+            return {
+                id: `event-${ce.id}`,
+                type: ce.event_type === 'location_update' ? 'location_update' as const : 'event',
+                user: actor.name,
+                avatar: actor.avatar || '',
+                action: actionText,
+                fieldLabel: editFieldLabel || undefined,
+                tagChanges,
+                details: detailsOnly ? translatedDetails : '',
+                date: formatTimelineDate(ce.created_at, lang),
+                timestamp: new Date(ce.created_at).getTime(),
+                // tags_change: the localized "Added / Removed" details line already
+                // says everything; the raw comma-joined pair would just repeat it.
+                oldValue: ce.event_type === 'location_update'
+                    ? (ce.old_value || undefined)
+                    : ce.event_type === 'tags_change'
+                      ? undefined
+                      : oldFormatted,
+                newValue: ce.event_type === 'location_update'
+                    ? (ce.new_value || undefined)
+                    : ce.event_type === 'tags_change'
+                      ? undefined
+                      : newFormatted,
+                reason: (ce as any).reason || undefined,
+                color: eventColor,
+            };
+        });
+
+        // Format SMS messages (Twilio)
+        const smsEntries = (leadSMSMessages as any[]).map((sms) => {
+            const user = users.find(u => u.id === sms.created_by);
+            const isAutoWelcome = sms.created_by == null;
+            return {
+                id: `sms-${sms.id}`,
+                type: 'sms' as const,
+                user: user?.name || sms.created_by_username || t('unknown'),
+                avatar: user?.avatar || '',
+                action: isAutoWelcome ? t('smsSentAutoWelcome') : t('smsSent'),
+                details: sms.body || '',
+                date: formatTimelineDate(sms.created_at, lang),
+                timestamp: new Date(sms.created_at).getTime(),
+                stage: sms.phone_number,
+            };
+        });
+
+        // Format WhatsApp messages
+        const waEntries = (leadWhatsAppMessages as any[]).map((wa) => {
+            const isInbound = wa.direction === 'inbound';
+            const isAutoWelcome = !isInbound && wa.send_source === 'auto_welcome';
+            const actor = resolveTimelineActor({
+                createdById: wa.created_by,
+                createdByUsername: wa.created_by_username,
+                users,
+                t,
+                fallback: isInbound ? 'contact' : 'whatsapp',
+                contactName: leadContactName,
+                contactPhone: wa.phone_number || leadContactPhone,
+            });
+            const dir = isInbound
+                ? t('whatsappReceived')
+                : isAutoWelcome
+                  ? t('whatsappSentAutoWelcome') || t('whatsappSent')
+                  : t('whatsappSent');
+            return {
+                id: `wa-${wa.id}`,
+                type: 'whatsapp' as const,
+                user: actor.name,
+                avatar: actor.avatar || '',
+                action: dir,
+                details: wa.body || '',
+                date: formatTimelineDate(wa.created_at, lang),
+                timestamp: new Date(wa.created_at).getTime(),
+                stage: wa.phone_number,
+                direction: isInbound ? ('inbound' as const) : ('outbound' as const),
+            };
+        });
+
+        const merged: TimelineEntry[] = [
+            ...actions,
+            ...calls,
+            ...visits,
+            ...fieldVisits,
+            ...events,
+            ...smsEntries,
+            ...waEntries,
+        ];
+        return collapseConsecutiveWhatsAppThreads(merged, t);
+    }, [displayLead, leadClientTasks, leadClientCalls, leadClientVisits, leadClientFieldVisits, clientEvents, leadSMSMessages, leadWhatsAppMessages, users, t, stages, statuses, channels, tags, callMethods, visitTypes, fieldVisitsAllowed, language, currentUser?.company?.re_assign_hours]);
+
+    const isResolvingLead = Boolean(leadId) && !displayLead && (leadLoading || leadFetching) && !leadError;
+
+    if (isResolvingLead) {
+        return (
+            <PageWrapper title={t('leads')}>
+                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
+                    <Loader size="lg" variant="primary"/>
+                </div>
+            </PageWrapper>
+        );
+    }
+
+    if (!displayLead) {
+        return <PageWrapper title={t('leads')}><div>{t('leadNotFound')}</div></PageWrapper>;
+    }
+
+    return (
+        <PageWrapper 
+            title={
+                <div className="flex min-w-0 w-full items-center gap-2 sm:gap-3">
+                    <button
+                        type="button"
+                        onClick={() => {
+                            const returnPage = getLeadsReturnPage();
+                            const route = currentUser?.company
+                                ? getCompanyRoute(currentUser.company.name, currentUser.company.domain, returnPage, currentUser.company.specialization)
+                                : `/${returnPage.toLowerCase().replace(/\s+/g, '-')}`;
+                            window.history.pushState({}, '', route);
+                            setCurrentPage(returnPage);
+                        }}
+                        className="shrink-0 rounded-md p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
+                        title={t('back') || 'Back'}
+                    >
+                        <ArrowLeftIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+                    </button>
+                    <MarqueeText
+                        text={displayLead.name}
+                        className="min-w-0 flex-1"
+                        contentClassName="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg md:text-xl"
+                    />
+                </div>
+            }
+            actions={
+                <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap">
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => {
+                            if (!displayLead) return;
+                            setEditingLead(displayLead);
+                            window.history.pushState({}, '', '/edit-lead');
+                            setCurrentPage('EditLead');
+                        }}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <EditIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                            {t('editClient')}
+                        </span>
+                    </Button>
+                    {canDeleteLead(displayLead) && (
+                        <Button
+                            variant="danger"
+                            type="button"
+                            className="w-full sm:w-auto shrink-0"
+                            onClick={() => handleDeleteLead(displayLead)}
+                        >
+                            <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                                <TrashIcon className="w-4 h-4 shrink-0" />
+                                {t('deleteLead') || 'Delete Lead'}
+                            </span>
+                        </Button>
+                    )}
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => {
+                            if (!displayLead) return;
+                            setSelectedLeadForDeal(displayLead.id);
+                            window.history.pushState({}, '', '/create-deal');
+                            setCurrentPage('CreateDeal');
+                        }}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <BriefcaseIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                            {t('addDeal')}
+                        </span>
+                    </Button>
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => setIsAddCallModalOpen(true)}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <PhoneIcon className="w-4 h-4 shrink-0 text-gray-500 dark:text-gray-400" />
+                            {t('addCall') || 'Add Call'}
+                        </span>
+                    </Button>
+                    {showVisitActions && (
+                        <Button
+                            variant="secondary"
+                            type="button"
+                            className="w-full sm:w-auto shrink-0"
+                            onClick={() => setIsAddVisitModalOpen(true)}
+                        >
+                            <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                                <MapPinIcon className="w-4 h-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                                {t('addVisit') || 'Add visit'}
+                            </span>
+                        </Button>
+                    )}
+                    {fieldVisitsAllowed && (
+                    <Button
+                        variant="secondary"
+                        type="button"
+                        className="w-full sm:w-auto shrink-0"
+                        onClick={() => setIsAddFieldVisitModalOpen(true)}
+                    >
+                        <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
+                            <MapPinIcon className="w-4 h-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                            {t('addFieldVisit')}
+                        </span>
+                    </Button>
+                    )}
+                    <Button onClick={() => setIsAddActionModalOpen(true)} className="w-full sm:w-auto shrink-0">
+                        <PlusIcon className="w-4 h-4 shrink-0" />
+                        <span className="whitespace-nowrap">{t('add_action')}</span>
+                    </Button>
+                </div>
+            }
+        >
+            <div className="min-w-0 overflow-x-hidden">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <Card className="lg:col-span-1">
+                    <h3 className="font-semibold text-lg mb-4 border-b pb-3 dark:border-gray-700">{t('contactInformation') || 'Contact Information'}</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('leadCompanyName')}</label>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || 'â€”'}</p>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('profession')}</label>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : 'â€”'}</p>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('residence')}</label>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : 'â€”'}</p>
+                        </div>
+                        {hasLeadLocation && (
+                            <div className="overflow-hidden md:col-span-1">
+                                <LeadLocationMapPicker
+                                    latitude={leadLocationLat}
+                                    longitude={leadLocationLng}
+                                    onChange={() => {}}
+                                    readOnly
+                                />
+                            </div>
+                        )}
+                        {(displayLead as Lead).patientFileNumber != null && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('patientFileNumber')}</label>
+                                <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead as Lead).patientFileNumber ?? (displayLead as any).patient_file_number}</p>
+                            </div>
+                        )}
+                        {currentUser?.company?.specialization === 'real_estate' && (
+                            <div className="md:col-span-1 space-y-3 border-t border-gray-200 dark:border-gray-700 pt-4 mt-2">
+                                <p className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                                    {t('leadInventoryInterest') || 'Property interest'}
+                                </p>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedDeveloper') || 'Developer'}</label>
+                                    <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
+                                        {((displayLead as Lead).interestedDeveloperName ?? (displayLead as any).interested_developer_name) || 'â€”'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedProject') || 'Project'}</label>
+                                    <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
+                                        {((displayLead as Lead).interestedProjectName ?? (displayLead as any).interested_project_name) || 'â€”'}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedUnit') || 'Unit'}</label>
+                                    <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
+                                        {(() => {
+                                            const un = (displayLead as Lead).interestedUnitName ?? (displayLead as any).interested_unit_name;
+                                            const uc = (displayLead as Lead).interestedUnitCode ?? (displayLead as any).interested_unit_code;
+                                            if (un && uc) return `${un} (${uc})`;
+                                            if (un) return un;
+                                            return 'â€”';
+                                        })()}
+                                    </p>
+                                </div>
+                            </div>
+                        )}
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('phoneNumbers') || 'Phone Numbers'}</label>
+                            <div className="mt-2 w-full">
+                                <LeadContactPhoneList
+                                    variant="details"
+                                    phoneNumbers={displayLead.phoneNumbers}
+                                    fallbackPhone={displayLead.phone}
+                                    pbxEnabled={canPbxDial}
+                                    onSms={(phone) => setSendSMSModal({ phone })}
+                                    onWhatsApp={(phone) => openWhatsApp(displayLead, phone)}
+                                    onPbxDial={handlePbxDial}
+                                    t={(key: string) => t(key as Parameters<typeof t>[0])}
+                                />
+                                {whatsappCalling ? (
+                                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                                    <button
+                                        type="button"
+                                        disabled={
+                                            whatsappCalling.isStartingOutbound ||
+                                            whatsappCalling.phase === 'connecting' ||
+                                            whatsappCalling.phase === 'ringing' ||
+                                            whatsappCalling.phase === 'active'
+                                        }
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700 hover:bg-emerald-100 disabled:cursor-wait disabled:opacity-60 dark:border-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300"
+                                        onClick={() => {
+                                            const phone =
+                                                displayLead.phoneNumbers?.find((p) => p.is_primary)?.phone_number ||
+                                                displayLead.phoneNumbers?.[0]?.phone_number ||
+                                                displayLead.phone ||
+                                                '';
+                                            if (!phone) return;
+                                            void whatsappCalling.startOutboundCall({
+                                                to: String(phone),
+                                                clientId: displayLead.id,
+                                            });
+                                        }}
+                                    >
+                                        {whatsappCalling.isStartingOutbound ||
+                                        whatsappCalling.phase === 'connecting' ? (
+                                            <Loader size="sm" variant="primary" />
+                                        ) : (
+                                            <PhoneIcon className="h-3.5 w-3.5" />
+                                        )}
+                                        {whatsappCalling.isStartingOutbound ||
+                                        whatsappCalling.phase === 'connecting'
+                                            ? t('whatsappCallStarting')
+                                            : t('whatsappCallButton')}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200 dark:hover:bg-gray-700"
+                                        onClick={() =>
+                                            openCallsFiltered({
+                                                clientId: String(displayLead.id),
+                                            })
+                                        }
+                                    >
+                                        {t('viewLeadCalls')}
+                                    </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-200"
+                                        onClick={() =>
+                                            openCallsFiltered({
+                                                clientId: String(displayLead.id),
+                                            })
+                                        }
+                                    >
+                                        {t('viewLeadCalls')}
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('communicationWay')}</label>
+                            <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
+                                {(displayLead as any).communication_way_name || displayLead.communicationWay || '-'}
+                            </p>
+                        </div>
+                        {(() => {
+                            const assignedToId = (displayLead as any).assigned_to || displayLead.assignedTo;
+                            const assignedToUsername = (displayLead as any).assigned_to_username;
+                            
+                            if (assignedToId) {
+                                const assignedUser = users.find(u => u.id === assignedToId);
+                                const displayName = assignedUser?.name || 
+                                                   assignedToUsername || 
+                                                   assignedUser?.username || 
+                                                   t('unknown');
+                                
+                                return (
+                                    <div>
+                                        <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('assignedTo')}</label>
+                                        <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">{displayName}</p>
+                                    </div>
+                                );
+                            }
+                            return null;
+                        })()}
+                    </div>
+                </Card>
+                <Card className="lg:col-span-1">
+                    <h3 className="font-semibold text-lg mb-4 border-b pb-3 dark:border-gray-700">{t('status')}</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('status')}</label>
+                            <div className="mt-1">
+                                {(() => {
+                                    // Use status_name from API if available, otherwise find by ID or name
+                                    const leadStatus = displayLead.status;
+                                    const statusName = (displayLead as any).status_name || 
+                                        (leadStatus ? statuses.find(s => s.id.toString() === leadStatus.toString() || s.name === leadStatus)?.name : null);
+                                    
+                                    // Find current status config
+                                    const currentStatusConfig = statuses.find(s => 
+                                        s.name === statusName || 
+                                        s.id.toString() === (displayLead.status?.toString() || '')
+                                    );
+                                    
+                                    // Get available statuses (non-hidden)
+                                    const availableStatuses = statuses.filter(s => !s.isHidden);
+                                    
+                                    const isUpdating = updatingLeadId === displayLead.id;
+
+                                    if (availableStatuses.length === 0) {
+                                        return <LeadStatusBadge name="â€”" size="md" />;
+                                    }
+
+                                    return (
+                                        <LeadStatusDropdown
+                                            leadId={displayLead.id}
+                                            currentStatus={currentStatusConfig ?? null}
+                                            availableStatuses={availableStatuses}
+                                            onStatusChange={handleStatusChange}
+                                            isUpdating={isUpdating}
+                                            size="md"
+                                        />
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                        {tags.length > 0 && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('tags')}</label>
+                                <div className="mt-1">
+                                    <TagMultiSelect
+                                        id="view-lead-tags"
+                                        tags={tags}
+                                        value={displayLead.tagsDetail?.map((tag) => tag.id) ?? []}
+                                        onChange={handleTagsChange}
+                                        disabled={isUpdatingTags}
+                                        placeholder={t('addTags')}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        {displayLead.lastStage && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('lastStage')}</label>
+                                <div className="mt-1">
+                                    {(() => {
+                                        const stageName = displayLead.lastStage;
+                                        const stageConfig = stages.find(s => s.name === stageName || s.id.toString() === stageName);
+                                        const stageColor = stageConfig?.color || '#808080';
+                                        
+                                        // Convert hex to RGB for background opacity
+                                        const hexToRgb = (hex: string) => {
+                                            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+                                            return result ? {
+                                                r: parseInt(result[1], 16),
+                                                g: parseInt(result[2], 16),
+                                                b: parseInt(result[3], 16)
+                                            } : null;
+                                        };
+                                        
+                                        const rgb = hexToRgb(stageColor);
+                                        const bgColor = rgb ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.2)` : undefined;
+                                        const textColor = rgb ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})` : undefined;
+                                        
+                                        return (
+                                            <span 
+                                                className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                                                style={{ 
+                                                    backgroundColor: bgColor || (theme === 'dark' ? '#1e293b' : '#f1f5f9'),
+                                                    color: textColor || (theme === 'dark' ? '#e2e8f0' : '#475569'),
+                                                    border: `1px solid ${textColor || 'transparent'}`
+                                                }}
+                                            >
+                                                {formatStage(stageName)}
+                                            </span>
+                                        );
+                                    })()}
+                                </div>
+                            </div>
+                        )}
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('priority')}</label>
+                            <div className="mt-1">
+                                {(() => {
+                                    const priority = displayLead.priority?.toLowerCase() || '';
+                                    return (
+                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                            priority === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' :
+                                            priority === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
+                                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                        }`}>
+                                            {priority === 'high' ? t('high') : 
+                                             priority === 'medium' ? t('medium') : 
+                                             priority === 'low' ? t('low') : 
+                                             displayLead.priority || '-'}
+                                        </span>
+                                    );
+                                })()}
+                                {(displayLead.isUrgent || (displayLead as any).is_urgent) ? (
+                                    <span className="ms-2 inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-orange-100 text-orange-800 dark:bg-orange-900/40 dark:text-orange-200">
+                                        {t('urgent')}
+                                    </span>
+                                ) : null}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('type')}</label>
+                            <div className="mt-1">
+                                {(() => {
+                                    const type = displayLead.type?.toLowerCase() || '';
+                                    return (
+                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+                                            type === 'fresh' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
+                                            type === 'hot' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200' :
+                                            type === 'cold' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                            'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                        }`}>
+                                            {type === 'fresh' ? t('fresh') :
+                                             type === 'hot' ? t('hot') :
+                                             type === 'cold' ? t('cold') :
+                                             displayLead.type || '-'}
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('source') || 'Source'}</label>
+                            <div className="mt-1">
+                                {(() => {
+                                    const source = displayLead.source || 'manual';
+                                    if (source === 'meta_lead_form') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                <FacebookIcon className="w-4 h-4" />
+                                                {t('metaLeadForm') || 'Meta'}
+                                            </span>
+                                        );
+                                    } else if (source === 'whatsapp') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                                                <WhatsappIcon className="w-4 h-4" />
+                                                {t('whatsappSource') || 'WhatsApp'}
+                                            </span>
+                                        );
+                                    } else if (source === 'tiktok') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                {t('tiktokSource') || 'TikTok'}
+                                            </span>
+                                        );
+                                    } else if (source === 'api') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-violet-100 text-violet-800 dark:bg-violet-900 dark:text-violet-200">
+                                                {t('leadApiSource') || 'Custom API'}
+                                            </span>
+                                        );
+                                    } else if (source === 'mujeb') {
+                                        return (
+                                            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200">
+                                                {t('mujebSource') || 'Mujeb'}
+                                            </span>
+                                        );
+                                    }
+                                    return (
+                                        <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                            {t('manualSource') || 'Manual'}
+                                        </span>
+                                    );
+                                })()}
+                            </div>
+                        </div>
+                        {isMetaLead && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">
+                                    {t('metaQualification')}
+                                </label>
+                                <div className="mt-1">
+                                    <select
+                                        value={metaQualificationStatus ?? ''}
+                                        onChange={(e) => handleMetaQualificationChange(e.target.value as '' | 'qualified' | 'unqualified')}
+                                        disabled={metaQualificationDisabled || updatingMetaQualification}
+                                        title={
+                                            !metaLeadgenId
+                                                ? t('metaQualificationNoLeadId')
+                                                : !metaPixelConfigured
+                                                    ? t('metaQualificationNoPixel')
+                                                    : undefined
+                                        }
+                                        className="block w-full max-w-xs rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm px-3 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                                    >
+                                        <option value="">{t('metaQualificationNotSet')}</option>
+                                        <option value="qualified">{t('qualified')}</option>
+                                        <option value="unqualified">{t('unqualified')}</option>
+                                    </select>
+                                    {updatingMetaQualification && (
+                                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('loading')}</p>
+                                    )}
+                                    {!metaLeadgenId && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                            {t('metaQualificationNoLeadId')}
+                                        </p>
+                                    )}
+                                    {metaLeadgenId && !metaPixelConfigured && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                                            {t('metaQualificationNoPixel')}
+                                        </p>
+                                    )}
+                                    {metaQualificationSentAt && !metaQualificationError && (
+                                        <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                            {t('metaQualificationSent')}
+                                            {metaQualificationSentAt ? ` Â· ${formatDateTimeToLocal(metaQualificationSentAt)}` : ''}
+                                        </p>
+                                    )}
+                                    {metaQualificationErrorText && (
+                                        <p className="text-xs text-red-600 dark:text-red-400 mt-1">{metaQualificationErrorText}</p>
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('createdBy') || 'Created by'}</label>
+                            <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
+                                {(() => {
+                                    const createdById = (displayLead as any).created_by ?? displayLead.createdBy;
+                                    const apiName = (displayLead as any).created_by_name ?? displayLead.createdByName;
+                                    const creatorUser = createdById ? users.find(u => u.id === createdById) : null;
+                                    return creatorUser?.name ?? apiName ?? '-';
+                                })()}
+                            </p>
+                        </div>
+                        {displayLead.campaign && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('campaign') || 'Campaign'}</label>
+                                <div className="mt-1">
+                                    <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                                        {(displayLead as any).campaign_name || `Campaign #${displayLead.campaign}`}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+                <Card className="lg:col-span-1">
+                    <h3 className="font-semibold text-lg mb-4 border-b pb-3 dark:border-gray-700">{t('financialInformation') || 'Financial Information'}</h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('budget')}</label>
+                            <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
+                                {(() => {
+                                    const s = formatLeadBudget(displayLead as any, language === 'ar' ? 'ar-IQ' : 'en-US');
+                                    return s ? (
+                                        <span className="text-lg font-semibold">{s}</span>
+                                    ) : (
+                                        <span className="text-gray-400 dark:text-gray-500">-</span>
+                                    );
+                                })()}
+                            </p>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('createdAt')}</label>
+                            <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
+                                {(() => {
+                                    const createdAt = (displayLead as any).created_at || displayLead.createdAt;
+                                    return createdAt
+                                        ? formatTimelineDate(createdAt, language === 'ar' ? 'ar' : 'en')
+                                        : '-';
+                                })()}
+                            </p>
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('lastFeedback')}</label>
+                            <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                {displayLead.lastFeedback || (displayLead as any).last_feedback || '-'}
+                            </p>
+                        </div>
+                        {(displayLead.notes != null && String(displayLead.notes).trim() !== '') && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('notes')}</label>
+                                <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap">
+                                    {String(displayLead.notes).trim()}
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </Card>
+            </div>
+
+            <div className="mt-6">
+                <Timeline history={timelineHistory} chatLead={displayLead} />
+            </div>
+            </div>
+
+            {sendSMSModal && displayLead && (
+                <SendSMSModal
+                    isOpen={!!sendSMSModal}
+                    onClose={() => setSendSMSModal(null)}
+                    leadId={displayLead.id}
+                    phoneNumber={sendSMSModal.phone}
+                    lead={displayLead}
+                    onSent={() => refetchLeadSMS()}
+                />
+            )}
+
+            <StatusChangeReasonModal {...reasonModalProps} />
+        </PageWrapper>
+    )
+}

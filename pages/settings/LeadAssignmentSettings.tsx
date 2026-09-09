@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import { Alert } from '../../components/Alert';
 import { Card, Button, NumberInput } from '../../components/index';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { useAppContext } from '../../context/AppContext';
@@ -374,18 +375,16 @@ export const LeadAssignmentSettings = () => {
                     </div>
 
                     {errors.general && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                            {errors.general}
-                        </div>
+                        <Alert variant="error">{errors.general}</Alert>
                     )}
 
                     <div className="flex justify-end pt-4 border-t border-gray-200 dark:border-gray-700">
                         <Button
                             onClick={handleSave}
                             loading={isSaving}
-                            disabled={isSaving}
+                            loadingText={t('saving')}
                         >
-                            {isSaving ? (t('saving') || 'جاري الحفظ...') : t('saveSettings')}
+                            {t('saveSettings')}
                         </Button>
                     </div>
                 </div>

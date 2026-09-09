@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { Button, Loader, Card, PaymentGatewaySelector } from '../components/index';
+import { Button, Loader, Card, Alert, PaymentGatewaySelector } from '../components/index';
 import {
     createPaymentSessionAPI,
     checkPaymentStatusAPI,
@@ -317,9 +317,7 @@ export const PaymentPage = () => {
                     </p>
                     
                     {error && (
-                        <div className="mb-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md">
-                            {error}
-                        </div>
+                        <Alert variant="error" className="mb-4">{error}</Alert>
                     )}
 
                     <div className="mb-6">

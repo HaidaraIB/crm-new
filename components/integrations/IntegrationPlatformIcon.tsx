@@ -1,10 +1,14 @@
 import React from 'react';
-import { FacebookIcon, TikTokIcon, WhatsappIcon, SmsIcon } from '../icons';
+import { FacebookIcon, InstagramIcon, TikTokIcon, WhatsappIcon, SmsIcon } from '../icons';
 
-export type IntegrationPlatform = 'meta' | 'tiktok' | 'whatsapp' | 'sms';
+// `meta_inbox` is a separate platform from `meta`, not a variant of it: different
+// Meta app, different credentials, its own account row. Instagram is the icon
+// because it is the channel that distinguishes it from Lead Ads at a glance.
+export type IntegrationPlatform = 'meta' | 'meta_inbox' | 'tiktok' | 'whatsapp' | 'sms';
 
 const PLATFORM_ICONS: Record<IntegrationPlatform, React.FC<React.SVGProps<SVGSVGElement>>> = {
     meta: FacebookIcon,
+    meta_inbox: InstagramIcon,
     tiktok: TikTokIcon,
     whatsapp: WhatsappIcon,
     sms: SmsIcon,
@@ -13,6 +17,7 @@ const PLATFORM_ICONS: Record<IntegrationPlatform, React.FC<React.SVGProps<SVGSVG
 /** Icon foreground — readable on dark UI backgrounds. */
 const ICON_FG: Record<IntegrationPlatform, string> = {
     meta: 'text-[#1877F2] dark:text-[#6BA8FF]',
+    meta_inbox: 'text-[#C13584] dark:text-[#F09AD3]',
     tiktok: 'text-gray-900 dark:text-white',
     whatsapp: 'text-[#128C7E] dark:text-[#5FE07A]',
     sms: 'text-primary-700 dark:text-primary-200',
@@ -20,6 +25,7 @@ const ICON_FG: Record<IntegrationPlatform, string> = {
 
 const BADGE_SHELL: Record<IntegrationPlatform, string> = {
     meta: 'bg-[#1877F2]/12 dark:bg-[#1877F2]/22 ring-[#1877F2]/30 dark:ring-[#1877F2]/45',
+    meta_inbox: 'bg-[#C13584]/12 dark:bg-[#C13584]/22 ring-[#C13584]/30 dark:ring-[#C13584]/45',
     tiktok: 'bg-gray-200/90 dark:bg-white/12 ring-gray-300/60 dark:ring-white/25',
     whatsapp: 'bg-[#25D366]/12 dark:bg-[#25D366]/22 ring-[#25D366]/30 dark:ring-[#25D366]/45',
     sms: 'bg-primary/12 dark:bg-primary/25 ring-primary/25 dark:ring-primary/40',

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAppContext } from '../../context/AppContext';
-import { Modal, Button, TableHorizontalScroll, PhoneText } from '../index';
+import { Modal, Button, TableHorizontalScroll, PhoneText, Loader } from '../index';
 import { useQueryClient } from '@tanstack/react-query';
 import { useUsers, useStatuses, useChannels, useCampaigns, useDevelopers, useProjects, useUnits } from '../../hooks/useQueries';
 import { createLeadAPI } from '../../services/api';
@@ -1423,7 +1423,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
 
         {step === 'importing' && (
           <div className="flex flex-col items-center justify-center py-6">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-3" />
+            <Loader size="lg" variant="primary" className="mb-3" />
             <p className="text-sm text-gray-600 dark:text-gray-400">{t('importing') || 'Importing...'}</p>
           </div>
         )}

@@ -117,7 +117,6 @@ export const TemplateManagementSettings = () => {
             <div className="flex items-center justify-end flex-wrap gap-3">
                 <Button
                     variant="secondary"
-                    disabled={syncingTemplates}
                     onClick={async () => {
                         setSyncingTemplates(true);
                         try {
@@ -140,18 +139,10 @@ export const TemplateManagementSettings = () => {
                         }
                     }}
                     className="min-w-[5rem]"
+                    loading={syncingTemplates}
+                    loadingText={t('syncing')}
                 >
-                    {syncingTemplates ? (
-                        <>
-                            <svg className="w-4 h-4 me-2 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                            </svg>
-                            {t('syncing')}
-                        </>
-                    ) : (
-                        t('sync')
-                    )}
+                    {t('sync')}
                 </Button>
                 <Button onClick={() => { setEditingTemplate(null); setIsEditTemplateOpen(true); }}>
                     <PlusIcon className="w-4 h-4 me-2" /> {t('addTemplate')}
@@ -186,7 +177,7 @@ export const TemplateManagementSettings = () => {
                                     <td colSpan={6} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                                         {templates.length === 0
                                             ? t('noTemplates')
-                                            : `${t('search')} — ${t('noResultsFound')}`}
+                                            : `${t('search')} â€” ${t('noResultsFound')}`}
                                     </td>
                                 </tr>
                             ) : (
@@ -210,7 +201,7 @@ export const TemplateManagementSettings = () => {
                                                     {isWa ? t('campaignViaWhatsApp') : t('campaignViaSms')}
                                                 </span>
                                             </td>
-                                            <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{categoryDisplay || '—'}</td>
+                                            <td className="py-3 px-4 text-center text-sm text-gray-900 dark:text-white">{categoryDisplay || 'â€”'}</td>
                                             <td className="py-3 px-4 text-center">
                                                 <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${metaStatus === 'APPROVED' ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300' : metaStatus === 'REJECTED' ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300' : metaStatus === 'NOT_ON_WABA' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300' : metaStatus === 'PENDING' ? 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-300' : isWa ? 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' : 'bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300'}`}>
                                                     {metaStatus === 'APPROVED'
@@ -232,7 +223,8 @@ export const TemplateManagementSettings = () => {
                                                         <Button
                                                             variant="secondary"
                                                             className="text-xs text-green-600 dark:text-green-400 border-green-300 dark:border-green-600 shrink-0 min-w-[7rem]"
-                                                            disabled={submittingTemplateId === tpl.id}
+                                                            loading={submittingTemplateId === tpl.id}
+                                                            loadingText={t('submittingToWhatsApp')}
                                                             onClick={async () => {
                                                                 setSubmittingTemplateId(tpl.id);
                                                                 try {
@@ -246,17 +238,7 @@ export const TemplateManagementSettings = () => {
                                                                 }
                                                             }}
                                                         >
-                                                            {submittingTemplateId === tpl.id ? (
-                                                                <>
-                                                                    <svg className="w-4 h-4 me-1.5 animate-spin shrink-0" fill="none" viewBox="0 0 24 24" aria-hidden="true">
-                                                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                                                                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                                                                    </svg>
-                                                                    {t('submittingToWhatsApp')}
-                                                                </>
-                                                            ) : (
-                                                                t('submitToWhatsApp')
-                                                            )}
+                                                            {t('submitToWhatsApp')}
                                                         </Button>
                                                     )}
                                                     <div className="inline-flex items-center gap-0.5 border border-gray-200 dark:border-gray-600 rounded-lg overflow-hidden bg-white dark:bg-gray-800 shrink-0">
@@ -270,7 +252,7 @@ export const TemplateManagementSettings = () => {
                                                                 aria-label={t('templateCloneToChannel').replace('{channel}', cloneTargetLabel)}
                                                             >
                                                                 {cloningTemplateId === tpl.id ? (
-                                                                    <Loader variant="primary" className="w-4 h-4" />
+                                                                    <Loader size="sm" variant="primary" />
                                                                 ) : (
                                                                     <IntegrationPlatformIcon platform={isWa ? 'sms' : 'whatsapp'} size="sm" variant="inline" />
                                                                 )}

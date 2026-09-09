@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState, PaymentResultBanner } from '../components/index';
+import { PageWrapper, Card, Button, Loader, Alert, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState, PaymentResultBanner } from '../components/index';
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI, cancelPendingPlanChangeAPI, getMyCompanyInvoicesAPI, downloadMyInvoicePdfAPI, type CompanyInvoiceListItem } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
 import { formatDaysRemainingLabel, isFreeTrialPlan } from '../utils/planEntitlements';
@@ -874,9 +874,7 @@ export const BillingPage = () => {
             >
                 <div className="space-y-4">
                     {formErrors.general && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                            {formErrors.general}
-                        </div>
+                        <Alert variant="error">{formErrors.general}</Alert>
                     )}
                     <p className="text-gray-600 dark:text-gray-400">
                         {t('selectPaymentMethodForRenewal') || 'Select a payment method to renew your subscription'}
@@ -910,9 +908,10 @@ export const BillingPage = () => {
                         <Button
                             onClick={handleRenewSubscription}
                             loading={isRenewing}
-                            disabled={!selectedGateway || isRenewing}
+                            loadingText={t('processing')}
+                            disabled={!selectedGateway}
                         >
-                            {isRenewing ? (t('processing') || 'Processing...') : (t('proceedToPayment') || 'Proceed to Payment')}
+                            {t('proceedToPayment')}
                         </Button>
                     </div>
                 </div>
@@ -930,9 +929,7 @@ export const BillingPage = () => {
             >
                 <div className="space-y-6">
                     {formErrors.general && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                            {formErrors.general}
-                        </div>
+                        <Alert variant="error">{formErrors.general}</Alert>
                     )}
                     {formErrors.plan && (
                         <p className="text-sm text-red-600 dark:text-red-400">{formErrors.plan}</p>
@@ -1150,7 +1147,7 @@ export const BillingPage = () => {
                                 })()
                             }
                         >
-                            {isRenewing ? (t('processing') || 'Processing...') : (t('changePlan') || 'Change Plan')}
+                            {t('changePlan')}
                         </Button>
                     </div>
                 </div>

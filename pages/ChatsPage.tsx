@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { IntegrationPlatformIcon } from '../components/integrations/IntegrationPlatformIcon';
 import { PageHelpVideoButton } from '../components/PageHelpVideoButton';
-import { ChatToast } from '../components/ChatToast';
 import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
 import {
   buildChatMediaAlbum,
@@ -109,6 +108,7 @@ export const ChatsPage: React.FC = () => {
     setIsConfirmDeleteModalOpen,
     openCallsFiltered,
     hasSupervisorPermission,
+    showToast,
   } = useAppContext();
   const whatsappCalling = useWhatsAppCallingOptional();
   const chatsAllowed = useWhatsAppChatsAllowed();
@@ -188,7 +188,6 @@ export const ChatsPage: React.FC = () => {
   const [chatTemplateSendId, setChatTemplateSendId] = useState<number | ''>('');
   const [chatTemplateSending, setChatTemplateSending] = useState(false);
   const [isStartNewOpen, setIsStartNewOpen] = useState(false);
-  const [chatToast, setChatToast] = useState<{ message: string; variant: 'error' | 'warning' } | null>(null);
   const [composerAlert, setComposerAlert] = useState<{
     variant: 'error' | 'warning' | 'info';
     message: string;
@@ -513,10 +512,7 @@ export const ChatsPage: React.FC = () => {
       .catch((e: any) => {
         const key = e?.error_key || e?.code;
         if (key === 'whatsapp_contact_not_found' || e?.status === 404) {
-          setChatToast({
-            message: t('whatsappContactNotFound') || 'Contact not found',
-            variant: 'warning',
-          });
+          showToast(t('whatsappContactNotFound') || 'Contact not found', { variant: 'warning' });
           setSelectedChatClient(null);
         }
       });
@@ -779,7 +775,6 @@ export const ChatsPage: React.FC = () => {
   };
 
   const selectChatClient = (client: any) => {
-    setChatToast(null);
     setComposerAlert(null);
     setPendingAttachment(null);
     setPendingIsVoiceNote(false);
@@ -846,19 +841,13 @@ export const ChatsPage: React.FC = () => {
           return;
         }
         if (isStaff) {
-          setChatToast({
-            message: t('whatsappContactNotFound') || 'Contact not found',
-            variant: 'warning',
-          });
+          showToast(t('whatsappContactNotFound') || 'Contact not found', { variant: 'warning' });
           return;
         }
       } catch (e: any) {
         const key = e?.error_key || e?.code;
         if (key === 'whatsapp_contact_not_found' || e?.status === 404) {
-          setChatToast({
-            message: t('whatsappContactNotFound') || 'Contact not found',
-            variant: 'warning',
-          });
+          showToast(t('whatsappContactNotFound') || 'Contact not found', { variant: 'warning' });
           return;
         }
       }
@@ -893,7 +882,7 @@ export const ChatsPage: React.FC = () => {
       return;
     }
     if (key === 'whatsapp_contact_not_found') {
-      setChatToast({ message: t('whatsappContactNotFound') || 'Contact not found', variant: 'warning' });
+      showToast(t('whatsappContactNotFound') || 'Contact not found', { variant: 'warning' });
       return;
     }
     if (key === 'whatsapp_voice_note_requires_ogg') {
@@ -1531,13 +1520,6 @@ export const ChatsPage: React.FC = () => {
         sending={shareLocationSending}
         t={t}
       />
-      {chatToast && (
-        <ChatToast
-          message={chatToast.message}
-          variant={chatToast.variant}
-          onDismiss={() => setChatToast(null)}
-        />
-      )}
       {mediaViewer && mediaViewer.items.length > 0 ? (
         <ChatMediaViewer
           items={mediaViewer.items}

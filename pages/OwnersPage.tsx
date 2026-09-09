@@ -149,7 +149,7 @@ export const OwnersPage = () => {
         return (
             <PageWrapper title={t('owners')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
+                    <Loader size="lg" variant="primary"/>
                 </div>
             </PageWrapper>
         );

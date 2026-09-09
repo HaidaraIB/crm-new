@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { Loader } from '../components/Loader';
 import { getCompanyRoute } from '../utils/routing';
 import {
   BASE_URL,
@@ -169,7 +170,7 @@ const ImpersonatePage: React.FC = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
         <div className="text-center max-w-sm px-4">
-          <div className="inline-block w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
+          <Loader size="lg" variant="primary" className="mb-4" />
           <p className="text-gray-700 dark:text-gray-300 font-medium mb-1">Switching account</p>
           <p className="text-sm text-gray-500 dark:text-gray-400">
             Signing in as the company owner…
@@ -198,7 +199,7 @@ const ImpersonatePage: React.FC = () => {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
       <div className="text-center">
-        <div className="inline-block w-10 h-10 border-4 border-primary-500 border-t-transparent rounded-full animate-spin mb-4" />
+        <Loader size="lg" variant="primary" className="mb-4" />
         <p className="text-gray-600 dark:text-gray-400">Redirecting to dashboard…</p>
       </div>
     </div>

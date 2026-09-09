@@ -22,6 +22,7 @@ export * from './CreateDealPage';
 export * from './EditDealPage';
 export * from './CreateLeadPage';
 export * from './CallCenterPage';
+export * from './InboxPage';
 export * from './ArrivalsPage';
 export * from './EditLeadPage';
 export * from './UsersPage';

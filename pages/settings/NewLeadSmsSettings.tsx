@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { SectionLoadingState } from '../../components/SectionLoadingState';
 import { Card, Button } from '../../components/index';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import {
@@ -178,7 +179,7 @@ export const NewLeadSmsSettings = () => {
     if (loading) {
         return (
             <Card>
-                <p className="text-sm text-gray-600 dark:text-gray-400 py-6">{t('loading') || 'Loading…'}</p>
+                <SectionLoadingState className="py-6" />
             </Card>
         );
     }
@@ -332,8 +333,8 @@ export const NewLeadSmsSettings = () => {
 
                 {errors.general ? <p className="text-sm text-red-600 dark:text-red-400">{errors.general}</p> : null}
 
-                <Button type="button" onClick={handleSave} disabled={saving}>
-                    {saving ? t('loading') || 'Saving…' : t('saveSettings')}
+                <Button type="button" onClick={handleSave} loading={saving} loadingText={t('saving')}>
+                    {t('saveSettings')}
                 </Button>
             </div>
         </Card>

@@ -34,6 +34,19 @@ The lead **Timeline** on web (`CRM-project`) and mobile (`crm_mobile`) must stay
 - Default **collapsed** (do not auto-expand all threads).
 - Web: **Open in Chats** when Messaging Center exists. Mobile: omit until an in-app WA chats screen exists (do not invent a divergent deep link).
 
+## Social quieter timeline (required parity)
+
+Instagram DM / Messenger, from `GET /integrations/inbox/lead-messages/?client=`.
+
+- Map each social message with `direction`, plus `socialChannel` and `socialConversationId` from the row.
+- Collapse consecutive `social` rows into one `social_thread` / `socialThread` card (`collapseConsecutiveSocialThreads`), run **after** the WhatsApp collapse on the same merged list.
+- **A change of conversation breaks the group**, unlike WhatsApp which groups on adjacency alone. A lead can hold an Instagram DM and a Messenger thread at once; merging them would file two strangers under one heading.
+- Thread card: pink chip labelled with the **network** (Instagram / Messenger, not "Inbox"), conversation title + count, latest-message preview, expand/collapse compact `←`/`→` lines. Default **collapsed**.
+- `stage` holds the contact handle, not a phone — do **not** apply `PhoneText` / `forceLtr` to it.
+- Media-only messages have an empty body; both platforms substitute a placeholder (`localizeSocialMessageBody` / `social_message_body_localize.dart`).
+- Both platforms link to the Inbox **list**, not a preselected thread: web `t('socialTimelineOpenInbox')` → `goToPage('Inbox')`, mobile `onOpenSocialInbox` → `SocialInboxListScreen`, each gated on inbox access.
+- The endpoint is gated on the inbox ACL, so reception/data entry get 403. Both clients treat that as "no social entries", never as an error.
+
 ## Rules of thumb
 
 - Same event sources and sort key (`timestamp`); same SharedPreferences/localStorage sort preference name when possible (`leadTimelineSortOrder`).

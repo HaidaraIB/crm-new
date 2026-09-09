@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -116,9 +117,7 @@ export const EditDeveloperModal = () => {
         <Modal isOpen={isEditDeveloperModalOpen} onClose={handleClose} title={`${t('edit')} ${t('developer')}`}>
             <form onSubmit={handleSubmit} className="space-y-4">
                 {errors._general && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                        {errors._general}
-                    </div>
+                    <Alert variant="error">{errors._general}</Alert>
                 )}
                 <div>
                     <Label htmlFor="name">{t('developerName')} <span className="text-red-500">*</span></Label>

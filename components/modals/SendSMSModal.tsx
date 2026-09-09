@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
@@ -153,9 +154,7 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
                     )}
                 </div>
                 {errors.general && (
-                    <div className="p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-sm text-red-600 dark:text-red-400">
-                        {errors.general}
-                    </div>
+                    <Alert variant="error">{errors.general}</Alert>
                 )}
                 <div className="flex justify-end gap-2">
                     <Button variant="secondary" onClick={handleClose} disabled={sending}>{t('cancel')}</Button>

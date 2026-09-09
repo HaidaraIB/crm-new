@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Alert } from '../Alert';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
@@ -163,9 +164,7 @@ export const DeactivateEmployeeModal = () => {
         >
             <div className="space-y-4">
                 {errorMessage && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                        {errorMessage}
-                    </div>
+                    <Alert variant="error">{errorMessage}</Alert>
                 )}
                 <p>{bodyText}</p>
                 {showLeadReassignOptions && leadsCount > 0 && (

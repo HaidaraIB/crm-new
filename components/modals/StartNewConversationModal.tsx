@@ -127,7 +127,7 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
               disabled={!manualPhone.trim() || startingPhone}
               className="px-3 py-2 rounded bg-primary text-white text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {startingPhone ? '…' : t('start') || 'Start'}
+              {startingPhone ? 'â€¦' : t('start') || 'Start'}
             </button>
           </div>
           {errors.phone && (
@@ -143,7 +143,7 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
         />
         <div className="max-h-80 overflow-y-auto custom-scrollbar border border-gray-200 dark:border-gray-600 rounded-lg">
           {loading ? (
-            <div className="flex justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+            <div className="flex justify-center py-8"><Loader size="md" variant="primary" /></div>
           ) : clients.length === 0 ? (
             <p className="p-4 text-sm text-gray-500 dark:text-gray-400 text-center">{t('noAccountsConnected') || 'No clients'}</p>
           ) : (

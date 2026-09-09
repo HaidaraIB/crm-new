@@ -1,3 +1,4 @@
+import { Alert } from '../Alert';
 
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -74,9 +75,7 @@ export const ConfirmDeleteModal: React.FC<ConfirmDeleteModalProps> = ({
         <Modal isOpen={isOpen} onClose={handleClose} title={title} overlayClassName="z-[110]">
             <div className="space-y-4">
                 {errorMessage && (
-                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-300 px-4 py-3 rounded-md text-sm">
-                        {errorMessage}
-                    </div>
+                    <Alert variant="error">{errorMessage}</Alert>
                 )}
                 <p className="text-gray-700 dark:text-gray-300">
                     {itemName ? (

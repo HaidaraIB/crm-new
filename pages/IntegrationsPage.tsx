@@ -1,9 +1,7 @@
-
-
 import React, { useMemo, useEffect, useState, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input, PhoneText, isPhoneLike } from '../components/index';
+import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, Alert, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input, PhoneText, isPhoneLike } from '../components/index';
 import { IntegrationPlatformIcon, integrationPlatformFromDataKey, integrationIconInAccentButtonClass, marketingAccentIconClass } from '../components/integrations/IntegrationPlatformIcon';
 import { CheckIcon, EyeIcon, EyeOffIcon } from '../components/icons';
 import { Page, getUserDisplayName } from '../types';
@@ -42,7 +40,6 @@ import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
 import { LeadApiDocumentation } from '../components/integrations/LeadApiDocumentation';
 import { leadApiDocT } from '../constants/leadApiDocumentation';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { ChatToast } from '../components/ChatToast';
 import { CampaignLeadPicker } from '../components/campaign/CampaignLeadPicker';
 import {
     isManualChatClient,
@@ -60,8 +57,11 @@ import {
     type ManualChatMessage,
 } from '../utils/whatsappManualChatsStorage';
 import { normalizeRole } from '../utils/roles';
+import { SocialInboxSection } from '../components/integrations/SocialInboxSection';
 import { clearFieldError } from '../utils/formFieldErrors';
 import { localizeMetaTokenError } from '../utils/metaTokenErrorDisplay';
+import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
+import { getSocialConnectionsAPI } from '../services/api';
 
 type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown>; is_active?: boolean };
 
@@ -444,7 +444,7 @@ function TwilioSMSForm({
                 {success && <p className="text-sm text-green-600 dark:text-green-400">{t('saveSucceeded')}</p>}
 
                 <Button onClick={handleSave} disabled={saving || selectedProviderPolicyDisabled}>
-                    {saving ? <Loader variant="primary" className="h-4 w-4" /> : t('save')}
+                    {saving ? <Loader size="sm" variant="primary" /> : t('save')}
                 </Button>
             </div>
         </Card>
@@ -608,9 +608,7 @@ function OpenAISettingsForm({
                 </div>
 
                 {openaiPolicyDisabled && (
-                    <div className="rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
-                        {openaiPolicyMessage || t('integrationDisabledDefaultMessage')}
-                    </div>
+                    <Alert variant="warning">{openaiPolicyMessage || t('integrationDisabledDefaultMessage')}</Alert>
                 )}
 
                 {lastError ? (
@@ -714,19 +712,13 @@ function OpenAISettingsForm({
                 </div>
 
                 {errors.general && (
-                    <div className="rounded-lg border px-4 py-3 text-sm bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
-                        {errors.general}
-                    </div>
+                    <Alert variant="error">{errors.general}</Alert>
                 )}
                 {testStatus === 'success' && testMessage ? (
-                    <div className="rounded-lg border px-4 py-3 text-sm bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200">
-                        {testMessage}
-                    </div>
+                    <Alert variant="success">{testMessage}</Alert>
                 ) : null}
                 {testStatus === 'error' && testMessage ? (
-                    <div className="rounded-lg border px-4 py-3 text-sm bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200">
-                        {testMessage}
-                    </div>
+                    <Alert variant="error">{testMessage}</Alert>
                 ) : null}
                 {running && (
                     <p className="text-sm text-gray-600 dark:text-gray-400">{t('aiAnalysisRunning')}</p>
@@ -785,10 +777,11 @@ export const IntegrationsPage = () => {
         setAlertMessage,
         setAlertVariant,
         setIsAlertModalOpen,
+        showToast,
     } = useAppContext();
 
     const companyId = currentUser?.company?.id as number | string | undefined;
-    /** { اسم الموظف } signs with the sender — matches the API's send-time rule. */
+    /** { Ø§Ø³Ù… Ø§Ù„Ù…ÙˆØ¸Ù } signs with the sender â€” matches the API's send-time rule. */
     const senderName = currentUser ? getUserDisplayName(currentUser) : '';
 
     const showAlert = (message: React.ReactNode, variant: 'info' | 'warning' | 'error' = 'info') => {
@@ -905,7 +898,6 @@ export const IntegrationsPage = () => {
     const manualChatsHydratedRef = useRef(false);
     const [selectedChatClient, setSelectedChatClient] = useState<any>(null);
     const [optimisticMessages, setOptimisticMessages] = useState<ManualChatMessage[]>([]);
-    const [chatToast, setChatToast] = useState<{ message: string; variant: 'error' | 'warning' } | null>(null);
     const [deletingMessageId, setDeletingMessageId] = useState<string | null>(null);
 
     // Staff must not stay on Accounts if role/localStorage left them there.
@@ -915,7 +907,7 @@ export const IntegrationsPage = () => {
         }
     }, [isEmployee, whatsAppTab]);
 
-    // Staff no longer use Integrations → WhatsApp for chats; send them to Chats.
+    // Staff no longer use Integrations â†’ WhatsApp for chats; send them to Chats.
     useEffect(() => {
         if (isEmployee && currentPage === 'WhatsApp') {
             setCurrentPage('Chats');
@@ -1054,6 +1046,23 @@ export const IntegrationsPage = () => {
     const [metaPixelDrafts, setMetaPixelDrafts] = useState<Record<number, string>>({});
     const [metaPixelSavingId, setMetaPixelSavingId] = useState<number | null>(null);
     const [metaPixelSavedId, setMetaPixelSavedId] = useState<number | null>(null);
+    // Lead Ads and the Inbox are two different Meta apps that happen to share a
+    // page. Tabs keep each one's account list whole instead of stacking two
+    // unrelated cards and making the page read as one broken integration.
+    const [metaTab, setMetaTab] = useState<'leadAds' | 'inbox'>('leadAds');
+
+    // Shares the React Query cache with SocialInboxSection (same key, so no extra
+    // request). The page needs the account id to run the inbox through the very
+    // same create-then-popup flow as Lead Ads instead of a second, divergent one.
+    const { data: socialInboxData } = useQuery({
+        queryKey: ['socialInboxConnections'],
+        queryFn: getSocialConnectionsAPI,
+        // 403 here just means "not the owner" â€” no point retrying.
+        retry: false,
+        enabled:
+            !isEmployee && (currentPage === 'Meta' || currentPage === 'Integrations'),
+    });
+    const socialInboxAccount = socialInboxData?.account ?? null;
     const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template' | 'logs' | 'requests'>(() => {
         try {
             const s = localStorage.getItem('messaging_center_tab');
@@ -1155,7 +1164,7 @@ export const IntegrationsPage = () => {
         }));
     }, [accountsResponse]);
 
-    // Tenant-level WhatsApp connectivity — independent of which platform tab is open.
+    // Tenant-level WhatsApp connectivity â€” independent of which platform tab is open.
     const { isConnected: hasConnectedWhatsApp } = useWhatsAppConnected();
 
     // Get platform details (memoized)
@@ -1349,7 +1358,7 @@ export const IntegrationsPage = () => {
                             </div>
                         </div>
                         {mujebLoading ? (
-                            <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                            <div className="flex items-center justify-center py-8"><Loader size="md" variant="primary" /></div>
                         ) : (
                             <>
                                 <div>
@@ -1469,7 +1478,7 @@ export const IntegrationsPage = () => {
                                                 const dateOpts = withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' });
                                                 const createdLabel = k.created_at
                                                     ? new Date(k.created_at).toLocaleString(dateLocale, dateOpts)
-                                                    : '—';
+                                                    : 'â€”';
                                                 const lastUsedLabel = k.last_used_at
                                                     ? new Date(k.last_used_at).toLocaleString(dateLocale, dateOpts)
                                                     : t('leadApiKeyNeverUsed');
@@ -1493,7 +1502,7 @@ export const IntegrationsPage = () => {
                                                                     >
                                                                         <span className="text-gray-900 dark:text-gray-100">{k.key_prefix}</span>
                                                                         <span className="text-gray-400 dark:text-gray-500 select-none tracking-wider">
-                                                                            {'•'.repeat(12)}
+                                                                            {'â€¢'.repeat(12)}
                                                                         </span>
                                                                         {k.key_suffix ? (
                                                                             <span className="text-gray-900 dark:text-gray-100">{k.key_suffix}</span>
@@ -1725,7 +1734,7 @@ export const IntegrationsPage = () => {
                             </div>
                         </div>
                         {leadApiLoading ? (
-                            <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                            <div className="flex items-center justify-center py-8"><Loader size="md" variant="primary" /></div>
                         ) : (
                             <>
                                 <div>
@@ -1826,7 +1835,7 @@ export const IntegrationsPage = () => {
                                                 const dateOpts = withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' });
                                                 const createdLabel = k.created_at
                                                     ? new Date(k.created_at).toLocaleString(dateLocale, dateOpts)
-                                                    : '—';
+                                                    : 'â€”';
                                                 const lastUsedLabel = k.last_used_at
                                                     ? new Date(k.last_used_at).toLocaleString(dateLocale, dateOpts)
                                                     : t('leadApiKeyNeverUsed');
@@ -1850,7 +1859,7 @@ export const IntegrationsPage = () => {
                                                                     >
                                                                         <span className="text-gray-900 dark:text-gray-100">{k.key_prefix}</span>
                                                                         <span className="text-gray-400 dark:text-gray-500 select-none tracking-wider">
-                                                                            {'•'.repeat(12)}
+                                                                            {'â€¢'.repeat(12)}
                                                                         </span>
                                                                         {k.key_suffix ? (
                                                                             <span className="text-gray-900 dark:text-gray-100">{k.key_suffix}</span>
@@ -1972,7 +1981,7 @@ export const IntegrationsPage = () => {
             : null;
         const setupSteps = [
             { step: 1, text: t('tiktokStep1') || 'Copy the Webhook URL below (it is unique to your company).' },
-            { step: 2, text: t('tiktokStep2') || 'In TikTok Ads Manager go to Leads Center → CRM integration → TikTok Custom API with Webhooks.' },
+            { step: 2, text: t('tiktokStep2') || 'In TikTok Ads Manager go to Leads Center â†’ CRM integration â†’ TikTok Custom API with Webhooks.' },
             { step: 3, text: t('tiktokStep3') || 'Paste the Webhook URL and save. Enable the integration if required.' },
             { step: 4, text: t('tiktokStep4') || 'Create a Lead Gen campaign with an Instant Form. New leads will appear as clients here automatically.' },
         ];
@@ -2009,7 +2018,7 @@ export const IntegrationsPage = () => {
                             </div>
                         </div>
                         {leadgenLoading ? (
-                            <div className="flex items-center justify-center py-8"><Loader variant="primary" className="h-8" /></div>
+                            <div className="flex items-center justify-center py-8"><Loader size="md" variant="primary" /></div>
                         ) : (
                             <>
                                 <div>
@@ -2230,7 +2239,14 @@ export const IntegrationsPage = () => {
     };
 
     const handleDelete = (accountId: number) => {
-        const account = accounts.find((acc: Account) => acc.id === accountId);
+        // The inbox account lives in its own query, not in `accounts` â€” look there
+        // too so the Inbox tab disconnects through this same confirm-then-revoke
+        // path instead of a parallel one.
+        const account: Account | undefined =
+            accounts.find((acc: Account) => acc.id === accountId) ??
+            (socialInboxAccount?.id === accountId
+                ? { ...socialInboxAccount, platform: 'meta_inbox' }
+                : undefined);
         if (account) {
             setConfirmDeleteConfig({
                 title: t('disconnect') || 'Disconnect Account',
@@ -2239,6 +2255,7 @@ export const IntegrationsPage = () => {
                 onConfirm: async () => {
                     try {
                         await disconnectAccountMutation.mutateAsync(accountId);
+                        invalidateAccountQueries();
                     } catch (error: any) {
                         console.error('Error disconnecting account:', error);
                         showAlert(error?.message || t('errorDeletingAccount') || 'Failed to disconnect account', 'error');
@@ -2249,8 +2266,20 @@ export const IntegrationsPage = () => {
         }
     };
 
-    const finalizeOAuthConnect = (accountId: number) => {
+    /**
+     * Every OAuth outcome can move either account list.
+     *
+     * The inbox is a separate query from `connectedAccounts` (separate endpoint,
+     * separate Meta app), so refreshing only the latter would leave a freshly
+     * connected Page invisible until a manual reload.
+     */
+    const invalidateAccountQueries = () => {
         queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+        queryClient.invalidateQueries({ queryKey: ['socialInboxConnections'] });
+    };
+
+    const finalizeOAuthConnect = (accountId: number) => {
+        invalidateAccountQueries();
         if (platformParam === 'meta') {
             getConnectedAccountsAPI(platformParam).then((accounts: any) => {
                 const list = Array.isArray(accounts) ? accounts : accounts?.results || [];
@@ -2333,7 +2362,7 @@ export const IntegrationsPage = () => {
                 if (event.data?.type === 'oauth_failed') {
                     window.removeEventListener('message', handleMessage);
                     releaseConnectLock(accountId);
-                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                    invalidateAccountQueries();
                 }
             };
             window.addEventListener('message', handleMessage);
@@ -2342,7 +2371,7 @@ export const IntegrationsPage = () => {
                     clearInterval(poll);
                     window.removeEventListener('message', handleMessage);
                     releaseConnectLock(accountId);
-                    queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                    invalidateAccountQueries();
                 }
             }, 500);
         } catch (error: any) {
@@ -2419,7 +2448,45 @@ export const IntegrationsPage = () => {
         setIsManageIntegrationAccountModalOpen(true);
     };
 
+    /**
+     * Connect Instagram & Messenger exactly the way Lead Ads connects: create the
+     * account if it does not exist yet, then hand off to `openConnectPopup`.
+     *
+     * The popup is the point. Assigning `window.location` sends the owner off the
+     * CRM mid-task and drops them back on a cold page, and the callback's
+     * `postMessage` handshake â€” which is what refreshes the row in place â€” only
+     * exists because the dialog runs in a child window.
+     */
+    const handleConnectInbox = async () => {
+        if (connectingAccountIdRef.current != null || isStartingConnect) return;
+        let accountId: number | null = socialInboxAccount?.id ?? null;
+        if (accountId == null) {
+            setIsStartingConnect(true);
+            try {
+                const created = await createAccountMutation.mutateAsync({
+                    platform: 'meta_inbox',
+                    name: t('connectInstagramMessenger'),
+                });
+                accountId = created?.id ?? null;
+            } catch (error: any) {
+                showAlert(error?.message || t('errorSavingAccount'), 'error');
+                return;
+            } finally {
+                setIsStartingConnect(false);
+            }
+        }
+        if (accountId != null) setPendingConnectAccountId(accountId);
+    };
+
     const handleAddNew = async () => {
+        if (metaTab === 'inbox') {
+            if (socialInboxAccount) {
+                showAlert(t('oneIntegrationAccountPerPlatformHint'), 'info');
+                return;
+            }
+            void handleConnectInbox();
+            return;
+        }
         if (accounts.length > 0) {
             showAlert(t('oneIntegrationAccountPerPlatformHint'), 'info');
             return;
@@ -2446,7 +2513,7 @@ export const IntegrationsPage = () => {
         setIsManageIntegrationAccountModalOpen(true);
     };
 
-    // WhatsApp settings or Messaging Center (Marketing) — Chats live in ChatsPage
+    // WhatsApp settings or Messaging Center (Marketing) â€” Chats live in ChatsPage
     const isMessagingCenterPage = currentPage === 'Messaging Center';
     if (currentPage === 'WhatsApp' || isMessagingCenterPage) {
         const ensureManualConversationListed = (client: any) => {
@@ -2468,7 +2535,6 @@ export const IntegrationsPage = () => {
         };
 
         const selectChatClient = (client: any) => {
-            setChatToast(null);
             setSelectedChatClient(client);
             const phone = normalizeChatPhone(client);
             if (isManualChatClient(client)) {
@@ -2554,10 +2620,7 @@ export const IntegrationsPage = () => {
         const handleOutboundSendError = (client: any, msgId: string, e: unknown, restoreText?: string) => {
             patchChatMessageStatus(client, msgId, 'failed');
             if (restoreText !== undefined) setMessageInput(restoreText);
-            setChatToast({
-                message: resolveLocalizedApiError(e as { data?: unknown; message?: string }, t, t('chatMessageFailed')),
-                variant: 'error',
-            });
+            showToast(resolveLocalizedApiError(e as { data?: unknown; message?: string }, t, t('chatMessageFailed')), { variant: 'error' });
         };
 
         const sendOutboundMessage = async (
@@ -2611,10 +2674,7 @@ export const IntegrationsPage = () => {
                             removeChatMessage(selectedChatClient, idStr);
                         }
                     } catch (e: unknown) {
-                        setChatToast({
-                            message: resolveLocalizedApiError(e as { data?: unknown; message?: string }, t, t('error')),
-                            variant: 'error',
-                        });
+                        showToast(resolveLocalizedApiError(e as { data?: unknown; message?: string }, t, t('error')), { variant: 'error' });
                     } finally {
                         setDeletingMessageId(null);
                     }
@@ -2685,7 +2745,7 @@ export const IntegrationsPage = () => {
                         previewBody: msg.body,
                     });
                 } else if (msg.sendKind === 'template') {
-                    setChatToast({ message: t('selectApprovedTemplate') || 'Select an approved template', variant: 'warning' });
+                    showToast(t('selectApprovedTemplate') || 'Select an approved template', { variant: 'warning' });
                 } else {
                     await sendOutboundMessage(selectedChatClient, msg.id, { kind: 'text', body: msg.body });
                 }
@@ -2897,7 +2957,7 @@ export const IntegrationsPage = () => {
 
             showAlert(
                 t('campaignComplete') +
-                    ' — ' +
+                    ' â€” ' +
                     t('campaignSentCount').replace('{sent}', String(sent)).replace('{failed}', String(failed)),
                 failed > 0 && sent === 0 ? 'warning' : 'info',
             );
@@ -3351,19 +3411,19 @@ export const IntegrationsPage = () => {
                                     )}
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 mt-1">{t('messageContent')}</label>
                                     <textarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={6} placeholder={t('messageContent')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y" />
-                                    {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppMessagingLimit')}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier} {t('conversationsPerDay')}{whatsAppLimits.quality_rating && ` · ${t('quality')}: ${whatsAppLimits.quality_rating}`}</p>}
+                                    {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppMessagingLimit')}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier} {t('conversationsPerDay')}{whatsAppLimits.quality_rating && ` Â· ${t('quality')}: ${whatsAppLimits.quality_rating}`}</p>}
                                     {campaignProgress !== null && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}</p>}
                                     {isRestrictedCampaignRole ? (
                                         <Button className="mt-3" onClick={handleSubmitCampaignRequest} disabled={campaignRequestSubmitting}>
                                             {campaignRequestSubmitting ? (
-                                                <><Loader variant="primary" className="w-4 h-4 me-2" /> {t('campaignSending')}</>
+                                                <><Loader size="sm" variant="primary" className="me-2" /> {t('campaignSending')}</>
                                             ) : (
                                                 <>{editingCampaignRequestId ? t('campaignEditAndResubmit') : t('messagingCenterSubmitForApproval')} ({campaignSelectedIds.size})</>
                                             )}
                                         </Button>
                                     ) : (
                                         <Button className="mt-3" onClick={handleCampaignSend} disabled={campaignSending}>
-                                            {campaignSending ? <><Loader variant="primary" className="w-4 h-4 me-2" /> {t('campaignSending')}</> : <>{t('sendToSelected')} ({campaignSelectedIds.size})</>}
+                                            {campaignSending ? <><Loader size="sm" variant="primary" className="me-2" /> {t('campaignSending')}</> : <>{t('sendToSelected')} ({campaignSelectedIds.size})</>}
                                         </Button>
                                     )}
                                 </div>
@@ -3411,7 +3471,7 @@ export const IntegrationsPage = () => {
             );
         }
 
-        // Integrations → WhatsApp: account settings only (chats are on ChatsPage)
+        // Integrations â†’ WhatsApp: account settings only (chats are on ChatsPage)
         const whatsAppTitleIcon = (
             <IntegrationPlatformIcon platform="whatsapp" size="md" variant="inline" />
         );
@@ -3472,7 +3532,7 @@ export const IntegrationsPage = () => {
                                                             className="ms-2 text-amber-600 dark:text-amber-400"
                                                             title={t('enableWhatsAppCallingCoexistenceHint')}
                                                         >
-                                                            · {t('whatsappCoexistenceBadge')}
+                                                            Â· {t('whatsappCoexistenceBadge')}
                                                         </span>
                                                     ) : null}
                                                 </span>
@@ -3563,6 +3623,12 @@ export const IntegrationsPage = () => {
         );
     }
 
+    // Instagram & Messenger runs on its own Meta app, so it gets its own tab
+    // rather than joining the Meta Lead Ads account list.
+    const showInboxTab =
+        (currentPage === 'Meta' || currentPage === 'Integrations') && !isEmployee;
+    const onInboxTab = showInboxTab && metaTab === 'inbox';
+
     return (
         <PageWrapper
             title={pageTitle}
@@ -3574,6 +3640,43 @@ export const IntegrationsPage = () => {
             }
         >
             {renderPolicyBanner()}
+
+            {showInboxTab && (
+                <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+                    <nav className="-mb-px flex gap-6 overflow-x-auto" aria-label="Tabs">
+                        <button
+                            type="button"
+                            onClick={() => setMetaTab('leadAds')}
+                            className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                                metaTab === 'leadAds' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                            }`}
+                        >
+                            {t('metaTabLeadAds')}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setMetaTab('inbox')}
+                            className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                                metaTab === 'inbox' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                            }`}
+                        >
+                            {t('connectInstagramMessenger')}
+                        </button>
+                    </nav>
+                </div>
+            )}
+
+            {onInboxTab && (
+                <SocialInboxSection
+                    onConnect={handleConnectInbox}
+                    onEdit={handleEdit}
+                    onDisconnect={handleDelete}
+                    connectingAccountId={connectingAccountId}
+                    isStartingConnect={isStartingConnect}
+                />
+            )}
+
+            {!onInboxTab && (
             <Card className="overflow-hidden p-0">
                 {accounts.length > 0 ? (
                     <ul className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
@@ -3614,7 +3717,7 @@ export const IntegrationsPage = () => {
                                             {account.status === 'Connected'
                                                 ? t('connected')
                                                 : account.status === 'Expired'
-                                                  ? t('statusExpired') || 'Expired — reconnect required'
+                                                  ? t('statusExpired') || 'Expired â€” reconnect required'
                                                   : t('disconnected')}
                                         </span>
                                     </div>
@@ -3725,7 +3828,8 @@ export const IntegrationsPage = () => {
                     </div>
                 )}
             </Card>
-            
+            )}
+
             {/* Select Lead Form Modal */}
             {selectLeadFormConfig && (
                 <SelectLeadFormModal
@@ -3855,7 +3959,7 @@ export const IntegrationsPage = () => {
                                             <span className={p.app_installed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                                                 {t('appInstalled') || 'App installed'}: {p.app_installed ? t('yes') : t('no')}
                                             </span>
-                                            {' · '}
+                                            {' Â· '}
                                             <span className={p.leadgen_subscribed ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
                                                 {t('leadgenSubscribed') || 'Leadgen subscribed'}: {p.leadgen_subscribed ? t('yes') : t('no')}
                                             </span>

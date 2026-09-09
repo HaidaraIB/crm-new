@@ -214,7 +214,7 @@ export const CampaignsPage = () => {
         return (
             <PageWrapper title={t('campaigns')}>
                 <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader variant="primary" className="h-12"/>
+                    <Loader size="lg" variant="primary"/>
                 </div>
             </PageWrapper>
         );

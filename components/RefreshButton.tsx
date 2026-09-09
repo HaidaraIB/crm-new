@@ -7,7 +7,7 @@ import { useAppContext } from '../context/AppContext';
 type RefreshButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
   /** Button label. Defaults to `t('refresh')`. Ignored when `iconOnly`. */
   children?: React.ReactNode;
-  /** Shows Button loader and disables the control. Combined with the global refresh state. */
+  /** Spins the refresh icon and disables the control. Combined with the global refresh state. */
   loading?: boolean;
   /** Hide the text label below the `sm` breakpoint (icon stays visible). */
   hideLabelOnMobile?: boolean;
@@ -111,13 +111,13 @@ export const RefreshButton = ({
       type={type}
       variant={variant}
       onClick={handleClick}
-      loading={busy}
-      disabled={disabled}
+      disabled={disabled || busy}
       title={tooltip}
+      aria-busy={busy || undefined}
       className={`shrink-0 ${className}`}
       {...props}
     >
-      <RefreshIcon className="size-4" />
+      <RefreshIcon className={`size-4 ${busy ? 'animate-spin' : ''}`} />
       <span className={hideLabelOnMobile ? 'hidden sm:inline' : undefined}>{label}</span>
     </Button>
   );

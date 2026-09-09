@@ -1638,6 +1638,8 @@ export const translations = {
     deleteChatMessageConfirm: "Remove this message from the chat history?",
     deleteConversationConfirm: "Delete this conversation and all its messages?",
     whatsapp_template_not_approved: "This template is not approved in Meta yet. Submit it and sync status, or pick another template.",
+    whatsapp_template_unconverted_placeholders:
+        "This template still has placeholder chips Meta would treat as plain text. Use the editor chips (e.g. { Employee Name }) or remove the braces before submitting.",
     whatsapp_template_parameter_count: "Wrong number of template variables. Check placeholders vs. values.",
     whatsapp_template_parameter_mismatch: "Could not fill template variables from this lead.",
     whatsapp_template_not_found_or_language:
@@ -4508,6 +4510,8 @@ export const translations = {
     deleteChatMessageConfirm: "إزالة هذه الرسالة من سجل المحادثة؟",
     deleteConversationConfirm: "حذف هذه المحادثة وجميع رسائلها؟",
     whatsapp_template_not_approved: "القالب غير معتمد في ميتا بعد. أرسله للمراجعة وحدّث الحالة أو اختر قالباً آخر.",
+    whatsapp_template_unconverted_placeholders:
+        "ما زال القالب يحتوي على عناصر نائبة ستُعاملها ميتا كنص ثابت. استخدم شرائح المحرر (مثل { اسم الموظف }) أو احذف الأقواس قبل الإرسال للمراجعة.",
     whatsapp_template_parameter_count: "عدد متغيرات القالب غير صحيح.",
     whatsapp_template_parameter_mismatch: "تعذر ملء متغيرات القالب من بيانات هذا العميل.",
     whatsapp_template_not_found_or_language:

@@ -30,6 +30,28 @@ export const LEGACY_TEMPLATE_PLACEHOLDER_CHIPS: PlaceholderChip[] = [
   { key: 'templatePlaceholderInvoiceNumber', insertEn: '[Invoice Number]', insertAr: '[رقم_الفاتورة]' },
 ];
 
+function normKey(raw: string): string {
+  // Mirror API `_norm_key`: NFKC, strip bidi/ZWSP (Cf), fold Arabic alef variants, strip harakat.
+  let text = (raw || '').normalize('NFKC');
+  text = Array.from(text)
+    .filter((ch) => {
+      const cp = ch.codePointAt(0) ?? 0;
+      // Unicode category Cf — format chars (bidi marks, ZWSP, etc.)
+      return (
+        (cp < 0x200b || cp > 0x200f) &&
+        cp !== 0x061c &&
+        cp !== 0xfeff &&
+        (cp < 0x202a || cp > 0x202e) &&
+        (cp < 0x2060 || cp > 0x2064) &&
+        (cp < 0x2066 || cp > 0x206f)
+      );
+    })
+    .join('');
+  text = text.replace(/[أإآٱ]/g, 'ا');
+  text = text.replace(/[\u064B-\u065F\u0670\u06D6-\u06ED]/g, '');
+  return text.trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
 const ALIAS_TO_CANONICAL: Record<string, string> = (() => {
   const groups: Record<string, string[]> = {
     customer_name: [
@@ -74,15 +96,11 @@ const ALIAS_TO_CANONICAL: Record<string, string> = (() => {
   const map: Record<string, string> = {};
   for (const [canonical, aliases] of Object.entries(groups)) {
     for (const alias of aliases) {
-      map[alias.normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ')] = canonical;
+      map[normKey(alias)] = canonical;
     }
   }
   return map;
 })();
-
-function normKey(raw: string): string {
-  return (raw || '').normalize('NFKC').trim().toLowerCase().replace(/\s+/g, ' ');
-}
 
 function escapeRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');

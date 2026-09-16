@@ -20,6 +20,10 @@ type Props = {
   onSearchChange: (value: string) => void;
   unreplied: boolean;
   onUnrepliedChange: (value: boolean) => void;
+  totalCount?: number;
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
   conversationStatus?: string;
   isStarred?: boolean;
   isUnsubscribed?: boolean;
@@ -62,6 +66,10 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         onUnrepliedChange={props.onUnrepliedChange}
         t={props.t}
         language={props.language}
+        totalCount={props.totalCount}
+        hasMore={props.hasMore}
+        isFetchingMore={props.isFetchingMore}
+        onLoadMore={props.onLoadMore}
       />
       <ChatThread
         t={props.t}

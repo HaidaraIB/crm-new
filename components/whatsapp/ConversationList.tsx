@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Button, PhoneText, isPhoneLike, PlusIcon } from '../index';
+import { Button, Loader, PhoneText, isPhoneLike, PlusIcon } from '../index';
 import { LeadStatusBadge } from '../LeadStatusDropdown';
 import {
   ClockIcon,
@@ -61,6 +61,11 @@ type Props = {
   onUnrepliedChange: (value: boolean) => void;
   t: (key: keyof typeof translations.en) => string;
   language: string;
+  /** Total matching conversations from API (not just loaded pages). */
+  totalCount?: number;
+  hasMore?: boolean;
+  isFetchingMore?: boolean;
+  onLoadMore?: () => void;
 };
 
 function formatListTime(iso: string | null | undefined, language: string): string {
@@ -104,10 +109,15 @@ export const ConversationList: React.FC<Props> = ({
   onUnrepliedChange,
   t,
   language,
+  totalCount,
+  hasMore = false,
+  isFetchingMore = false,
+  onLoadMore,
 }) => {
   const [menuForId, setMenuForId] = useState<string | null>(null);
   const [submenu, setSubmenu] = useState<'status' | 'snooze' | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  const listRef = useRef<HTMLUListElement | null>(null);
 
   useEffect(() => {
     if (!menuForId) return;
@@ -122,6 +132,17 @@ export const ConversationList: React.FC<Props> = ({
   }, [menuForId]);
 
   const statuses = ['open', 'pending', 'spam', 'invalid', 'done'] as const;
+  const shown = conversations.length;
+  const total = typeof totalCount === 'number' ? totalCount : shown;
+  const showCountFooter = total > 0 && (shown < total || hasMore);
+
+  const handleListScroll = () => {
+    const el = listRef.current;
+    if (!el || !hasMore || isFetchingMore || !onLoadMore) return;
+    if (el.scrollHeight - el.scrollTop - el.clientHeight < 160) {
+      onLoadMore();
+    }
+  };
 
   return (
     <div
@@ -174,7 +195,11 @@ export const ConversationList: React.FC<Props> = ({
           />
         </div>
       </div>
-      <ul className="min-h-0 flex-1 overflow-y-auto custom-scrollbar">
+      <ul
+        ref={listRef}
+        onScroll={handleListScroll}
+        className="min-h-0 flex-1 overflow-y-auto custom-scrollbar"
+      >
         {conversations.map((row) => {
           const {
             client,
@@ -458,6 +483,33 @@ export const ConversationList: React.FC<Props> = ({
         {conversations.length === 0 && (
           <li className="p-6 text-center text-sm text-gray-500">
             {t('noConversations')}
+          </li>
+        )}
+        {showCountFooter && (
+          <li className="flex flex-col items-center gap-2 border-t border-black/5 px-3 py-3 dark:border-white/5">
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              {t('messageLogShowingCount')
+                .replace('{shown}', String(shown))
+                .replace('{total}', String(total))}
+            </p>
+            {hasMore && (
+              <Button
+                type="button"
+                variant="secondary"
+                className="!h-8 !px-3 !text-xs"
+                onClick={() => onLoadMore?.()}
+                disabled={isFetchingMore}
+              >
+                {isFetchingMore ? (
+                  <>
+                    <Loader size="sm" variant="primary" className="me-2" />
+                    {t('loading')}
+                  </>
+                ) : (
+                  t('messageLogLoadMore')
+                )}
+              </Button>
+            )}
           </li>
         )}
       </ul>

@@ -282,14 +282,30 @@ export const ChatsPage: React.FC = () => {
   const {
     data: conversationsPayload,
     refetch: refetchConversations,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
   } = useWhatsAppConversations(apiParams, {
     enabled: chatsAllowed,
     refetchInterval: chatsAllowed ? chatPollMs : false,
   });
 
-  const conversationsList = conversationsPayload?.results ?? [];
-  const statusCounts = conversationsPayload?.status_counts ?? {};
-  const assignmentCounts = conversationsPayload?.assignment_counts ?? {};
+  const conversationsList = useMemo(() => {
+    const pages = conversationsPayload?.pages ?? [];
+    const seen = new Set<number>();
+    const out: NonNullable<(typeof pages)[number]['results']> = [];
+    for (const page of pages) {
+      for (const row of page.results ?? []) {
+        if (seen.has(row.id)) continue;
+        seen.add(row.id);
+        out.push(row);
+      }
+    }
+    return out;
+  }, [conversationsPayload]);
+  const conversationsTotalCount = conversationsPayload?.pages?.[0]?.count ?? 0;
+  const statusCounts = conversationsPayload?.pages?.[0]?.status_counts ?? {};
+  const assignmentCounts = conversationsPayload?.pages?.[0]?.assignment_counts ?? {};
 
   const { data: usersResponse } = useUsers(undefined, { enabled: canSeeAllLeads });
   const agentInitialsById = useMemo(() => {
@@ -1367,6 +1383,12 @@ export const ChatsPage: React.FC = () => {
           onUnrepliedChange={(value) =>
             setChatFilters((prev) => ({ ...prev, unreplied: value }))
           }
+          totalCount={conversationsTotalCount}
+          hasMore={Boolean(hasNextPage)}
+          isFetchingMore={isFetchingNextPage}
+          onLoadMore={() => {
+            if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+          }}
           conversationStatus={threadStatusForHeader}
           isStarred={threadStarredForHeader}
           isUnsubscribed={threadUnsubscribedForHeader}

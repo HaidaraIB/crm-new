@@ -3,7 +3,7 @@
  * This file contains all reusable query hooks for the application
  */
 
-import { useQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
 import type { LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
@@ -768,32 +768,51 @@ export const useWhatsAppChatMessages = (
   });
 };
 
+/** Default page size for WhatsApp conversation list (backend max is 200). */
+export const WHATSAPP_CONVERSATIONS_PAGE_SIZE = 100;
+
+export type WhatsAppConversationsListParams = {
+  status?: string;
+  assignment?: string;
+  agent?: number;
+  starred?: boolean;
+  unreplied?: boolean;
+  search?: string;
+  ordering?: string;
+};
+
+/**
+ * Infinite conversation list — backend supports limit/offset; UI loads more on scroll.
+ * Query key intentionally omits limit/offset (those are pageParams).
+ */
 export const useWhatsAppConversations = (
-  params?: {
-    status?: string;
-    assignment?: string;
-    agent?: number;
-    starred?: boolean;
-    unreplied?: boolean;
-    search?: string;
-    ordering?: string;
-    limit?: number;
-    offset?: number;
-  },
-  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'> & {
+  params?: WhatsAppConversationsListParams,
+  options?: {
     refetchInterval?: number | false;
     enabled?: boolean;
   }
 ) => {
-  const { refetchInterval = false, enabled = true, ...rest } = options || {};
-  return useQuery({
+  const { refetchInterval = false, enabled = true } = options || {};
+  return useInfiniteQuery({
     queryKey: queryKeys.whatsAppConversations(params as Record<string, unknown> | undefined),
-    queryFn: () => getWhatsAppConversationsAPI(params),
+    queryFn: ({ pageParam }) =>
+      getWhatsAppConversationsAPI({
+        ...params,
+        limit: WHATSAPP_CONVERSATIONS_PAGE_SIZE,
+        offset: pageParam,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: (lastPage, allPages) => {
+      const loaded = allPages.reduce((n, p) => n + (p.results?.length ?? 0), 0);
+      const total = lastPage.count ?? 0;
+      if (loaded >= total) return undefined;
+      if ((lastPage.results?.length ?? 0) < WHATSAPP_CONVERSATIONS_PAGE_SIZE) return undefined;
+      return loaded;
+    },
     staleTime: 3 * 1000,
     refetchOnWindowFocus: true,
     refetchInterval,
     enabled,
-    ...rest,
   });
 };
 
@@ -804,26 +823,35 @@ export const useUpdateWhatsAppConversationState = () => {
     onMutate: async (vars) => {
       await queryClient.cancelQueries({ queryKey: ['whatsAppConversations'] });
       const previous = queryClient.getQueriesData({ queryKey: ['whatsAppConversations'] });
-      queryClient.setQueriesData({ queryKey: ['whatsAppConversations'] }, (old: any) => {
-        if (!old || !Array.isArray(old?.results)) return old;
-        const clientId = Number(vars.clientId);
+      const clientId = Number(vars.clientId);
+      const patchRow = (row: any) => {
+        if (Number(row.id) !== clientId) return row;
         return {
-          ...old,
-          results: old.results.map((row: any) => {
-            if (Number(row.id) !== clientId) return row;
-            return {
-              ...row,
-              ...(vars.status !== undefined ? { status: vars.status } : {}),
-              ...(vars.snoozedUntil !== undefined
-                ? { snoozed_until: vars.snoozedUntil }
-                : {}),
-              ...(vars.isStarred !== undefined ? { is_starred: vars.isStarred } : {}),
-              ...(vars.isUnsubscribed !== undefined
-                ? { is_unsubscribed: vars.isUnsubscribed }
-                : {}),
-            };
-          }),
+          ...row,
+          ...(vars.status !== undefined ? { status: vars.status } : {}),
+          ...(vars.snoozedUntil !== undefined
+            ? { snoozed_until: vars.snoozedUntil }
+            : {}),
+          ...(vars.isStarred !== undefined ? { is_starred: vars.isStarred } : {}),
+          ...(vars.isUnsubscribed !== undefined
+            ? { is_unsubscribed: vars.isUnsubscribed }
+            : {}),
         };
+      };
+      queryClient.setQueriesData({ queryKey: ['whatsAppConversations'] }, (old: any) => {
+        if (!old) return old;
+        // Infinite query shape: { pages: [{ results }], pageParams }
+        if (Array.isArray(old.pages)) {
+          return {
+            ...old,
+            pages: old.pages.map((page: any) => {
+              if (!Array.isArray(page?.results)) return page;
+              return { ...page, results: page.results.map(patchRow) };
+            }),
+          };
+        }
+        if (!Array.isArray(old?.results)) return old;
+        return { ...old, results: old.results.map(patchRow) };
       });
       return { previous };
     },

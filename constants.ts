@@ -1740,6 +1740,8 @@ export const translations = {
     timezone: "Timezone",
 
     sendToReview: "Send to review",
+    templateResubmitToWhatsApp: "Resubmit to WhatsApp",
+    templateSaveBeforeSubmit: "Save your template changes before submitting to WhatsApp.",
     templateNamePlaceholderEn: "Enter message template name in English",
     templateNameEnglishOnly: "Template name must contain only English letters, numbers, spaces, hyphens and underscores.",
     templateHeaderMediaRequired: "Upload a header image, video, or document before saving or submitting this template.",
@@ -4682,6 +4684,8 @@ export const translations = {
     timezone: "المنطقة الزمنية",
 
     sendToReview: "إرسال للمراجعة",
+    templateResubmitToWhatsApp: "إعادة الإرسال إلى واتساب",
+    templateSaveBeforeSubmit: "احفظ تغييرات القالب قبل إرساله إلى واتساب.",
     templateNamePlaceholderEn: "أدخل اسم قالب الرسالة بالإنجليزية",
     templateNameEnglishOnly: "اسم القالب يجب أن يحتوي على حروف إنجليزية وأرقام ومسافات وشرطات وشرطات سفلية فقط.",
     templateHeaderMediaRequired: "ارفع صورة أو فيديو أو مستند للرأس قبل حفظ القالب أو إرساله للمراجعة.",

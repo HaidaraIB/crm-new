@@ -185,7 +185,7 @@ export const TemplateManagementSettings = () => {
                                     const isWa = isWhatsAppTemplate(tpl.channel_type);
                                     const rawMeta = (tpl as MessageTemplateType).meta_status;
                                     const metaStatus = rawMeta ? String(rawMeta).toUpperCase() : '';
-                                    const canSubmitToWhatsApp = isWa && (!metaStatus || metaStatus === 'REJECTED');
+                                    const canSubmitToWhatsApp = isWa && (!metaStatus || metaStatus === 'REJECTED' || metaStatus === 'APPROVED');
                                     const canClone = canCloneTemplate(tpl, templates);
                                     const cloneTargetLabel = isWa ? t('campaignViaSms') : t('campaignViaWhatsApp');
                                     const cat = (tpl.category || '').toLowerCase();

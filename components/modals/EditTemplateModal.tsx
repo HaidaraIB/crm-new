@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import {
@@ -124,9 +124,13 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const isEdit = !!template?.id;
   const isWhatsApp = channelType === 'whatsapp_api';
   const metaStatus = template?.meta_status ? String(template.meta_status).toUpperCase() : '';
-  const canSendToReview = !metaStatus || metaStatus === 'REJECTED';
+  const canSendToReview =
+    !metaStatus || metaStatus === 'REJECTED' || metaStatus === 'APPROVED';
+  const submitToWhatsAppLabel =
+    metaStatus === 'APPROVED' ? t('templateResubmitToWhatsApp') : (t('sendToReview') || 'Send to review');
   const isMediaHeader = headerType === 'image' || headerType === 'video' || headerType === 'document';
   const hasHeaderMedia = Boolean(headerMediaFile || storedHeaderMediaUrl || headerMediaPreviewUrl);
+  const headerPreviewUrl = headerMediaPreviewUrl || storedHeaderMediaUrl;
 
   const clearLocalHeaderMedia = () => {
     setHeaderMediaFile(null);
@@ -184,6 +188,41 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
     return payload;
   }, []);
 
+  const currentPayload = useMemo(
+    () =>
+      buildTemplatePayload({
+        name,
+        channelType,
+        content,
+        category,
+        templateLanguage,
+        headerType,
+        headerText,
+        footer,
+        buttons,
+        isWhatsApp,
+      }),
+    [
+      buildTemplatePayload,
+      name,
+      channelType,
+      content,
+      category,
+      templateLanguage,
+      headerType,
+      headerText,
+      footer,
+      buttons,
+      isWhatsApp,
+    ]
+  );
+
+  const isDirty = useMemo(() => {
+    if (!initialPayloadRef.current) return false;
+    const patch = buildUpdateDiff(initialPayloadRef.current, currentPayload);
+    return Object.keys(patch).length > 0 || Boolean(headerMediaFile);
+  }, [currentPayload, headerMediaFile]);
+
   useEffect(() => {
     if (template) {
       setChannelType((template.channel_type === 'sms' ? 'sms' : 'whatsapp_api') as 'sms' | 'whatsapp_api');
@@ -198,6 +237,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       setHeaderType(hdrType);
       clearLocalHeaderMedia();
       setStoredHeaderMediaUrl((template as any).header_media_url || null);
+      if ((template as any).header_media_url) {
+        setHeaderMediaName('Image');
+      }
       const hdrText = (template as any).header_text || '';
       setHeaderText(hdrText);
       const footerValue = (template as any).footer || '';
@@ -319,6 +361,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
         buttons,
         isWhatsApp,
       });
+      let saved: Awaited<ReturnType<typeof updateMessageTemplateAPI>> | undefined;
       if (isEdit && template) {
         const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
         if (Object.keys(patch).length === 0 && !headerMediaFile) {
@@ -326,19 +369,38 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
           return;
         }
         const payload = headerMediaFile ? { ...next, ...patch } : patch;
-        await updateMessageTemplateAPI(
+        saved = await updateMessageTemplateAPI(
           template.id,
           payload as Parameters<typeof updateMessageTemplateAPI>[1],
           headerMediaFile
         );
       } else {
-        await createMessageTemplateAPI(
+        saved = await createMessageTemplateAPI(
           next as Parameters<typeof createMessageTemplateAPI>[0],
           headerMediaFile
         );
       }
+      if (saved?.header_media_url) {
+        setStoredHeaderMediaUrl(saved.header_media_url);
+        setHeaderMediaName('Image');
+      }
+      clearLocalHeaderMedia();
+      initialPayloadRef.current = buildTemplatePayload({
+        name,
+        channelType,
+        content,
+        category,
+        templateLanguage,
+        headerType,
+        headerText,
+        footer,
+        buttons,
+        isWhatsApp,
+      });
       onSuccess();
-      onClose();
+      if (!isEdit || metaStatus !== 'APPROVED') {
+        onClose();
+      }
     } catch (e: any) {
       setErrors({ general: e?.message || (t('save') || 'Save') + ' failed' });
     } finally {
@@ -358,6 +420,10 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const handleSendToReview = async () => {
     if (!template?.id || !onSendToReview) return;
     if (!runWhatsAppBodyValidation()) return;
+    if (isDirty) {
+      setErrors({ general: t('templateSaveBeforeSubmit') });
+      return;
+    }
     if (isMediaHeader && !hasHeaderMedia) {
       setErrors({ general: t('templateHeaderMediaRequired') });
       return;
@@ -534,9 +600,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
               )}
               {headerType === 'image' && (
                 <div role="button" tabIndex={0} onClick={() => setShowSelectMedia(true)} onKeyDown={(e) => e.key === 'Enter' && setShowSelectMedia(true)} className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 cursor-pointer hover:border-primary/50">
-                  {(headerMediaPreviewUrl || storedHeaderMediaUrl) ? (
+                  {headerPreviewUrl ? (
                     <img
-                      src={headerMediaPreviewUrl || storedHeaderMediaUrl || ''}
+                      src={headerPreviewUrl}
                       alt=""
                       className="mb-2 max-h-40 w-full rounded-lg object-contain"
                     />
@@ -711,8 +777,18 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
             <div className="rounded-2xl rounded-tl-md shadow-lg bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 overflow-hidden max-w-[280px]">
               {headerType !== 'none' && (
                 <div className="w-full overflow-hidden bg-gray-100 dark:bg-gray-600 flex flex-col items-center justify-center min-h-[72px] px-2 py-2">
-                  {headerType === 'text' && <span className="text-sm text-gray-800 dark:text-gray-200 text-center line-clamp-2 break-words w-full px-2">{headerText || (t('templateHeader') || 'Header text')}</span>}
-                  {headerType !== 'text' && (
+                  {headerType === 'text' && (
+                    <span className="text-sm text-gray-800 dark:text-gray-200 text-center line-clamp-2 break-words w-full px-2">
+                      {headerText || (t('templateHeader') || 'Header text')}
+                    </span>
+                  )}
+                  {headerType === 'image' && headerPreviewUrl ? (
+                    <img
+                      src={headerPreviewUrl}
+                      alt=""
+                      className="w-full max-h-36 object-cover"
+                    />
+                  ) : headerType !== 'text' && (
                     <>
                       <span className="text-2xl">{headerType === 'image' ? '🖼' : headerType === 'video' ? '🎬' : headerType === 'document' ? '📎' : '📍'}</span>
                       <span className="text-[10px] font-medium uppercase text-gray-500 dark:text-gray-400 mt-0.5">{headerType === 'document' ? 'DOCUMENT' : headerType === 'location' ? 'LOCATION' : headerType.toUpperCase()}</span>
@@ -785,7 +861,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
           </Button>
           {isEdit && isWhatsApp && onSendToReview && canSendToReview && (
             <Button variant="primary" onClick={() => { if (runWhatsAppBodyValidation()) setShowValidationConfirm(true); }}>
-              {t('sendToReview') || 'Send to review'}
+              {submitToWhatsAppLabel}
             </Button>
           )}
         </div>

@@ -4334,6 +4334,7 @@ export interface MessageTemplateType {
   language?: string | null;
   header_type?: string | null;
   header_text?: string | null;
+  header_media_url?: string | null;
   footer?: string | null;
   buttons?: TemplateButtonPayload[] | null;
   meta_template_id?: string | null;
@@ -4342,6 +4343,39 @@ export interface MessageTemplateType {
   meta_variable_map?: { body?: string[]; header?: string[] } | null;
   created_at: string;
   updated_at: string;
+}
+
+type MessageTemplateWritePayload = {
+  name?: string;
+  channel_type?: string;
+  content?: string;
+  category?: string;
+  language?: string;
+  header_type?: string;
+  header_text?: string;
+  footer?: string;
+  buttons?: TemplateButtonPayload[];
+};
+
+function buildMessageTemplateFormData(
+  data: Partial<MessageTemplateWritePayload>,
+  headerMediaFile?: File | null
+): FormData | string {
+  if (headerMediaFile) {
+    const form = new FormData();
+    if (data.name != null) form.append('name', data.name);
+    if (data.channel_type != null) form.append('channel_type', data.channel_type);
+    if (data.content != null) form.append('content', data.content);
+    if (data.category != null) form.append('category', data.category);
+    if (data.language != null) form.append('language', data.language);
+    if (data.header_type != null) form.append('header_type', data.header_type);
+    if (data.header_text != null) form.append('header_text', data.header_text);
+    if (data.footer != null) form.append('footer', data.footer);
+    if (data.buttons != null) form.append('buttons', JSON.stringify(data.buttons));
+    form.append('header_media', headerMediaFile);
+    return form;
+  }
+  return JSON.stringify(data);
 }
 
 /**
@@ -4358,20 +4392,15 @@ export const getMessageTemplatesAPI = async (): Promise<MessageTemplateType[]> =
 /**
  * POST /api/integrations/templates/
  */
-export const createMessageTemplateAPI = async (data: {
-  name: string;
-  channel_type: string;
-  content: string;
-  category: string;
-  language?: string;
-  header_type?: string;
-  header_text?: string;
-  footer?: string;
-  buttons?: TemplateButtonPayload[];
-}) => {
+export const createMessageTemplateAPI = async (
+  data: Required<Pick<MessageTemplateWritePayload, 'name' | 'channel_type' | 'content' | 'category'>> &
+    Omit<MessageTemplateWritePayload, 'name' | 'channel_type' | 'content' | 'category'>,
+  headerMediaFile?: File | null
+) => {
+  const body = buildMessageTemplateFormData(data, headerMediaFile);
   return apiRequest<MessageTemplateType>('/integrations/templates/', {
     method: 'POST',
-    body: JSON.stringify(data),
+    body,
   });
 };
 
@@ -4380,21 +4409,13 @@ export const createMessageTemplateAPI = async (data: {
  */
 export const updateMessageTemplateAPI = async (
   id: number,
-  data: {
-    name?: string;
-    channel_type?: string;
-    content?: string;
-    category?: string;
-    language?: string;
-    header_type?: string;
-    header_text?: string;
-    footer?: string;
-    buttons?: TemplateButtonPayload[];
-  }
+  data: Partial<MessageTemplateWritePayload>,
+  headerMediaFile?: File | null
 ) => {
+  const body = buildMessageTemplateFormData(data as MessageTemplateWritePayload, headerMediaFile);
   return apiRequest<MessageTemplateType>(`/integrations/templates/${id}/`, {
     method: 'PATCH',
-    body: JSON.stringify(data),
+    body,
   });
 };
 

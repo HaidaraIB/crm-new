@@ -1125,6 +1125,11 @@ export const ChatsPage: React.FC = () => {
       variableMap: tpl.meta_variable_map?.body ?? undefined,
       senderName,
     });
+    const templateHeaderKind =
+      tpl.header_type === 'image' || tpl.header_type === 'video' || tpl.header_type === 'document'
+        ? tpl.header_type
+        : null;
+    const templateHeaderUrl = tpl.header_media_url || null;
     const msgId = newChatMessageId();
     pushOptimistic(selectedChatClient, (prev) => [
       ...prev,
@@ -1137,6 +1142,9 @@ export const ChatsPage: React.FC = () => {
         sendKind: 'template',
         templateId: tpl.id,
         createdByUsername: currentUser?.username,
+        ...(templateHeaderKind && templateHeaderUrl
+          ? { attachmentKind: templateHeaderKind, attachmentUrl: templateHeaderUrl }
+          : {}),
       } as any,
     ]);
     try {

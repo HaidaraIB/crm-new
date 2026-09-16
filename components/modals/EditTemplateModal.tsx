@@ -115,6 +115,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const [showValidationConfirm, setShowValidationConfirm] = useState(false);
   const [showSelectMedia, setShowSelectMedia] = useState(false);
   const [headerMediaName, setHeaderMediaName] = useState<string | null>(null);
+  const [headerMediaFile, setHeaderMediaFile] = useState<File | null>(null);
+  const [headerMediaPreviewUrl, setHeaderMediaPreviewUrl] = useState<string | null>(null);
+  const [storedHeaderMediaUrl, setStoredHeaderMediaUrl] = useState<string | null>(null);
   const initialPayloadRef = useRef<Record<string, unknown> | null>(null);
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -122,6 +125,14 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const isWhatsApp = channelType === 'whatsapp_api';
   const metaStatus = template?.meta_status ? String(template.meta_status).toUpperCase() : '';
   const canSendToReview = !metaStatus || metaStatus === 'REJECTED';
+  const isMediaHeader = headerType === 'image' || headerType === 'video' || headerType === 'document';
+  const hasHeaderMedia = Boolean(headerMediaFile || storedHeaderMediaUrl || headerMediaPreviewUrl);
+
+  const clearLocalHeaderMedia = () => {
+    setHeaderMediaFile(null);
+    setHeaderMediaName(null);
+    setHeaderMediaPreviewUrl(null);
+  };
 
   const buildTemplatePayload = useCallback((
     args: {
@@ -185,6 +196,8 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       setTemplateLanguage(lang);
       const hdrType = (template as any).header_type || 'none';
       setHeaderType(hdrType);
+      clearLocalHeaderMedia();
+      setStoredHeaderMediaUrl((template as any).header_media_url || null);
       const hdrText = (template as any).header_text || '';
       setHeaderText(hdrText);
       const footerValue = (template as any).footer || '';
@@ -235,6 +248,8 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       setHeaderText('');
       setFooter('');
       setButtons([]);
+      clearLocalHeaderMedia();
+      setStoredHeaderMediaUrl(null);
       initialPayloadRef.current = null;
     }
     setErrors({});
@@ -282,6 +297,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
     if (!content.trim()) {
       newErrors.content = (t('messageContent') || 'Message content') + ' ' + (t('required') || 'required');
     }
+    if (isWhatsApp && isMediaHeader && !hasHeaderMedia) {
+      newErrors.headerMedia = t('templateHeaderMediaRequired');
+    }
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
@@ -303,13 +321,21 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       });
       if (isEdit && template) {
         const patch = buildUpdateDiff(initialPayloadRef.current || {}, next);
-        if (Object.keys(patch).length === 0) {
+        if (Object.keys(patch).length === 0 && !headerMediaFile) {
           onClose();
           return;
         }
-        await updateMessageTemplateAPI(template.id, patch as Parameters<typeof updateMessageTemplateAPI>[1]);
+        const payload = headerMediaFile ? { ...next, ...patch } : patch;
+        await updateMessageTemplateAPI(
+          template.id,
+          payload as Parameters<typeof updateMessageTemplateAPI>[1],
+          headerMediaFile
+        );
       } else {
-        await createMessageTemplateAPI(next as Parameters<typeof createMessageTemplateAPI>[0]);
+        await createMessageTemplateAPI(
+          next as Parameters<typeof createMessageTemplateAPI>[0],
+          headerMediaFile
+        );
       }
       onSuccess();
       onClose();
@@ -332,6 +358,10 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   const handleSendToReview = async () => {
     if (!template?.id || !onSendToReview) return;
     if (!runWhatsAppBodyValidation()) return;
+    if (isMediaHeader && !hasHeaderMedia) {
+      setErrors({ general: t('templateHeaderMediaRequired') });
+      return;
+    }
     setErrors({});
     setSendingToReview(true);
     try {
@@ -485,7 +515,14 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('templateHeader')}</label>
               <select
                 value={headerType}
-                onChange={(e) => { setHeaderType(e.target.value); setHeaderMediaName(null); }}
+                onChange={(e) => {
+                  const nextType = e.target.value;
+                  setHeaderType(nextType);
+                  clearLocalHeaderMedia();
+                  if (nextType !== 'image' && nextType !== 'video' && nextType !== 'document') {
+                    setStoredHeaderMediaUrl(null);
+                  }
+                }}
                 className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm mb-2"
               >
                 {HEADER_OPTIONS.map((opt) => (
@@ -497,7 +534,15 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
               )}
               {headerType === 'image' && (
                 <div role="button" tabIndex={0} onClick={() => setShowSelectMedia(true)} onKeyDown={(e) => e.key === 'Enter' && setShowSelectMedia(true)} className="rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800/50 p-6 flex flex-col items-center justify-center text-gray-500 dark:text-gray-400 cursor-pointer hover:border-primary/50">
-                  <svg className="w-10 h-10 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" /></svg>
+                  {(headerMediaPreviewUrl || storedHeaderMediaUrl) ? (
+                    <img
+                      src={headerMediaPreviewUrl || storedHeaderMediaUrl || ''}
+                      alt=""
+                      className="mb-2 max-h-40 w-full rounded-lg object-contain"
+                    />
+                  ) : (
+                    <svg className="w-10 h-10 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14" /></svg>
+                  )}
                   <span className="text-sm font-medium uppercase">{headerMediaName || 'Image'}</span>
                 </div>
               )}
@@ -518,6 +563,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                   <svg className="w-10 h-10 mb-2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                   <span className="text-sm font-medium uppercase">Location</span>
                 </div>
+              )}
+              {errors.headerMedia && (
+                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.headerMedia}</p>
               )}
             </div>
 
@@ -750,7 +798,12 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       onClose={() => setShowSelectMedia(false)}
       t={t}
       accept={headerType === 'image' ? 'image' : headerType === 'video' ? 'video' : headerType === 'document' ? 'document' : 'all'}
-      onSelect={(url, file) => { setHeaderMediaName(file?.name || url.split('/').pop() || 'Selected'); setShowSelectMedia(false); }}
+      onSelect={(url, file) => {
+        setHeaderMediaName(file?.name || url.split('/').pop() || 'Selected');
+        setHeaderMediaFile(file || null);
+        setHeaderMediaPreviewUrl(file ? URL.createObjectURL(file) : url);
+        setShowSelectMedia(false);
+      }}
     />
 
     {showValidationConfirm && (

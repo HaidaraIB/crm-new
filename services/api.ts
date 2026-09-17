@@ -237,11 +237,21 @@ export function resolveLocalizedApiError(
       return localized;
     }
   }
+  if (t && looksLikeMetaWabaNotApiEligible(combinedMetaText)) {
+    const localized = t('meta_waba_not_api_eligible');
+    if (localized && localized !== 'meta_waba_not_api_eligible') {
+      return localized;
+    }
+  }
   if (t && code && metaTemplateCodes.has(code)) {
     const translated = t(code);
     const specific =
       (apiMessage && !/^[a-z][a-z0-9_]+$/.test(apiMessage) ? apiMessage : '') || metaMsg;
-    if (specific && !looksLikeMetaTemplateLanguageDeletionCooldown(specific)) {
+    if (
+      specific &&
+      !looksLikeMetaTemplateLanguageDeletionCooldown(specific) &&
+      !looksLikeMetaWabaNotApiEligible(specific)
+    ) {
       const prefix = translated && translated !== code ? translated : fallback;
       return specific.includes(prefix) ? specific : `${prefix}: ${specific}`;
     }
@@ -311,6 +321,15 @@ function looksLikeMetaTemplateLanguageDeletionCooldown(text: string): boolean {
   return (
     m.includes('4 weeks') &&
     (m.includes('being deleted') || m.includes('existing arabic') || m.includes('new arabic content'))
+  );
+}
+
+function looksLikeMetaWabaNotApiEligible(text: string): boolean {
+  const m = (text || '').toLowerCase();
+  if (!m) return false;
+  return (
+    m.includes('whatsapp accounts cannot be used with this api') ||
+    m.includes('cannot be used with this api')
   );
 }
 

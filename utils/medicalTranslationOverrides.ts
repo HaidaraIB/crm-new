@@ -240,6 +240,8 @@ export const medicalTranslationOverrides: {
     template_counterpart_exists: 'A counterpart template already exists for this channel.',
     meta_templates_fetch_failed: 'Failed to fetch templates from Meta.',
     meta_template_submit_failed: 'Meta rejected the template submission.',
+    meta_template_language_deletion_cooldown:
+      'Meta is still deleting the previous Arabic version of this template name. You cannot resubmit the same name in Arabic for about 4 weeks. Wait and try again later, or create a new template with a different English name (for example marketing2), add the header image, save, and submit that new template for review.',
     meta_api_request_failed: 'Could not reach Meta. Check your connection and try again.',
     only_whatsapp_templates_to_meta: 'Only WhatsApp templates can be submitted to Meta.',
     whatsapp_limits_fetch_failed: 'Failed to fetch WhatsApp limits from Meta.',
@@ -522,6 +524,8 @@ export const medicalTranslationOverrides: {
     template_counterpart_exists: 'يوجد قالب مقابل لهذه القناة بالفعل.',
     meta_templates_fetch_failed: 'تعذر جلب القوالب من ميتا.',
     meta_template_submit_failed: 'رفضت ميتا إرسال القالب.',
+    meta_template_language_deletion_cooldown:
+      'ميتا ما زالت تحذف النسخة العربية السابقة لهذا الاسم. لا يمكن إرسال قالب جديد بنفس الاسم واللغة العربية قبل نحو 4 أسابيع. انتظر ثم أعد المحاولة، أو أنشئ قالباً جديداً باسم إنجليزي مختلف (مثل marketing2)، أضف صورة الرأس، احفظ، ثم أرسله للمراجعة.',
     meta_api_request_failed: 'تعذر الاتصال بميتا. تحقق من الاتصال وحاول مرة أخرى.',
     only_whatsapp_templates_to_meta: 'يمكن إرسال قوالب واتساب فقط إلى ميتا.',
     whatsapp_limits_fetch_failed: 'تعذر جلب حدود واتساب من ميتا.',

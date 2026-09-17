@@ -205,13 +205,23 @@ export function resolveLocalizedApiError(
     'meta_template_delete_failed',
     'whatsapp_template_header_upload_failed',
   ]);
+  const combinedMetaText = `${apiMessage} ${metaMsg}`.trim();
+  if (t && looksLikeMetaTemplateLanguageDeletionCooldown(combinedMetaText)) {
+    const localized = t('meta_template_language_deletion_cooldown');
+    if (localized && localized !== 'meta_template_language_deletion_cooldown') {
+      return localized;
+    }
+  }
   if (t && code && metaTemplateCodes.has(code)) {
     const translated = t(code);
     const specific =
       (apiMessage && !/^[a-z][a-z0-9_]+$/.test(apiMessage) ? apiMessage : '') || metaMsg;
-    if (specific) {
+    if (specific && !looksLikeMetaTemplateLanguageDeletionCooldown(specific)) {
       const prefix = translated && translated !== code ? translated : fallback;
       return specific.includes(prefix) ? specific : `${prefix}: ${specific}`;
+    }
+    if (translated && translated !== code) {
+      return translated;
     }
   }
   if (t && code) {
@@ -267,6 +277,15 @@ function looksLikeBrowserPermissionMessage(text: string): boolean {
     m.includes('permission denied by system') ||
     m.includes('notallowederror') ||
     (m.includes('permission') && m.includes('denied') && m.includes('microphone'))
+  );
+}
+
+function looksLikeMetaTemplateLanguageDeletionCooldown(text: string): boolean {
+  const m = (text || '').toLowerCase();
+  if (!m) return false;
+  return (
+    m.includes('4 weeks') &&
+    (m.includes('being deleted') || m.includes('existing arabic') || m.includes('new arabic content'))
   );
 }
 

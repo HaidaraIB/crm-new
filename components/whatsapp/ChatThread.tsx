@@ -41,6 +41,7 @@ type Props = {
   /** First unread inbound api id — inserts “New Messages” divider before it. */
   newMessagesBeforeApiId?: number | null;
   isFetching?: boolean;
+  isLoading?: boolean;
   onRefresh?: () => void;
   onWhatsAppCall?: () => void;
   isWhatsAppCalling?: boolean;
@@ -73,6 +74,7 @@ export const ChatThread: React.FC<Props> = ({
   threadCalls = [],
   newMessagesBeforeApiId = null,
   isFetching,
+  isLoading,
   onRefresh,
   onWhatsAppCall,
   isWhatsAppCalling,
@@ -320,7 +322,7 @@ export const ChatThread: React.FC<Props> = ({
             scope="handler"
             iconOnly
             onClick={onRefresh}
-            loading={!!isFetching}
+            loading={Boolean(isFetching && !isLoading)}
             className="text-inherit"
           />
         )}

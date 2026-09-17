@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Button } from './Button';
 import { RefreshIcon } from './icons';
@@ -7,7 +7,7 @@ import { useAppContext } from '../context/AppContext';
 type RefreshButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
   /** Button label. Defaults to `t('refresh')`. Ignored when `iconOnly`. */
   children?: React.ReactNode;
-  /** Spins the refresh icon and disables the control. Combined with the global refresh state. */
+  /** Spins the refresh icon and disables the control. */
   loading?: boolean;
   /** Hide the text label below the `sm` breakpoint (icon stays visible). */
   hideLabelOnMobile?: boolean;
@@ -17,13 +17,11 @@ type RefreshButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'c
   /**
    * How much this control refreshes.
    *
-   * `'all'` (default) — invalidate every query, so whatever the page is showing
-   * reloads. This is what users expect "Refresh" to mean, and it is the only
-   * variant that cannot silently rot: a page that gains a new data source keeps
-   * refreshing correctly without anyone remembering to update a handler.
+   * `'handler'` (default) — run `onClick` only. Pages list the queries they render.
    *
-   * `'handler'` — run `onClick` only. For controls that must stay narrow, e.g. a
-   * refresh inside a busy panel where reloading the whole app would be wasteful.
+   * `'all'` — also invalidate every query (fire-and-forget). Opt-in only; the spinner
+   * follows `loading`, not global invalidation, so a slow background query cannot
+   * leave the button stuck.
    */
   scope?: 'all' | 'handler';
 };
@@ -31,10 +29,8 @@ type RefreshButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'c
 /**
  * Shared refresh control sized to match `Button` / `FilterButton`.
  *
- * Clicking refetches every active query (see `scope`). `onClick` still runs first,
- * so page-specific handlers keep working — React Query dedupes the concurrent
- * refetch of a key that a handler already requested, so listing a query in both
- * places costs one request, not two.
+ * Clicking runs `onClick` first. With `scope="all"`, every query is also marked stale
+ * without blocking the button — React Query dedupes concurrent refetches of the same key.
  */
 export const RefreshButton = ({
   children,
@@ -42,7 +38,7 @@ export const RefreshButton = ({
   hideLabelOnMobile = true,
   iconOnly = false,
   variant = 'secondary',
-  scope = 'all',
+  scope = 'handler',
   className = '',
   type = 'button',
   title,
@@ -52,40 +48,19 @@ export const RefreshButton = ({
 }: RefreshButtonProps) => {
   const { t } = useAppContext();
   const queryClient = useQueryClient();
-  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
-  const mountedRef = useRef(true);
-
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
 
   // Param is optional so this satisfies both `MouseEventHandler` and the bare
   // `() => void` half of Button's intersection-typed onClick.
   const handleClick = useCallback(
     (event?: React.MouseEvent<HTMLButtonElement>) => {
       onClick?.(event as React.MouseEvent<HTMLButtonElement>);
-      if (scope !== 'all') return;
-
-      setIsRefreshingAll(true);
-      // No filter = every query. Active ones refetch now; inactive ones are marked
-      // stale and reload when they next mount — the same shape as a browser refresh.
-      queryClient
-        .invalidateQueries()
-        .catch(() => {
-          // Individual query errors surface in their own components; the button
-          // must not swallow the page or stay stuck spinning.
-        })
-        .finally(() => {
-          if (mountedRef.current) setIsRefreshingAll(false);
-        });
+      if (scope === 'all') {
+        void queryClient.invalidateQueries();
+      }
     },
     [onClick, queryClient, scope],
   );
 
-  const busy = loading || isRefreshingAll;
   const label = children ?? t('refresh');
   const tooltip = title ?? t('refresh');
 
@@ -94,14 +69,14 @@ export const RefreshButton = ({
       <button
         type={type}
         onClick={handleClick}
-        disabled={disabled || busy}
+        disabled={disabled || loading}
         title={tooltip}
         aria-label={t('refresh')}
-        aria-busy={busy || undefined}
+        aria-busy={loading || undefined}
         className={`rounded-full p-2 hover:bg-white/10 disabled:cursor-wait disabled:opacity-60 ${className}`}
         {...props}
       >
-        <RefreshIcon className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} />
+        <RefreshIcon className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
       </button>
     );
   }
@@ -111,13 +86,13 @@ export const RefreshButton = ({
       type={type}
       variant={variant}
       onClick={handleClick}
-      disabled={disabled || busy}
+      disabled={disabled || loading}
       title={tooltip}
-      aria-busy={busy || undefined}
+      aria-busy={loading || undefined}
       className={`shrink-0 ${className}`}
       {...props}
     >
-      <RefreshIcon className={`size-4 ${busy ? 'animate-spin' : ''}`} />
+      <RefreshIcon className={`size-4 ${loading ? 'animate-spin' : ''}`} />
       <span className={hideLabelOnMobile ? 'hidden sm:inline' : undefined}>{label}</span>
     </Button>
   );

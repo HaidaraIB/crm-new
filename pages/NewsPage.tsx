@@ -83,7 +83,10 @@ export const NewsPage = () => {
             void listQuery.refetch();
             if (selectedId != null) void detailQuery.refetch();
           }}
-          loading={listQuery.isFetching || detailQuery.isFetching}
+          loading={
+            (listQuery.isFetching || detailQuery.isFetching) &&
+            !(listQuery.isLoading || detailQuery.isLoading)
+          }
         />
       }
     >

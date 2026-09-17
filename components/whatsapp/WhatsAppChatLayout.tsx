@@ -37,6 +37,7 @@ type Props = {
   threadCalls?: ChatThreadCall[];
   newMessagesBeforeApiId?: number | null;
   isFetchingMessages?: boolean;
+  isLoadingMessages?: boolean;
   onRefreshMessages?: () => void;
   onWhatsAppCall?: () => void;
   isWhatsAppCalling?: boolean;
@@ -79,6 +80,7 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         threadCalls={props.threadCalls}
         newMessagesBeforeApiId={props.newMessagesBeforeApiId}
         isFetching={props.isFetchingMessages}
+        isLoading={props.isLoadingMessages}
         onRefresh={props.onRefreshMessages}
         onWhatsAppCall={props.onWhatsAppCall}
         isWhatsAppCalling={props.isWhatsAppCalling}

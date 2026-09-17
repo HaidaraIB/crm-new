@@ -338,6 +338,7 @@ export const ChatsPage: React.FC = () => {
     data: leadWhatsAppMessages = [],
     refetch: refetchLeadWhatsApp,
     isFetching: isFetchingChatMessages,
+    isLoading: isLoadingChatMessages,
     isFetched: isChatMessagesFetched,
     isSuccess: isChatMessagesSuccess,
   } = useWhatsAppChatMessages({
@@ -1419,6 +1420,7 @@ export const ChatsPage: React.FC = () => {
           threadCalls={threadCalls}
           newMessagesBeforeApiId={newMessagesBeforeApiId}
           isFetchingMessages={isFetchingChatMessages}
+          isLoadingMessages={isLoadingChatMessages}
           onRefreshMessages={() => {
             void refetchLeadWhatsApp();
             void refetchWaSession();

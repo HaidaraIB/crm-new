@@ -70,7 +70,11 @@ export const ArrivalsPage = () => {
       title={t('arrivals') || 'Arrivals'}
       actions={
         <div className="flex flex-wrap items-center gap-2">
-          <RefreshButton onClick={() => refetch()} loading={isFetching} />
+          <RefreshButton
+            scope="handler"
+            onClick={() => refetch()}
+            loading={isFetching && !isLoading}
+          />
           <FilterButton
             onClick={() => setIsArrivalsFilterDrawerOpen(true)}
             hasActiveFilters={isFiltered}

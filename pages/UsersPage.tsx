@@ -295,7 +295,13 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                         <span className="text-xs text-gray-600 dark:text-gray-300">
                             {user.is_online
                                 ? `${t('online') || 'Online'} (${getPresenceSourceLabel(user.last_seen_source, t)})`
-                                : `${t('offline') || 'Offline'} â€¢ ${t('lastSeen') || 'Last seen'} ${formatLastSeenRelative(user.last_seen_at, t)}`}
+                                : (
+                                    <>
+                                        {t('offline') || 'Offline'}{' '}
+                                        <span aria-hidden>·</span>{' '}
+                                        {t('lastSeen') || 'Last seen'} {formatLastSeenRelative(user.last_seen_at, t)}
+                                    </>
+                                )}
                         </span>
                     </div>
                 )}
@@ -505,7 +511,7 @@ export const UsersPage = () => {
         usersPageNumber,
         undefined,
         usersPageSize,
-        { excludeRoles: ['admin', 'super_admin'] }
+        { excludeRoles: ['admin', 'super_admin', 'supervisor'] }
     );
     const allUsers = usersResponse?.results || [];
     const hasNextPage = Boolean(usersResponse?.next);
@@ -519,10 +525,10 @@ export const UsersPage = () => {
         setUsersPageNumber(1);
     }, [usersPageSize]);
     
-    // Exclude company owner from the grid; supervisors stay visible (view/manage in Settings).
+    // Exclude company owner and supervisors from the grid; supervisors are managed in Settings → Supervisors.
     const filteredUsers = allUsers.filter(user => {
         const normalizedRole = normalizeRole(user.role);
-        return normalizedRole !== 'Owner';
+        return normalizedRole !== 'Owner' && normalizedRole !== 'Supervisor';
     });
     const userCount = totalUsersCount || filteredUsers.length;
     

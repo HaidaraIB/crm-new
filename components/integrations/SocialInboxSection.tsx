@@ -12,6 +12,7 @@ import {
   connectSocialPageAPI,
   disconnectSocialPageAPI,
   getSocialConnectionsAPI,
+  resolveLocalizedApiError,
   type MetaInboxConnectionPayload,
 } from '../../services/api';
 
@@ -34,6 +35,8 @@ interface SocialInboxSectionProps {
   /** Page-level connect lock, so both tabs disable together during a popup. */
   connectingAccountId: number | null;
   isStartingConnect: boolean;
+  integrationDisabled?: boolean;
+  integrationDisabledMessage?: string;
 }
 
 const StatusPill: React.FC<{ tone: 'connected' | 'error' | 'idle'; children: React.ReactNode }> = ({
@@ -64,6 +67,8 @@ export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
   onDisconnect,
   connectingAccountId,
   isStartingConnect,
+  integrationDisabled = false,
+  integrationDisabledMessage,
 }) => {
   const {
     t,
@@ -86,7 +91,7 @@ export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
     queryClient.invalidateQueries({ queryKey: ['socialInboxConnections'] });
 
   const fail = (err: any, fallback: string) => {
-    const message = t((err?.code || '') as any) || err?.message || fallback;
+    const message = resolveLocalizedApiError(err, t, fallback);
     setError(message);
     showToast(message, { variant: 'error' });
   };
@@ -135,8 +140,9 @@ export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
   }
 
   if (isError || !data) {
+    const loadError = integrationDisabledMessage || t('socialInboxLoadFailed');
     return (
-      <Alert variant="error">{t('errorConnectingAccount')}</Alert>
+      <Alert variant="error">{loadError}</Alert>
     );
   }
 
@@ -156,7 +162,7 @@ export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
         onConnect();
       }}
       loading={isStartingConnect || (account != null && connectingAccountId === account.id)}
-      disabled={connectingAccountId != null || isStartingConnect}
+      disabled={integrationDisabled || connectingAccountId != null || isStartingConnect}
       className="rounded-lg shadow-sm"
     >
       {accountExpired ? t('reconnect') : t('connect')}

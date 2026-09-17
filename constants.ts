@@ -1075,6 +1075,7 @@ export const translations = {
     connectInstagramMessenger: "Instagram & Messenger",
     connectInstagramMessengerPrompt:
         "Click 'Add New Account' to connect a Facebook Page for Instagram Direct and Messenger.",
+    socialInboxLoadFailed: "Could not load Instagram & Messenger settings. Please refresh and try again.",
     socialNoPagesGranted: "No Pages were granted. Reconnect and select the Pages you want to use.",
     instagramNotLinked: "Instagram not linked",
     instagramNotLinkedHint: "This Page has no Instagram account. Messenger still works.",
@@ -1106,9 +1107,12 @@ export const translations = {
     addAccountThenConnectHint: "After saving the account name, a Meta login window will open to connect your WhatsApp/Meta account.",
     integrationStatusEnabled: "Integration is active",
     integrationStatusDisabled: "Integration is disabled",
+    integrationStatusDisabledInbox: "Instagram & Messenger is unavailable",
     integrationDisabledDefaultMessage: "This integration is currently disabled by your administrator.",
     integrationDisabledCompanyMessage: "This integration is currently disabled for your company.",
     integrationDisabledPlanMessage: "This integration is not included in your current plan.",
+    plan_integration_not_included: "This integration is not included in your current plan.",
+    plan_integration_disabled: "This integration is not included in your current plan.",
     smsProviderDisabledTitle: "{provider} SMS is unavailable",
     smsProviderUnavailable: "unavailable",
     // TikTok Lead Gen
@@ -4028,6 +4032,7 @@ export const translations = {
     connectInstagramMessenger: "إنستغرام وماسنجر",
     connectInstagramMessengerPrompt:
         "انقر فوق 'إضافة حساب جديد' لربط صفحة فيسبوك لإنستغرام دايركت وماسنجر.",
+    socialInboxLoadFailed: "تعذر تحميل إعدادات إنستغرام وماسنجر. حدّث الصفحة وحاول مرة أخرى.",
     socialNoPagesGranted: "لم تُمنح أي صفحات. أعد الربط واختر الصفحات التي تريد استخدامها.",
     instagramNotLinked: "إنستغرام غير مربوط",
     instagramNotLinkedHint: "هذه الصفحة بلا حساب إنستغرام. ماسنجر ما زال يعمل.",
@@ -4059,9 +4064,12 @@ export const translations = {
     addAccountThenConnectHint: "بعد حفظ اسم الحساب ستفتح نافذة تسجيل الدخول إلى Meta لربط حساب واتساب/ميتا.",
     integrationStatusEnabled: "التكامل مفعّل",
     integrationStatusDisabled: "التكامل معطّل",
+    integrationStatusDisabledInbox: "إنستغرام وماسنجر غير متاح",
     integrationDisabledDefaultMessage: "هذا التكامل معطّل حالياً من قبل المسؤول.",
     integrationDisabledCompanyMessage: "هذا التكامل معطّل حالياً لشركتك.",
     integrationDisabledPlanMessage: "هذا التكامل غير مشمول في خطتك الحالية.",
+    plan_integration_not_included: "هذا التكامل غير مشمول في خطتك الحالية.",
+    plan_integration_disabled: "هذا التكامل غير مشمول في خطتك الحالية.",
     smsProviderDisabledTitle: "رسائل {provider} غير متاحة",
     smsProviderUnavailable: "غير متاح",
     // TikTok Lead Gen

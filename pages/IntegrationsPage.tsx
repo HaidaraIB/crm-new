@@ -1178,7 +1178,15 @@ export const IntegrationsPage = () => {
         };
     }, [dataKey]);
 
-    const currentPolicy = platformParam ? integrationPolicyMap?.[platformParam] : undefined;
+    const policyPlatformKey = useMemo(() => {
+        if ((currentPage === 'Meta' || currentPage === 'Integrations') && metaTab === 'inbox') {
+            return 'meta_inbox';
+        }
+        return platformParam;
+    }, [currentPage, metaTab, platformParam]);
+
+    const currentPolicy = policyPlatformKey ? integrationPolicyMap?.[policyPlatformKey] : undefined;
+    const inboxPolicyDisabled = integrationPolicyMap?.meta_inbox?.enabled === false;
 
     function renderSmsProviderPolicyBanners() {
         if (currentPage !== 'Twilio' || !integrationPolicyMap) return null;
@@ -1217,9 +1225,13 @@ export const IntegrationsPage = () => {
         if (currentPage === 'Twilio') return null;
         const policy = currentPolicy;
         if (!policy || policy.enabled !== false) return null;
+        const title =
+            policyPlatformKey === 'meta_inbox'
+                ? t('integrationStatusDisabledInbox') || t('integrationStatusDisabled')
+                : t('integrationStatusDisabled') || 'Integration is disabled';
         return (
             <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
-                <div className="font-semibold">{t('integrationStatusDisabled') || 'Integration is disabled'}</div>
+                <div className="font-semibold">{title}</div>
                 <div className="mt-1">
                     {resolveIntegrationPolicyMessage(policy.message, policy.scope, t)}
                 </div>
@@ -2363,6 +2375,22 @@ export const IntegrationsPage = () => {
                     window.removeEventListener('message', handleMessage);
                     releaseConnectLock(accountId);
                     invalidateAccountQueries();
+                    let oauthError = event.data?.error;
+                    if (typeof oauthError === 'string') {
+                        try {
+                            oauthError = decodeURIComponent(oauthError);
+                        } catch {
+                            // keep raw
+                        }
+                    }
+                    showAlert(
+                        resolveLocalizedApiError(
+                            { message: oauthError },
+                            t,
+                            t('connectionFailed') || 'Connection failed'
+                        ),
+                        'error'
+                    );
                 }
             };
             window.addEventListener('message', handleMessage);
@@ -2376,7 +2404,10 @@ export const IntegrationsPage = () => {
             }, 500);
         } catch (error: any) {
             console.error('Error connecting account:', error);
-            showAlert(error?.message || t('errorConnectingAccount') || 'Failed to connect account', 'error');
+            showAlert(
+                resolveLocalizedApiError(error, t, t('errorConnectingAccount') || 'Failed to connect account'),
+                'error'
+            );
         } finally {
             if (!keepBlockedForPopup) {
                 releaseConnectLock(accountId);
@@ -2459,6 +2490,14 @@ export const IntegrationsPage = () => {
      */
     const handleConnectInbox = async () => {
         if (connectingAccountIdRef.current != null || isStartingConnect) return;
+        if (inboxPolicyDisabled) {
+            const policy = integrationPolicyMap?.meta_inbox;
+            showAlert(
+                resolveIntegrationPolicyMessage(policy?.message, policy?.scope, t),
+                'warning'
+            );
+            return;
+        }
         let accountId: number | null = socialInboxAccount?.id ?? null;
         if (accountId == null) {
             setIsStartingConnect(true);
@@ -2469,7 +2508,7 @@ export const IntegrationsPage = () => {
                 });
                 accountId = created?.id ?? null;
             } catch (error: any) {
-                showAlert(error?.message || t('errorSavingAccount'), 'error');
+                showAlert(resolveLocalizedApiError(error, t, t('errorSavingAccount')), 'error');
                 return;
             } finally {
                 setIsStartingConnect(false);
@@ -2503,7 +2542,7 @@ export const IntegrationsPage = () => {
                     setPendingConnectAccountId(created.id);
                 }
             } catch (error: any) {
-                showAlert(error?.message || t('errorSavingAccount'), 'error');
+                showAlert(resolveLocalizedApiError(error, t, t('errorSavingAccount')), 'error');
             } finally {
                 setIsStartingConnect(false);
             }
@@ -3634,7 +3673,15 @@ export const IntegrationsPage = () => {
             title={pageTitle}
             helpVideoPageKey={helpVideoPageKey}
             actions={
-                <Button onClick={handleAddNew} loading={isStartingConnect} disabled={isStartingConnect || connectingAccountId != null}>
+                <Button
+                    onClick={handleAddNew}
+                    loading={isStartingConnect}
+                    disabled={
+                        isStartingConnect ||
+                        connectingAccountId != null ||
+                        (onInboxTab && inboxPolicyDisabled)
+                    }
+                >
                     <PlusIcon className="w-4 h-4" /> {t('addNewAccount')}
                 </Button>
             }
@@ -3673,6 +3720,16 @@ export const IntegrationsPage = () => {
                     onDisconnect={handleDelete}
                     connectingAccountId={connectingAccountId}
                     isStartingConnect={isStartingConnect}
+                    integrationDisabled={inboxPolicyDisabled}
+                    integrationDisabledMessage={
+                        inboxPolicyDisabled
+                            ? resolveIntegrationPolicyMessage(
+                                  integrationPolicyMap?.meta_inbox?.message,
+                                  integrationPolicyMap?.meta_inbox?.scope,
+                                  t
+                              )
+                            : undefined
+                    }
                 />
             )}
 

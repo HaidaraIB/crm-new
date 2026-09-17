@@ -6,6 +6,7 @@
  */
 
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
+import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { isImpersonating, isTabSuperseded } from '../utils/impersonation';
 import type { CampaignRequest, LeadApiFilters, LeadArrival, User, WorkSessionStatus, WorkSessionSummary } from '../types';
 
@@ -200,6 +201,30 @@ export function resolveLocalizedApiError(
       if (m != null) metaMsg = String(m).trim();
     }
   }
+  const integrationPolicyCodes = new Set([
+    'integration_disabled',
+    'plan_integration_not_included',
+    'plan_integration_disabled',
+  ]);
+  if (code && integrationPolicyCodes.has(code)) {
+    const scope =
+      code === 'plan_integration_not_included' || code === 'plan_integration_disabled'
+        ? 'plan'
+        : undefined;
+    if (apiMessage && t) {
+      return resolveIntegrationPolicyMessage(apiMessage, scope, t);
+    }
+    if (apiMessage) {
+      return apiMessage;
+    }
+    if (t) {
+      const translated = t(code);
+      if (translated && translated !== code) {
+        return translated;
+      }
+    }
+  }
+
   const metaTemplateCodes = new Set([
     'meta_template_submit_failed',
     'meta_template_delete_failed',

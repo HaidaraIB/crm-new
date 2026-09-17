@@ -69,13 +69,13 @@ const CATEGORY_OPTIONS: { value: string; labelKey: string; descKey: string; back
   { value: 'limited_time_offer', labelKey: 'categoryLimitedTimeOfferLabel', descKey: 'categoryLimitedTimeOfferDesc', backendValue: 'utility' },
 ];
 
-const HEADER_OPTIONS = [
-  { value: 'none', label: 'None' },
-  { value: 'text', label: 'Text' },
-  { value: 'image', label: 'Image' },
-  { value: 'video', label: 'Video' },
-  { value: 'document', label: 'Document' },
-  { value: 'location', label: 'Location' },
+const HEADER_OPTIONS: { value: string; labelKey: string }[] = [
+  { value: 'none', labelKey: 'templateHeaderNone' },
+  { value: 'text', labelKey: 'templateHeaderText' },
+  { value: 'image', labelKey: 'templateHeaderImage' },
+  { value: 'video', labelKey: 'templateHeaderVideo' },
+  { value: 'document', labelKey: 'templateHeaderDocument' },
+  { value: 'location', labelKey: 'templateHeaderLocation' },
 ];
 
 type TemplateButton = {
@@ -621,7 +621,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                 className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm mb-2"
               >
                 {HEADER_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                  <option key={opt.value} value={opt.value}>{t(opt.labelKey)}</option>
                 ))}
               </select>
               {headerType === 'text' && (
@@ -820,7 +820,9 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                   ) : headerType !== 'text' && (
                     <>
                       <span className="text-2xl">{headerType === 'image' ? '🖼' : headerType === 'video' ? '🎬' : headerType === 'document' ? '📎' : '📍'}</span>
-                      <span className="text-[10px] font-medium uppercase text-gray-500 dark:text-gray-400 mt-0.5">{headerType === 'document' ? 'DOCUMENT' : headerType === 'location' ? 'LOCATION' : headerType.toUpperCase()}</span>
+                      <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
+                        {t(HEADER_OPTIONS.find((opt) => opt.value === headerType)?.labelKey || 'templateHeader')}
+                      </span>
                     </>
                   )}
                 </div>

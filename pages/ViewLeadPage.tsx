@@ -38,6 +38,7 @@ import { localizeSocialMessageBody } from '../utils/socialMessageBodyDisplay';
 import { translations } from '../constants';
 import { MarqueeText } from '../components/MarqueeText';
 import { normalizeRole } from '../utils/roles';
+import { isMedicalSpecialization } from '../utils/medicalTranslationOverrides';
 import { getCompanyRoute, extractViewLeadIdFromPath } from '../utils/routing';
 import { getLeadsReturnPage } from '../utils/leadsReturnPage';
 
@@ -151,6 +152,7 @@ function collapseConsecutiveSocialThreads(
 
 export const ViewLeadPage = () => {
     const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered } = useAppContext();
+    const isMedicalCompany = isMedicalSpecialization(currentUser?.company?.specialization);
     
     const canPbxDial = usePbxDialEnabled();
     const whatsappCalling = useWhatsAppCallingOptional();
@@ -1076,16 +1078,18 @@ export const ViewLeadPage = () => {
                     <div className="space-y-4">
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('leadCompanyName')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || 'â€”'}</p>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || '—'}</p>
                         </div>
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('profession')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : 'â€”'}</p>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : '—'}</p>
                         </div>
-                        <div>
-                            <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('residence')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : 'â€”'}</p>
-                        </div>
+                        {isMedicalCompany && (
+                            <div>
+                                <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('residence')}</label>
+                                <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : '—'}</p>
+                            </div>
+                        )}
                         {hasLeadLocation && (
                             <div className="overflow-hidden md:col-span-1">
                                 <LeadLocationMapPicker
@@ -1096,7 +1100,7 @@ export const ViewLeadPage = () => {
                                 />
                             </div>
                         )}
-                        {(displayLead as Lead).patientFileNumber != null && (
+                        {isMedicalCompany && (displayLead as Lead).patientFileNumber != null && (
                             <div>
                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('patientFileNumber')}</label>
                                 <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead as Lead).patientFileNumber ?? (displayLead as any).patient_file_number}</p>
@@ -1110,13 +1114,13 @@ export const ViewLeadPage = () => {
                                 <div>
                                     <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedDeveloper') || 'Developer'}</label>
                                     <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
-                                        {((displayLead as Lead).interestedDeveloperName ?? (displayLead as any).interested_developer_name) || 'â€”'}
+                                        {((displayLead as Lead).interestedDeveloperName ?? (displayLead as any).interested_developer_name) || '—'}
                                     </p>
                                 </div>
                                 <div>
                                     <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('interestedProject') || 'Project'}</label>
                                     <p className="mt-1 text-base font-medium text-gray-900 dark:text-gray-100">
-                                        {((displayLead as Lead).interestedProjectName ?? (displayLead as any).interested_project_name) || 'â€”'}
+                                        {((displayLead as Lead).interestedProjectName ?? (displayLead as any).interested_project_name) || '—'}
                                     </p>
                                 </div>
                                 <div>
@@ -1127,7 +1131,7 @@ export const ViewLeadPage = () => {
                                             const uc = (displayLead as Lead).interestedUnitCode ?? (displayLead as any).interested_unit_code;
                                             if (un && uc) return `${un} (${uc})`;
                                             if (un) return un;
-                                            return 'â€”';
+                                            return '—';
                                         })()}
                                     </p>
                                 </div>

@@ -267,7 +267,7 @@ function MultiSelectDropdown({
                             );
                         })}
                         {visible.length === 0 && (
-                            <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{searchPlaceholder || 'â€”'}</p>
+                            <p className="px-3 py-2 text-xs text-gray-500 dark:text-gray-400">{searchPlaceholder || '—'}</p>
                         )}
                     </div>
                 </div>

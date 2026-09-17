@@ -17,7 +17,7 @@ import {
     validateNameField,
 } from '../../utils/formValidation';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
-import { roleHasScheduleSettings } from '../../utils/roles';
+import { roleShowsLeadAvailability } from '../../utils/roles';
 
 const ADD_USER_DOM_ID_MAP: Record<string, string> = {
     name: 'add-user-name',
@@ -97,7 +97,7 @@ export const AddUserModal = () => {
             newErrors.role = t('roleRequired') || 'Role is required';
         }
 
-        if (roleHasScheduleSettings(formData.role)) {
+        if (roleShowsLeadAvailability(formData.role)) {
             const start = formData.workStartTime.trim();
             const end = formData.workEndTime.trim();
             if ((start && !end) || (!start && end)) {
@@ -158,7 +158,7 @@ export const AddUserModal = () => {
                 role: formData.role,
                 company_id: companyIdNumber,
             };
-            if (roleHasScheduleSettings(formData.role)) {
+            if (roleShowsLeadAvailability(formData.role)) {
                 userData.weekly_day_off =
                     formData.weeklyDayOff === '' ? null : parseInt(formData.weeklyDayOff, 10);
                 const start = formData.workStartTime.trim();
@@ -366,7 +366,7 @@ export const AddUserModal = () => {
                     </Select>
                     {errors.role && <p className="text-red-500 text-xs mt-1">{errors.role}</p>}
                 </div>
-                {roleHasScheduleSettings(formData.role) && (
+                {roleShowsLeadAvailability(formData.role) && (
                     <div>
                         <Label htmlFor="add-user-weekly-day-off">{t('weeklyDayOff')}</Label>
                         <Select
@@ -386,7 +386,7 @@ export const AddUserModal = () => {
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
                     </div>
                 )}
-                {roleHasScheduleSettings(formData.role) && (
+                {roleShowsLeadAvailability(formData.role) && (
                     <div>
                         <Label htmlFor="add-user-work-start">{t('workingHours')}</Label>
                         <div className="grid grid-cols-2 gap-3">

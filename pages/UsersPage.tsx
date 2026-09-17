@@ -7,7 +7,7 @@ import { Supervisor, User } from '../types';
 import { useUsers, useReactivateEmployee, useSetUserAvailability, useWorkSessionSummary } from '../hooks/useQueries';
 import { deleteSupervisorAPI, getSupervisorsAPI, updateSupervisorAPI, updateUserAPI } from '../services/api';
 import { SupervisorFormData, SupervisorModal } from './settings/SupervisorModal';
-import { getRoleTranslation, normalizeRole } from '../utils/roles';
+import { getRoleTranslation, normalizeRole, roleShowsLeadAvailability } from '../utils/roles';
 import { formatWorkedDuration } from '../utils/workHours';
 import { buildWaMeUrl } from '../utils/whatsappLaunch';
 import { UserAvailabilityBadge } from '../components/UserAvailabilityBadge';
@@ -25,9 +25,6 @@ const UNAVAILABLE_PRESETS: Array<{ minutes: number; labelKey: string }> = [
 
 /** Mirrors MAX_UNAVAILABLE_MINUTES in accounts/employee_availability.py (24h). */
 const MAX_UNAVAILABLE_MINUTES = 24 * 60;
-
-/** Roles that are in the lead/arrival routing pool, and so have availability to manage. */
-const ROUTED_ROLES = new Set(['Employee', 'Doctor']);
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -265,7 +262,7 @@ const UserCard = ({
 
     // Deactivated users are out of routing entirely; availability is meaningless for them.
     const showsAvailability =
-        user.is_active !== false && ROUTED_ROLES.has(normalizeRole(user.role) || '');
+        user.is_active !== false && roleShowsLeadAvailability(user.role);
     const isTemporarilyUnavailable = getAssignmentBlockReason(user, companyTz) === 'unavailable';
 
     return (
@@ -285,6 +282,17 @@ const UserCard = ({
                                         <DropdownItem onClick={() => onEditSupervisor?.(user)}>
                                             {t('supervisorsEdit')}
                                         </DropdownItem>
+                                        {showsAvailability && (
+                                            isTemporarilyUnavailable ? (
+                                                <DropdownItem onClick={() => setIsAvailableConfirmOpen(true)}>
+                                                    {t('markAvailable')}
+                                                </DropdownItem>
+                                            ) : (
+                                                <DropdownItem onClick={() => setIsUnavailableModalOpen(true)}>
+                                                    {t('markUnavailable')}
+                                                </DropdownItem>
+                                            )
+                                        )}
                                         {user.is_active !== false ? (
                                             <DropdownItem onClick={handleDeactivate}>{t('deactivateEmployee')}</DropdownItem>
                                         ) : (

@@ -4,7 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { PhoneText } from '../PhoneText';
-import { getRoleTranslation } from '../../utils/roles';
+import { getRoleTranslation, roleShowsLeadAvailability } from '../../utils/roles';
 import { toHtmlTimeValue } from '../../utils/weekOff';
 import { UserAvailabilityBadge } from '../UserAvailabilityBadge';
 
@@ -87,6 +87,7 @@ export const ViewUserModal = () => {
 
     const displayName = getUserDisplayName(selectedUser, t);
     const companyTz = currentUser?.company?.timezone ?? 'UTC';
+    const showsLeadAvailability = roleShowsLeadAvailability(selectedUser.role);
 
     return (
         <Modal isOpen={isViewUserModalOpen} onClose={() => setIsViewUserModalOpen(false)} title={`${t('viewEmployee')}: ${displayName}`}>
@@ -143,37 +144,41 @@ export const ViewUserModal = () => {
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            {t('weeklyDayOff')}
-                        </label>
-                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
-                            {weeklyDayOffLabel(selectedUser, t)}
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
-                    </div>
+                    {showsLeadAvailability && (
+                        <>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    {t('weeklyDayOff')}
+                                </label>
+                                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
+                                    {weeklyDayOffLabel(selectedUser, t)}
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('weeklyDayOffHelp')}</p>
+                            </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            {t('workingHours')}
-                        </label>
-                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
-                            {selectedUser.work_start_time && selectedUser.work_end_time
-                                ? `${toHtmlTimeValue(selectedUser.work_start_time)} – ${toHtmlTimeValue(selectedUser.work_end_time)}`
-                                : t('workingHoursNone')}
-                        </div>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('workingHoursHelp')}</p>
-                    </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    {t('workingHours')}
+                                </label>
+                                <div className="px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-gray-100">
+                                    {selectedUser.work_start_time && selectedUser.work_end_time
+                                        ? `${toHtmlTimeValue(selectedUser.work_start_time)} – ${toHtmlTimeValue(selectedUser.work_end_time)}`
+                                        : t('workingHoursNone')}
+                                </div>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t('workingHoursHelp')}</p>
+                            </div>
 
-                    {/* No planned-leave row: nothing in the UI schedules a date window
-                        any more — short absences go through "Mark unavailable", whose
-                        state is shown by the availability row below. */}
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                            {t('availableForLeads')}
-                        </label>
-                        <UserAvailabilityBadge user={selectedUser} companyTimeZone={companyTz} t={t} />
-                    </div>
+                            {/* No planned-leave row: nothing in the UI schedules a date window
+                                any more — short absences go through "Mark unavailable", whose
+                                state is shown by the availability row below. */}
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                    {t('availableForLeads')}
+                                </label>
+                                <UserAvailabilityBadge user={selectedUser} companyTimeZone={companyTz} t={t} />
+                            </div>
+                        </>
+                    )}
                 </div>
 
                 {/* Action Buttons */}

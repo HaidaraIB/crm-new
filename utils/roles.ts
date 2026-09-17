@@ -193,6 +193,12 @@ export const showInLeadAssigneePicker = (role?: string): boolean => {
   return ar !== 'DataEntry' && ar !== 'Reception' && ar !== 'CallCenter';
 };
 
+/** Roles that can receive lead assignments and should show availability/schedule UI. */
+export const roleShowsLeadAvailability = (role?: string): boolean => {
+  const r = normalizeRole(role);
+  return r === 'Employee' || r === 'Doctor' || r === 'Supervisor';
+};
+
 /** Deactivate flow: ask whether to redistribute leads (data entry / reception / call center cannot hold assignee leads). */
 export const roleUsesLeadReassignOnDeactivate = (role?: string): boolean => {
   const ar = normalizeRole(role);

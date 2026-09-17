@@ -2454,7 +2454,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   if (variant === 'dialog' && onClose) {
     return createPortal(
       <div
-        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-3 sm:p-4"
+        className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-4"
         role="presentation"
         onMouseDown={(e) => {
           if (e.target === e.currentTarget) onClose();
@@ -2464,7 +2464,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
           role="dialog"
           aria-modal="true"
           aria-labelledby="team-chat-dialog-title"
-          className="flex max-h-[90vh] w-full max-w-[min(72rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-2xl dark:border-gray-700 dark:bg-gray-900"
+          className="flex max-h-[90vh] w-full max-w-[min(72rem,calc(100vw-1.5rem))] flex-col overflow-hidden rounded-xl border border-gray-200 bg-gray-50 shadow-2xl ring-1 ring-black/10 dark:border-gray-700 dark:bg-gray-900 dark:ring-white/10"
           onMouseDown={(e) => e.stopPropagation()}
         >
           <div className="flex shrink-0 items-center justify-between gap-3 border-b border-gray-200 bg-white px-4 py-3 dark:border-gray-700 dark:bg-gray-800">

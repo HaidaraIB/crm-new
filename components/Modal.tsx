@@ -25,8 +25,8 @@ export const Modal = ({ isOpen, onClose, title, children, maxWidth = 'md', overl
     '4xl': 'max-w-4xl',
   }[maxWidth];
   return (
-    <div className={`fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-3 sm:p-4 ${overlayClassName ?? 'z-50'}`}>
-      <div className={`bg-card dark:bg-gray-800 rounded-lg shadow-xl w-full ${maxWidthClass} m-auto max-h-[90vh] flex flex-col`} onClick={(e) => e.stopPropagation()}>
+    <div className={`fixed inset-0 flex items-center justify-center p-3 sm:p-4 ${overlayClassName ?? 'z-50'}`}>
+      <div className={`bg-card dark:bg-gray-800 rounded-lg shadow-2xl ring-1 ring-black/10 dark:ring-white/10 w-full ${maxWidthClass} m-auto max-h-[90vh] flex flex-col`} onClick={(e) => e.stopPropagation()}>
         <div className="p-3 sm:p-4 border-b dark:border-gray-700 flex justify-between items-center flex-shrink-0 bg-card dark:bg-gray-800">
           <h3 className={`text-lg sm:text-xl font-semibold text-gray-900 dark:text-white ${language === 'ar' ? 'pr-2' : 'pl-2'}`}>{title}</h3>
           <button onClick={onClose} className="text-gray-600 dark:text-gray-400 hover:text-secondary dark:hover:text-secondary text-2xl sm:text-3xl leading-none flex-shrink-0">&times;</button>

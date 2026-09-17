@@ -1,9 +1,12 @@
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText, RefreshButton, Modal, NumberInput } from '../components/index';
-import { User } from '../types';
+import { Supervisor, User } from '../types';
 import { useUsers, useReactivateEmployee, useSetUserAvailability, useWorkSessionSummary } from '../hooks/useQueries';
+import { deleteSupervisorAPI, getSupervisorsAPI, updateSupervisorAPI, updateUserAPI } from '../services/api';
+import { SupervisorFormData, SupervisorModal } from './settings/SupervisorModal';
 import { getRoleTranslation, normalizeRole } from '../utils/roles';
 import { formatWorkedDuration } from '../utils/workHours';
 import { buildWaMeUrl } from '../utils/whatsappLaunch';
@@ -121,7 +124,21 @@ const WORK_HOURS_WINDOW_DAYS = 7;
 
 type UserWorkHours = { today_seconds: number; range_seconds: number };
 
-const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }) => {
+type UserCardProps = {
+    user: User;
+    workHours?: UserWorkHours;
+    canManageSupervisors?: boolean;
+    onEditSupervisor?: (user: User) => void;
+    onDeleteSupervisor?: (user: User) => void;
+};
+
+const UserCard = ({
+    user,
+    workHours,
+    canManageSupervisors = false,
+    onEditSupervisor,
+    onDeleteSupervisor,
+}: UserCardProps) => {
     const {
         t,
         setSelectedUser,
@@ -261,28 +278,46 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
                         </Button>
                     }>
                         <DropdownItem onClick={handleView}>{t('viewEmployee')}</DropdownItem>
-                        {isSupervisorUser ? null : !isUserAdmin ? (
-                            <>
-                                <DropdownItem onClick={handleEdit}>{t('editEmployee')}</DropdownItem>
-                                {showsAvailability && (
-                                    isTemporarilyUnavailable ? (
-                                        <DropdownItem onClick={() => setIsAvailableConfirmOpen(true)}>
-                                            {t('markAvailable')}
+                        {!isUserAdmin && (
+                            isSupervisorUser ? (
+                                canManageSupervisors ? (
+                                    <>
+                                        <DropdownItem onClick={() => onEditSupervisor?.(user)}>
+                                            {t('supervisorsEdit')}
                                         </DropdownItem>
+                                        {user.is_active !== false ? (
+                                            <DropdownItem onClick={handleDeactivate}>{t('deactivateEmployee')}</DropdownItem>
+                                        ) : (
+                                            <DropdownItem onClick={handleReactivate}>{t('reactivateEmployee')}</DropdownItem>
+                                        )}
+                                        <DropdownItem onClick={() => onDeleteSupervisor?.(user)}>
+                                            {t('deleteEmployee')}
+                                        </DropdownItem>
+                                    </>
+                                ) : null
+                            ) : (
+                                <>
+                                    <DropdownItem onClick={handleEdit}>{t('editEmployee')}</DropdownItem>
+                                    {showsAvailability && (
+                                        isTemporarilyUnavailable ? (
+                                            <DropdownItem onClick={() => setIsAvailableConfirmOpen(true)}>
+                                                {t('markAvailable')}
+                                            </DropdownItem>
+                                        ) : (
+                                            <DropdownItem onClick={() => setIsUnavailableModalOpen(true)}>
+                                                {t('markUnavailable')}
+                                            </DropdownItem>
+                                        )
+                                    )}
+                                    {user.is_active !== false ? (
+                                        <DropdownItem onClick={handleDeactivate}>{t('deactivateEmployee')}</DropdownItem>
                                     ) : (
-                                        <DropdownItem onClick={() => setIsUnavailableModalOpen(true)}>
-                                            {t('markUnavailable')}
-                                        </DropdownItem>
-                                    )
-                                )}
-                                {user.is_active !== false ? (
-                                    <DropdownItem onClick={handleDeactivate}>{t('deactivateEmployee')}</DropdownItem>
-                                ) : (
-                                    <DropdownItem onClick={handleReactivate}>{t('reactivateEmployee')}</DropdownItem>
-                                )}
-                                <DropdownItem onClick={handleDelete}>{t('deleteEmployee')}</DropdownItem>
-                            </>
-                        ) : null}
+                                        <DropdownItem onClick={handleReactivate}>{t('reactivateEmployee')}</DropdownItem>
+                                    )}
+                                    <DropdownItem onClick={handleDelete}>{t('deleteEmployee')}</DropdownItem>
+                                </>
+                            )
+                        )}
                     </Dropdown>
                 </div>
             )}
@@ -501,17 +536,143 @@ const UserCard = ({ user, workHours }: { user: User; workHours?: UserWorkHours }
 };
 
 
+const parseSupervisorsResponse = (res: unknown): Supervisor[] => {
+    if (res && typeof res === 'object' && Array.isArray((res as { results?: Supervisor[] }).results)) {
+        return (res as { results: Supervisor[] }).results;
+    }
+    return Array.isArray(res) ? res : [];
+};
+
 export const UsersPage = () => {
-    const { t, currentUser, setIsAddUserModalOpen, hasSupervisorPermission } = useAppContext();
+    const queryClient = useQueryClient();
+    const {
+        t,
+        currentUser,
+        setIsAddUserModalOpen,
+        hasSupervisorPermission,
+        isDeactivateEmployeeModalOpen,
+    } = useAppContext();
     const [usersPageNumber, setUsersPageNumber] = useState(1);
     const [usersPageSize, setUsersPageSize] = usePersistedPageSize('users');
+    const isOwner = normalizeRole(currentUser?.role) === 'Owner';
+    const [editingSupervisor, setEditingSupervisor] = useState<Supervisor | null>(null);
+    const [isSupervisorModalOpen, setIsSupervisorModalOpen] = useState(false);
+    const [isSavingSupervisor, setIsSavingSupervisor] = useState(false);
+    const [deleteSupervisorTarget, setDeleteSupervisorTarget] = useState<Supervisor | null>(null);
+    const [isDeletingSupervisor, setIsDeletingSupervisor] = useState(false);
+
+    const { data: supervisorsData, refetch: refetchSupervisors } = useQuery({
+        queryKey: ['supervisors'],
+        queryFn: async () => parseSupervisorsResponse(await getSupervisorsAPI()),
+        enabled: isOwner,
+    });
+
+    const supervisorByUserId = useMemo(() => {
+        const map = new Map<number, Supervisor>();
+        for (const supervisor of supervisorsData ?? []) {
+            map.set(supervisor.user.id, supervisor);
+        }
+        return map;
+    }, [supervisorsData]);
+
+    const deactivateModalWasOpen = useRef(false);
+    useEffect(() => {
+        if (!isOwner) return;
+        if (deactivateModalWasOpen.current && !isDeactivateEmployeeModalOpen) {
+            void refetchSupervisors();
+            void queryClient.invalidateQueries({ queryKey: ['users'] });
+        }
+        deactivateModalWasOpen.current = isDeactivateEmployeeModalOpen;
+    }, [isDeactivateEmployeeModalOpen, isOwner, queryClient, refetchSupervisors]);
+
+    const resolveSupervisorForUser = async (user: User): Promise<Supervisor | null> => {
+        const cached = supervisorByUserId.get(user.id);
+        if (cached) return cached;
+        const list = parseSupervisorsResponse(await getSupervisorsAPI());
+        return list.find((supervisor) => supervisor.user.id === user.id) ?? null;
+    };
+
+    const handleEditSupervisor = async (user: User) => {
+        const supervisor = await resolveSupervisorForUser(user);
+        if (!supervisor) {
+            alert(t('errorLoadingEmployees') || 'Could not load supervisor details.');
+            return;
+        }
+        setEditingSupervisor(supervisor);
+        setIsSupervisorModalOpen(true);
+    };
+
+    const handleDeleteSupervisor = async (user: User) => {
+        const supervisor = await resolveSupervisorForUser(user);
+        if (!supervisor) {
+            alert(t('errorLoadingEmployees') || 'Could not load supervisor details.');
+            return;
+        }
+        setDeleteSupervisorTarget(supervisor);
+    };
+
+    const handleSaveSupervisor = async (data: SupervisorFormData) => {
+        if (!editingSupervisor) return;
+        setIsSavingSupervisor(true);
+        try {
+            await Promise.all([
+                updateUserAPI(editingSupervisor.user.id, {
+                    first_name: data.first_name,
+                    last_name: data.last_name,
+                    phone: (data.phone || '').trim(),
+                }),
+                updateSupervisorAPI(editingSupervisor.id, {
+                    user_id: editingSupervisor.user.id,
+                    is_active: data.is_active,
+                    can_manage_leads: data.can_manage_leads,
+                    can_manage_deals: data.can_manage_deals,
+                    can_manage_tasks: data.can_manage_tasks,
+                    can_view_reports: data.can_view_reports,
+                    can_manage_users: data.can_manage_users,
+                    can_manage_products: data.can_manage_products,
+                    can_manage_services: data.can_manage_services,
+                    can_manage_real_estate: data.can_manage_real_estate,
+                    can_manage_settings: data.can_manage_settings,
+                    can_delete_clients: data.can_delete_clients,
+                    can_manage_whatsapp_chats: data.can_manage_whatsapp_chats,
+                    can_manage_whatsapp_calls: data.can_manage_whatsapp_calls,
+                    notify_team_activity_status: data.notify_team_activity_status,
+                    notify_team_activity_action: data.notify_team_activity_action,
+                    notify_team_activity_overdue: data.notify_team_activity_overdue,
+                }),
+            ]);
+            setIsSupervisorModalOpen(false);
+            setEditingSupervisor(null);
+            await refetchSupervisors();
+            await queryClient.invalidateQueries({ queryKey: ['users'] });
+        } catch (error) {
+            console.error('Error saving supervisor:', error);
+        } finally {
+            setIsSavingSupervisor(false);
+        }
+    };
+
+    const confirmDeleteSupervisor = async () => {
+        if (!deleteSupervisorTarget) return;
+        setIsDeletingSupervisor(true);
+        try {
+            await deleteSupervisorAPI(deleteSupervisorTarget.id);
+            setDeleteSupervisorTarget(null);
+            await refetchSupervisors();
+            await queryClient.invalidateQueries({ queryKey: ['users'] });
+        } catch (error) {
+            console.error('Error deleting supervisor:', error);
+        } finally {
+            setIsDeletingSupervisor(false);
+        }
+    };
     
     // Fetch users using React Query
     const { data: usersResponse, isLoading: usersLoading, isFetching: usersFetching, error: usersError, refetch: refetchUsers } = useUsers(
         usersPageNumber,
         undefined,
         usersPageSize,
-        { excludeRoles: ['admin', 'super_admin', 'supervisor'] }
+        { excludeRoles: ['admin', 'super_admin'] }
     );
     const allUsers = usersResponse?.results || [];
     const hasNextPage = Boolean(usersResponse?.next);
@@ -525,10 +686,10 @@ export const UsersPage = () => {
         setUsersPageNumber(1);
     }, [usersPageSize]);
     
-    // Exclude company owner and supervisors from the grid; supervisors are managed in Settings → Supervisors.
+    // Exclude company owner from the grid; supervisors stay visible (permissions managed in Settings → Supervisors).
     const filteredUsers = allUsers.filter(user => {
         const normalizedRole = normalizeRole(user.role);
-        return normalizedRole !== 'Owner' && normalizedRole !== 'Supervisor';
+        return normalizedRole !== 'Owner';
     });
     const userCount = totalUsersCount || filteredUsers.length;
     
@@ -666,6 +827,9 @@ export const UsersPage = () => {
                                             ? workHoursByUser.get(user.id) ?? zeroHours
                                             : undefined
                                     }
+                                    canManageSupervisors={isOwner}
+                                    onEditSupervisor={handleEditSupervisor}
+                                    onDeleteSupervisor={handleDeleteSupervisor}
                                 />
                             </div>
                         ))}
@@ -733,6 +897,53 @@ export const UsersPage = () => {
                             </Button>
                         </div>
                     </div>
+                </>
+            )}
+            {isOwner && (
+                <>
+                    <SupervisorModal
+                        isOpen={isSupervisorModalOpen}
+                        onClose={() => {
+                            setIsSupervisorModalOpen(false);
+                            setEditingSupervisor(null);
+                        }}
+                        onSave={handleSaveSupervisor}
+                        editingSupervisor={editingSupervisor}
+                        isLoading={isSavingSupervisor}
+                    />
+                    {deleteSupervisorTarget && (
+                        <div
+                            className="fixed inset-0 z-50 flex justify-center items-center p-4"
+                            onClick={() => setDeleteSupervisorTarget(null)}
+                        >
+                            <div
+                                className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full shadow-2xl ring-1 ring-black/10 dark:ring-white/10"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <p className="text-gray-700 dark:text-gray-300 mb-4">
+                                    {t('supervisorsDeleteConfirm')}{' '}
+                                    {deleteSupervisorTarget.user.first_name} {deleteSupervisorTarget.user.last_name}
+                                </p>
+                                <div className="flex justify-end gap-2">
+                                    <Button
+                                        variant="secondary"
+                                        onClick={() => setDeleteSupervisorTarget(null)}
+                                        disabled={isDeletingSupervisor}
+                                    >
+                                        {t('cancel')}
+                                    </Button>
+                                    <Button
+                                        variant="danger"
+                                        onClick={() => void confirmDeleteSupervisor()}
+                                        loading={isDeletingSupervisor}
+                                        disabled={isDeletingSupervisor}
+                                    >
+                                        {t('delete')}
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
+                    )}
                 </>
             )}
         </PageWrapper>

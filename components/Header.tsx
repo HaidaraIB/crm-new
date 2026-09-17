@@ -140,7 +140,7 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
             {isLogoutConfirmOpen &&
                 createPortal(
                     <div
-                        className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 p-4"
+                        className="fixed inset-0 z-[100] flex items-center justify-center p-4"
                         role="presentation"
                         onClick={() => setIsLogoutConfirmOpen(false)}
                     >
@@ -148,7 +148,7 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                             role="dialog"
                             aria-modal="true"
                             aria-labelledby="logout-confirm-title"
-                            className="w-full max-w-md transform rounded-lg bg-white shadow-xl transition-all dark:bg-gray-800"
+                            className="w-full max-w-md transform rounded-lg bg-white shadow-2xl ring-1 ring-black/10 transition-all dark:bg-gray-800 dark:ring-white/10"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="p-6">

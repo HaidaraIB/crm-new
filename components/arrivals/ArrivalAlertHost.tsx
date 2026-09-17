@@ -74,13 +74,13 @@ export const ArrivalAlertHost = () => {
 
   return (
     <div
-      className="fixed inset-0 z-[95] flex items-center justify-center bg-black/50 p-4 dark:bg-black/60"
+      className="fixed inset-0 z-[95] flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-live="assertive"
       aria-label={t('customerReception')}
     >
-      <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-primary-300/80 bg-white text-center shadow-2xl dark:border-primary-700/60 dark:bg-gray-900">
+      <div className="w-full max-w-sm overflow-hidden rounded-2xl border border-primary-300/80 bg-white text-center shadow-2xl ring-1 ring-black/10 dark:border-primary-700/60 dark:bg-gray-900 dark:ring-white/10">
         <div className="flex flex-col items-center gap-3 px-6 pt-8 pb-6">
           <span className="relative flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 text-primary-700 dark:bg-primary-900/50 dark:text-primary-300">
             <span className="absolute inset-0 animate-ping rounded-full bg-primary-400/40" />

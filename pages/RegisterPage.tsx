@@ -1596,8 +1596,8 @@ export const RegisterPage = () => {
                 </div>
             </div>
             {showVerificationModal && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4">
-                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl p-6 w-full max-w-md relative">
+                <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+                    <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl ring-1 ring-black/10 dark:ring-white/10 p-6 w-full max-w-md relative">
                         <button
                             className="absolute top-3 end-3 text-gray-500 dark:text-gray-300 hover:text-gray-800 dark:hover:text-gray-100"
                             onClick={handleSkipVerification}

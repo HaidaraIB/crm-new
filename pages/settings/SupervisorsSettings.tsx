@@ -387,8 +387,8 @@ export const SupervisorsSettings = () => {
       </TableHorizontalScroll>
       <SupervisorModal isOpen={isModalOpen} onClose={handleCloseModal} onSave={handleSave} editingSupervisor={editingSupervisor} isLoading={isSaving} />
       {deleteTarget && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full shadow-xl" onClick={(e) => e.stopPropagation()}>
+        <div className="fixed inset-0 z-50 flex justify-center items-center p-4" onClick={() => setDeleteTarget(null)}>
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full shadow-2xl ring-1 ring-black/10 dark:ring-white/10" onClick={(e) => e.stopPropagation()}>
             <p className="text-gray-700 dark:text-gray-300 mb-4">
               {t('supervisorsDeleteConfirm')} {deleteTarget.user.first_name} {deleteTarget.user.last_name}
             </p>

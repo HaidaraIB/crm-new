@@ -465,6 +465,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
       onSuccess();
       onClose();
     } catch (e: any) {
+      setShowValidationConfirm(false);
       setErrors({ general: resolveLocalizedApiError(e, t, 'Failed to send to review') });
     } finally {
       setSendingToReview(false);

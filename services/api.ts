@@ -200,6 +200,20 @@ export function resolveLocalizedApiError(
       if (m != null) metaMsg = String(m).trim();
     }
   }
+  const metaTemplateCodes = new Set([
+    'meta_template_submit_failed',
+    'meta_template_delete_failed',
+    'whatsapp_template_header_upload_failed',
+  ]);
+  if (t && code && metaTemplateCodes.has(code)) {
+    const translated = t(code);
+    const specific =
+      (apiMessage && !/^[a-z][a-z0-9_]+$/.test(apiMessage) ? apiMessage : '') || metaMsg;
+    if (specific) {
+      const prefix = translated && translated !== code ? translated : fallback;
+      return specific.includes(prefix) ? specific : `${prefix}: ${specific}`;
+    }
+  }
   if (t && code) {
     const translated = t(code);
     if (translated && translated !== code) {

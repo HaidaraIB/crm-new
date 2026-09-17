@@ -61,6 +61,16 @@ function canCloneTemplate(tpl: MessageTemplateType, templates: MessageTemplateTy
     return true;
 }
 
+function isTemplateOnMeta(tpl: MessageTemplateType): boolean {
+    if (tpl.meta_template_id) return true;
+    const metaStatus = (tpl.meta_status || '').toUpperCase();
+    return ['APPROVED', 'PENDING', 'REJECTED'].includes(metaStatus);
+}
+
+function deleteTemplateConfirmMessage(tpl: MessageTemplateType, t: (key: string) => string): string {
+    return isTemplateOnMeta(tpl) ? t('deleteTemplateConfirmMeta') : t('deleteTemplateConfirm');
+}
+
 export const TemplateManagementSettings = () => {
     const { t, language, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, showAlert } = useAppContext();
     const [templateSearch, setTemplateSearch] = useState('');
@@ -263,13 +273,20 @@ export const TemplateManagementSettings = () => {
                                                             onClick={() => {
                                                                 setConfirmDeleteConfig({
                                                                     title: t('deleteTemplate'),
-                                                                    message: t('deleteTemplateConfirm'),
+                                                                    message: deleteTemplateConfirmMessage(tpl, t),
                                                                     itemName: tpl.name,
                                                                     confirmButtonText: t('delete'),
                                                                     confirmButtonVariant: 'danger',
                                                                     onConfirm: async () => {
-                                                                        await deleteMessageTemplateAPI(tpl.id);
-                                                                        refetchTemplates();
+                                                                        try {
+                                                                            await deleteMessageTemplateAPI(tpl.id);
+                                                                            refetchTemplates();
+                                                                        } catch (e: any) {
+                                                                            showAlert(
+                                                                                resolveLocalizedApiError(e, t, t('meta_template_delete_failed')),
+                                                                                'error',
+                                                                            );
+                                                                        }
                                                                     },
                                                                 });
                                                                 setIsConfirmDeleteModalOpen(true);
@@ -322,15 +339,22 @@ export const TemplateManagementSettings = () => {
                 onRequestDelete={(tpl) => {
                     setConfirmDeleteConfig({
                         title: t('deleteTemplate'),
-                        message: t('deleteTemplateConfirm'),
+                        message: deleteTemplateConfirmMessage(tpl, t),
                         itemName: tpl.name,
                         confirmButtonText: t('delete'),
                         confirmButtonVariant: 'danger',
                         onConfirm: async () => {
-                            await deleteMessageTemplateAPI(tpl.id);
-                            refetchTemplates();
-                            setIsEditTemplateOpen(false);
-                            setEditingTemplate(null);
+                            try {
+                                await deleteMessageTemplateAPI(tpl.id);
+                                refetchTemplates();
+                                setIsEditTemplateOpen(false);
+                                setEditingTemplate(null);
+                            } catch (e: any) {
+                                showAlert(
+                                    resolveLocalizedApiError(e, t, t('meta_template_delete_failed')),
+                                    'error',
+                                );
+                            }
                         },
                     });
                     setIsConfirmDeleteModalOpen(true);

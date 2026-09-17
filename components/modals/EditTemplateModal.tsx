@@ -6,7 +6,7 @@ import {
   insertTextAtCaret,
 } from '../MessagePlaceholderChips';
 import type { MessageTemplateType, TemplateButtonPayload } from '../../services/api';
-import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTemplateAPI, resolveLocalizedApiError } from '../../services/api';
+import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTemplateAPI, resolveLocalizedApiError, getApiErrorDetails } from '../../services/api';
 import { SelectMediaModal } from './SelectMediaModal';
 import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
 import { clearFieldError } from '../../utils/formFieldErrors';
@@ -86,6 +86,16 @@ type TemplateButton = {
   url?: string;
   dynamicUrl?: boolean;
 };
+
+function isTemplateOnMeta(tpl: MessageTemplateType): boolean {
+  if (tpl.meta_template_id) return true;
+  const metaStatus = (tpl.meta_status || '').toUpperCase();
+  return ['APPROVED', 'PENDING', 'REJECTED'].includes(metaStatus);
+}
+
+function deleteTemplateConfirmMessage(tpl: MessageTemplateType, t: (key: string) => string): string {
+  return isTemplateOnMeta(tpl) ? t('deleteTemplateConfirmMeta') : t('deleteTemplateConfirm');
+}
 
 type EditTemplateModalProps = {
   isOpen: boolean;
@@ -402,7 +412,26 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
         onClose();
       }
     } catch (e: any) {
-      setErrors({ general: e?.message || (t('save') || 'Save') + ' failed' });
+      const details = getApiErrorDetails(e?.data);
+      const fieldErrors: Record<string, string> = {};
+      if (details && typeof details === 'object') {
+        for (const [key, val] of Object.entries(details as Record<string, unknown>)) {
+          if (!Array.isArray(val) || !val[0]) continue;
+          const msg = String(val[0]);
+          if (key === 'header_media') fieldErrors.headerMedia = msg;
+          else if (key === 'name') fieldErrors.name = msg;
+          else if (key === 'content') fieldErrors.content = msg;
+          else fieldErrors.general = msg;
+        }
+      }
+      setErrors({
+        ...fieldErrors,
+        general:
+          fieldErrors.general ||
+          (!fieldErrors.headerMedia && !fieldErrors.name && !fieldErrors.content
+            ? resolveLocalizedApiError(e, t, (t('save') || 'Save') + ' failed')
+            : undefined),
+      });
     } finally {
       setSaving(false);
     }
@@ -845,8 +874,15 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
               onClick={() => {
                 if (onRequestDelete) {
                   onRequestDelete(template);
-                } else if (window.confirm(t('deleteTemplateConfirm'))) {
-                  deleteMessageTemplateAPI(template.id).then(onSuccess).then(onClose);
+                } else if (window.confirm(deleteTemplateConfirmMessage(template, t))) {
+                  deleteMessageTemplateAPI(template.id)
+                    .then(onSuccess)
+                    .then(onClose)
+                    .catch((err) => {
+                      setErrors({
+                        general: resolveLocalizedApiError(err, t, t('meta_template_delete_failed')),
+                      });
+                    });
                 }
               }}
             >

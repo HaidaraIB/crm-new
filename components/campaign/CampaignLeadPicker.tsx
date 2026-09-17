@@ -10,7 +10,7 @@ import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
 import { leadHasPhone, resolveLeadPhoneRaw } from '../../utils/smsSendHelpers';
 import { Button, Loader, PhoneText } from '../index';
 import { getStatusSurfaceStyles } from '../LeadStatusDropdown';
-import { SearchIcon } from '../icons';
+import { ChevronDownIcon, SearchIcon } from '../icons';
 
 const LEAD_TYPES = ['fresh', 'hot', 'cold'] as const;
 const PRIORITIES = ['high', 'medium', 'low'] as const;
@@ -227,7 +227,7 @@ function MultiSelectDropdown({
             <button type="button" onClick={() => onOpenChange(!open)} className={dropdownBtnClass(active, open)}>
                 <span>{label}</span>
                 {active && <span className="opacity-80">({selected.length})</span>}
-                <span className="text-[10px] opacity-70">â–¾</span>
+                <ChevronDownIcon className="h-2.5 w-2.5 shrink-0 opacity-70" aria-hidden />
             </button>
             {open && (
                 <div
@@ -733,7 +733,7 @@ export function CampaignLeadPicker({
                             className={dropdownBtnClass(dateActive, openDropdown === 'date')}
                         >
                             <span>{dateActive ? dateLabel : t('dates')}</span>
-                            <span className="text-[10px] opacity-70">â–¾</span>
+                            <ChevronDownIcon className="h-2.5 w-2.5 shrink-0 opacity-70" aria-hidden />
                         </button>
                         {openDropdown === 'date' && (
                             <div
@@ -800,7 +800,7 @@ export function CampaignLeadPicker({
                             className={dropdownBtnClass(!filters.withPhoneOnly || filters.assignedToMe, openDropdown === 'more')}
                         >
                             {t('campaignMoreFilters')}
-                            <span className="text-[10px] opacity-70">â–¾</span>
+                            <ChevronDownIcon className="h-2.5 w-2.5 shrink-0 opacity-70" aria-hidden />
                         </button>
                         {openDropdown === 'more' && (
                             <div

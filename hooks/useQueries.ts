@@ -91,7 +91,8 @@ export const queryKeys = {
   deals: (page?: number, pageSize?: number, search?: string, stage?: string) =>
     ['deals', page ?? 'all', pageSize ?? 'default', search ?? '', stage ?? ''] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
-  activities: (filters?: any) => ['activities', filters] as const,
+  activities: (page?: number, pageSize?: number, filters?: any) =>
+    ['activities', page ?? 'all', pageSize ?? 'default', filters] as const,
   clientTasks: ['clientTasks'] as const,
   clientCalls: ['clientCalls'] as const,
   clientVisits: ['clientVisits'] as const,
@@ -298,14 +299,18 @@ export const useTasks = (
 };
 
 export const useActivities = (
+  pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+  pageSize?: number,
   filters?: any,
-  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>
 ) => {
+  const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
+  const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   return useQuery({
-    queryKey: queryKeys.activities(filters),
-    queryFn: () => getActivitiesAPI(filters),
+    queryKey: queryKeys.activities(page, pageSize, filters),
+    queryFn: () => getActivitiesAPI(page, pageSize, filters),
     staleTime: 1 * 60 * 1000, // 1 minute
-    ...options,
+    ...resolvedOptions,
   });
 };
 
@@ -352,7 +357,7 @@ export const useCreateClientFieldVisit = (options?: UseMutationOptions<any, Erro
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientFieldVisits });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
       if (variables.client || variables.clientId) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.clientEvents(variables.client || variables.clientId),
@@ -1313,7 +1318,7 @@ export const useCreateTask = (options?: UseMutationOptions<any, Error, any>) => 
     mutationFn: (data: any) => createTaskAPI(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1325,7 +1330,7 @@ export const useUpdateTask = (options?: UseMutationOptions<any, Error, { id: num
     mutationFn: ({ id, data }: { id: number; data: any }) => updateTaskAPI(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1340,7 +1345,7 @@ export const usePatchTask = (
       patchTaskAPI(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1352,7 +1357,7 @@ export const useDeleteTask = (options?: UseMutationOptions<void, Error, number>)
     mutationFn: (id: number) => deleteTaskAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1364,7 +1369,7 @@ export const useCompleteTask = (options?: UseMutationOptions<any, Error, number>
     mutationFn: (id: number) => completeTaskAPI(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.tasks() });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1379,7 +1384,7 @@ export const useCreateClientTask = (options?: UseMutationOptions<any, Error, any
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
       // Also invalidate events for this lead if task creation triggers an event
       if (variables.client || variables.clientId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.client || variables.clientId) });
@@ -1398,7 +1403,7 @@ export const useUpdateClientTask = (options?: UseMutationOptions<any, Error, { i
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1413,7 +1418,7 @@ export const useDeleteClientTask = (options?: UseMutationOptions<void, Error, nu
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1428,7 +1433,7 @@ export const useCompleteClientTaskReminder = (options?: UseMutationOptions<any, 
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1441,7 +1446,7 @@ export const useCreateClientCall = (options?: UseMutationOptions<any, Error, any
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
       // Also invalidate events for this lead if call creation triggers an event
       if (variables.client || variables.clientId) {
         queryClient.invalidateQueries({ queryKey: queryKeys.clientEvents(variables.client || variables.clientId) });
@@ -1458,7 +1463,7 @@ export const useUpdateClientCall = (options?: UseMutationOptions<any, Error, { i
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1471,7 +1476,7 @@ export const useDeleteClientCall = (options?: UseMutationOptions<void, Error, nu
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientCalls });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1486,7 +1491,7 @@ export const useCompleteClientCallFollowUp = (options?: UseMutationOptions<any, 
       queryClient.invalidateQueries({ queryKey: queryKeys.missionBarSummary });
       queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1499,7 +1504,7 @@ export const useCreateClientVisit = (options?: UseMutationOptions<any, Error, an
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientVisits });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
       if (variables.client || variables.clientId) {
         queryClient.invalidateQueries({
           queryKey: queryKeys.clientEvents(variables.client || variables.clientId),
@@ -1517,7 +1522,7 @@ export const useUpdateClientVisit = (options?: UseMutationOptions<any, Error, { 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientVisits });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });
@@ -1530,7 +1535,7 @@ export const useDeleteClientVisit = (options?: UseMutationOptions<void, Error, n
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.clientVisits });
       queryClient.invalidateQueries({ queryKey: ['leads'] });
-      queryClient.invalidateQueries({ queryKey: queryKeys.activities() });
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
     },
     ...options,
   });

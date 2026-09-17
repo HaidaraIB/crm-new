@@ -1,403 +1,261 @@
 
-
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Loader, FilterButton, RefreshButton, SearchIcon, Input, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Card, FilterButton, RefreshButton, Button, TableHorizontalScroll, hasActiveFilters } from '../components/index';
 import { DEFAULT_ACTIVITY_FILTERS } from '../components/drawers/ActivitiesFilterDrawer';
-import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
-
-/** صف جدول الأنشطة بعد دمج client_task و client_call (المعرّف نصي لتفادي التعارض بين الأنواع) */
-type ActivitiesTableRow = {
-    id: string;
-    user: string;
-    lead: string;
-    stage: string;
-    callMethod: string;
-    date: string;
-    notes: string;
-    type?: string;
-};
-import { useClientTasks, useClientCalls, useUsers, useLeads, useStages, useCallMethods } from '../hooks/useQueries';
+import { getStageDisplayLabel } from '../utils/taskStageMapper';
+import { useActivities, useStages, useCallMethods } from '../hooks/useQueries';
 import { formatDateToLocal } from '../utils/dateUtils';
+import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import type { ActivityFeedFilters } from '../services/api';
+
+const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    const items: Array<number | 'ellipsis'> = [1];
+    const start = Math.max(2, current - 1);
+    const end = Math.min(total - 1, current + 1);
+    if (start > 2) items.push('ellipsis');
+    for (let page = start; page <= end; page += 1) items.push(page);
+    if (end < total - 1) items.push('ellipsis');
+    items.push(total);
+    return items;
+};
+
+const hexToRgb = (hex: string) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+        ? {
+              r: parseInt(result[1], 16),
+              g: parseInt(result[2], 16),
+              b: parseInt(result[3], 16),
+          }
+        : null;
+};
+
+const badgeStyle = (color: string) => {
+    const rgb = hexToRgb(color);
+    if (!rgb) return null;
+    return {
+        backgroundColor: `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`,
+        color: `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`,
+    };
+};
 
 export const ActivitiesPage = () => {
-    const { 
-        t, 
+    const {
+        t,
         activityFilters,
-        setActivityFilters,
         setIsActivitiesFilterDrawerOpen,
     } = useAppContext();
 
-    // Fetch data using React Query
-    const { data: clientTasksResponse, isLoading: clientTasksLoading, isFetching: clientTasksFetching, refetch: refetchClientTasks } = useClientTasks();
-    const clientTasks = clientTasksResponse?.results || [];
-    
-    const { data: clientCallsResponse, isLoading: clientCallsLoading, isFetching: clientCallsFetching, refetch: refetchClientCalls } = useClientCalls();
-    const clientCalls = clientCallsResponse?.results || [];
+    const [activitiesPageNumber, setActivitiesPageNumber] = useState(1);
+    const [activitiesPageSize, setActivitiesPageSize] = usePersistedPageSize('activities');
 
-    const { data: usersResponse } = useUsers();
-    const users = usersResponse?.results || [];
+    const apiFilters = useMemo((): ActivityFeedFilters => ({
+        user: activityFilters.user,
+        stage: activityFilters.stage,
+        leadType: activityFilters.leadType,
+        timePeriod: activityFilters.timePeriod,
+        dateFrom: activityFilters.dateFrom,
+        dateTo: activityFilters.dateTo,
+        search: activityFilters.search,
+    }), [activityFilters]);
 
-    const { data: leadsResponse } = useLeads();
-    const leads = leadsResponse?.results || [];
+    useEffect(() => {
+        setActivitiesPageNumber(1);
+    }, [apiFilters, activitiesPageSize]);
+
+    const {
+        data: activitiesResponse,
+        isLoading: activitiesLoading,
+        isFetching: activitiesFetching,
+        refetch: refetchActivities,
+    } = useActivities(activitiesPageNumber, undefined, activitiesPageSize, apiFilters);
+
+    const activities = activitiesResponse?.results || [];
+    const totalActivitiesCount = activitiesResponse?.count || 0;
+    const hasNextPage = Boolean(activitiesResponse?.next);
+    const hasPreviousPage = Boolean(activitiesResponse?.previous);
+    const totalPages = Math.max(1, Math.ceil(totalActivitiesCount / activitiesPageSize));
+    const paginationItems = getPaginationItems(activitiesPageNumber, totalPages);
 
     const { data: stagesData } = useStages();
-    const stages = Array.isArray(stagesData) 
-        ? stagesData 
+    const stages = Array.isArray(stagesData)
+        ? stagesData
         : (stagesData?.results || []);
-    
+
     const { data: callMethodsData } = useCallMethods();
-    const callMethods = Array.isArray(callMethodsData) 
-        ? callMethodsData 
+    const callMethods = Array.isArray(callMethodsData)
+        ? callMethodsData
         : (callMethodsData?.results || []);
 
-    // Combine ClientTasks and ClientCalls, then filter and transform to Activities format
-    const filteredActivities = useMemo((): ActivitiesTableRow[] => {
-        // Combine client tasks and client calls
-        const allActivities = [
-            ...clientTasks.map((ct: any) => ({ ...ct, type: 'client_task' })),
-            ...clientCalls.map((cc: any) => ({ ...cc, type: 'client_call' })),
-        ];
-        
-        let filtered = allActivities;
-
-        // User filter
-        if (activityFilters.user && activityFilters.user !== 'All') {
-            filtered = filtered.filter((ct: any) => {
-                const createdById = ct.created_by || ct.createdBy;
-                return createdById && createdById.toString() === activityFilters.user;
-            });
-        }
-
-        // Stage filter (for client tasks) or call method filter (for client calls)
-        if (activityFilters.stage && activityFilters.stage !== 'All') {
-            filtered = filtered.filter((item: any) => {
-                if (item.type === 'client_task') {
-                    const stageName = item.stage_name || item.stage || '';
-                    return stageName === activityFilters.stage;
-                } else if (item.type === 'client_call') {
-                    const callMethodName = item.call_method_name || item.call_method || '';
-                    return callMethodName === activityFilters.stage;
-                }
-                return false;
-            });
-        }
-
-        // Lead type filter
-        if (activityFilters.leadType && activityFilters.leadType !== 'All') {
-            filtered = filtered.filter((ct: any) => {
-                const clientId = ct.client || ct.clientId;
-                const lead = leads.find(l => l.id === clientId);
-                if (!lead) return false;
-                const leadType = (lead as any).type || lead.type || '';
-                return leadType.toLowerCase() === activityFilters.leadType.toLowerCase();
-            });
-        }
-
-        // Time period filter
-        if (activityFilters.timePeriod && activityFilters.timePeriod !== 'All') {
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            filtered = filtered.filter((ct: any) => {
-                const createdAt = ct.created_at || ct.createdAt;
-                const activityDate = new Date(createdAt);
-                
-                switch (activityFilters.timePeriod) {
-                    case 'today': {
-                        const activityDateOnly = new Date(activityDate);
-                        activityDateOnly.setHours(0, 0, 0, 0);
-                        return activityDateOnly.getTime() === today.getTime();
-                    }
-                    case 'yesterday': {
-                        const yesterday = new Date(today);
-                        yesterday.setDate(yesterday.getDate() - 1);
-                        const activityDateOnly = new Date(activityDate);
-                        activityDateOnly.setHours(0, 0, 0, 0);
-                        return activityDateOnly.getTime() === yesterday.getTime();
-                    }
-                    case 'last7': {
-                        const last7Days = new Date(today);
-                        last7Days.setDate(last7Days.getDate() - 7);
-                        return activityDate >= last7Days;
-                    }
-                    case 'thisMonth': {
-                        const thisMonthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-                        return activityDate >= thisMonthStart;
-                    }
-                    default:
-                        return true;
-                }
-            });
-        }
-
-        // Date range filter
-        if (activityFilters.dateFrom) {
-            const fromDate = new Date(activityFilters.dateFrom);
-            fromDate.setHours(0, 0, 0, 0);
-            filtered = filtered.filter((ct: any) => {
-                const createdAt = ct.created_at || ct.createdAt;
-                const activityDate = new Date(createdAt);
-                activityDate.setHours(0, 0, 0, 0);
-                return activityDate >= fromDate;
-            });
-        }
-
-        if (activityFilters.dateTo) {
-            const toDate = new Date(activityFilters.dateTo);
-            toDate.setHours(23, 59, 59, 999);
-            filtered = filtered.filter((ct: any) => {
-                const createdAt = ct.created_at || ct.createdAt;
-                const activityDate = new Date(createdAt);
-                return activityDate <= toDate;
-            });
-        }
-
-        // Search filter
-        if (activityFilters.search) {
-            const searchLower = activityFilters.search.toLowerCase();
-            filtered = filtered.filter((ct: any) => {
-                // Find user and lead names for search
-                const createdById = ct.created_by || ct.createdBy;
-                const user = users.find(u => u.id === createdById);
-                const userName = user?.name || ct.created_by_username || '';
-                
-                const clientId = ct.client || ct.clientId;
-                const lead = leads.find(l => l.id === clientId);
-                const leadName = lead?.name || ct.client_name || '';
-                
-                const notes = ct.notes || '';
-                
-                return leadName.toLowerCase().includes(searchLower) ||
-                    notes.toLowerCase().includes(searchLower) ||
-                    userName.toLowerCase().includes(searchLower);
-            });
-        }
-
-        // Transform filtered ClientTasks and ClientCalls to Activities format
-        return filtered.map((item: any) => {
-            // Find user by created_by ID
-            const createdById = item.created_by || item.createdBy;
-            const user = users.find(u => u.id === createdById);
-            const userName = user?.name || item.created_by_username || t('unknown');
-
-            // Find lead by client ID
-            const clientId = item.client || item.clientId;
-            const lead = leads.find(l => l.id === clientId);
-            const leadName = lead?.name || item.client_name || t('unknown');
-
-            // Get stage name (for client tasks) or call method name (for client calls)
-            let stageName = '';
-            let callMethodName = '';
-            if (item.type === 'client_task') {
-                stageName = item.stage_name || item.stage || '';
-            } else if (item.type === 'client_call') {
-                callMethodName = item.call_method_name || item.call_method || '';
-                // Client calls don't have stages
-                stageName = '';
-            }
-
-            // Format date
-            const createdAt = item.created_at || item.createdAt;
-            const formattedDate = formatDateToLocal(createdAt);
-
-            return {
-                id: `${item.type}-${item.id}`, // Prefix to avoid conflicts
-                user: userName,
-                lead: leadName,
-                stage: stageName,
-                callMethod: callMethodName, // Store call method separately for client calls
-                date: formattedDate,
-                notes: item.notes || '',
-                type: item.type, // Store type for display
-            };
-        });
-    }, [clientTasks, clientCalls, activityFilters, users, leads, t]);
-
     return (
-            <PageWrapper
-                title={t('activities')}
-                actions={
-                    <div className="flex flex-wrap items-center gap-2">
-                        <RefreshButton
-                            onClick={() => {
-                                void refetchClientTasks();
-                                void refetchClientCalls();
-                            }}
-                            loading={(clientTasksFetching || clientCallsFetching) && !clientTasksLoading && !clientCallsLoading}
-                        />
-                        <FilterButton
-                            onClick={() => setIsActivitiesFilterDrawerOpen(true)}
-                            hasActiveFilters={hasActiveFilters(activityFilters, DEFAULT_ACTIVITY_FILTERS)}
-                        />
-                    </div>
-                }
-            >
-                <Card>
-                    <TableHorizontalScroll>
-                        <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
-                            <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
-                                <tr>
-                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('type') || 'Type'}</th>
-                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('user')}</th>
-                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('lead')}</th>
-                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('stage')}</th>
-                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('callMethod') || 'Call Method'}</th>
-                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('date')}</th>
-                                    <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('notes')}</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredActivities.length > 0 ? (
-                                    filteredActivities.map(activity => {
-                                        const activityType = activity.type || 'client_task';
-                                        const typeLabel = activityType === 'client_task' 
-                                            ? (t('action') || 'Action')
-                                            : (t('call') || 'Call');
-                                        
-                                        return (
-                                    <tr key={activity.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
-                                                activityType === 'client_task' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                                'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                            }`}>
-                                                {typeLabel}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap text-center">{activity.user}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">{activity.lead}</td>
-                                        <td className="px-6 py-4 text-center">
-                                            {(() => {
-                                                let stageConfig = null;
-                                                let callMethodConfig = null;
-                                                let stageColor = '#808080';
-                                                let displayName = '';
-                                                
-                                                if (activityType === 'client_task') {
-                                                    // For client tasks, use stage
-                                                    const stageName = typeof activity.stage === 'string' 
-                                                        ? activity.stage.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ')
-                                                        : activity.stage;
-                                                    displayName = stageName;
-                                                    stageConfig = stages.find(s => 
-                                                        s.name.toLowerCase().replace(/\s+/g, '_') === stageName.toLowerCase().replace(/\s+/g, '_') ||
-                                                        s.name === stageName
-                                                    );
-                                                    stageColor = stageConfig?.color || '#808080';
-                                                } else if (activityType === 'client_call') {
-                                                    // For client calls, use call method (not stage)
-                                                    const callMethodName = activity.callMethod || '';
-                                                    displayName = callMethodName;
-                                                    callMethodConfig = callMethods.find(c => 
-                                                        c.name.toLowerCase().replace(/\s+/g, '_') === callMethodName.toLowerCase().replace(/\s+/g, '_') ||
-                                                        c.name === callMethodName
-                                                    );
-                                                    stageColor = callMethodConfig?.color || '#808080';
-                                                }
-                                                
-                                                // Convert hex to RGB for background opacity
-                                                const hexToRgb = (hex: string) => {
-                                                    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                                                    return result ? {
-                                                        r: parseInt(result[1], 16),
-                                                        g: parseInt(result[2], 16),
-                                                        b: parseInt(result[3], 16)
-                                                    } : null;
-                                                };
-                                                
-                                                const rgb = hexToRgb(stageColor);
-                                                const bgColor = rgb 
-                                                    ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
-                                                    : 'bg-gray-100 dark:bg-gray-700';
-                                                const textColor = rgb
-                                                    ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
-                                                    : 'text-gray-800 dark:text-gray-200';
-                                                
-                                                if (activityType === 'client_call') {
-                                                    // Client calls don't have stages - show "-"
-                                                    return (
-                                                        <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
-                                                    );
-                                                } else {
-                                                    // For client tasks, show stage
-                                                    return (
-                                                        <span 
-                                                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
-                                                            style={rgb ? {
-                                                                backgroundColor: bgColor,
-                                                                color: textColor,
-                                                            } : {}}
-                                                        >
-                                                            {getStageDisplayLabel(displayName)}
-                                                        </span>
-                                                    );
-                                                }
-                                            })()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            {(() => {
-                                                if (activityType === 'client_call') {
-                                                    // Show call method for client calls
-                                                    const callMethodName = activity.callMethod || '';
-                                                    const callMethodConfig = callMethods.find(c => 
-                                                        c.name.toLowerCase().replace(/\s+/g, '_') === callMethodName.toLowerCase().replace(/\s+/g, '_') ||
-                                                        c.name === callMethodName
-                                                    );
-                                                    const callMethodColor = callMethodConfig?.color || '#808080';
-                                                    
-                                                    const hexToRgb = (hex: string) => {
-                                                        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-                                                        return result ? {
-                                                            r: parseInt(result[1], 16),
-                                                            g: parseInt(result[2], 16),
-                                                            b: parseInt(result[3], 16)
-                                                        } : null;
-                                                    };
-                                                    
-                                                    const rgb = hexToRgb(callMethodColor);
-                                                    const bgColor = rgb 
-                                                        ? `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.1)`
-                                                        : 'bg-gray-100 dark:bg-gray-700';
-                                                    const textColor = rgb
-                                                        ? `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
-                                                        : 'text-gray-800 dark:text-gray-200';
-                                                    
-                                                    return (
-                                                        <span 
-                                                            className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!rgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
-                                                            style={rgb ? {
-                                                                backgroundColor: bgColor,
-                                                                color: textColor,
-                                                            } : {}}
-                                                        >
-                                                            {callMethodName || '-'}
-                                                        </span>
-                                                    );
-                                                } else {
-                                                    // Other activity types don't have call methods
-                                                    return (
-                                                        <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
-                                                    );
-                                                }
-                                            })()}
-                                        </td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">{activity.date}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-center">{activity.notes}</td>
-                                    </tr>
+        <PageWrapper
+            title={t('activities')}
+            actions={
+                <div className="flex flex-wrap items-center gap-2">
+                    <RefreshButton
+                        onClick={() => {
+                            void refetchActivities();
+                        }}
+                        loading={activitiesFetching && !activitiesLoading}
+                    />
+                    <FilterButton
+                        onClick={() => setIsActivitiesFilterDrawerOpen(true)}
+                        hasActiveFilters={hasActiveFilters(activityFilters, DEFAULT_ACTIVITY_FILTERS)}
+                    />
+                </div>
+            }
+        >
+            <Card>
+                <TableHorizontalScroll>
+                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400">
+                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
+                            <tr>
+                                <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('type') || 'Type'}</th>
+                                <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('user')}</th>
+                                <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('lead')}</th>
+                                <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('stage')}</th>
+                                <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('callMethod') || 'Call Method'}</th>
+                                <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('date')}</th>
+                                <th scope="col" className="px-6 py-3 text-center whitespace-nowrap">{t('notes')}</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {activities.length > 0 ? (
+                                activities.map((activity) => {
+                                    const activityType = activity.type || 'client_task';
+                                    const typeLabel = activityType === 'client_task'
+                                        ? (t('action') || 'Action')
+                                        : (t('call') || 'Call');
+
+                                    const stageConfig = activityType === 'client_task'
+                                        ? stages.find((s: { name: string }) => s.name === activity.stage)
+                                        : null;
+                                    const stageColor = stageConfig?.color || '#808080';
+                                    const stageRgb = hexToRgb(stageColor);
+
+                                    const callMethodName = activity.call_method || '';
+                                    const callMethodConfig = activityType === 'client_call'
+                                        ? callMethods.find((c: { name: string }) => c.name === callMethodName)
+                                        : null;
+                                    const callMethodColor = callMethodConfig?.color || '#808080';
+                                    const callMethodRgb = hexToRgb(callMethodColor);
+
+                                    return (
+                                        <tr key={activity.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                                                    activityType === 'client_task' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
+                                                    'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                }`}>
+                                                    {typeLabel}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 font-medium text-gray-900 dark:text-white whitespace-nowrap text-center">{activity.user}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">{activity.lead}</td>
+                                            <td className="px-6 py-4 text-center">
+                                                {activityType === 'client_call' ? (
+                                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                                ) : (
+                                                    <span
+                                                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!stageRgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
+                                                        style={badgeStyle(stageColor) ?? undefined}
+                                                    >
+                                                        {getStageDisplayLabel(activity.stage)}
+                                                    </span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {activityType === 'client_call' ? (
+                                                    <span
+                                                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium whitespace-nowrap ${!callMethodRgb ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200' : ''}`}
+                                                        style={badgeStyle(callMethodColor) ?? undefined}
+                                                    >
+                                                        {callMethodName || '-'}
+                                                    </span>
+                                                ) : (
+                                                    <span className="text-sm text-gray-400 dark:text-gray-500 italic">-</span>
+                                                )}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">
+                                                {activity.created_at ? formatDateToLocal(activity.created_at) : '-'}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-center">{activity.notes}</td>
+                                        </tr>
                                     );
-                                    })
-                                 ) : (
-                                    <tr>
-                                        <td colSpan={6} className="text-center py-10">
-                                            {t('noActivitiesFound')}
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </TableHorizontalScroll>
-                </Card>
-            </PageWrapper>
+                                })
+                            ) : (
+                                <tr>
+                                    <td colSpan={7} className="text-center py-10">
+                                        {activitiesLoading ? t('loading') : t('noActivitiesFound')}
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </TableHorizontalScroll>
+                <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                        {t('page')} {activitiesPageNumber} {t('of')} {totalPages}
+                    </p>
+                    <div className="flex items-center gap-2" dir="ltr">
+                        <select
+                            value={activitiesPageSize}
+                            onChange={(e) => setActivitiesPageSize(Number(e.target.value))}
+                            className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
+                        >
+                            {PAGE_SIZE_OPTIONS.map((size) => (
+                                <option key={size} value={size}>
+                                    {`${size} ${t('perPage')}`}
+                                </option>
+                            ))}
+                        </select>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setActivitiesPageNumber(1)}
+                            disabled={activitiesPageNumber === 1 || activitiesLoading}
+                        >
+                            &laquo;
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setActivitiesPageNumber((prev) => Math.max(1, prev - 1))}
+                            disabled={!hasPreviousPage || activitiesLoading}
+                        >
+                            {t('previous')}
+                        </Button>
+                        {paginationItems.map((item, idx) =>
+                            item === 'ellipsis' ? (
+                                <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
+                            ) : (
+                                <Button
+                                    key={item}
+                                    variant={item === activitiesPageNumber ? 'primary' : 'secondary'}
+                                    onClick={() => setActivitiesPageNumber(item)}
+                                    disabled={activitiesLoading}
+                                >
+                                    {item}
+                                </Button>
+                            )
+                        )}
+                        <Button
+                            variant="secondary"
+                            onClick={() => setActivitiesPageNumber((prev) => prev + 1)}
+                            disabled={!hasNextPage || activitiesLoading}
+                        >
+                            {t('next')}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            onClick={() => setActivitiesPageNumber(totalPages)}
+                            disabled={activitiesPageNumber === totalPages || activitiesLoading}
+                        >
+                            &raquo;
+                        </Button>
+                    </div>
+                </div>
+            </Card>
+        </PageWrapper>
     );
 };

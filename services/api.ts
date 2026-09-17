@@ -5710,20 +5710,54 @@ export const revokeLeadApiKeyAPI = async (keyId: number) => {
 
 // ==================== Activities/Tasks APIs ====================
 
+export type ActivityFeedRow = {
+  id: string;
+  type: 'client_task' | 'client_call';
+  user: string;
+  lead: string;
+  stage: string;
+  call_method: string;
+  notes: string;
+  created_at: string | null;
+};
+
+export type ActivityFeedFilters = {
+  user?: string;
+  stage?: string;
+  leadType?: string;
+  timePeriod?: string;
+  dateFrom?: string;
+  dateTo?: string;
+  search?: string;
+};
+
 /**
- * الحصول على Tasks (Activities في Frontend)
- * GET /api/tasks/
- * Query params: ?deal=xxx&stage=xxx&search=xxx
- * Response: { count, next, previous, results: Task[] }
+ * Paginated merged client tasks + client calls for the Activities page.
+ * GET /api/activities/
  */
-export const getActivitiesAPI = async (filters?: any) => {
+export const getActivitiesAPI = async (
+  page?: number,
+  pageSize?: number,
+  filters?: ActivityFeedFilters,
+) => {
   const queryParams = new URLSearchParams();
-  if (isMeaningfulFilterValue(filters?.deal)) queryParams.append('deal', String(filters.deal));
-  if (isMeaningfulFilterValue(filters?.stage)) queryParams.append('stage', String(filters.stage));
-  if (filters?.search) queryParams.append('search', filters.search);
-  
-  const queryString = queryParams.toString();
-  return fetchAllPaginatedPages<any>(`/tasks/${queryString ? `?${queryString}` : ''}`);
+  if (page) queryParams.append('page', String(page));
+  if (pageSize) queryParams.append('page_size', String(pageSize));
+  if (filters?.user && filters.user !== 'All') queryParams.append('user', filters.user);
+  if (filters?.stage && filters.stage !== 'All') queryParams.append('stage', filters.stage);
+  if (filters?.leadType && filters.leadType !== 'All') queryParams.append('lead_type', filters.leadType);
+  if (filters?.timePeriod && filters.timePeriod !== 'All') queryParams.append('time_period', filters.timePeriod);
+  if (filters?.dateFrom) queryParams.append('date_from', filters.dateFrom);
+  if (filters?.dateTo) queryParams.append('date_to', filters.dateTo);
+  if (filters?.search?.trim()) queryParams.append('search', filters.search.trim());
+
+  const endpoint = `/activities/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+  return apiRequest<{
+    count: number;
+    next: string | null;
+    previous: string | null;
+    results: ActivityFeedRow[];
+  }>(endpoint);
 };
 
 /**

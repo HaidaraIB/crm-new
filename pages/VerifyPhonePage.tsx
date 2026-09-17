@@ -311,7 +311,7 @@ export const VerifyPhonePage = () => {
                 <div className="max-w-md w-full space-y-6">
                     <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm p-6 md:p-8 space-y-6">
                         <div className="text-center space-y-2">
-                            <h1 className="text-2xl font-bold text-primary">{t('preLoginVerifyPhoneTitle')}</h1>
+                            <h1 className="text-2xl font-bold text-heading">{t('preLoginVerifyPhoneTitle')}</h1>
                             <p className="text-sm text-secondary">{t('preLoginVerifyPhoneIntro')}</p>
                         </div>
 

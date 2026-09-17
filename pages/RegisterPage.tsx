@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
 import { Button, Input, PhoneInput, Alert, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PlanEntitlementsSummary } from '../components/index';
@@ -13,6 +13,7 @@ import {
     registerPhoneVerifyOtpAPI,
     registerEmailSendOtpAPI,
     registerEmailVerifyOtpAPI,
+    validateTrialCodeAPI,
     type RegistrationPhoneOtpChannel,
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
@@ -36,6 +37,13 @@ import {
     translateBackendError as translateBackendErrorUtil,
     mapRegisterBackendErrorsToFields,
 } from '../utils/formFieldErrors';
+import {
+    peekRegistrationDraft,
+    bootstrapRegistrationDraft,
+    saveRegistrationDraft,
+    clearRegistrationDraft,
+    clampRestoredRegistrationStep,
+} from '../utils/registrationDraft';
 
 type PublicPlan = {
     id: number;
@@ -51,31 +59,52 @@ type PublicPlan = {
     features?: Record<string, boolean>;
     limits?: Record<string, number | 'unlimited' | null>;
     usage_limits_monthly?: Record<string, number | 'unlimited' | null>;
+    tier?: number;
 };
 
 const slugifyDomain = (text: string) =>
     text.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
+const resolveRecommendedPlanId = (planList: PublicPlan[]): number | null => {
+    if (planList.length < 2) return null;
+    const paid = planList.filter(
+        (p) => Number(p.price_monthly || 0) > 0 || Number(p.price_yearly || 0) > 0,
+    );
+    if (paid.length === 0) return planList[1]?.id ?? null;
+    return paid.reduce((best, plan) => ((plan.tier ?? 0) > (best.tier ?? 0) ? plan : best)).id;
+};
+
 export const RegisterPage = () => {
     const { setIsLoggedIn, setCurrentUser, t, language, setLanguage, setCurrentPage, theme, setTheme } = useAppContext();
+    const [registrationBootstrap] = useState(() => bootstrapRegistrationDraft());
 
     // Company information
-    const [companyName, setCompanyName] = useState('');
-    const [companyDomain, setCompanyDomain] = useState('');
-    const [specialization, setSpecialization] = useState<'real_estate' | 'services' | 'products' | 'medical'>('real_estate');
+    const [companyName, setCompanyName] = useState(registrationBootstrap.companyName);
+    const [companyDomain, setCompanyDomain] = useState(registrationBootstrap.companyDomain);
+    const [specialization, setSpecialization] = useState<'real_estate' | 'services' | 'products' | 'medical'>(
+        registrationBootstrap.specialization,
+    );
 
     // Owner information
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
-    const [email, setEmail] = useState('');
-    const [username, setUsername] = useState('');
-    const [phone, setPhone] = useState('');
-    const [password, setPassword] = useState('');
-    const [confirmPassword, setConfirmPassword] = useState('');
+    const [firstName, setFirstName] = useState(registrationBootstrap.firstName);
+    const [lastName, setLastName] = useState(registrationBootstrap.lastName);
+    const [email, setEmail] = useState(registrationBootstrap.email);
+    const [username, setUsername] = useState(registrationBootstrap.username);
+    const [phone, setPhone] = useState(registrationBootstrap.phone);
+    const [password, setPassword] = useState(registrationBootstrap.password);
+    const [confirmPassword, setConfirmPassword] = useState(registrationBootstrap.confirmPassword);
 
     // Plan selection (optional - can be trial)
-    const [selectedPlan, setSelectedPlan] = useState<number | null>(null);
-    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly');
+    const [selectedPlan, setSelectedPlan] = useState<number | null>(registrationBootstrap.selectedPlan);
+    const [trialCodeInput, setTrialCodeInput] = useState(registrationBootstrap.trialCodeInput);
+    const [trialCodeApplied, setTrialCodeApplied] = useState<{
+        code: string;
+        trialDays: number;
+        planId: number;
+        planName: string;
+    } | null>(null);
+    const [trialCodeLoading, setTrialCodeLoading] = useState(false);
+    const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(registrationBootstrap.billingCycle);
     const [plans, setPlans] = useState<PublicPlan[]>([]);
     const [plansLoading, setPlansLoading] = useState<boolean>(true);
     const [plansError, setPlansError] = useState<string | null>(null);
@@ -106,11 +135,13 @@ export const RegisterPage = () => {
     };
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
-    const [currentStep, setCurrentStep] = useState(1); // 1: Company, 2: Owner, 3: OTP or Plan, 4: Plan when OTP required
+    const [currentStep, setCurrentStep] = useState(registrationBootstrap.currentStep);
     // Default OFF — only enable after the policy endpoint confirms it (avoids 403 send-otp when disabled).
-    const [phoneOtpRequired, setPhoneOtpRequired] = useState(false);
+    const [phoneOtpRequired, setPhoneOtpRequired] = useState(registrationBootstrap.phoneOtpRequired);
     const [phoneOtpChannel, setPhoneOtpChannel] = useState<RegistrationPhoneOtpChannel | null>(null);
-    const [emailVerificationRequired, setEmailVerificationRequired] = useState(false);
+    const [emailVerificationRequired, setEmailVerificationRequired] = useState(
+        registrationBootstrap.emailVerificationRequired,
+    );
     const [phoneOtpCode, setPhoneOtpCode] = useState('');
     const [emailOtpCode, setEmailOtpCode] = useState('');
     const [phoneVerificationToken, setPhoneVerificationToken] = useState<string | null>(null);
@@ -122,6 +153,8 @@ export const RegisterPage = () => {
     const otpStep = 3;
     const anyOtpRequired = phoneOtpRequired || emailVerificationRequired;
     const planStep = anyOtpRequired ? 4 : 3;
+    const formPanelRef = useRef<HTMLDivElement>(null);
+    const isPlanStep = currentStep === planStep;
 
     const mapRegisterPhoneOtpSendError = (e: unknown): string => {
         const err = e as Error & { code?: string };
@@ -207,9 +240,6 @@ export const RegisterPage = () => {
     };
 
     const selectedPlanDetails = selectedPlan ? plans.find((p) => p.id === selectedPlan) : undefined;
-    const isSelectedPlanFreeOrTrial = !!selectedPlanDetails
-        && Number(selectedPlanDetails.price_monthly || 0) <= 0
-        && Number(selectedPlanDetails.price_yearly || 0) <= 0;
     const clearFieldError = (field: string) => {
         if (errors[field] || errors.general) {
             setErrors(prev => {
@@ -319,9 +349,99 @@ export const RegisterPage = () => {
 
 
     const handlePlanSelect = (planId: number) => {
+        if (trialCodeApplied) return;
         setSelectedPlan(planId);
         clearFieldError('plan');
     };
+
+    const handleApplyTrialCode = async () => {
+        const raw = trialCodeInput.trim();
+        if (!raw) return;
+        setTrialCodeLoading(true);
+        clearFieldError('trialCode');
+        try {
+            const result = await validateTrialCodeAPI(raw, language);
+            const planName =
+                language === 'ar' && result.plan_name_ar?.trim()
+                    ? result.plan_name_ar
+                    : result.plan_name;
+            setTrialCodeApplied({
+                code: raw.toUpperCase(),
+                trialDays: result.trial_days,
+                planId: result.plan_id,
+                planName,
+            });
+            setSelectedPlan(result.plan_id);
+            clearFieldError('plan');
+        } catch {
+            setTrialCodeApplied(null);
+            setErrors((prev) => ({
+                ...prev,
+                trialCode: t('trialCodeInvalid'),
+            }));
+        } finally {
+            setTrialCodeLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        const codeFromUrl = params.get('code');
+        if (codeFromUrl?.trim()) {
+            setTrialCodeInput(codeFromUrl.trim().toUpperCase());
+        }
+    }, []);
+
+    useEffect(() => {
+        const timeout = window.setTimeout(() => {
+            saveRegistrationDraft({
+                currentStep,
+                companyName,
+                companyDomain,
+                specialization,
+                firstName,
+                lastName,
+                email,
+                username,
+                phone,
+                password,
+                confirmPassword,
+                billingCycle,
+                selectedPlan,
+                trialCodeInput,
+                phoneOtpRequired,
+                emailVerificationRequired,
+            });
+        }, 300);
+        return () => window.clearTimeout(timeout);
+    }, [
+        currentStep,
+        companyName,
+        companyDomain,
+        specialization,
+        firstName,
+        lastName,
+        email,
+        username,
+        phone,
+        password,
+        confirmPassword,
+        billingCycle,
+        selectedPlan,
+        trialCodeInput,
+        phoneOtpRequired,
+        emailVerificationRequired,
+    ]);
+
+    useEffect(() => {
+        if (trialCodeInput && !trialCodeApplied && currentStep === planStep) {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get('code')?.trim()) {
+                void handleApplyTrialCode();
+            }
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [currentStep, planStep]);
 
     const checkAvailability = async (fields: {
         company_domain?: string;
@@ -418,6 +538,7 @@ export const RegisterPage = () => {
                         features: plan.features || {},
                         limits: plan.limits || {},
                         usage_limits_monthly: plan.usage_limits_monthly || {},
+                        tier: typeof plan.tier === 'number' ? plan.tier : undefined,
                     }));
                     setPlans(normalizedPlans);
                 }
@@ -462,6 +583,7 @@ export const RegisterPage = () => {
                     features: plan.features || {},
                     limits: plan.limits || {},
                     usage_limits_monthly: plan.usage_limits_monthly || {},
+                    tier: typeof plan.tier === 'number' ? plan.tier : undefined,
                 }));
                 setPlans(normalizedPlans);
             } catch (error: any) {
@@ -491,13 +613,28 @@ export const RegisterPage = () => {
                 setPhoneOtpChannel(
                     required ? data.phone_otp_channel ?? 'whatsapp' : null
                 );
-                setEmailVerificationRequired(!!emailReq.email_verification_required);
-                if (!required) setCurrentStep((prev) => (prev === 4 ? 3 : prev));
+                const emailRequired = !!emailReq.email_verification_required;
+                setEmailVerificationRequired(emailRequired);
+                const anyOtp = required || emailRequired;
+                const draft = peekRegistrationDraft();
+                const bootAnyOtp =
+                    registrationBootstrap.phoneOtpRequired || registrationBootstrap.emailVerificationRequired;
+                if (draft && anyOtp !== bootAnyOtp) {
+                    setCurrentStep(clampRestoredRegistrationStep(draft.currentStep, anyOtp));
+                } else if (!anyOtp) {
+                    setCurrentStep((prev) => (prev === 4 ? 3 : prev));
+                }
             } catch {
                 // OTP off unless the server explicitly says otherwise.
                 if (!isMounted) return;
                 setPhoneOtpRequired(false);
                 setPhoneOtpChannel(null);
+                const draft = peekRegistrationDraft();
+                const bootAnyOtp =
+                    registrationBootstrap.phoneOtpRequired || registrationBootstrap.emailVerificationRequired;
+                if (draft && bootAnyOtp) {
+                    setCurrentStep(clampRestoredRegistrationStep(draft.currentStep, false));
+                }
             }
         };
         loadPhoneOtpRequirement();
@@ -516,6 +653,10 @@ export const RegisterPage = () => {
             });
         }
     }, [plansLoading, plans]);
+
+    useEffect(() => {
+        formPanelRef.current?.scrollTo({ top: 0, behavior: 'instant' });
+    }, [currentStep]);
 
     const validateStep1 = (): boolean => {
         const newErrors: { [key: string]: string } = {};
@@ -799,7 +940,7 @@ export const RegisterPage = () => {
             return;
         }
 
-        if (!selectedPlan) {
+        if (!trialCodeApplied && !selectedPlan) {
             setErrors(prev => ({
                 ...prev,
                 plan: t('planRequired') || 'Please select a plan to continue',
@@ -828,8 +969,9 @@ export const RegisterPage = () => {
                 },
                 ...(phoneVerificationToken ? { phone_verification_token: phoneVerificationToken } : {}),
                 ...(emailVerificationToken ? { email_verification_token: emailVerificationToken } : {}),
-                plan_id: selectedPlan,
-                billing_cycle: billingCycle,
+                ...(trialCodeApplied
+                    ? { trial_code: trialCodeApplied.code }
+                    : { plan_id: selectedPlan, billing_cycle: billingCycle }),
             }, language);
 
             // Clear old user data before registration
@@ -838,6 +980,7 @@ export const RegisterPage = () => {
             localStorage.removeItem('refreshToken');
             localStorage.removeItem('isLoggedIn');
             localStorage.removeItem('pendingUserData');
+            clearRegistrationDraft();
 
             const userLang: 'en' | 'ar' | undefined =
                 response.user.language === 'ar' || response.user.language === 'en'
@@ -961,15 +1104,18 @@ export const RegisterPage = () => {
                     </Button>
                 </div>
                 <AuthHero />
-                <div className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex items-center justify-center p-8 overflow-y-auto custom-scrollbar">
-                    <div className="max-w-md w-full space-y-8">
+                <div
+                    ref={formPanelRef}
+                    className="w-full lg:w-1/2 bg-gray-100 dark:bg-gray-900 flex h-screen min-h-0 items-start justify-center overflow-y-auto p-8 py-8 lg:py-10 custom-scrollbar"
+                >
+                    <div className={`w-full space-y-8 ${isPlanStep ? 'max-w-4xl' : 'max-w-md'}`}>
                         <div className="flex flex-col items-center">
                             <img
                                 src="/logo_purple.png"
                                 alt="LOOP CRM Logo"
                                 className="h-12 w-auto object-contain mb-4 lg:hidden"
                             />
-                            <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">
+                            <h2 className="mt-6 text-center text-3xl font-extrabold text-heading">
                                 {t('register') || 'Register'}
                             </h2>
                             <p className="mt-2 text-center text-sm text-secondary">
@@ -1011,7 +1157,7 @@ export const RegisterPage = () => {
                             {/* Step 1: Company Information */}
                             {currentStep === 1 && (
                                 <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-primary">
+                                    <h3 className="text-lg font-semibold text-heading">
                                         {t('companyInformation') || 'Company Information'}
                                     </h3>
 
@@ -1086,7 +1232,7 @@ export const RegisterPage = () => {
                             {/* Step 2: Owner Information */}
                             {currentStep === 2 && (
                                 <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-primary">
+                                    <h3 className="text-lg font-semibold text-heading">
                                         {t('ownerInformation') || 'Owner Information'}
                                     </h3>
 
@@ -1270,7 +1416,7 @@ export const RegisterPage = () => {
                             {/* Step 3: Phone OTP (WhatsApp or SMS) */}
                             {anyOtpRequired && currentStep === otpStep && (
                                 <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-primary">
+                                    <h3 className="text-lg font-semibold text-heading">
                                         {phoneOtpRequired
                                             ? (phoneOtpChannel === 'twilio_sms'
                                                 ? t('verifyPhoneSms')
@@ -1355,173 +1501,330 @@ export const RegisterPage = () => {
 
                             {/* Step 4: Plan Selection */}
                             {currentStep === planStep && (
-                                <div className="space-y-4">
-                                    <h3 className="text-lg font-semibold text-primary">
-                                        {t('selectPlan') || 'Select a Plan'}
-                                    </h3>
+                                <div className="space-y-5">
+                                    <div>
+                                        <h3 className="text-lg font-semibold text-heading">
+                                            {t('selectPlan') || 'Select a Plan'}
+                                        </h3>
+                                        <p className="mt-1 text-sm text-secondary">
+                                            {t('registerPlanStepHint')}
+                                        </p>
+                                    </div>
 
-                                    {!isSelectedPlanFreeOrTrial && (
-                                        <div className="flex items-center justify-between gap-3">
-                                            <span className="text-sm font-medium text-secondary">
-                                                {t('billingCycle') || 'Billing cycle'}
-                                            </span>
-                                            <div className="inline-flex rounded-full border border-gray-300 dark:border-gray-600 overflow-hidden">
+                                    {trialCodeApplied && selectedPlanDetails ? (
+                                        <div className="overflow-hidden rounded-xl border-2 border-primary-500 bg-gradient-to-br from-primary-50 via-white to-white shadow-sm dark:from-primary-950/50 dark:via-gray-900 dark:to-gray-900 dark:border-primary-600">
+                                            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-primary-200/70 bg-primary-100/50 px-4 py-3 dark:border-primary-800/60 dark:bg-primary-900/25">
+                                                <div className="flex min-w-0 items-center gap-3">
+                                                    <div
+                                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-green-500 text-white"
+                                                        aria-hidden
+                                                    >
+                                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                                        </svg>
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-semibold text-primary-900 dark:text-primary-100">
+                                                            {t('trialCodeAppliedTitle')}
+                                                        </p>
+                                                        <p className="truncate font-mono text-xs text-primary-700/90 dark:text-primary-300/90">
+                                                            {trialCodeApplied.code}
+                                                        </p>
+                                                    </div>
+                                                </div>
                                                 <button
                                                     type="button"
-                                                    className={`px-3 py-1 text-sm font-medium transition ${billingCycle === 'monthly'
-                                                            ? 'bg-primary-500 text-white'
-                                                            : 'text-secondary'
-                                                        }`}
-                                                    onClick={() => setBillingCycle('monthly')}
+                                                    onClick={() => {
+                                                        setTrialCodeApplied(null);
+                                                        setTrialCodeInput('');
+                                                        setSelectedPlan(plans[0]?.id ?? null);
+                                                    }}
+                                                    className="shrink-0 text-sm font-medium text-primary-700 hover:text-primary-900 dark:text-primary-300 dark:hover:text-primary-100"
                                                 >
-                                                    {t('monthly') || 'Monthly'}
+                                                    {t('trialCodeChange')}
                                                 </button>
-                                                <button
-                                                    type="button"
-                                                    className={`px-3 py-1 text-sm font-medium transition ${billingCycle === 'yearly'
-                                                            ? 'bg-primary-500 text-white'
-                                                            : 'text-secondary'
-                                                        }`}
-                                                    onClick={() => setBillingCycle('yearly')}
-                                                >
-                                                    {t('yearly') || 'Yearly'}
-                                                </button>
+                                            </div>
+                                            <div className="space-y-4 p-4">
+                                                <div className="flex flex-wrap items-start justify-between gap-3">
+                                                    <div>
+                                                        <h4 className="text-xl font-bold text-heading">
+                                                            {language === 'ar' && selectedPlanDetails.name_ar?.trim()
+                                                                ? selectedPlanDetails.name_ar
+                                                                : selectedPlanDetails.name}
+                                                        </h4>
+                                                        <p className="mt-1 text-sm text-secondary">
+                                                            {t('trialCodeValid')
+                                                                .replace('{days}', String(trialCodeApplied.trialDays))
+                                                                .replace('{plan}', trialCodeApplied.planName)}
+                                                        </p>
+                                                    </div>
+                                                    <span className="inline-flex shrink-0 rounded-full bg-green-100 px-3 py-1 text-xs font-semibold text-green-800 dark:bg-green-900/40 dark:text-green-200">
+                                                        {t('trialDayFreeBadge').replace('{days}', String(trialCodeApplied.trialDays))}
+                                                    </span>
+                                                </div>
+                                                <PlanEntitlementsSummary
+                                                    users={selectedPlanDetails.users}
+                                                    clients={selectedPlanDetails.clients}
+                                                    extra_limits={selectedPlanDetails.limits}
+                                                    features={selectedPlanDetails.features}
+                                                    language={language === 'ar' ? 'ar' : 'en'}
+                                                    labels={{
+                                                        resourceLimitsTitle: t('planSectionResourceLimits') || 'Resource limits',
+                                                        featuresTitle: t('planSectionFeatures') || 'Features',
+                                                        none: t('planFeaturesNone') || 'None',
+                                                    }}
+                                                />
                                             </div>
                                         </div>
-                                    )}
+                                    ) : (
+                                        <>
+                                            {plans.some(
+                                                (p) => Number(p.price_monthly || 0) > 0 || Number(p.price_yearly || 0) > 0,
+                                            ) && (
+                                                <div className="flex justify-center">
+                                                    <div className="inline-flex rounded-full bg-gray-200/80 p-1 dark:bg-gray-700/70">
+                                                        <button
+                                                            type="button"
+                                                            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                                                                billingCycle === 'monthly'
+                                                                    ? 'bg-gray-900 text-white shadow-sm dark:bg-white dark:text-gray-900'
+                                                                    : 'text-secondary hover:text-heading'
+                                                            }`}
+                                                            onClick={() => setBillingCycle('monthly')}
+                                                        >
+                                                            {t('monthly') || 'Monthly'}
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            className={`rounded-full px-5 py-2 text-sm font-semibold transition ${
+                                                                billingCycle === 'yearly'
+                                                                    ? 'bg-gray-900 text-white shadow-sm dark:bg-white dark:text-gray-900'
+                                                                    : 'text-secondary hover:text-heading'
+                                                            }`}
+                                                            onClick={() => setBillingCycle('yearly')}
+                                                        >
+                                                            {t('yearly') || 'Yearly'}
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            )}
 
-                                    <div className="space-y-3">
-                                        {plansLoading && (
-                                            <div className="text-sm text-secondary">
-                                                {t('loadingPlans') || 'Loading plans...'}
-                                            </div>
-                                        )}
+                                            {plansLoading && (
+                                                <div className="text-sm text-secondary">
+                                                    {t('loadingPlans') || 'Loading plans...'}
+                                                </div>
+                                            )}
 
-                                        {plansError && !plansLoading && (
-                                            <div className="space-y-2">
-                                                <Alert variant="error">{plansError}</Alert>
-                                                <button
-                                                    type="button"
-                                                    className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
-                                                    onClick={async () => {
-                                                        setPlansLoading(true);
-                                                        setPlansError(null);
-                                                        try {
-                                                            const data = await getPublicPlansAPI();
-                                                            const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
-                                                                id: plan.id,
-                                                                name: plan.name || '',
-                                                                name_ar: plan.name_ar || '',
-                                                                description: plan.description || '',
-                                                                description_ar: plan.description_ar || '',
-                                                                price_monthly: Number(plan.price_monthly || 0),
-                                                                price_yearly: Number(plan.price_yearly || 0),
-                                                                trial_days: Number(plan.trial_days || 0),
-                                                                users: plan.users,
-                                                                clients: plan.clients,
-                                                                features: plan.features || {},
-                                                                limits: plan.limits || {},
-                                                                usage_limits_monthly: plan.usage_limits_monthly || {},
-                                                            }));
-                                                            setPlans(normalizedPlans);
-                                                        } catch (error: any) {
-                                                            setPlansError(error.message || t('failedToLoadPlans') || 'Failed to load plans');
-                                                        } finally {
-                                                            setPlansLoading(false);
-                                                        }
-                                                    }}
-                                                >
-                                                    {t('retry') || 'Retry'}
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {!plansLoading && !plansError && plans.length === 0 && (
-                                            <p className="text-sm text-secondary">
-                                                {t('noPlansAvailable') || 'No paid plans are published yet. You can continue with the free trial.'}
-                                            </p>
-                                        )}
-
-                                        {!plansLoading && !plansError && plans.length > 0 && (
-                                            <div className="space-y-3">
-                                                {plans.map((plan) => {
-                                                    const displayName =
-                                                        language === 'ar' && plan.name_ar && plan.name_ar.trim()
-                                                            ? plan.name_ar
-                                                            : plan.name;
-                                                    const explicitDesc =
-                                                        language === 'ar' && plan.description_ar && plan.description_ar.trim()
-                                                            ? plan.description_ar.trim()
-                                                            : (plan.description?.trim() || '');
-                                                    const resolvedDesc =
-                                                        explicitDesc || (t('planDefaultDescription') || 'All CRM essentials included.');
-                                                    const showPlanDescription = !isRedundantPlanDescription(displayName, resolvedDesc);
-                                                    const isPlanSelected = selectedPlan === plan.id;
-                                                    return (
+                                            {plansError && !plansLoading && (
+                                                <div className="space-y-2">
+                                                    <Alert variant="error">{plansError}</Alert>
                                                     <button
                                                         type="button"
-                                                        key={plan.id}
-                                                        aria-pressed={isPlanSelected}
-                                                        onClick={() => handlePlanSelect(plan.id)}
-                                                        className={`w-full p-4 border-2 rounded-lg text-left transition-colors ${isPlanSelected
-                                                                ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/20'
-                                                                : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
-                                                            }`}
+                                                        className="text-sm text-primary-600 dark:text-primary-400 hover:underline"
+                                                        onClick={async () => {
+                                                            setPlansLoading(true);
+                                                            setPlansError(null);
+                                                            try {
+                                                                const data = await getPublicPlansAPI();
+                                                                const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
+                                                                    id: plan.id,
+                                                                    name: plan.name || '',
+                                                                    name_ar: plan.name_ar || '',
+                                                                    description: plan.description || '',
+                                                                    description_ar: plan.description_ar || '',
+                                                                    price_monthly: Number(plan.price_monthly || 0),
+                                                                    price_yearly: Number(plan.price_yearly || 0),
+                                                                    trial_days: Number(plan.trial_days || 0),
+                                                                    users: plan.users,
+                                                                    clients: plan.clients,
+                                                                    features: plan.features || {},
+                                                                    limits: plan.limits || {},
+                                                                    usage_limits_monthly: plan.usage_limits_monthly || {},
+                                                                    tier: typeof plan.tier === 'number' ? plan.tier : undefined,
+                                                                }));
+                                                                setPlans(normalizedPlans);
+                                                            } catch (error: any) {
+                                                                setPlansError(error.message || t('failedToLoadPlans') || 'Failed to load plans');
+                                                            } finally {
+                                                                setPlansLoading(false);
+                                                            }
+                                                        }}
                                                     >
-                                                        <div className="flex items-start justify-between gap-4">
-                                                            <div className="flex min-w-0 flex-1 items-start gap-2">
-                                                                {isPlanSelected && (
-                                                                    <div
-                                                                        className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary-500 text-white"
-                                                                        aria-hidden
-                                                                    >
-                                                                        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                                                        </svg>
-                                                                    </div>
-                                                                )}
-                                                                <div className="min-w-0">
-                                                                    <h4 className="font-semibold text-primary">
+                                                        {t('retry') || 'Retry'}
+                                                    </button>
+                                                </div>
+                                            )}
+
+                                            {!plansLoading && !plansError && plans.length === 0 && (
+                                                <p className="text-sm text-secondary">
+                                                    {t('noPlansAvailable') || 'No paid plans are published yet. You can continue with the free trial.'}
+                                                </p>
+                                            )}
+
+                                            {!plansLoading && !plansError && plans.length > 0 && (() => {
+                                                const recommendedPlanId = resolveRecommendedPlanId(plans);
+                                                return (
+                                                    <div
+                                                        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+                                                        role="radiogroup"
+                                                        aria-label={t('selectPlan') || 'Select a Plan'}
+                                                    >
+                                                        {plans.map((plan) => {
+                                                            const displayName =
+                                                                language === 'ar' && plan.name_ar && plan.name_ar.trim()
+                                                                    ? plan.name_ar
+                                                                    : plan.name;
+                                                            const explicitDesc =
+                                                                language === 'ar' && plan.description_ar && plan.description_ar.trim()
+                                                                    ? plan.description_ar.trim()
+                                                                    : (plan.description?.trim() || '');
+                                                            const resolvedDesc =
+                                                                explicitDesc || (t('planDefaultDescription') || 'All CRM essentials included.');
+                                                            const showPlanDescription = !isRedundantPlanDescription(displayName, resolvedDesc);
+                                                            const isPlanSelected = selectedPlan === plan.id;
+                                                            const isRecommended = recommendedPlanId === plan.id;
+                                                            const isFreeOrTrial =
+                                                                Number(plan.price_monthly || 0) <= 0
+                                                                && Number(plan.price_yearly || 0) <= 0;
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={plan.id}
+                                                                    role="radio"
+                                                                    aria-checked={isPlanSelected}
+                                                                    onClick={() => handlePlanSelect(plan.id)}
+                                                                    className={`relative flex h-full flex-col rounded-2xl border-2 bg-white p-5 text-start shadow-sm transition-all group dark:bg-gray-800/90 ${
+                                                                        isPlanSelected
+                                                                            ? 'border-primary-500 shadow-md ring-2 ring-primary-500/20 dark:ring-primary-400/30'
+                                                                            : 'border-gray-200 hover:border-primary-300 hover:shadow-md dark:border-gray-600 dark:hover:border-gray-500'
+                                                                    }`}
+                                                                >
+                                                                    {isRecommended && (
+                                                                        <span className="absolute -top-3 end-4 rounded-full bg-amber-400 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-900 shadow-sm">
+                                                                            {t('planMostPopular')}
+                                                                        </span>
+                                                                    )}
+                                                                    <h4 className="text-xl font-bold text-heading">
                                                                         {displayName}
                                                                     </h4>
+                                                                    <div className="mt-4">
+                                                                        <span className="text-3xl font-extrabold tracking-tight text-heading">
+                                                                            {getPlanPriceLabel(plan)}
+                                                                        </span>
+                                                                        {!isFreeOrTrial && (
+                                                                            <p className="mt-1 text-sm text-secondary capitalize">
+                                                                                {billingCycle === 'monthly'
+                                                                                    ? (t('perMonth') || 'per month')
+                                                                                    : (t('perYear') || 'per year')}
+                                                                            </p>
+                                                                        )}
+                                                                    </div>
                                                                     {showPlanDescription && (
-                                                                        <p className="text-sm text-secondary">
+                                                                        <p className="mt-4 text-sm font-semibold leading-snug text-secondary">
                                                                             {resolvedDesc}
                                                                         </p>
                                                                     )}
-                                                                </div>
-                                                            </div>
-                                                            <div className="shrink-0 text-right">
-                                                                <div className="text-2xl font-bold text-primary-600 dark:text-primary-400">
-                                                                    {getPlanPriceLabel(plan)}
-                                                                </div>
-                                                                {!(Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0) && (
-                                                                    <p className="text-xs text-secondary capitalize">
-                                                                        {billingCycle === 'monthly'
-                                                                            ? (t('perMonth') || 'per month')
-                                                                            : (t('perYear') || 'per year')}
-                                                                    </p>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        <PlanEntitlementsSummary
-                                                            users={plan.users}
-                                                            clients={plan.clients}
-                                                            extra_limits={plan.limits}
-                                                            features={plan.features}
-                                                            language={language === 'ar' ? 'ar' : 'en'}
-                                                            labels={{
-                                                                resourceLimitsTitle: t('planSectionResourceLimits') || 'Resource limits',
-                                                                featuresTitle: t('planSectionFeatures') || 'Features',
-                                                                none: t('planFeaturesNone') || 'None',
-                                                            }}
-                                                        />
-                                                    </button>
+                                                                    <div className="mt-5 flex-1 border-t border-gray-200/80 pt-4 dark:border-gray-600/80">
+                                                                        <PlanEntitlementsSummary
+                                                                            users={plan.users}
+                                                                            clients={plan.clients}
+                                                                            extra_limits={plan.limits}
+                                                                            features={plan.features}
+                                                                            language={language === 'ar' ? 'ar' : 'en'}
+                                                                            labels={{
+                                                                                resourceLimitsTitle: t('planSectionResourceLimits') || 'Resource limits',
+                                                                                featuresTitle: t('planSectionFeatures') || 'Features',
+                                                                                none: t('planFeaturesNone') || 'None',
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    <span
+                                                                        className={`mt-5 block w-full rounded-lg py-2.5 text-center text-sm font-semibold transition ${
+                                                                            isPlanSelected
+                                                                                ? 'bg-primary-500 text-white shadow-sm'
+                                                                                : 'border border-gray-300 bg-gray-100 text-gray-900 group-hover:bg-gray-200 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-50 dark:group-hover:bg-gray-500'
+                                                                        }`}
+                                                                    >
+                                                                        {isPlanSelected ? t('planSelected') : t('selectThisPlan')}
+                                                                    </span>
+                                                                </button>
+                                                            );
+                                                        })}
+                                                    </div>
                                                 );
-                                                })}
+                                            })()}
+
+                                            {!plansLoading && !plansError && plans.length > 0 && (
+                                                <div className="relative py-2">
+                                                    <div className="absolute inset-0 flex items-center" aria-hidden>
+                                                        <div className="w-full border-t border-gray-200 dark:border-gray-700" />
+                                                    </div>
+                                                    <div className="relative flex justify-center">
+                                                        <span className="bg-gray-100 px-3 text-xs font-medium uppercase tracking-wide text-secondary dark:bg-gray-900">
+                                                            {t('trialCodeOrUseCode')}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="overflow-hidden rounded-xl border border-primary-200/70 bg-gradient-to-br from-primary-50/90 via-white to-white dark:border-primary-800/50 dark:from-primary-950/40 dark:via-gray-900 dark:to-gray-900">
+                                                <div className="flex flex-col gap-4 p-4 sm:p-5">
+                                                    <div className="flex items-start gap-3">
+                                                        <div
+                                                            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary-100 text-primary-600 dark:bg-primary-900/60 dark:text-primary-300"
+                                                            aria-hidden
+                                                        >
+                                                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+                                                            </svg>
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm font-semibold text-heading">
+                                                                {t('trialCodeLabel')}
+                                                            </p>
+                                                            <p className="mt-0.5 text-xs text-secondary">
+                                                                {t('trialCodeHint')}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex w-full overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm focus-within:border-primary-400 focus-within:ring-2 focus-within:ring-primary-500/25 dark:border-gray-600 dark:bg-gray-800 dark:focus-within:border-primary-500">
+                                                        <input
+                                                            type="text"
+                                                            value={trialCodeInput}
+                                                            onChange={(e) => {
+                                                                setTrialCodeInput(e.target.value.toUpperCase());
+                                                                setTrialCodeApplied(null);
+                                                                clearFieldError('trialCode');
+                                                            }}
+                                                            placeholder={t('trialCodePlaceholder')}
+                                                            className="min-w-0 flex-1 border-0 bg-transparent px-3 py-2.5 font-mono text-sm text-heading placeholder:text-gray-400 focus:outline-none focus:ring-0 dark:placeholder:text-gray-500"
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter' && trialCodeInput.trim() && !trialCodeLoading) {
+                                                                    e.preventDefault();
+                                                                    void handleApplyTrialCode();
+                                                                }
+                                                            }}
+                                                            aria-invalid={Boolean(errors.trialCode)}
+                                                            aria-describedby={errors.trialCode ? 'trial-code-error' : undefined}
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => void handleApplyTrialCode()}
+                                                            disabled={trialCodeLoading || !trialCodeInput.trim()}
+                                                            className="shrink-0 border-s border-gray-200 bg-primary-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-primary-700 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 dark:border-gray-600 dark:disabled:bg-gray-700 dark:disabled:text-gray-400"
+                                                        >
+                                                            {trialCodeLoading ? (t('loading') || '…') : t('trialCodeApply')}
+                                                        </button>
+                                                    </div>
+                                                    {errors.trialCode && (
+                                                        <p id="trial-code-error" className="text-sm text-red-600 dark:text-red-300">
+                                                            {errors.trialCode}
+                                                        </p>
+                                                    )}
+                                                </div>
                                             </div>
-                                        )}
-                                    </div>
+                                        </>
+                                    )}
 
                                     {errors.plan && (
                                         <p className="text-sm text-red-600 dark:text-red-300">
@@ -1561,7 +1864,7 @@ export const RegisterPage = () => {
                                         {t('verifyAndContinue') || 'Verify and continue'}
                                     </Button>
                                 )}
-                                {currentStep === planStep && (
+                                {isPlanStep && (
                                     <Button onClick={handleRegister} loading={isLoading} disabled={isLoading}>
                                         {t('register') || 'Register'}
                                     </Button>
@@ -1574,6 +1877,7 @@ export const RegisterPage = () => {
                                     {t('alreadyHaveAccount') || 'Already have an account?'}{' '}
                                     <button
                                         onClick={() => {
+                                            clearRegistrationDraft();
                                             window.location.href = '/login';
                                         }}
                                         className="text-primary-600 dark:text-primary-400 hover:underline font-medium"
@@ -1607,7 +1911,7 @@ export const RegisterPage = () => {
                         </button>
                         <div className="space-y-4">
                             <div>
-                                <h3 className="text-xl font-semibold text-primary">
+                                <h3 className="text-xl font-semibold text-heading">
                                     {t('verifyEmailTitle') || 'Verify your email'}
                                 </h3>
                                 <p className="text-sm text-secondary mt-1">

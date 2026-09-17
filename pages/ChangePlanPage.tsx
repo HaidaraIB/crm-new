@@ -8,6 +8,7 @@ import {
     getCurrentUserAPI,
     previewSubscriptionChangeAPI,
     scheduleSubscriptionDowngradeAPI,
+    redeemTrialCodeAPI,
     type CreatePaymentSessionResult,
 } from '../services/api';
 import { isRedundantPlanDescription, isFreeTrialPlan } from '../utils/planEntitlements';
@@ -55,6 +56,9 @@ export const ChangePlanPage = () => {
         error?: string;
     } | null>(null);
     const [previewLoading, setPreviewLoading] = useState(false);
+    const [trialCodeInput, setTrialCodeInput] = useState('');
+    const [trialCodeRedeeming, setTrialCodeRedeeming] = useState(false);
+    const [trialCodeMessage, setTrialCodeMessage] = useState<string | null>(null);
 
     useEffect(() => {
         // Get subscription_id from URL
@@ -301,6 +305,26 @@ export const ChangePlanPage = () => {
         }
     };
 
+    const handleRedeemTrialCode = async () => {
+        const code = trialCodeInput.trim();
+        if (!code) return;
+        setTrialCodeRedeeming(true);
+        setTrialCodeMessage(null);
+        try {
+            hydratePaymentAccessToken();
+            const result = await redeemTrialCodeAPI(code, language);
+            localStorage.setItem('accessToken', result.access);
+            localStorage.setItem('refreshToken', result.refresh);
+            setSuccessMessage(t('trialCodeRedeemSuccess'));
+            setIsSuccessModalOpen(true);
+            window.location.href = '/';
+        } catch (error: any) {
+            setTrialCodeMessage(error?.message || t('trialCodeInvalid'));
+        } finally {
+            setTrialCodeRedeeming(false);
+        }
+    };
+
     const isRTL = language === 'ar';
 
     return (
@@ -318,6 +342,33 @@ export const ChangePlanPage = () => {
                     {errors.general && (
                         <Alert variant="error" className="mb-6">{errors.general}</Alert>
                     )}
+
+                    <div className="mb-6 rounded-lg border border-gray-200 dark:border-gray-600 p-4 space-y-2">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('trialCodeRedeem')}</p>
+                        <div className="flex flex-wrap gap-2">
+                            <input
+                                type="text"
+                                value={trialCodeInput}
+                                onChange={(e) => {
+                                    setTrialCodeInput(e.target.value.toUpperCase());
+                                    setTrialCodeMessage(null);
+                                }}
+                                placeholder={t('trialCodePlaceholder')}
+                                className="flex-1 min-w-[160px] rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-mono bg-white dark:bg-gray-800"
+                            />
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                onClick={() => void handleRedeemTrialCode()}
+                                disabled={trialCodeRedeeming || !trialCodeInput.trim()}
+                            >
+                                {trialCodeRedeeming ? (t('loading') || '…') : t('trialCodeApply')}
+                            </Button>
+                        </div>
+                        {trialCodeMessage && (
+                            <p className="text-sm text-red-600 dark:text-red-300">{trialCodeMessage}</p>
+                        )}
+                    </div>
 
                     {/* Billing Cycle Toggle */}
                     <div className="flex justify-center mb-6">

@@ -67,7 +67,16 @@
               },
             },
           }
-        }
+        },
+        plugins: [
+          function ({ addUtilities }) {
+            // Semantic heading/body colors — do not use Tailwind `text-primary` for headings
+            // (that resolves to brand purple primary-500 and fails contrast on dark backgrounds).
+            addUtilities({
+              '.text-heading': { color: 'rgb(var(--text-primary))' },
+            });
+          },
+        ],
       }
     </script>
     <style>
@@ -224,11 +233,9 @@
             min-height: 100%;
         }
         
-        /* Utility classes for consistent text colors */
-        .text-primary {
-            color: rgb(var(--text-primary));
-        }
-        
+        /* Utility classes for consistent text colors.
+           Note: `.text-heading` is the semantic heading color (via Tailwind plugin above).
+           Avoid `text-primary` for headings — Tailwind maps that to brand purple (primary-500). */
         .text-secondary {
             color: rgb(var(--text-secondary));
         }

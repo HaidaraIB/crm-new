@@ -532,11 +532,29 @@ export const BillingPage = () => {
     const daysRemaining = getDaysRemaining();
     const planPrice = getPlanPrice();
     const isCurrentFreeOrTrial = Number(subscriptionInfo?.plan?.price_monthly ?? 0) <= 0 && Number(subscriptionInfo?.plan?.price_yearly ?? 0) <= 0;
+    const isPromoTrialing =
+        subscriptionInfo?.subscriptionStatus === 'trialing' && !isCurrentFreeOrTrial;
+    const promoPlanName =
+        language === 'ar' && subscriptionInfo?.plan?.name_ar?.trim()
+            ? subscriptionInfo.plan.name_ar
+            : (subscriptionInfo?.plan?.name || '');
 
     return (
         <PageWrapper title={t('billing') || 'Billing'}>
             <div className="max-w-4xl mx-auto space-y-6">
                 <PaymentResultBanner autoHideMs={20000} />
+                {isPromoTrialing && daysRemaining !== null && (
+                    <div className="rounded-lg border border-primary-500/40 bg-primary-50 dark:bg-primary-950/40 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                        <p className="text-sm text-primary-900 dark:text-primary-100">
+                            {t('promoTrialBanner')
+                                .replace('{plan}', promoPlanName)
+                                .replace('{days}', String(daysRemaining))}
+                        </p>
+                        <Button type="button" onClick={() => setShowRenewalModal(true)}>
+                            {t('promoTrialConvert')}
+                        </Button>
+                    </div>
+                )}
                 {/* Current Subscription Status */}
                 <Card>
                     <div className="flex items-center gap-3 mb-6">

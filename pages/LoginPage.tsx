@@ -2,11 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PaymentResultBanner } from '../components/index';
-import { loginAPI, getCurrentUserAPI } from '../services/api';
+import { loginAPI, getCurrentUserAPI, redeemTrialCodeAPI } from '../services/api';
 import { AuthHero } from '../components/AuthHero';
 import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
-import { clearPaymentAccessToken, storePaymentAccessToken } from '../utils/paymentAuth';
+import { clearPaymentAccessToken, hydratePaymentAccessToken, storePaymentAccessToken } from '../utils/paymentAuth';
+import { clearRegistrationDraft } from '../utils/registrationDraft';
 
 export const LoginPage = () => {
     // Check if this is a logout redirect and clear any remaining data
@@ -35,6 +36,7 @@ export const LoginPage = () => {
             localStorage.removeItem('pendingSubscriptionId');
             sessionStorage.removeItem('2fa_username');
             sessionStorage.removeItem('2fa_password');
+            clearRegistrationDraft();
             window.history.replaceState({}, '', '/login');
         }
     }, []);
@@ -45,6 +47,9 @@ export const LoginPage = () => {
     const [isLoading, setIsLoading] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [subscriptionId, setSubscriptionId] = useState<string | null>(null);
+    const [trialCodeInput, setTrialCodeInput] = useState('');
+    const [trialCodeRedeeming, setTrialCodeRedeeming] = useState(false);
+    const [trialCodeError, setTrialCodeError] = useState<string | null>(null);
     const [verificationGate, setVerificationGate] = useState<{
         verifyEmailUrl?: string;
         verifyPhoneUrl?: string;
@@ -165,6 +170,63 @@ export const LoginPage = () => {
         return t('invalidCredentials') || 'Invalid username or password';
     };
 
+    const handleRedeemTrialCode = async () => {
+        const code = trialCodeInput.trim();
+        if (!code) return;
+        setTrialCodeRedeeming(true);
+        setTrialCodeError(null);
+        try {
+            if (!hydratePaymentAccessToken()) {
+                setTrialCodeError(t('trialCodeInvalid'));
+                return;
+            }
+            const result = await redeemTrialCodeAPI(code, language);
+            localStorage.setItem('accessToken', result.access);
+            localStorage.setItem('refreshToken', result.refresh);
+            clearPaymentAccessToken();
+            localStorage.removeItem('pendingSubscriptionId');
+            const userData = await getCurrentUserAPI();
+            const frontendUser = {
+                id: userData.id,
+                name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim() || userData.username,
+                username: userData.username,
+                email: userData.email,
+                role: normalizeRole(userData.role),
+                phone: userData.phone || '',
+                avatar: userData.profile_photo || `https://ui-avatars.com/api/?name=${encodeURIComponent(userData.username)}&background=random`,
+                company: userData.company
+                    ? {
+                        id: userData.company.id,
+                        name: userData.company.name,
+                        domain: userData.company.domain,
+                        specialization: userData.company.specialization,
+                    }
+                    : undefined,
+                language: userData.language,
+            };
+            localStorage.setItem('currentUser', JSON.stringify(frontendUser));
+            localStorage.setItem('isLoggedIn', 'true');
+            setCurrentUser(frontendUser);
+            if (frontendUser.language === 'ar' || frontendUser.language === 'en') {
+                setLanguage(frontendUser.language);
+            }
+            clearRegistrationDraft();
+            setIsLoggedIn(true);
+            const landingPage = getRoleLandingPage(frontendUser.role);
+            setCurrentPage(landingPage);
+            window.location.href = getCompanyRoute(
+                frontendUser.company?.name,
+                frontendUser.company?.domain,
+                landingPage,
+                frontendUser.company?.specialization,
+            );
+        } catch (error: any) {
+            setTrialCodeError(error?.message || t('trialCodeInvalid'));
+        } finally {
+            setTrialCodeRedeeming(false);
+        }
+    };
+
     const handleLogin = async () => {
         setErrors({});
         setVerificationGate(null);
@@ -248,6 +310,7 @@ export const LoginPage = () => {
             if (frontendUser.language) setLanguage(frontendUser.language);
             sessionStorage.removeItem('prelogin_username');
             sessionStorage.removeItem('prelogin_password');
+            clearRegistrationDraft();
             setIsLoggedIn(true);
             // Land on the role's own home page (Dashboard for most, Call Center for the
             // call center role) and go straight to its company-scoped URL, so the first
@@ -341,7 +404,7 @@ export const LoginPage = () => {
                             alt="LOOP CRM Logo" 
                             className="h-12 w-auto object-contain mb-4 lg:hidden" 
                         />
-                        <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">{t('welcomeBack')}</h2>
+                        <h2 className="mt-6 text-center text-3xl font-extrabold text-heading">{t('welcomeBack')}</h2>
                         <p className="mt-2 text-center text-sm text-secondary">{t('signInToContinue')}</p>
                     </div>
                     <div className="space-y-6">
@@ -399,6 +462,33 @@ export const LoginPage = () => {
                                         errors.general
                                     )}
                                 </div>
+                                {errors.general === 'SUBSCRIPTION_INACTIVE' && subscriptionId && (
+                                    <div className="mt-4 pt-4 border-t border-red-200 dark:border-red-800 space-y-2">
+                                        <p className="text-sm font-medium">{t('trialCodeRedeem')}</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            <Input
+                                                value={trialCodeInput}
+                                                onChange={(e) => {
+                                                    setTrialCodeInput(e.target.value.toUpperCase());
+                                                    setTrialCodeError(null);
+                                                }}
+                                                placeholder={t('trialCodePlaceholder')}
+                                                className="flex-1 min-w-[140px] font-mono"
+                                            />
+                                            <Button
+                                                type="button"
+                                                variant="secondary"
+                                                onClick={() => void handleRedeemTrialCode()}
+                                                disabled={trialCodeRedeeming || !trialCodeInput.trim()}
+                                            >
+                                                {trialCodeRedeeming ? (t('loading') || '…') : t('trialCodeApply')}
+                                            </Button>
+                                        </div>
+                                        {trialCodeError && (
+                                            <p className="text-xs text-red-600 dark:text-red-300">{trialCodeError}</p>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
                         <div>

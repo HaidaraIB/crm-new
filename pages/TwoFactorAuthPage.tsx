@@ -408,7 +408,7 @@ export const TwoFactorAuthPage = () => {
                             alt="LOOP CRM Logo" 
                             className="h-12 w-auto object-contain mb-4 lg:hidden" 
                         />
-                        <h2 className="mt-6 text-center text-3xl font-extrabold text-primary">{t('twoFactorAuthTitle')}</h2>
+                        <h2 className="mt-6 text-center text-3xl font-extrabold text-heading">{t('twoFactorAuthTitle')}</h2>
                         <p className="mt-2 text-center text-sm text-secondary">
                             {t('enter2FACode')}
                         </p>

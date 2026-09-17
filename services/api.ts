@@ -1009,6 +1009,7 @@ export const registerCompanyAPI = async (data: {
   email_verification_token?: string;
   plan_id?: number | null;
   billing_cycle?: 'monthly' | 'yearly';
+  trial_code?: string;
 }, language: string = 'en'): Promise<RegisterCompanyResponse> => {
   const response = await fetch(`${BASE_URL}/auth/register/`, {
     method: 'POST',
@@ -1478,6 +1479,49 @@ export const getPublicPlansAPI = async () => {
     throwApiError(errorData, 'Failed to load plans');
   }
   return parseSuccessJsonResponse<any[]>(response);
+};
+
+/** POST /api/public/trial-codes/validate/ */
+export const validateTrialCodeAPI = async (code: string, language: string = 'en') => {
+  const response = await fetch(`${BASE_URL}/public/trial-codes/validate/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      'Accept-Language': language,
+    }),
+    body: JSON.stringify({ code }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Invalid trial code');
+  }
+  return parseSuccessJsonResponse<{
+    valid: boolean;
+    trial_days: number;
+    plan_id: number;
+    plan_name: string;
+    plan_name_ar?: string;
+  }>(response);
+};
+
+/** POST /api/subscriptions/redeem-trial-code/ */
+export const redeemTrialCodeAPI = async (code: string, language: string = 'en') => {
+  return apiRequest<{
+    subscription_id: number;
+    plan_id: number;
+    plan_name: string;
+    end_date: string;
+    subscription_status: string;
+    is_active: boolean;
+    access: string;
+    refresh: string;
+  }>('/subscriptions/redeem-trial-code/', {
+    method: 'POST',
+    headers: {
+      'Accept-Language': language,
+    },
+    body: JSON.stringify({ code }),
+  });
 };
 
 /**

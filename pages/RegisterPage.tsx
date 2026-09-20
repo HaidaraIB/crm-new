@@ -1121,6 +1121,18 @@ export const RegisterPage = () => {
                             <p className="mt-2 text-center text-sm text-secondary">
                                 {t('createCompanyAccount') || 'Create your company account'}
                             </p>
+                            <p className="mt-3 text-center text-sm text-secondary">
+                                {t('bookDemoLeadIn')}{' '}
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        window.location.href = '/book-demo';
+                                    }}
+                                    className="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                                >
+                                    {t('bookDemo')}
+                                </button>
+                            </p>
                         </div>
 
                         {/* Progress indicator */}
@@ -1872,7 +1884,7 @@ export const RegisterPage = () => {
                             </div>
 
                             {/* Login link */}
-                            <div className="text-center">
+                            <div className="text-center space-y-2">
                                 <p className="text-sm text-secondary">
                                     {t('alreadyHaveAccount') || 'Already have an account?'}{' '}
                                     <button

@@ -11,7 +11,7 @@ import { useWebPush } from './hooks/useWebPush';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, AlertModal, ToastHost, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
@@ -202,7 +202,8 @@ const TheApp = () => {
         const normalizedPath = path.replace(/\/+$/, '') || '/';
         return normalizedPath === '/data-deletion-policy' || normalizedPath === '/data-deletion' || normalizedPath.endsWith('/data-deletion-policy') || normalizedPath.endsWith('/data-deletion')
             || normalizedPath === '/terms-of-service' || normalizedPath === '/terms' || normalizedPath.endsWith('/terms-of-service') || normalizedPath.endsWith('/terms')
-            || normalizedPath === '/privacy-policy' || normalizedPath === '/privacy' || normalizedPath.endsWith('/privacy-policy') || normalizedPath.endsWith('/privacy');
+            || normalizedPath === '/privacy-policy' || normalizedPath === '/privacy' || normalizedPath.endsWith('/privacy-policy') || normalizedPath.endsWith('/privacy')
+            || normalizedPath === '/book-demo' || normalizedPath === '/book-a-demo' || normalizedPath.endsWith('/book-demo') || normalizedPath.endsWith('/book-a-demo');
     };
     
     // Track payment success feedback to prevent email verification message from showing over it
@@ -893,6 +894,12 @@ const TheApp = () => {
     const isDataDeletionRoute = pathname === '/data-deletion-policy' || pathname === '/data-deletion' || pathname.endsWith('/data-deletion-policy') || pathname.endsWith('/data-deletion') || currentPage === 'DataDeletionPolicy';
     const isTermsRoute = pathname === '/terms-of-service' || pathname === '/terms' || pathname.endsWith('/terms-of-service') || pathname.endsWith('/terms') || currentPage === 'TermsOfService';
     const isPrivacyRoute = pathname === '/privacy-policy' || pathname === '/privacy' || pathname.endsWith('/privacy-policy') || pathname.endsWith('/privacy') || currentPage === 'PrivacyPolicy';
+    const isBookDemoRoute =
+        pathname === '/book-demo' ||
+        pathname === '/book-a-demo' ||
+        pathname.endsWith('/book-demo') ||
+        pathname.endsWith('/book-a-demo') ||
+        currentPage === 'BookDemo';
     
     // Impersonate: exchange one-time code for tokens and log in (Super Admin handoff from admin panel)
     if (pathname === '/impersonate' || pathname.startsWith('/impersonate?')) {
@@ -935,6 +942,9 @@ const TheApp = () => {
     }
     if (isDataDeletionRoute) {
         return <DataDeletionPolicyPage />;
+    }
+    if (isBookDemoRoute) {
+        return <BookDemoPage />;
     }
     
     // Handle routing for login and register pages

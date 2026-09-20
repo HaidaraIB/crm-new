@@ -406,6 +406,18 @@ export const LoginPage = () => {
                         />
                         <h2 className="mt-6 text-center text-3xl font-extrabold text-heading">{t('welcomeBack')}</h2>
                         <p className="mt-2 text-center text-sm text-secondary">{t('signInToContinue')}</p>
+                        <p className="mt-3 text-center text-sm text-secondary">
+                            {t('bookDemoLeadIn')}{' '}
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    window.location.href = '/book-demo';
+                                }}
+                                className="text-primary-600 dark:text-primary-400 hover:underline font-medium"
+                            >
+                                {t('bookDemo')}
+                            </button>
+                        </p>
                     </div>
                     <div className="space-y-6">
                         <PaymentResultBanner compact clearOnDismiss={false} />

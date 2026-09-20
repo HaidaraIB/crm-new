@@ -28,7 +28,7 @@ export type Page =
   | 'Login' | 'Register' | 'ForgotPassword' | 'ResetPassword'
   | 'VerifyEmail' | 'VerifyPhone' | 'TwoFactorAuth'
   // Legal pages
-  | 'TermsOfService' | 'PrivacyPolicy' | 'DataDeletionPolicy';
+  | 'TermsOfService' | 'PrivacyPolicy' | 'DataDeletionPolicy' | 'BookDemo';
 
 export interface Subscription {
   id: number;

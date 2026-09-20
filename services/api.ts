@@ -1534,6 +1534,102 @@ export const getPublicPaymentGatewaysAPI = async () => {
   });
 };
 
+export type PublicDemoBookingConfig = {
+  is_enabled: boolean;
+  timezone: string;
+  duration_minutes: number;
+  horizon_days: number;
+  intro_en: string;
+  intro_ar: string;
+};
+
+export type PublicDemoBookingSlot = {
+  starts_at: string;
+  ends_at: string;
+  date: string;
+};
+
+export type PublicDemoBookingRecord = {
+  id: number;
+  name: string;
+  email: string;
+  phone: string;
+  company_name: string;
+  notes: string;
+  starts_at: string;
+  ends_at: string;
+  status: string;
+  language: string;
+  created_at: string;
+  timezone?: string;
+};
+
+/** GET /api/public/demo-bookings/config/ */
+export const getPublicDemoBookingConfigAPI = async () => {
+  const response = await fetch(`${BASE_URL}/public/demo-bookings/config/`, {
+    method: 'GET',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to load demo booking settings');
+  }
+  return parseSuccessJsonResponse<PublicDemoBookingConfig>(response);
+};
+
+/** GET /api/public/demo-bookings/slots/?from=&to= */
+export const getPublicDemoBookingSlotsAPI = async (from: string, to: string) => {
+  const params = new URLSearchParams({ from, to });
+  const response = await fetch(`${BASE_URL}/public/demo-bookings/slots/?${params}`, {
+    method: 'GET',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to load time slots');
+  }
+  return parseSuccessJsonResponse<{ slots: PublicDemoBookingSlot[]; dates_with_slots: string[] }>(response);
+};
+
+/** POST /api/public/demo-bookings/ */
+export const createPublicDemoBookingAPI = async (payload: {
+  starts_at: string;
+  name: string;
+  email: string;
+  phone: string;
+  company_name?: string;
+  notes?: string;
+  language?: string;
+}) => {
+  const response = await fetch(`${BASE_URL}/public/demo-bookings/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+      'Accept-Language': payload.language || 'en',
+    }),
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to create booking');
+  }
+  return parseSuccessJsonResponse<PublicDemoBookingRecord>(response);
+};
+
+/** POST /api/public/demo-bookings/lookup/ */
+export const lookupPublicDemoBookingAPI = async (bookingId: number, email: string) => {
+  const response = await fetch(`${BASE_URL}/public/demo-bookings/lookup/`, {
+    method: 'POST',
+    headers: getHeadersWithApiKey({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ booking_id: bookingId, email: email.trim() }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to find booking');
+  }
+  return parseSuccessJsonResponse<PublicDemoBookingRecord>(response);
+};
+
 /**
  * Switch subscription to a free/trial plan (no payment).
  * POST /api/subscriptions/switch-plan-free/

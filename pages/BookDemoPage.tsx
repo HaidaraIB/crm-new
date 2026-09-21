@@ -11,8 +11,28 @@ import {
   PublicDemoBookingSlot,
 } from '../services/api';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import {
+  buildFieldErrorSummary,
+  clearFieldError,
+  mapApiFieldsToUiErrors,
+  scrollToFirstFieldError,
+} from '../utils/formFieldErrors';
+import { validateEmailField, validateNameField, validatePhoneField } from '../utils/formValidation';
+import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
 
 const DEMO_BOOKING_STORAGE_KEY = 'loop.publicDemoBooking.v1';
+
+const BOOK_DEMO_FIELD_DOM_IDS: Record<string, string> = {
+  name: 'book-demo-name',
+  email: 'book-demo-email',
+  phone: 'book-demo-phone',
+};
+
+const BOOK_DEMO_FIELD_LABELS: Record<string, string> = {
+  name: 'bookDemoName',
+  email: 'bookDemoEmail',
+  phone: 'bookDemoPhone',
+};
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -77,6 +97,10 @@ const formatBookingDateTime = (iso: string, timeZone: string, language: string) 
 
 const statusLabelKey = (status: string): string => {
   switch (status) {
+    case 'pending':
+      return 'bookDemoStatusPending';
+    case 'not_confirmed':
+      return 'bookDemoStatusNotConfirmed';
     case 'completed':
       return 'bookDemoStatusCompleted';
     case 'cancelled':
@@ -92,7 +116,9 @@ const NOTES_TEXTAREA_CLASS =
   'w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100';
 
 const STATUS_BADGE_CLASS: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
   confirmed: 'bg-blue-100 text-blue-900 dark:bg-blue-900/40 dark:text-blue-100',
+  not_confirmed: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
   completed: 'bg-green-100 text-green-900 dark:bg-green-900/40 dark:text-green-100',
   cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200',
   no_show: 'bg-amber-100 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100',
@@ -120,16 +146,26 @@ type BookingSummaryProps = {
 
 const BookingSummary: React.FC<BookingSummaryProps> = ({ booking, timeZone, language, t, onBookAnother }) => {
   const scheduledFor = formatBookingDateTime(booking.starts_at, timeZone, language);
-  const statusClass = STATUS_BADGE_CLASS[booking.status] || STATUS_BADGE_CLASS.confirmed;
+  const statusClass = STATUS_BADGE_CLASS[booking.status] || STATUS_BADGE_CLASS.pending;
 
   return (
     <div className="space-y-6 -mt-1">
       <div className="text-center space-y-4 pt-2">
         <div
-          className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/35 ring-8 ring-green-50 dark:ring-green-950/50"
+          className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ring-8 ${
+            booking.status === 'confirmed'
+              ? 'bg-green-100 dark:bg-green-900/35 ring-green-50 dark:ring-green-950/50'
+              : 'bg-primary-100 dark:bg-primary-900/35 ring-primary-50 dark:ring-primary-950/50'
+          }`}
           aria-hidden
         >
-          <CheckIcon className="h-8 w-8 text-green-600 dark:text-green-400" />
+          <CheckIcon
+            className={`h-8 w-8 ${
+              booking.status === 'confirmed'
+                ? 'text-green-600 dark:text-green-400'
+                : 'text-primary-600 dark:text-primary-400'
+            }`}
+          />
         </div>
         <div className="space-y-2">
           <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{t('bookDemoSuccessTitle')}</h2>
@@ -221,15 +257,21 @@ const BookDemoFlowSection: React.FC<BookDemoFlowSectionProps> = ({
 type BookDemoFieldProps = {
   label: string;
   htmlFor?: string;
+  error?: string | null;
   children: React.ReactNode;
 };
 
-const BookDemoField: React.FC<BookDemoFieldProps> = ({ label, htmlFor, children }) => (
+const BookDemoField: React.FC<BookDemoFieldProps> = ({ label, htmlFor, error, children }) => (
   <div>
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1.5">
       {label}
     </label>
     {children}
+    {error ? (
+      <p className="mt-1.5 text-sm text-red-600 dark:text-red-400" role="alert">
+        {error}
+      </p>
+    ) : null}
   </div>
 );
 
@@ -252,6 +294,7 @@ export const BookDemoPage = () => {
   const [notes, setNotes] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [showLookup, setShowLookup] = useState(false);
   const [lookupId, setLookupId] = useState('');
   const [lookupEmail, setLookupEmail] = useState('');
@@ -367,15 +410,42 @@ export const BookDemoPage = () => {
     return formatBookingDateTime(selectedSlot.starts_at, tz, language);
   }, [selectedSlot, tz, language]);
 
+  const validateDetailsForm = (): Record<string, string> => {
+    const next: Record<string, string> = {};
+    const nameErr = validateNameField(name, t, { requiredKey: 'nameRequired' });
+    if (nameErr) next.name = nameErr;
+    const emailErr = validateEmailField(email, t);
+    if (emailErr) next.email = emailErr;
+    const phoneErr = validatePhoneField(phone, t);
+    if (phoneErr) next.phone = phoneErr;
+    return next;
+  };
+
   const handleSubmit = async () => {
-    if (!selectedSlot || !name.trim() || !email.trim() || !phone.trim()) return;
+    if (!selectedSlot) return;
+    const clientErrors = validateDetailsForm();
+    if (Object.keys(clientErrors).length > 0) {
+      setFieldErrors(clientErrors);
+      setError(
+        buildFieldErrorSummary(
+          clientErrors,
+          Object.fromEntries(
+            Object.entries(BOOK_DEMO_FIELD_LABELS).map(([k, v]) => [k, t(v)])
+          ),
+          t
+        )
+      );
+      requestAnimationFrame(() => scrollToFirstFieldError(clientErrors, BOOK_DEMO_FIELD_DOM_IDS));
+      return;
+    }
     setSubmitting(true);
     setError(null);
+    setFieldErrors({});
     try {
       const booking = await createPublicDemoBookingAPI({
         starts_at: selectedSlot.starts_at,
         name: name.trim(),
-        email: email.trim(),
+        email: email.trim().toLowerCase(),
         phone: phone.trim(),
         company_name: companyName.trim(),
         notes: notes.trim(),
@@ -383,8 +453,36 @@ export const BookDemoPage = () => {
       });
       writeStoredDemoBooking(booking.id, booking.email);
       setSavedBooking(booking);
-    } catch {
-      setError(t('bookDemoError'));
+    } catch (err: unknown) {
+      const apiErr = err as Error & { code?: string; fields?: Record<string, unknown> };
+      const mapped = mapApiFieldsToUiErrors(apiErr.fields, t);
+      if (Object.keys(mapped).length > 0) {
+        setFieldErrors(mapped);
+        setError(
+          mapped.general ||
+            buildFieldErrorSummary(
+              mapped,
+              Object.fromEntries(
+                Object.entries(BOOK_DEMO_FIELD_LABELS).map(([k, v]) => [k, t(v)])
+              ),
+              t
+            )
+        );
+        requestAnimationFrame(() => scrollToFirstFieldError(mapped, BOOK_DEMO_FIELD_DOM_IDS));
+        return;
+      }
+      if (apiErr.code === 'duplicate_booking') {
+        const msg = t('bookDemoDuplicateBooking');
+        setFieldErrors({ email: msg });
+        setError(msg);
+        requestAnimationFrame(() => scrollToFirstFieldError({ email: msg }, BOOK_DEMO_FIELD_DOM_IDS));
+        return;
+      }
+      if (apiErr.code === 'slot_unavailable') {
+        setError(t('bookDemoSlotUnavailable'));
+        return;
+      }
+      setError(getLocalizedApiErrorMessage(apiErr, t, 'bookDemoError'));
     } finally {
       setSubmitting(false);
     }
@@ -413,6 +511,7 @@ export const BookDemoPage = () => {
     setSelectedDay(null);
     setSelectedSlot(null);
     setError(null);
+    setFieldErrors({});
   };
 
   return (
@@ -636,19 +735,49 @@ export const BookDemoPage = () => {
                     </p>
                   </div>
                   <div className="space-y-4">
-                    <BookDemoField label={t('bookDemoName')}>
-                      <Input placeholder={t('bookDemoName')} value={name} onChange={(e) => setName(e.target.value)} />
-                    </BookDemoField>
-                    <BookDemoField label={t('bookDemoEmail')}>
+                    <BookDemoField label={t('bookDemoName')} htmlFor="book-demo-name" error={fieldErrors.name}>
                       <Input
-                        type="email"
-                        placeholder={t('bookDemoEmail')}
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
+                        id="book-demo-name"
+                        placeholder={t('bookDemoName')}
+                        value={name}
+                        onChange={(e) => {
+                          setName(e.target.value);
+                          clearFieldError(setFieldErrors, 'name');
+                          setError(null);
+                        }}
+                        aria-invalid={fieldErrors.name ? true : undefined}
+                        className={fieldErrors.name ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}
                       />
                     </BookDemoField>
-                    <BookDemoField label={t('bookDemoPhone')}>
-                      <PhoneInput value={phone} onChange={setPhone} placeholder={t('bookDemoPhone')} />
+                    <BookDemoField label={t('bookDemoEmail')} htmlFor="book-demo-email" error={fieldErrors.email}>
+                      <Input
+                        id="book-demo-email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        placeholder={t('bookDemoEmail')}
+                        value={email}
+                        onChange={(e) => {
+                          setEmail(e.target.value);
+                          clearFieldError(setFieldErrors, 'email');
+                          setError(null);
+                        }}
+                        aria-invalid={fieldErrors.email ? true : undefined}
+                        className={fieldErrors.email ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}
+                      />
+                    </BookDemoField>
+                    <BookDemoField label={t('bookDemoPhone')} htmlFor="book-demo-phone" error={fieldErrors.phone}>
+                      <PhoneInput
+                        id="book-demo-phone"
+                        value={phone}
+                        error={!!fieldErrors.phone}
+                        onChange={(value) => {
+                          setPhone(value);
+                          clearFieldError(setFieldErrors, 'phone');
+                          setError(null);
+                        }}
+                        placeholder={t('bookDemoPhone')}
+                      />
                     </BookDemoField>
                     <BookDemoField label={t('bookDemoCompany')}>
                       <Input
@@ -671,7 +800,13 @@ export const BookDemoPage = () => {
                   <Button
                     className="w-full mt-6 py-3 text-base"
                     loading={submitting}
-                    disabled={submitting || !name.trim() || !email.trim() || !phone.trim()}
+                    disabled={
+                      submitting ||
+                      !selectedSlot ||
+                      !name.trim() ||
+                      !email.trim() ||
+                      !phone.trim()
+                    }
                     onClick={() => void handleSubmit()}
                   >
                     {t('bookDemoSubmit')}

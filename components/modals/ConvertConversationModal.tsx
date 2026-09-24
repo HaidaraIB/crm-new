@@ -3,6 +3,7 @@ import { Alert } from '../Alert';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Input } from '../Input';
+import { PhoneInput } from '../PhoneInput';
 import { useAppContext } from '../../context/AppContext';
 import { useUsers } from '../../hooks/useQueries';
 import { buildLeadAssigneePickerOptions } from '../../utils/roles';
@@ -23,13 +24,7 @@ type Props = {
   errorMessage?: string | null;
 };
 
-/**
- * Convert an inbox conversation into a CRM lead.
- *
- * Phone is optional on purpose: Instagram and Messenger carry no phone number,
- * so most leads created here have none. The backend refuses to fabricate one —
- * a placeholder would consume the company-wide unique phone key.
- */
+/** Convert an inbox conversation into a CRM lead (phone required). */
 export const ConvertConversationModal: React.FC<Props> = ({
   isOpen,
   onClose,
@@ -62,7 +57,9 @@ export const ConvertConversationModal: React.FC<Props> = ({
     if (!isOpen || !conversation) return;
     const contact = conversation.contact;
     setName(contact?.name || contact?.username || contact?.display_name || '');
-    setPhone('');
+    const isWhatsapp = conversation.channel === 'whatsapp';
+    const contactPhone = contact?.external_id || '';
+    setPhone(isWhatsapp && contactPhone ? contactPhone : '');
     setNotes('');
     setAutoAssign(true);
     setAssignedTo(null);
@@ -96,10 +93,10 @@ export const ConvertConversationModal: React.FC<Props> = ({
 
         <div>
           <label className="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">
-            {t('phoneOptional')}
+            {t('phoneRequired')}
           </label>
-          <Input value={phone} onChange={(e) => setPhone(e.target.value)} dir="ltr" />
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('phoneOptionalHint')}</p>
+          <PhoneInput value={phone} onChange={setPhone} />
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('convertConversationPhoneHint')}</p>
         </div>
 
         <div className="space-y-2">
@@ -154,7 +151,11 @@ export const ConvertConversationModal: React.FC<Props> = ({
           <Button variant="secondary" onClick={onClose} disabled={isSubmitting}>
             {t('cancel')}
           </Button>
-          <Button onClick={handleSubmit} loading={isSubmitting} disabled={!name.trim()}>
+          <Button
+            onClick={handleSubmit}
+            loading={isSubmitting}
+            disabled={!name.trim() || !phone.trim()}
+          >
             {t('convertToLead')}
           </Button>
         </div>

@@ -58,10 +58,11 @@ import {
 } from '../utils/whatsappManualChatsStorage';
 import { normalizeRole } from '../utils/roles';
 import { SocialInboxSection } from '../components/integrations/SocialInboxSection';
+import { WhatsAppInboxSection } from '../components/integrations/WhatsAppInboxSection';
 import { clearFieldError } from '../utils/formFieldErrors';
 import { localizeMetaTokenError } from '../utils/metaTokenErrorDisplay';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
-import { getSocialConnectionsAPI } from '../services/api';
+import { getSocialConnectionsAPI, getWhatsappInboxNumbersAPI } from '../services/api';
 
 type Account = { id: number; name: string; status: string; platform?: string; metadata?: Record<string, unknown>; is_active?: boolean };
 
@@ -1050,6 +1051,7 @@ export const IntegrationsPage = () => {
     // page. Tabs keep each one's account list whole instead of stacking two
     // unrelated cards and making the page read as one broken integration.
     const [metaTab, setMetaTab] = useState<'leadAds' | 'inbox'>('leadAds');
+    const [whatsappIntegrationTab, setWhatsappIntegrationTab] = useState<'crm' | 'inbox'>('crm');
 
     // Shares the React Query cache with SocialInboxSection (same key, so no extra
     // request). The page needs the account id to run the inbox through the very
@@ -1063,6 +1065,13 @@ export const IntegrationsPage = () => {
             !isEmployee && (currentPage === 'Meta' || currentPage === 'Integrations'),
     });
     const socialInboxAccount = socialInboxData?.account ?? null;
+    const { data: whatsappInboxData } = useQuery({
+        queryKey: ['whatsappInboxNumbers'],
+        queryFn: getWhatsappInboxNumbersAPI,
+        retry: false,
+        enabled: !isEmployee && currentPage === 'WhatsApp',
+    });
+    const whatsappInboxAccount = whatsappInboxData?.account ?? null;
     const [messagingCenterTab, setMessagingCenterTab] = useState<'campaign' | 'template' | 'logs' | 'requests'>(() => {
         try {
             const s = localStorage.getItem('messaging_center_tab');
@@ -1182,8 +1191,11 @@ export const IntegrationsPage = () => {
         if ((currentPage === 'Meta' || currentPage === 'Integrations') && metaTab === 'inbox') {
             return 'meta_inbox';
         }
+        if (currentPage === 'WhatsApp' && whatsappIntegrationTab === 'inbox') {
+            return 'whatsapp_inbox';
+        }
         return platformParam;
-    }, [currentPage, metaTab, platformParam]);
+    }, [currentPage, metaTab, platformParam, whatsappIntegrationTab]);
 
     const currentPolicy = policyPlatformKey ? integrationPolicyMap?.[policyPlatformKey] : undefined;
     const inboxPolicyDisabled = integrationPolicyMap?.meta_inbox?.enabled === false;
@@ -1228,7 +1240,9 @@ export const IntegrationsPage = () => {
         const title =
             policyPlatformKey === 'meta_inbox'
                 ? t('integrationStatusDisabledInbox') || t('integrationStatusDisabled')
-                : t('integrationStatusDisabled') || 'Integration is disabled';
+                : policyPlatformKey === 'whatsapp_inbox'
+                  ? t('integrationStatusDisabledWhatsappInbox') || t('integrationStatusDisabled')
+                  : t('integrationStatusDisabled') || 'Integration is disabled';
         return (
             <div className="mb-4 rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
                 <div className="font-semibold">{title}</div>
@@ -2258,7 +2272,9 @@ export const IntegrationsPage = () => {
             accounts.find((acc: Account) => acc.id === accountId) ??
             (socialInboxAccount?.id === accountId
                 ? { ...socialInboxAccount, platform: 'meta_inbox' }
-                : undefined);
+                : whatsappInboxAccount?.id === accountId
+                  ? { ...whatsappInboxAccount, platform: 'whatsapp_inbox' }
+                  : undefined);
         if (account) {
             setConfirmDeleteConfig({
                 title: t('disconnect') || 'Disconnect Account',
@@ -2288,6 +2304,7 @@ export const IntegrationsPage = () => {
     const invalidateAccountQueries = () => {
         queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
         queryClient.invalidateQueries({ queryKey: ['socialInboxConnections'] });
+        queryClient.invalidateQueries({ queryKey: ['whatsappInboxNumbers'] });
     };
 
     const finalizeOAuthConnect = (accountId: number) => {
@@ -2517,7 +2534,36 @@ export const IntegrationsPage = () => {
         if (accountId != null) setPendingConnectAccountId(accountId);
     };
 
+    const handleConnectWhatsappInbox = async () => {
+        if (connectingAccountIdRef.current != null || isStartingConnect) return;
+        let accountId: number | null = whatsappInboxAccount?.id ?? null;
+        if (accountId == null) {
+            setIsStartingConnect(true);
+            try {
+                const created = await createAccountMutation.mutateAsync({
+                    platform: 'whatsapp_inbox',
+                    name: t('whatsappInboxTab'),
+                });
+                accountId = created?.id ?? null;
+            } catch (error: any) {
+                showAlert(resolveLocalizedApiError(error, t, t('errorSavingAccount')), 'error');
+                return;
+            } finally {
+                setIsStartingConnect(false);
+            }
+        }
+        if (accountId != null) setPendingConnectAccountId(accountId);
+    };
+
     const handleAddNew = async () => {
+        if (currentPage === 'WhatsApp' && whatsappIntegrationTab === 'inbox') {
+            if (whatsappInboxAccount?.status === 'connected') {
+                showAlert(t('oneIntegrationAccountPerPlatformHint'), 'info');
+                return;
+            }
+            void handleConnectWhatsappInbox();
+            return;
+        }
         if (metaTab === 'inbox') {
             if (socialInboxAccount) {
                 showAlert(t('oneIntegrationAccountPerPlatformHint'), 'info');
@@ -3530,6 +3576,11 @@ export const IntegrationsPage = () => {
             );
         }
 
+        const crmWhatsappAccounts = accounts.filter(
+            (a: Account) => (a as any).platform !== 'whatsapp_inbox'
+        );
+        const onWhatsappInboxTab = !isEmployee && whatsappIntegrationTab === 'inbox';
+
         return (
             <PageWrapper
                 title={t('whatsApp')}
@@ -3546,10 +3597,44 @@ export const IntegrationsPage = () => {
             >
                 {renderPolicyBanner()}
 
+                {!isEmployee && (
+                    <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
+                        <nav className="-mb-px flex gap-6 overflow-x-auto" aria-label="Tabs">
+                            <button
+                                type="button"
+                                onClick={() => setWhatsappIntegrationTab('crm')}
+                                className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                                    whatsappIntegrationTab === 'crm' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                                }`}
+                            >
+                                {t('whatsApp')}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setWhatsappIntegrationTab('inbox')}
+                                className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                                    whatsappIntegrationTab === 'inbox' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+                                }`}
+                            >
+                                {t('whatsappInboxTab')}
+                            </button>
+                        </nav>
+                    </div>
+                )}
+
+                {onWhatsappInboxTab ? (
+                    <WhatsAppInboxSection
+                        onConnect={handleConnectWhatsappInbox}
+                        onEdit={handleEdit}
+                        onDisconnect={handleDelete}
+                        connectingAccountId={connectingAccountId}
+                        isStartingConnect={isStartingConnect}
+                    />
+                ) : (
                 <Card>
-                        {accounts.length > 0 ? (
+                        {crmWhatsappAccounts.length > 0 ? (
                             <ul className="divide-y divide-gray-200 dark:divide-gray-700">
-                                {accounts.map((account: Account) => {
+                                {crmWhatsappAccounts.map((account: Account) => {
                                     const isCoexistence =
                                         account.metadata?.coexistence === true ||
                                         account.metadata?.is_on_biz_app === true;
@@ -3650,6 +3735,7 @@ export const IntegrationsPage = () => {
                             </div>
                         )}
                     </Card>
+                )}
             </PageWrapper>
         );
     }

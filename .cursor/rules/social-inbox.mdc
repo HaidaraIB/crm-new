@@ -59,11 +59,13 @@ the window — abusing the tag risks app-level enforcement against the whole app
 
 - Once only. A second attempt returns `409 social_already_converted` with the
   existing `client_id`; the UI shows the lead chip instead of erroring.
-- **Phone is optional and must stay optional.** Instagram/Messenger carry no
-  phone number. The created `Client` usually has `phone_number = None` and no
-  `ClientPhoneNumber` row. That is safe against `uniq_company_phone_normalized`
-  (the constraint is conditional on a non-empty normalized value). Never
-  fabricate a placeholder number — it would consume the company-wide unique key.
+- **Phone is required on every conversion.** Instagram/Messenger carry no phone
+  number — the agent must enter one. WhatsApp inbox may prefill from the contact
+  `external_id`. Never fabricate a placeholder number.
+- **WhatsApp inbox** uses a separate `WhatsAppInboxNumber` (connected under
+  Integrations → WhatsApp → Inbox number). It must differ from the CRM WhatsApp
+  number. Outside the 24h window, agents send approved templates via
+  `POST /integrations/inbox/send-template/`.
 - If a phone *is* supplied and matches an existing lead, the conversation links
   to that lead (`duplicate: true`) rather than forking a second one.
 - Assignment reuses `crm/assignment.py`; notifications reuse

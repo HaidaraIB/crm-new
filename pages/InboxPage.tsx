@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/Button';
 import { Input } from '../components/Input';
 import { ChatBlobMedia } from '../components/chat/ChatBlobMedia';
@@ -11,6 +11,7 @@ import {
   type ChatMediaAlbumItem,
 } from '../components/chat/chatMediaAlbum';
 import { ChatPendingAttachmentChip } from '../components/chat/ChatPendingAttachmentChip';
+import { SocialContactAvatar } from '../components/chat/SocialContactAvatar';
 import { ChatVoiceRecordingBar } from '../components/chat/ChatVoiceRecordingBar';
 import {
   InboxFilterRail,
@@ -43,7 +44,11 @@ import {
 } from '../hooks/useQueries';
 import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
-import { getSocialMessageAttachmentUrl } from '../services/api';
+import {
+  getMessageTemplatesAPI,
+  getSocialMessageAttachmentUrl,
+  sendSocialInboxTemplateAPI,
+} from '../services/api';
 import type { SocialConversationPayload, SocialMessagePayload } from '../services/api';
 import type { Lead } from '../types';
 import { clientLocationMapsUrl } from '../utils/leadLocation';
@@ -56,7 +61,6 @@ import {
   WA_ALERT_ERROR,
   WA_ALERT_INFO,
   WA_ALERT_WARN,
-  WA_AVATAR,
   WA_BUBBLE_IN,
   WA_BUBBLE_OUT,
   WA_BUBBLE_OUT_FAILED,
@@ -120,12 +124,6 @@ function saveInboxFilters(next: InboxFiltersPersist) {
   } catch {
     // Quota / private mode — filters still work for the session.
   }
-}
-
-function initialsOf(name: string): string {
-  const parts = (name || '').trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return '?';
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
 }
 
 function formatTime(iso: string | null | undefined, language: string): string {
@@ -378,7 +376,24 @@ export const InboxPage: React.FC = () => {
   const updateState = useUpdateSocialConversationState();
   const convert = useConvertSocialConversation();
 
-  const composerBlocked = window ? !window.open : false;
+  const requiresTemplate = Boolean(window?.requires_template);
+  const composerBlocked = window ? !window.open && !requiresTemplate : false;
+  const [templateId, setTemplateId] = useState<number | ''>('');
+  const [templateSending, setTemplateSending] = useState(false);
+  const { data: messageTemplates } = useQuery({
+    queryKey: ['messageTemplates', 'inbox'],
+    queryFn: () => getMessageTemplatesAPI(),
+    enabled: requiresTemplate && Boolean(selectedId),
+  });
+  const approvedTemplates = useMemo(
+    () =>
+      (Array.isArray(messageTemplates) ? messageTemplates : []).filter(
+        (tpl: any) =>
+          (tpl.channel_type === 'whatsapp' || tpl.channel_type === 'whatsapp_api') &&
+          String(tpl.meta_status || 'APPROVED').toUpperCase() === 'APPROVED'
+      ),
+    [messageTemplates]
+  );
   const sending = sendText.isPending || sendMedia.isPending;
   const textDir = composerTextDir(draft, isRtl);
   const canSend = Boolean(draft.trim() || pendingAttachment);
@@ -676,7 +691,10 @@ export const InboxPage: React.FC = () => {
                   selectedId === row.id ? WA_LIST_ACTIVE : ''
                 }`}
               >
-                <div className={WA_AVATAR}>{initialsOf(row.contact.display_name)}</div>
+                <SocialContactAvatar
+                  displayName={row.contact.display_name}
+                  profilePicUrl={row.contact.profile_pic_url}
+                />
                 <div className="min-w-0 flex-1">
                   {/* Name alone on the first line — the converted badge used to
                       sit inline with shrink-0 and ate the whole title in Arabic. */}
@@ -823,7 +841,54 @@ export const InboxPage: React.FC = () => {
                     )}
                   </div>
                 )}
-                {composerBlocked && (
+                {requiresTemplate && (
+                  <div className={WA_ALERT_WARN}>
+                    <p className="font-semibold">{t('replyWindowClosed')}</p>
+                    <p>{t('inboxTemplateRequiredHint')}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <select
+                        value={templateId}
+                        onChange={(e) =>
+                          setTemplateId(e.target.value ? Number(e.target.value) : '')
+                        }
+                        className="min-w-[12rem] rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
+                      >
+                        <option value="">{t('inboxSendTemplate')}</option>
+                        {approvedTemplates.map((tpl: any) => (
+                          <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
+                        ))}
+                      </select>
+                      <Button
+                        size="sm"
+                        disabled={!templateId || templateSending || !selectedId}
+                        loading={templateSending}
+                        onClick={async () => {
+                          if (!selectedId || !templateId) return;
+                          setTemplateSending(true);
+                          try {
+                            await sendSocialInboxTemplateAPI({
+                              conversation: selectedId,
+                              template_id: Number(templateId),
+                            });
+                            setTemplateId('');
+                            queryClient.invalidateQueries({
+                              queryKey: queryKeys.socialMessages(selectedId),
+                            });
+                          } catch (e: any) {
+                            setSendError(
+                              e?.message || t('social_send_failed') || 'Send failed'
+                            );
+                          } finally {
+                            setTemplateSending(false);
+                          }
+                        }}
+                      >
+                        {t('inboxSendTemplate')}
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {composerBlocked && !requiresTemplate && (
                   <div className={WA_ALERT_WARN}>
                     <p className="font-semibold">{t('replyWindowClosed')}</p>
                     <p>{t('replyWindowClosedHint')}</p>

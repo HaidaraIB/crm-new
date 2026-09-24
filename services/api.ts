@@ -4269,10 +4269,11 @@ export interface SocialMessagePayload {
 
 export interface SocialSendWindow {
   open: boolean;
-  mode: 'response' | 'human_agent' | 'closed';
+  mode: 'response' | 'human_agent' | 'closed' | 'customer_care';
   last_inbound_at: string | null;
   expires_at: string | null;
   human_agent_available: boolean;
+  requires_template?: boolean;
 }
 
 export interface SocialConversationsResponse {
@@ -4490,6 +4491,46 @@ export interface MetaInboxConnectionPayload {
   subscribed_fields: string[];
   last_webhook_at: string | null;
 }
+
+const INBOX_WHATSAPP_NUMBERS_PATH = '/integrations/inbox/whatsapp-numbers/';
+
+export type WhatsappInboxNumberPayload = {
+  id: number;
+  phone_number_id: string;
+  display_phone_number: string;
+  waba_id: string;
+  status: string;
+  error_message: string | null;
+  last_webhook_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+/** GET /api/integrations/inbox/whatsapp-numbers/ */
+export const getWhatsappInboxNumbersAPI = async (): Promise<{
+  account: {
+    id: number;
+    name: string;
+    status: string;
+    external_account_name: string;
+    error_message: string | null;
+  } | null;
+  numbers: WhatsappInboxNumberPayload[];
+}> => apiRequest(INBOX_WHATSAPP_NUMBERS_PATH);
+
+/** DELETE /api/integrations/inbox/whatsapp-numbers/<id>/ */
+export const deleteWhatsappInboxNumberAPI = async (id: number) =>
+  apiRequest(INBOX_WHATSAPP_NUMBERS_PATH + id + '/', { method: 'DELETE' });
+
+/** POST /api/integrations/inbox/send-template/ */
+export const sendSocialInboxTemplateAPI = async (payload: {
+  conversation: number;
+  template_id: number;
+}) =>
+  apiRequest('/integrations/inbox/send-template/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 
 /** GET /api/integrations/inbox/connections/ - owner-only account configuration. */
 export const getSocialConnectionsAPI = async (): Promise<{

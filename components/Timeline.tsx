@@ -54,7 +54,9 @@ function getTypeChipLabel(
         case 'social':
         case 'social_thread':
             // The network, not "Inbox" — an owner thinks in Instagram/Messenger.
-            return entry.socialChannel === 'messenger' ? t('messenger') : t('instagram');
+            if (entry.socialChannel === 'messenger') return t('messenger');
+            if (entry.socialChannel === 'whatsapp') return t('whatsApp');
+            return t('instagram');
         case 'sms':
             return t('smsSent');
         case 'call':

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { translations } from '../../constants';
 import { chatStatusLabelKey } from '../../utils/whatsappConversationStatus';
+import { IntegrationPlatformIcon } from '../integrations/IntegrationPlatformIcon';
 import {
   ArrowLeftIcon,
   InboxIcon,
@@ -34,6 +35,7 @@ export const INBOX_CHANNEL_FILTERS = [
   { value: 'all', labelKey: 'allChannels' as const },
   { value: 'instagram', labelKey: 'instagramDirect' as const },
   { value: 'messenger', labelKey: 'facebookMessenger' as const },
+  { value: 'whatsapp', labelKey: 'whatsApp' as const },
 ];
 
 const RAIL_COLLAPSED_STORAGE_KEY = 'crm.socialInboxFilterRailCollapsed';
@@ -59,6 +61,9 @@ function ChannelIcon({
 }) {
   if (channel === 'instagram') return <InstagramIcon className={className} />;
   if (channel === 'messenger') return <MessengerIcon className={className} />;
+  if (channel === 'whatsapp') {
+    return <IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" className={className} />;
+  }
   return <InboxIcon className={className} />;
 }
 

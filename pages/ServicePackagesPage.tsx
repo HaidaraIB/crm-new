@@ -121,18 +121,25 @@ export const ServicePackagesPage = () => {
     const { data: packagesResponse, isLoading: packagesLoading, isFetching: packagesFetching, error: packagesError, refetch: refetchPackages } = useServicePackages();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
-    const allPackages = useMemo(() => {
+    const allPackages = useMemo((): ServicePackage[] => {
         const packages = packagesResponse?.results || [];
-        return packages.map((p: any) => ({
-            id: p.id,
-            code: p.code || '',
-            name: p.name || '',
-            description: p.description || '',
+        return packages.map((p: any): ServicePackage => ({
+            id: Number(p.id),
+            code: String(p.code || ''),
+            name: String(p.name || ''),
+            description: String(p.description || ''),
             price: p.price || p.price === 0 ? Number(p.price) : 0,
-            duration: p.duration || '',
-            services: Array.isArray(p.services) ? p.services.map((s: any) => typeof s === 'number' ? s : (s.id || s)) : [],
-            isActive: p.is_active !== undefined ? p.is_active : (p.isActive !== undefined ? p.isActive : true),
-        } as ServicePackage));
+            duration: String(p.duration || ''),
+            services: Array.isArray(p.services)
+                ? p.services.map((s: any) => (typeof s === 'number' ? s : Number(s.id || s)))
+                : [],
+            isActive:
+                p.is_active !== undefined
+                    ? Boolean(p.is_active)
+                    : p.isActive !== undefined
+                      ? Boolean(p.isActive)
+                      : true,
+        }));
     }, [packagesResponse]);
 
     // Delete service package mutation

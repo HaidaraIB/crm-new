@@ -1699,16 +1699,30 @@ export type CompanyInvoiceListItem = {
 /** GET /api/invoices/ — tenant company admin sees own company invoices */
 export const getMyCompanyInvoicesAPI = async (params?: {
   ordering?: string;
-}): Promise<CompanyInvoiceListItem[]> => {
+  page?: number;
+  page_size?: number;
+}): Promise<PaginatedResponse<CompanyInvoiceListItem>> => {
   const search = new URLSearchParams();
   if (params?.ordering) search.set('ordering', params.ordering);
+  if (params?.page != null) search.set('page', String(params.page));
+  if (params?.page_size != null) search.set('page_size', String(params.page_size));
   const qs = search.toString();
   const data = await apiRequest<any>(`/invoices/${qs ? `?${qs}` : ''}`, {
     method: 'GET',
   });
-  if (Array.isArray(data)) return data;
-  if (Array.isArray(data?.results)) return data.results;
-  return [];
+  if (isPaginatedResponse<CompanyInvoiceListItem>(data)) return data;
+  if (Array.isArray(data)) {
+    return { count: data.length, next: null, previous: null, results: data };
+  }
+  if (Array.isArray(data?.results)) {
+    return {
+      count: typeof data.count === 'number' ? data.count : data.results.length,
+      next: data.next ?? null,
+      previous: data.previous ?? null,
+      results: data.results,
+    };
+  }
+  return { count: 0, next: null, previous: null, results: [] };
 };
 
 /** GET /api/invoices/{id}/pdf/ — binary PDF for company admin / platform admin */
@@ -4207,7 +4221,7 @@ const INBOX_CONNECTIONS_PATH = '/integrations/inbox/connections/';
 // (not a Lead), and stays lead-less until an agent converts it.
 // ============================================================================
 
-export type SocialChannel = 'instagram' | 'messenger';
+export type SocialChannel = 'instagram' | 'messenger' | 'whatsapp';
 
 export interface SocialContactPayload {
   id: number;
@@ -4385,14 +4399,33 @@ export const sendSocialMediaAPI = async (params: {
   file: File;
   text?: string;
   kind?: string;
+  isVoiceNote?: boolean;
 }): Promise<{ message: SocialMessagePayload }> => {
   const form = new FormData();
   form.append('conversation', String(params.conversationId));
   form.append('file', params.file);
   if (params.text) form.append('text', params.text);
   if (params.kind) form.append('kind', params.kind);
+  if (params.isVoiceNote) form.append('is_voice_note', 'true');
   return apiRequest('/integrations/inbox/send-media/', { method: 'POST', body: form });
 };
+
+/** POST /api/integrations/inbox/send-location/ */
+export const sendSocialInboxLocationAPI = async (params: {
+  conversation: number;
+  latitude: number;
+  longitude: number;
+  name?: string;
+  address?: string;
+}): Promise<{ message: SocialMessagePayload }> =>
+  apiRequest('/integrations/inbox/send-location/', {
+    method: 'POST',
+    body: JSON.stringify(params),
+  });
+
+/** DELETE /api/integrations/inbox/conversations/<id>/ */
+export const deleteSocialConversationAPI = async (conversationId: number) =>
+  apiRequest(`/integrations/inbox/conversations/${conversationId}/`, { method: 'DELETE' });
 
 /** GET /api/integrations/inbox/window/ - drives the composer's enabled state. */
 export const getSocialSendWindowAPI = async (
@@ -4408,6 +4441,7 @@ export const updateSocialConversationStateAPI = async (params: {
   snoozedUntil?: string | null;
   isStarred?: boolean;
   isUnsubscribed?: boolean;
+  assignedTo?: number | null;
 }): Promise<{ conversation: SocialConversationPayload }> => {
   const body: Record<string, string | number | boolean | null> = {
     conversation: params.conversationId,
@@ -4416,6 +4450,7 @@ export const updateSocialConversationStateAPI = async (params: {
   if (params.snoozedUntil !== undefined) body.snoozed_until = params.snoozedUntil;
   if (params.isStarred !== undefined) body.is_starred = params.isStarred;
   if (params.isUnsubscribed !== undefined) body.is_unsubscribed = params.isUnsubscribed;
+  if (params.assignedTo !== undefined) body.assigned_to = params.assignedTo;
   return apiRequest(INBOX_CONVERSATIONS_PATH + 'state/', {
     method: 'POST',
     body: JSON.stringify(body),
@@ -4500,6 +4535,7 @@ export type WhatsappInboxNumberPayload = {
   display_phone_number: string;
   waba_id: string;
   status: string;
+  calling_enabled?: boolean;
   error_message: string | null;
   last_webhook_at: string | null;
   created_at: string;
@@ -4526,6 +4562,7 @@ export const deleteWhatsappInboxNumberAPI = async (id: number) =>
 export const sendSocialInboxTemplateAPI = async (payload: {
   conversation: number;
   template_id: number;
+  body_parameters?: string[];
 }) =>
   apiRequest('/integrations/inbox/send-template/', {
     method: 'POST',
@@ -4749,6 +4786,9 @@ export type WhatsAppCallRecord = {
   agent?: number | null;
   agent_username?: string | null;
   whatsapp_account_id?: number;
+  wa_inbox_number_id?: number | null;
+  social_conversation_id?: number | null;
+  call_source?: 'crm' | 'inbox';
   offer_sdp?: string | null;
   answer_sdp?: string | null;
   started_at?: string | null;
@@ -4771,6 +4811,7 @@ export const getWhatsAppCallsAPI = async (params?: {
   has_recording?: boolean;
   search?: string;
   client?: number;
+  conversation?: number;
   agent?: number;
   ordering?: string;
   limit?: number;
@@ -4787,6 +4828,7 @@ export const getWhatsAppCallsAPI = async (params?: {
   if (params?.has_recording) q.set('has_recording', 'true');
   if (params?.search) q.set('search', params.search);
   if (params?.client != null) q.set('client', String(params.client));
+  if (params?.conversation != null) q.set('conversation', String(params.conversation));
   if (params?.agent != null) q.set('agent', String(params.agent));
   if (params?.ordering) q.set('ordering', params.ordering);
   if (params?.limit != null) q.set('limit', String(params.limit));
@@ -4845,6 +4887,8 @@ export const whatsappCallInitiateAPI = async (data: {
   sdp?: string;
   client_id?: number;
   whatsapp_account_id?: number;
+  wa_inbox_number_id?: number;
+  conversation?: number;
   skip_permission_check?: boolean;
 }) => {
   return apiRequest<WhatsAppCallRecord>('/integrations/whatsapp/calls/initiate/', {
@@ -4856,6 +4900,10 @@ export const whatsappCallInitiateAPI = async (data: {
       ...(data.whatsapp_account_id != null && {
         whatsapp_account_id: data.whatsapp_account_id,
       }),
+      ...(data.wa_inbox_number_id != null && {
+        wa_inbox_number_id: data.wa_inbox_number_id,
+      }),
+      ...(data.conversation != null && { conversation: data.conversation }),
       ...(data.skip_permission_check && { skip_permission_check: true }),
     }),
   });
@@ -4904,7 +4952,8 @@ export type WhatsAppCallHoursDay = {
 };
 
 export type WhatsAppCallHoursConfig = {
-  whatsapp_account_id: number;
+  whatsapp_account_id?: number;
+  wa_inbox_number_id?: number;
   enabled: boolean;
   timezone: string;
   weekly: Record<string, WhatsAppCallHoursDay>;
@@ -4914,11 +4963,18 @@ export type WhatsAppCallHoursConfig = {
   meta_sync_error?: string;
 };
 
-export const getWhatsAppCallHoursAPI = async (whatsappAccountId?: number) => {
-  const q =
-    whatsappAccountId != null
-      ? `?whatsapp_account_id=${encodeURIComponent(String(whatsappAccountId))}`
-      : '';
+export const getWhatsAppCallHoursAPI = async (opts?: {
+  whatsappAccountId?: number;
+  waInboxNumberId?: number;
+}) => {
+  const params = new URLSearchParams();
+  if (opts?.whatsappAccountId != null) {
+    params.set('whatsapp_account_id', String(opts.whatsappAccountId));
+  }
+  if (opts?.waInboxNumberId != null) {
+    params.set('wa_inbox_number_id', String(opts.waInboxNumberId));
+  }
+  const q = params.toString() ? `?${params.toString()}` : '';
   return apiRequest<WhatsAppCallHoursConfig>(`/integrations/whatsapp/calls/hours/${q}`);
 };
 
@@ -4930,6 +4986,7 @@ export const updateWhatsAppCallHoursAPI = async (
     out_of_hours_message?: string;
     sync_meta?: boolean;
     whatsapp_account_id?: number;
+    wa_inbox_number_id?: number;
   }
 ) => {
   return apiRequest<WhatsAppCallHoursConfig>('/integrations/whatsapp/calls/hours/', {
@@ -4956,16 +5013,21 @@ export const sendWhatsAppCallPermissionRequestAPI = async (data: {
   });
 };
 
-export const enableWhatsAppCallingAPI = async (whatsapp_account_id?: number) => {
-  return apiRequest<{ calling_enabled: boolean; whatsapp_account_id: number }>(
-    '/integrations/whatsapp/calling/enable/',
-    {
-      method: 'POST',
-      body: JSON.stringify(
-        whatsapp_account_id != null ? { whatsapp_account_id } : {}
-      ),
-    }
-  );
+export const enableWhatsAppCallingAPI = async (opts?: {
+  whatsapp_account_id?: number;
+  wa_inbox_number_id?: number;
+}) => {
+  const body: Record<string, number> = {};
+  if (opts?.whatsapp_account_id != null) body.whatsapp_account_id = opts.whatsapp_account_id;
+  if (opts?.wa_inbox_number_id != null) body.wa_inbox_number_id = opts.wa_inbox_number_id;
+  return apiRequest<{
+    calling_enabled: boolean;
+    whatsapp_account_id?: number | null;
+    wa_inbox_number_id?: number | null;
+  }>('/integrations/whatsapp/calling/enable/', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  });
 };
 
 export const uploadWhatsAppCallRecordingAPI = async (

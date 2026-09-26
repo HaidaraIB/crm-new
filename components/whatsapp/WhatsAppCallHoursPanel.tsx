@@ -21,6 +21,8 @@ const DAYS = [
 type Props = {
   t: (key: any) => string;
   canManage: boolean;
+  whatsappAccountId?: number;
+  waInboxNumberId?: number;
 };
 
 const COMMON_TIMEZONES = [
@@ -48,7 +50,12 @@ function dayLabel(day: string, t: (k: any) => string): string {
 /**
  * Weekly WhatsApp call hours + out-of-hours customer message.
  */
-export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
+export const WhatsAppCallHoursPanel: React.FC<Props> = ({
+  t,
+  canManage,
+  whatsappAccountId,
+  waInboxNumberId,
+}) => {
   const [config, setConfig] = useState<WhatsAppCallHoursConfig | null>(null);
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -63,7 +70,10 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
       else setLoading(true);
       setError(null);
       try {
-        const data = await getWhatsAppCallHoursAPI();
+        const data = await getWhatsAppCallHoursAPI({
+          whatsappAccountId,
+          waInboxNumberId,
+        });
         setConfig(data);
       } catch (e: any) {
         setConfig(null);
@@ -75,7 +85,7 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
         setRefreshing(false);
       }
     },
-    [t]
+    [t, whatsappAccountId, waInboxNumberId]
   );
 
   useEffect(() => {
@@ -107,6 +117,7 @@ export const WhatsAppCallHoursPanel: React.FC<Props> = ({ t, canManage }) => {
         out_of_hours_message: config.out_of_hours_message,
         sync_meta: true,
         whatsapp_account_id: config.whatsapp_account_id,
+        wa_inbox_number_id: config.wa_inbox_number_id ?? waInboxNumberId,
       });
       setConfig(updated);
       setSaved(true);

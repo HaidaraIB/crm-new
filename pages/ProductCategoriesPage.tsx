@@ -105,9 +105,9 @@ export const ProductCategoriesPage = () => {
     const { data: categoriesResponse, isLoading: categoriesLoading, isFetching: categoriesFetching, error: categoriesError, refetch: refetchCategories } = useProductCategories();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
-    const allCategories = useMemo(() => {
+    const allCategories = useMemo((): ProductCategory[] => {
         const categories = categoriesResponse?.results || [];
-        return categories.map((c: any) => {
+        return categories.map((c: any): ProductCategory => {
             // Handle parent_category - could be ID, object with id, or null
             let parentCategoryId: number | undefined = undefined;
             if (c.parent_category) {
@@ -123,12 +123,12 @@ export const ProductCategoriesPage = () => {
             }
             
             return {
-                id: c.id,
-                code: c.code || '',
-                name: c.name || '',
-                description: c.description || '',
+                id: Number(c.id),
+                code: String(c.code || ''),
+                name: String(c.name || ''),
+                description: String(c.description || ''),
                 parentCategory: parentCategoryId,
-            } as ProductCategory;
+            };
         });
     }, [categoriesResponse]);
 

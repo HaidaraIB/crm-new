@@ -50,14 +50,12 @@ export const EmployeesReportPage = () => {
 
   // Working hours are preformatted here (rather than in the pure mapper) because this
   // is where `t` lives — and a string value means CSV export needs no special casing.
-  const employeeStats = useMemo(
-    () =>
-      (data?.rows ?? []).map((row: any) => {
-        const mapped = mapApiEmployeeReportRow(row);
-        return { ...mapped, workedHours: formatWorkedDuration(mapped.workedSeconds ?? 0, t) };
-      }),
-    [data?.rows, t],
-  );
+  const employeeStats = useMemo((): EmployeeReportRow[] => {
+    return (data?.rows ?? []).map((row: unknown) => {
+      const mapped = mapApiEmployeeReportRow(row);
+      return { ...mapped, workedHours: formatWorkedDuration(mapped.workedSeconds ?? 0, t) };
+    });
+  }, [data?.rows, t]);
 
   const reportHeroSubtitle = useMemo(
     () =>

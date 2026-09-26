@@ -5,6 +5,7 @@ import { Button } from '../Button';
 import { FileTextIcon, MicrophoneIcon } from '../icons';
 import { ChatMediaThumb } from '../chat/ChatMediaThumb';
 import { useAppContext } from '../../context/AppContext';
+import type { translations } from '../../constants';
 import {
   CompanyLibraryFile,
   downloadCompanyLibraryAsFileAPI,
@@ -14,12 +15,14 @@ import {
 
 type Step = 'source' | 'library';
 
+type TFn = (key: keyof typeof translations.en) => string;
+
 type Props = {
   isOpen: boolean;
   onClose: () => void;
   onPickDevice: () => void;
   onPickLibraryFile: (file: File) => void;
-  t: (key: string) => string;
+  t: TFn;
 };
 
 function formatBytes(bytes: number): string {
@@ -28,7 +31,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function kindLabel(kind: string, t: (key: string) => string): string {
+function kindLabel(kind: string, t: TFn): string {
   switch (kind) {
     case 'image':
       return t('libraryKindImage') || 'Image';

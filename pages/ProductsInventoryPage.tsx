@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
 import { Product, ProductCategory, Supplier } from '../types';
 import { AddProductModal } from '../components/modals/AddProductModal';
 import { EditProductModal } from '../components/modals/EditProductModal';
@@ -9,6 +9,14 @@ import { AddProductCategoryModal } from '../components/modals/AddProductCategory
 import { EditProductCategoryModal } from '../components/modals/EditProductCategoryModal';
 import { AddSupplierModal } from '../components/modals/AddSupplierModal';
 import { EditSupplierModal } from '../components/modals/EditSupplierModal';
+import {
+    useDeleteProduct,
+    useDeleteProductCategory,
+    useDeleteSupplier,
+    useProductCategories,
+    useProducts,
+    useSuppliers,
+} from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { withLatinDigits } from '../utils/dateUtils';
@@ -179,15 +187,10 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers:
 };
 
 export const ProductsInventoryPage = () => {
-    const { 
+    const {
         t,
         currentUser,
-        products,
-        productCategories,
-        suppliers,
-        deleteProduct,
-        deleteProductCategory,
-        deleteSupplier,
+        hasSupervisorPermission,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
         setIsAddProductModalOpen,
@@ -201,18 +204,89 @@ export const ProductsInventoryPage = () => {
         setEditingSupplier,
     } = useAppContext();
     const [activeTab, setActiveTab] = useState<Tab>('products');
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, []);
+    const { data: productsResponse, isLoading: productsLoading } = useProducts();
+    const { data: categoriesResponse, isLoading: categoriesLoading } = useProductCategories();
+    const { data: suppliersResponse, isLoading: suppliersLoading } = useSuppliers();
+    const deleteProductMutation = useDeleteProduct();
+    const deleteProductCategoryMutation = useDeleteProductCategory();
+    const deleteSupplierMutation = useDeleteSupplier();
 
-    // Check if user's company specialization is products
+    const products = useMemo((): Product[] => {
+        const rows = productsResponse?.results || [];
+        return rows.map((p: any): Product => {
+            let categoryName = '';
+            if (typeof p.category === 'string') categoryName = p.category;
+            else if (typeof p.category === 'object' && p.category?.name) categoryName = p.category.name;
+            else if (typeof p.category === 'number') categoryName = p.category_name || '';
+
+            let supplierName = '';
+            if (typeof p.supplier === 'string') supplierName = p.supplier;
+            else if (typeof p.supplier === 'object' && p.supplier?.name) supplierName = p.supplier.name;
+            else if (typeof p.supplier === 'number') supplierName = p.supplier_name || '';
+
+            return {
+                id: Number(p.id),
+                code: String(p.code || ''),
+                name: String(p.name || ''),
+                description: String(p.description || ''),
+                price: p.price || p.price === 0 ? Number(p.price) : 0,
+                cost: p.cost || p.cost === 0 ? Number(p.cost) : 0,
+                stock: p.stock || p.stock === 0 ? Number(p.stock) : 0,
+                category: categoryName || p.category_name || '',
+                supplier: supplierName || p.supplier_name || undefined,
+                sku: p.sku || undefined,
+                image: p.image || undefined,
+                isActive: p.is_active !== undefined ? Boolean(p.is_active) : p.isActive !== undefined ? Boolean(p.isActive) : true,
+            };
+        });
+    }, [productsResponse]);
+
+    const productCategories = useMemo((): ProductCategory[] => {
+        const rows = categoriesResponse?.results || [];
+        return rows.map((c: any): ProductCategory => {
+            let parentCategoryId: number | undefined;
+            if (typeof c.parent_category === 'number') parentCategoryId = c.parent_category;
+            else if (typeof c.parent_category === 'object' && c.parent_category?.id) parentCategoryId = c.parent_category.id;
+            else if (c.parent_category_id) parentCategoryId = c.parent_category_id;
+            else if (c.parentCategory) {
+                parentCategoryId = typeof c.parentCategory === 'number' ? c.parentCategory : c.parentCategory?.id;
+            }
+            return {
+                id: Number(c.id),
+                code: String(c.code || ''),
+                name: String(c.name || ''),
+                description: String(c.description || ''),
+                parentCategory: parentCategoryId,
+            };
+        });
+    }, [categoriesResponse]);
+
+    const suppliers = useMemo((): Supplier[] => {
+        const rows = suppliersResponse?.results || [];
+        return rows.map((s: any): Supplier => ({
+            id: Number(s.id),
+            code: String(s.code || ''),
+            name: String(s.name || ''),
+            logo: String(s.logo || ''),
+            phone: String(s.phone || ''),
+            email: String(s.email || ''),
+            address: String(s.address || ''),
+            contactPerson: String(s.contact_person || s.contactPerson || ''),
+            specialization: String(s.specialization || ''),
+        }));
+    }, [suppliersResponse]);
+
     const isProducts = currentUser?.company?.specialization === 'products';
-    const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin =
+        currentRole === 'Owner' ||
+        (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_products'));
+    const loading =
+        (activeTab === 'products' && productsLoading) ||
+        (activeTab === 'categories' && categoriesLoading) ||
+        (activeTab === 'suppliers' && suppliersLoading);
 
-    // If not products, show message
     if (!isProducts) {
         return (
             <PageWrapper title={t('products')}>
@@ -226,14 +300,14 @@ export const ProductsInventoryPage = () => {
     }
 
     const handleDeleteProduct = (id: number) => {
-        const product = products.find(p => p.id === id);
+        const product = products.find((p) => p.id === id);
         if (product) {
             setConfirmDeleteConfig({
                 title: t('deleteProduct') || 'Delete Product',
                 message: t('confirmDeleteProduct') || 'Are you sure you want to delete',
                 itemName: product.name,
                 onConfirm: async () => {
-                    await deleteProduct(id);
+                    await deleteProductMutation.mutateAsync(id);
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -246,14 +320,14 @@ export const ProductsInventoryPage = () => {
     };
 
     const handleDeleteCategory = (id: number) => {
-        const category = productCategories.find(c => c.id === id);
+        const category = productCategories.find((c) => c.id === id);
         if (category) {
             setConfirmDeleteConfig({
                 title: t('deleteProductCategory') || 'Delete Product Category',
                 message: t('confirmDeleteProductCategory') || 'Are you sure you want to delete',
                 itemName: category.name,
                 onConfirm: async () => {
-                    await deleteProductCategory(id);
+                    await deleteProductCategoryMutation.mutateAsync(id);
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -266,14 +340,14 @@ export const ProductsInventoryPage = () => {
     };
 
     const handleDeleteSupplier = (id: number) => {
-        const supplier = suppliers.find(s => s.id === id);
+        const supplier = suppliers.find((s) => s.id === id);
         if (supplier) {
             setConfirmDeleteConfig({
                 title: t('deleteSupplier') || 'Delete Supplier',
                 message: t('confirmDeleteSupplier') || 'Are you sure you want to delete',
                 itemName: supplier.name,
                 onConfirm: async () => {
-                    await deleteSupplier(id);
+                    await deleteSupplierMutation.mutateAsync(id);
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -286,6 +360,13 @@ export const ProductsInventoryPage = () => {
     };
 
     const renderContent = () => {
+        if (loading) {
+            return (
+                <div className="flex items-center justify-center py-16">
+                    <Loader size="lg" variant="primary" />
+                </div>
+            );
+        }
         switch (activeTab) {
             case 'products':
                 return <Card><ProductsTable products={products} onUpdate={handleUpdateProduct} onDelete={handleDeleteProduct} isAdmin={isAdmin} /></Card>;
@@ -330,16 +411,6 @@ export const ProductsInventoryPage = () => {
             )}
         </>
     );
-
-    if (loading) {
-        return (
-            <PageWrapper title={t('products')} actions={pageActions}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader size="lg" variant="primary"/>
-                </div>
-            </PageWrapper>
-        );
-    }
 
     return (
         <PageWrapper title={t('products')} actions={pageActions}>

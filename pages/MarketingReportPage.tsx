@@ -9,7 +9,11 @@ import { reportPageContainer } from '../components/reports/reportStyles';
 import { ReportHero } from '../components/reports/ReportHero';
 import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
 import { ReportTableCard, ReportTableDefaults } from '../components/reports/ReportTableCard';
-import { buildReportDateSubtitle, mapApiMarketingReportRow } from '../utils/reportMetrics';
+import {
+  buildReportDateSubtitle,
+  mapApiMarketingReportRow,
+  type MarketingReportRow,
+} from '../utils/reportMetrics';
 import { downloadCsv } from '../utils/reportExport';
 
 export const MarketingReportPage = () => {
@@ -27,10 +31,9 @@ export const MarketingReportPage = () => {
 
   const { data, isLoading, isFetching, isError, refetch } = useMarketingReport(reportParams);
 
-  const campaignStats = useMemo(
-    () => (data?.rows ?? []).map(mapApiMarketingReportRow),
-    [data?.rows],
-  );
+  const campaignStats = useMemo((): MarketingReportRow[] => {
+    return (data?.rows ?? []).map(mapApiMarketingReportRow);
+  }, [data?.rows]);
 
   const reportHeroSubtitle = useMemo(
     () =>

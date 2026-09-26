@@ -451,7 +451,13 @@ export function useWhatsAppCallSession() {
   );
 
   const startOutbound = useCallback(
-    async (opts: { to: string; clientId?: number; skipPermissionCheck?: boolean }) => {
+    async (opts: {
+      to: string;
+      clientId?: number;
+      conversationId?: number;
+      waInboxNumberId?: number;
+      skipPermissionCheck?: boolean;
+    }) => {
       setError(null);
       setPhase('connecting');
       setNotes('');
@@ -481,6 +487,8 @@ export function useWhatsAppCallSession() {
           to: opts.to,
           sdp: finalSdp,
           client_id: opts.clientId,
+          conversation: opts.conversationId,
+          wa_inbox_number_id: opts.waInboxNumberId,
           skip_permission_check: opts.skipPermissionCheck,
         });
         setActiveCall(created);

@@ -13,6 +13,7 @@ import { ChatMediaThumb } from '../components/chat/ChatMediaThumb';
 import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
 import type { ChatMediaAlbumItem } from '../components/chat/chatMediaAlbum';
 import { useAppContext } from '../context/AppContext';
+import type { translations } from '../constants';
 import {
   CompanyLibraryFile,
   CompanyLibraryQuota,
@@ -23,6 +24,8 @@ import {
 } from '../services/api';
 import { normalizeRole } from '../utils/roles';
 
+type TFn = (key: keyof typeof translations.en) => string;
+
 function formatBytes(bytes: number | null | undefined): string {
   if (bytes == null || !Number.isFinite(bytes)) return '—';
   if (bytes < 1024) return `${bytes} B`;
@@ -31,7 +34,7 @@ function formatBytes(bytes: number | null | undefined): string {
   return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
 }
 
-function kindLabel(kind: string, t: (key: string) => string): string {
+function kindLabel(kind: string, t: TFn): string {
   switch (kind) {
     case 'image':
       return t('libraryKindImage') || 'Image';

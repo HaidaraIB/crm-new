@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, PlusIcon, NumberInput, Alert, ArrowLeftIcon, PageLoadingState, LeadSearchSelect } from '../components/index';
 import { useProjects, useUnits, useLeads, useUsers, useCreateDeal } from '../hooks/useQueries';
-import { User } from '../types';
+import { Project, User } from '../types';
 import { getAssignmentBlockReason, ASSIGNMENT_BLOCK_LABEL_KEY } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../utils/roles';
 
@@ -37,7 +37,7 @@ export const CreateDealPage = () => {
     
     // Fetch data using React Query hooks
     const { data: projectsResponse } = useProjects();
-    const projects = projectsResponse?.results || [];
+    const projects: Project[] = projectsResponse?.results || [];
     
     const { data: unitsResponse } = useUnits();
     const allUnits = Array.isArray(unitsResponse) 
@@ -574,7 +574,7 @@ export const CreateDealPage = () => {
                          {/* Row 5 */}
                          <div>
                             <Label htmlFor="totalValue">{t('totalValue')}</Label>
-                            <Input id="totalValue" type="number" value={calculatedValues.totalValue} readOnly className="font-bold bg-gray-100 dark:bg-gray-800" />
+                            <Input id="totalValue" type="number" value={calculatedValues.totalValue.toFixed(2)} readOnly className="font-bold bg-gray-100 dark:bg-gray-800" />
                         </div>
                         <div>
                             <Label htmlFor="salesCommissionPercentage">{t('salesCommissionPercentage')}</Label>

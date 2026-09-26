@@ -682,7 +682,7 @@ export const UsersPage = () => {
         usersPageSize,
         { excludeRoles: ['admin', 'super_admin'] }
     );
-    const allUsers = usersResponse?.results || [];
+    const allUsers: User[] = usersResponse?.results || [];
     const hasNextPage = Boolean(usersResponse?.next);
     const hasPreviousPage = Boolean(usersResponse?.previous);
     const totalUsersCount = usersResponse?.count || 0;

@@ -40,6 +40,11 @@ for employee/doctor. If the lead is later reassigned, they lose the thread.
 A conversation the viewer may not see answers **404, never 403** — a 403 would
 confirm it exists. Keep it that way.
 
+**Deleting history** (`DELETE inbox/conversations/<pk>/`) is **company owner
+only** (`is_company_owner`), same as WhatsApp Chats message/conversation delete
+— not admins, supervisors, or call center. UI must gate on
+`is_company_owner` / `isCompanyOwner`, not `role === 'Owner'` or `is_admin()`.
+
 ## Messaging window — stricter than WhatsApp
 
 There are no approved templates to reopen a closed thread. Only two states send:
@@ -91,7 +96,10 @@ Integrations, mirroring the WhatsApp precedent in `whatsapp-chats.mdc`.
 Inbox reuses `components/chat/*` **as-is** (`ChatBlobMedia`, `ChatMediaViewer`,
 `ChatConversationStatusMenu`, `ChatPendingAttachmentChip`,
 `ChatVoiceRecordingBar`, `useChatVoiceRecorder`, `AttachmentSourceModal`,
-`InboxFilterRail`) plus `whatsappChatTheme` tokens. Filter chrome (rail vs
+`ChatComposerAlerts`, `ChatTemplatePicker`, `ChatCallBubble`, `InboxFilterRail`)
+plus `hooks/whatsappThread/*` (adapters + headless hooks shared with Chats, not
+the Chats layout) and `components/inbox/*` (Inbox-owned thread pieces). Also
+`whatsappChatTheme` tokens. Filter chrome (rail vs
 chips, Channel vs Status sections) lives in `InboxFilterRail` and shares
 visual tokens with WhatsApp via `components/chat/chatFilterRailChrome.tsx` —
 never import `ChatFilterRail` itself. Thread status uses the same colored-dot

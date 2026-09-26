@@ -742,7 +742,7 @@ export const ProfilePage = () => {
                     )}
                     <div className="flex justify-end gap-4 pt-4">
                         <Button
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => {
                                 setShowRenewalModal(false);
                                 setSelectedGateway(null);

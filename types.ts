@@ -241,6 +241,9 @@ export interface User {
   /** True for every staff role except Owner/Supervisor: Messaging Center bulk
    * sends are limited to their own assigned leads and require owner approval. */
   requires_campaign_approval?: boolean;
+  /** True when this user is the company's billing/owner account (API may send either casing). */
+  is_company_owner?: boolean;
+  isCompanyOwner?: boolean;
 }
 
 export type CampaignRequestStatus =

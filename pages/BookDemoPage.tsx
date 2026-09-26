@@ -19,6 +19,9 @@ import {
 } from '../utils/formFieldErrors';
 import { validateEmailField, validateNameField, validatePhoneField } from '../utils/formValidation';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
+import type { translations } from '../constants';
+
+type TFn = (key: keyof typeof translations.en) => string;
 
 const DEMO_BOOKING_STORAGE_KEY = 'loop.publicDemoBooking.v1';
 
@@ -28,11 +31,17 @@ const BOOK_DEMO_FIELD_DOM_IDS: Record<string, string> = {
   phone: 'book-demo-phone',
 };
 
-const BOOK_DEMO_FIELD_LABELS: Record<string, string> = {
+const BOOK_DEMO_FIELD_LABELS = {
   name: 'bookDemoName',
   email: 'bookDemoEmail',
   phone: 'bookDemoPhone',
-};
+} as const satisfies Record<string, keyof typeof translations.en>;
+
+const resolveBookDemoFieldLabels = (t: TFn): Record<string, string> => ({
+  name: t(BOOK_DEMO_FIELD_LABELS.name),
+  email: t(BOOK_DEMO_FIELD_LABELS.email),
+  phone: t(BOOK_DEMO_FIELD_LABELS.phone),
+});
 
 const pad2 = (n: number) => String(n).padStart(2, '0');
 
@@ -95,7 +104,7 @@ const formatBookingDateTime = (iso: string, timeZone: string, language: string) 
   }
 };
 
-const statusLabelKey = (status: string): string => {
+const statusLabelKey = (status: string): keyof typeof translations.en => {
   switch (status) {
     case 'pending':
       return 'bookDemoStatusPending';
@@ -140,7 +149,7 @@ type BookingSummaryProps = {
   booking: PublicDemoBookingRecord;
   timeZone: string;
   language: string;
-  t: (key: string) => string;
+  t: TFn;
   onBookAnother: () => void;
 };
 
@@ -429,9 +438,7 @@ export const BookDemoPage = () => {
       setError(
         buildFieldErrorSummary(
           clientErrors,
-          Object.fromEntries(
-            Object.entries(BOOK_DEMO_FIELD_LABELS).map(([k, v]) => [k, t(v)])
-          ),
+          resolveBookDemoFieldLabels(t),
           t
         )
       );
@@ -462,9 +469,7 @@ export const BookDemoPage = () => {
           mapped.general ||
             buildFieldErrorSummary(
               mapped,
-              Object.fromEntries(
-                Object.entries(BOOK_DEMO_FIELD_LABELS).map(([k, v]) => [k, t(v)])
-              ),
+              resolveBookDemoFieldLabels(t),
               t
             )
         );

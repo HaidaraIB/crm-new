@@ -9,6 +9,7 @@ type Props = {
   t: (key: any) => string;
   onAnswer: () => void;
   onOpenCalls: () => void;
+  onOpenChat?: () => void;
   onDismiss: () => void;
 };
 
@@ -29,6 +30,7 @@ export const WhatsAppLiveCallToast: React.FC<Props> = ({
   t,
   onAnswer,
   onOpenCalls,
+  onOpenChat,
   onDismiss,
 }) => {
   const title = call.client_name || call.peer_name || t('whatsappIncomingCall');
@@ -86,13 +88,23 @@ export const WhatsAppLiveCallToast: React.FC<Props> = ({
             <PhoneIcon className="h-4 w-4" />
             {t('whatsappAcceptCall')}
           </button>
-          <button
-            type="button"
-            onClick={onOpenCalls}
-            className="inline-flex items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white/90 ring-1 ring-white/15 hover:bg-white/15"
-          >
-            {t('openCalls')}
-          </button>
+          {onOpenChat ? (
+            <button
+              type="button"
+              onClick={onOpenChat}
+              className="inline-flex items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white/90 ring-1 ring-white/15 hover:bg-white/15"
+            >
+              {t('openInboxConversation')}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={onOpenCalls}
+              className="inline-flex items-center justify-center rounded-xl bg-white/10 px-3 py-2 text-sm font-medium text-white/90 ring-1 ring-white/15 hover:bg-white/15"
+            >
+              {t('openCalls')}
+            </button>
+          )}
         </div>
       </div>
     </div>

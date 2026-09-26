@@ -7,7 +7,7 @@ import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { useActivities, useStages, useCallMethods } from '../hooks/useQueries';
 import { formatDateToLocal } from '../utils/dateUtils';
 import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
-import type { ActivityFeedFilters } from '../services/api';
+import type { ActivityFeedFilters, ActivityFeedRow } from '../services/api';
 
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -72,7 +72,7 @@ export const ActivitiesPage = () => {
         refetch: refetchActivities,
     } = useActivities(activitiesPageNumber, undefined, activitiesPageSize, apiFilters);
 
-    const activities = activitiesResponse?.results || [];
+    const activities: ActivityFeedRow[] = activitiesResponse?.results || [];
     const totalActivitiesCount = activitiesResponse?.count || 0;
     const hasNextPage = Boolean(activitiesResponse?.next);
     const hasPreviousPage = Boolean(activitiesResponse?.previous);

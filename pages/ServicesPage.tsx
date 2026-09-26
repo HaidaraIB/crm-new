@@ -121,19 +121,24 @@ export const ServicesPage = () => {
     const { data: servicesResponse, isLoading: servicesLoading, isFetching: servicesFetching, error: servicesError, refetch: refetchServices } = useServices();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
-    const allServices = useMemo(() => {
+    const allServices = useMemo((): Service[] => {
         const services = servicesResponse?.results || [];
-        return services.map((s: any) => ({
-            id: s.id,
-            code: s.code || '',
-            name: s.name || '',
-            description: s.description || '',
+        return services.map((s: any): Service => ({
+            id: Number(s.id),
+            code: String(s.code || ''),
+            name: String(s.name || ''),
+            description: String(s.description || ''),
             price: s.price || s.price === 0 ? Number(s.price) : 0,
-            duration: s.duration || '',
-            category: s.category || '',
+            duration: String(s.duration || ''),
+            category: String(s.category || ''),
             provider: s.provider_name || s.provider || s.provider_id || '',
-            isActive: s.is_active !== undefined ? s.is_active : (s.isActive !== undefined ? s.isActive : true),
-        } as Service));
+            isActive:
+                s.is_active !== undefined
+                    ? Boolean(s.is_active)
+                    : s.isActive !== undefined
+                      ? Boolean(s.isActive)
+                      : true,
+        }));
     }, [servicesResponse]);
 
     // Delete service mutation

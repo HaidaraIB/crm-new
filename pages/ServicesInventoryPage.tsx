@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, SearchIcon, Input, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
 import { Service, ServicePackage, ServiceProvider } from '../types';
 import { AddServiceModal } from '../components/modals/AddServiceModal';
 import { EditServiceModal } from '../components/modals/EditServiceModal';
@@ -9,6 +9,14 @@ import { AddServicePackageModal } from '../components/modals/AddServicePackageMo
 import { EditServicePackageModal } from '../components/modals/EditServicePackageModal';
 import { AddServiceProviderModal } from '../components/modals/AddServiceProviderModal';
 import { EditServiceProviderModal } from '../components/modals/EditServiceProviderModal';
+import {
+    useDeleteService,
+    useDeleteServicePackage,
+    useDeleteServiceProvider,
+    useServicePackages,
+    useServiceProviders,
+    useServices,
+} from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
@@ -181,15 +189,10 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
 };
 
 export const ServicesInventoryPage = () => {
-    const { 
+    const {
         t,
         currentUser,
-        services,
-        servicePackages,
-        serviceProviders,
-        deleteService,
-        deleteServicePackage,
-        deleteServiceProvider,
+        hasSupervisorPermission,
         setConfirmDeleteConfig,
         setIsConfirmDeleteModalOpen,
         setIsAddServiceModalOpen,
@@ -203,18 +206,78 @@ export const ServicesInventoryPage = () => {
         setEditingServiceProvider,
     } = useAppContext();
     const [activeTab, setActiveTab] = useState<Tab>('services');
-    const [loading, setLoading] = useState(true);
 
-    useEffect(() => {
-        const timer = setTimeout(() => setLoading(false), 1000);
-        return () => clearTimeout(timer);
-    }, []);
+    const { data: servicesResponse, isLoading: servicesLoading } = useServices();
+    const { data: packagesResponse, isLoading: packagesLoading } = useServicePackages();
+    const { data: providersResponse, isLoading: providersLoading } = useServiceProviders();
+    const deleteServiceMutation = useDeleteService();
+    const deleteServicePackageMutation = useDeleteServicePackage();
+    const deleteServiceProviderMutation = useDeleteServiceProvider();
 
-    // Check if user's company specialization is services
+    const services = useMemo((): Service[] => {
+        const rows = servicesResponse?.results || [];
+        return rows.map((s: any): Service => ({
+            id: Number(s.id),
+            code: String(s.code || ''),
+            name: String(s.name || ''),
+            description: String(s.description || ''),
+            price: s.price || s.price === 0 ? Number(s.price) : 0,
+            duration: String(s.duration || ''),
+            category: String(s.category || ''),
+            provider: s.provider_name || s.provider || s.provider_id || '',
+            isActive:
+                s.is_active !== undefined
+                    ? Boolean(s.is_active)
+                    : s.isActive !== undefined
+                      ? Boolean(s.isActive)
+                      : true,
+        }));
+    }, [servicesResponse]);
+
+    const servicePackages = useMemo((): ServicePackage[] => {
+        const rows = packagesResponse?.results || [];
+        return rows.map((p: any): ServicePackage => ({
+            id: Number(p.id),
+            code: String(p.code || ''),
+            name: String(p.name || ''),
+            description: String(p.description || ''),
+            price: p.price || p.price === 0 ? Number(p.price) : 0,
+            duration: String(p.duration || ''),
+            services: Array.isArray(p.services)
+                ? p.services.map((s: any) => (typeof s === 'number' ? s : Number(s.id || s)))
+                : [],
+            isActive:
+                p.is_active !== undefined
+                    ? Boolean(p.is_active)
+                    : p.isActive !== undefined
+                      ? Boolean(p.isActive)
+                      : true,
+        }));
+    }, [packagesResponse]);
+
+    const serviceProviders = useMemo((): ServiceProvider[] => {
+        const rows = providersResponse?.results || [];
+        return rows.map((p: any): ServiceProvider => ({
+            id: Number(p.id),
+            code: String(p.code || ''),
+            name: String(p.name || ''),
+            phone: String(p.phone || ''),
+            email: String(p.email || ''),
+            specialization: String(p.specialization || ''),
+            rating: p.rating !== undefined && p.rating !== null ? Number(p.rating) : undefined,
+        }));
+    }, [providersResponse]);
+
     const isServices = companyHasServiceInventory(currentUser?.company?.specialization);
-    const isAdmin = normalizeRole(currentUser?.role) === 'Owner';
+    const currentRole = normalizeRole(currentUser?.role);
+    const isAdmin =
+        currentRole === 'Owner' ||
+        (currentRole === 'Supervisor' && hasSupervisorPermission('can_manage_services'));
+    const loading =
+        (activeTab === 'services' && servicesLoading) ||
+        (activeTab === 'packages' && packagesLoading) ||
+        (activeTab === 'providers' && providersLoading);
 
-    // If not services, show message
     if (!isServices) {
         return (
             <PageWrapper title={t('services')}>
@@ -228,14 +291,14 @@ export const ServicesInventoryPage = () => {
     }
 
     const handleDeleteService = (id: number) => {
-        const service = services.find(s => s.id === id);
+        const service = services.find((s) => s.id === id);
         if (service) {
             setConfirmDeleteConfig({
                 title: t('deleteService') || 'Delete Service',
                 message: t('confirmDeleteService') || 'Are you sure you want to delete',
                 itemName: service.name,
                 onConfirm: async () => {
-                    await deleteService(id);
+                    await deleteServiceMutation.mutateAsync(id);
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -248,14 +311,14 @@ export const ServicesInventoryPage = () => {
     };
 
     const handleDeletePackage = (id: number) => {
-        const pkg = servicePackages.find(p => p.id === id);
+        const pkg = servicePackages.find((p) => p.id === id);
         if (pkg) {
             setConfirmDeleteConfig({
                 title: t('deleteServicePackage') || 'Delete Service Package',
                 message: t('confirmDeleteServicePackage') || 'Are you sure you want to delete',
                 itemName: pkg.name,
                 onConfirm: async () => {
-                    await deleteServicePackage(id);
+                    await deleteServicePackageMutation.mutateAsync(id);
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -268,14 +331,14 @@ export const ServicesInventoryPage = () => {
     };
 
     const handleDeleteProvider = (id: number) => {
-        const provider = serviceProviders.find(p => p.id === id);
+        const provider = serviceProviders.find((p) => p.id === id);
         if (provider) {
             setConfirmDeleteConfig({
                 title: t('deleteServiceProvider') || 'Delete Service Provider',
                 message: t('confirmDeleteServiceProvider') || 'Are you sure you want to delete',
                 itemName: provider.name,
                 onConfirm: async () => {
-                    await deleteServiceProvider(id);
+                    await deleteServiceProviderMutation.mutateAsync(id);
                 },
             });
             setIsConfirmDeleteModalOpen(true);
@@ -288,6 +351,13 @@ export const ServicesInventoryPage = () => {
     };
 
     const renderContent = () => {
+        if (loading) {
+            return (
+                <div className="flex items-center justify-center py-16">
+                    <Loader size="lg" variant="primary" />
+                </div>
+            );
+        }
         switch (activeTab) {
             case 'services':
                 return <Card><ServicesTable services={services} onUpdate={handleUpdateService} onDelete={handleDeleteService} isAdmin={isAdmin} /></Card>;
@@ -332,16 +402,6 @@ export const ServicesInventoryPage = () => {
             )}
         </>
     );
-
-    if (loading) {
-        return (
-            <PageWrapper title={t('services')} actions={pageActions}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <Loader size="lg" variant="primary"/>
-                </div>
-            </PageWrapper>
-        );
-    }
 
     return (
         <PageWrapper title={t('services')} actions={pageActions}>

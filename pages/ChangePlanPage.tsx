@@ -555,7 +555,7 @@ export const ChangePlanPage = () => {
                     {/* Action Button */}
                     <div className="flex justify-end gap-4">
                         <Button
-                            variant="outline"
+                            variant="secondary"
                             onClick={() => window.location.href = '/login'}
                         >
                             {t('cancel') || 'Cancel'}

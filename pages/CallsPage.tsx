@@ -34,6 +34,7 @@ import { normalizeRole } from '../utils/roles';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
+import { stashPendingInboxConversationId } from '../utils/inboxDeepLink';
 import {
   DEFAULT_CALL_FILTERS,
   callFiltersFromSearchParams,
@@ -369,6 +370,16 @@ export const CallsPage: React.FC = () => {
     }
   );
 
+  const openInboxConversation = (call: WhatsAppCallRecord) => {
+    const convId = call.social_conversation_id;
+    if (!convId) return;
+    stashPendingInboxConversationId(convId);
+    setCurrentPage('Inbox');
+  };
+
+  const callSourceLabel = (call: WhatsAppCallRecord) =>
+    call.call_source === 'inbox' ? t('whatsappCallSourceInbox') : t('whatsappCallSourceCrm');
+
   const openLead = (call: WhatsAppCallRecord) => {
     if (!call.client) return;
     setSelectedLead({
@@ -684,6 +695,12 @@ export const CallsPage: React.FC = () => {
                             >
                               {statusLabel(call.status, t)}
                             </span>
+                            <span
+                              className="inline-flex shrink-0 rounded-full bg-gray-100 px-2 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
+                              title={callSourceLabel(call)}
+                            >
+                              {callSourceLabel(call)}
+                            </span>
                             {hasRec ? (
                               <span
                                 className="inline-flex items-center gap-0.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
@@ -734,6 +751,17 @@ export const CallsPage: React.FC = () => {
                             }}
                           >
                             {t('viewLead')}
+                          </button>
+                        ) : call.social_conversation_id ? (
+                          <button
+                            type="button"
+                            className="shrink-0 text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              openInboxConversation(call);
+                            }}
+                          >
+                            {t('openInboxConversation')}
                           </button>
                         ) : (
                           <span className="w-16 shrink-0 sm:w-20" aria-hidden />
@@ -798,6 +826,15 @@ export const CallsPage: React.FC = () => {
                       onClick={() => openLead(selected)}
                     >
                       {t('viewLead')}
+                    </Button>
+                  ) : selected.social_conversation_id ? (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      className="h-9 rounded-lg"
+                      onClick={() => openInboxConversation(selected)}
+                    >
+                      {t('openInboxConversation')}
                     </Button>
                   ) : null}
                   <button

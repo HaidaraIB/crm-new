@@ -21,15 +21,19 @@ import {
 import { ConvertConversationModal } from '../components/modals/ConvertConversationModal';
 import { AttachmentSourceModal } from '../components/modals/AttachmentSourceModal';
 import {
-  InstagramIcon,
+  blobMediaKind,
+  InboxChannelBadge,
+  InboxMessageAttachment,
+} from '../components/inbox/InboxMessageList';
+import {
   MapPinIcon,
-  MessengerIcon,
   MicrophoneIcon,
   PaperclipIcon,
   SearchIcon,
   StarIcon,
 } from '../components/index';
 import { useAppContext } from '../context/AppContext';
+import type { translations } from '../constants';
 import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
 import {
   queryKeys,
@@ -45,13 +49,22 @@ import {
 import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
 import {
+  deleteSocialConversationAPI,
   getMessageTemplatesAPI,
   getSocialMessageAttachmentUrl,
+  getWhatsAppCallsAPI,
+  resolveLocalizedApiError,
+  sendSocialInboxLocationAPI,
   sendSocialInboxTemplateAPI,
 } from '../services/api';
+import { ChatCallBubble } from '../components/chat/ChatCallBubble';
+import { ShareLocationModal } from '../components/modals/ShareLocationModal';
+import { PhoneIcon } from '../components/icons';
+import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
+import { inboxWhatsappThreadAdapter } from '../hooks/whatsappThread/inboxThreadAdapter';
 import type { SocialConversationPayload, SocialMessagePayload } from '../services/api';
 import type { Lead } from '../types';
-import { clientLocationMapsUrl } from '../utils/leadLocation';
+import { consumePendingInboxConversationId } from '../utils/inboxDeepLink';
 import { getCompanyViewLeadRoute } from '../utils/routing';
 import {
   canConvertSocialConversation,
@@ -136,25 +149,21 @@ function formatTime(iso: string | null | undefined, language: string): string {
   });
 }
 
-function humanizeRemaining(expiresAt: string | null, language: string): string {
+function humanizeRemaining(
+  expiresAt: string | null,
+  t: (key: keyof typeof translations.en) => string
+): string {
   if (!expiresAt) return '';
   const ms = new Date(expiresAt).getTime() - Date.now();
   if (Number.isNaN(ms) || ms <= 0) return '';
   const hours = Math.floor(ms / 3600000);
   const minutes = Math.floor((ms % 3600000) / 60000);
-  if (language === 'ar') {
-    return hours > 0 ? `${hours} ساعة ${minutes} دقيقة` : `${minutes} دقيقة`;
+  if (hours > 0) {
+    return t('inboxWindowTimeRemainingHours')
+      .replace('{hours}', String(hours))
+      .replace('{minutes}', String(minutes));
   }
-  return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
-}
-
-function blobMediaKind(
-  kind: string | null
-): 'image' | 'video' | 'audio' | 'document' | null {
-  if (kind === 'image' || kind === 'video' || kind === 'audio' || kind === 'document') {
-    return kind;
-  }
-  return null;
+  return t('inboxWindowTimeRemainingMinutes').replace('{minutes}', String(minutes));
 }
 
 /** Caret/base direction from UI language when empty, else first strong letter. */
@@ -180,121 +189,6 @@ function composerTextDir(text: string, uiIsRtl: boolean): 'ltr' | 'rtl' {
   return uiIsRtl ? 'rtl' : 'ltr';
 }
 
-const ChannelBadge: React.FC<{ channel: string; className?: string }> = ({ channel, className }) => {
-  const Icon = channel === 'instagram' ? InstagramIcon : MessengerIcon;
-  return <Icon className={className ?? 'w-3.5 h-3.5'} />;
-};
-
-/**
- * Attachment / location block for one bubble.
- * Uses ChatBlobMedia (auth blob cache) when bytes exist; Meta CDN-expired kinds
- * stay as labels because ChatBlobMedia cannot recover them.
- */
-const MessageAttachment: React.FC<{
-  message: SocialMessagePayload;
-  t: (key: string) => string;
-  onOpenMedia?: (messageId: number) => void;
-}> = ({ message, t, onOpenMedia }) => {
-  const outbound = message.direction === 'outbound';
-  const lat = message.location_latitude != null ? Number(message.location_latitude) : null;
-  const lng = message.location_longitude != null ? Number(message.location_longitude) : null;
-  const hasCoords =
-    lat != null && lng != null && Number.isFinite(lat) && Number.isFinite(lng);
-  const mapsUrl = hasCoords ? clientLocationMapsUrl(`${lat},${lng}`) : null;
-
-  const expiredLabel =
-    !message.has_attachment && message.attachment_kind
-      ? message.attachment_kind === 'story_mention'
-        ? t('storyMention')
-        : message.attachment_kind === 'share'
-          ? t('sharedPost')
-          : message.attachment_kind === 'reel'
-            ? t('sharedReel')
-            : null
-      : null;
-
-  const mediaKind = message.has_attachment ? blobMediaKind(message.attachment_kind) : null;
-  const url = mediaKind ? getSocialMessageAttachmentUrl(message.id) : null;
-
-  return (
-    <>
-      {hasCoords ? (
-        <div className="mb-1 w-[min(70vw,16rem)] max-w-full">
-          <div
-            className={`flex gap-2 rounded-md px-2.5 py-2 ${
-              outbound ? 'bg-black/10' : 'bg-black/[0.04] dark:bg-white/5'
-            }`}
-          >
-            <span
-              className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full ${
-                outbound
-                  ? 'bg-white/20 text-white'
-                  : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-              }`}
-            >
-              <MapPinIcon className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-medium [unicode-bidi:plaintext]" dir="auto">
-                {(message.location_name || '').trim() ||
-                  (message.location_address || '').trim() ||
-                  t('openInMaps')}
-              </p>
-              {hasCoords ? (
-                <p
-                  className={`mt-0.5 font-mono text-[10px] tabular-nums ${
-                    outbound ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
-                  }`}
-                  dir="ltr"
-                >
-                  {lat!.toFixed(5)}, {lng!.toFixed(5)}
-                </p>
-              ) : null}
-              {mapsUrl ? (
-                <a
-                  href={mapsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={`mt-1 inline-block text-xs font-medium ${
-                    outbound ? 'text-white/90 hover:text-white' : 'text-primary hover:underline'
-                  }`}
-                >
-                  {t('openInMaps')}
-                </a>
-              ) : null}
-            </div>
-          </div>
-        </div>
-      ) : null}
-
-      {expiredLabel ? <div className="text-xs italic opacity-80">{expiredLabel}</div> : null}
-
-      {mediaKind && url ? (
-        <div
-          className={
-            mediaKind === 'audio' ? 'mb-1 w-full min-w-0' : 'mb-1 w-[min(70vw,20rem)] max-w-full'
-          }
-        >
-          <ChatBlobMedia
-            url={url}
-            kind={mediaKind}
-            mine={outbound}
-            filename={message.original_filename}
-            attachmentWidth={message.attachment_width}
-            attachmentHeight={message.attachment_height}
-            t={t as any}
-            onOpen={
-              onOpenMedia && (mediaKind === 'image' || mediaKind === 'video')
-                ? () => onOpenMedia(message.id)
-                : undefined
-            }
-          />
-        </div>
-      ) : null}
-    </>
-  );
-};
-
 export const InboxPage: React.FC = () => {
   const { t, language, currentUser, setCurrentPage, setSelectedLead } = useAppContext();
   const queryClient = useQueryClient();
@@ -307,8 +201,13 @@ export const InboxPage: React.FC = () => {
   const [channel, setChannel] = useState(filtersInit.channel);
   const [status, setStatus] = useState<string>(filtersInit.status);
   const [unreplied, setUnreplied] = useState(filtersInit.unreplied);
+  const [starredOnly, setStarredOnly] = useState(false);
+  const [assignment, setAssignment] = useState<string>('all');
   const [search, setSearch] = useState('');
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [shareLocationOpen, setShareLocationOpen] = useState(false);
+  const waCalling = useWhatsAppCallingOptional();
+  const waCapabilities = inboxWhatsappThreadAdapter.capabilities;
+  const [selectedId, setSelectedId] = useState<number | null>(() => consumePendingInboxConversationId());
   const [draft, setDraft] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
@@ -332,9 +231,11 @@ export const InboxPage: React.FC = () => {
       status,
       search: search.trim() || undefined,
       unreplied: unreplied || undefined,
+      starred: starredOnly || undefined,
+      assignment: assignment !== 'all' ? assignment : undefined,
       limit: 100,
     }),
-    [channel, status, search, unreplied]
+    [channel, status, search, unreplied, starredOnly, assignment]
   );
 
   useEffect(() => {
@@ -367,8 +268,17 @@ export const InboxPage: React.FC = () => {
   );
   const messages: SocialMessagePayload[] = threadData?.results ?? [];
   const threadConversation = threadData?.conversation ?? selected;
+  const isWhatsappThread = selected?.channel === 'whatsapp';
 
-  const { data: window } = useSocialSendWindow(selectedId ?? undefined);
+  const { data: threadCallsData } = useQuery({
+    queryKey: ['whatsappCalls', 'inbox-thread', selectedId],
+    queryFn: () => getWhatsAppCallsAPI({ conversation: selectedId!, limit: 50 }),
+    enabled: Boolean(selectedId && isWhatsappThread && waCapabilities.calling),
+    refetchInterval: pollMs,
+  });
+  const threadCalls = threadCallsData?.results ?? [];
+
+  const { data: sendWindow } = useSocialSendWindow(selectedId ?? undefined);
 
   const sendText = useSendSocialMessage();
   const sendMedia = useSendSocialMedia();
@@ -376,8 +286,8 @@ export const InboxPage: React.FC = () => {
   const updateState = useUpdateSocialConversationState();
   const convert = useConvertSocialConversation();
 
-  const requiresTemplate = Boolean(window?.requires_template);
-  const composerBlocked = window ? !window.open && !requiresTemplate : false;
+  const requiresTemplate = Boolean(sendWindow?.requires_template);
+  const composerBlocked = sendWindow ? !sendWindow.open && !requiresTemplate : false;
   const [templateId, setTemplateId] = useState<number | ''>('');
   const [templateSending, setTemplateSending] = useState(false);
   const { data: messageTemplates } = useQuery({
@@ -505,6 +415,7 @@ export const InboxPage: React.FC = () => {
           file,
           text: caption,
           kind,
+          isVoiceNote: pendingIsVoiceNote,
         });
       } else {
         const text = draft.trim();
@@ -657,7 +568,26 @@ export const InboxPage: React.FC = () => {
                 </span>
                 {t('chatFilterUnreplied')}
               </label>
+              <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-gray-600 dark:text-gray-300">
+                <input
+                  type="checkbox"
+                  checked={starredOnly}
+                  onChange={(e) => setStarredOnly(e.target.checked)}
+                />
+                {t('chatFilterStarred')}
+              </label>
             </div>
+            {!staffScopedInbox && (channel === 'whatsapp' || channel === 'all') ? (
+              <select
+                value={assignment}
+                onChange={(e) => setAssignment(e.target.value)}
+                className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs dark:border-gray-600 dark:bg-gray-800"
+              >
+                <option value="all">{t('chatFilterAll')}</option>
+                <option value="mine">{t('chatFilterAssignedToMe')}</option>
+                <option value="unassigned">{t('chatFilterUnassigned')}</option>
+              </select>
+            ) : null}
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -699,7 +629,7 @@ export const InboxPage: React.FC = () => {
                   {/* Name alone on the first line — the converted badge used to
                       sit inline with shrink-0 and ate the whole title in Arabic. */}
                   <div className="flex min-w-0 items-center gap-1.5">
-                    <ChannelBadge
+                    <InboxChannelBadge
                       channel={row.channel}
                       className="h-3.5 w-3.5 shrink-0 text-gray-500 dark:text-gray-300"
                     />
@@ -747,7 +677,7 @@ export const InboxPage: React.FC = () => {
             <>
               <div className={`${WA_HEADER_BAR} ${WA_HEADER_TEXT} justify-between gap-2`}>
                 <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <ChannelBadge channel={selected.channel} className="h-4 w-4 shrink-0" />
+                  <InboxChannelBadge channel={selected.channel} className="h-4 w-4 shrink-0" />
                   <span className="min-w-0 truncate font-semibold">
                     {selected.contact.display_name}
                   </span>
@@ -775,6 +705,29 @@ export const InboxPage: React.FC = () => {
                       {t('convertToLead')}
                     </Button>
                   ) : null}
+                  {isWhatsappThread && waCapabilities.calling && waCalling && selected.contact?.external_id ? (
+                    <button
+                      type="button"
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white hover:bg-white/20"
+                      aria-label={t('whatsappThreadVoiceCall')}
+                      title={t('whatsappThreadVoiceCall')}
+                      onClick={() => {
+                        const target = inboxWhatsappThreadAdapter.callTarget({
+                          peerPhone: selected.contact.external_id,
+                          clientId: threadConversation?.client?.id,
+                          conversationId: selected.id,
+                        });
+                        if (!target) return;
+                        void waCalling.startOutboundCall({
+                          to: target.to,
+                          clientId: target.clientId,
+                          conversationId: target.conversationId,
+                        });
+                      }}
+                    >
+                      <PhoneIcon className="h-4 w-4" />
+                    </button>
+                  ) : null}
                   <ChatConversationStatusMenu
                     t={t}
                     status={selected.status}
@@ -782,6 +735,23 @@ export const InboxPage: React.FC = () => {
                     isUnsubscribed={selected.is_unsubscribed}
                     onChange={handleThreadStatusChange}
                   />
+                  {(currentUser?.is_company_owner || currentUser?.isCompanyOwner) &&
+                  isWhatsappThread &&
+                  waCapabilities.deleteConversation ? (
+                    <Button
+                      variant="ghost"
+                      className="!h-8 !text-white hover:!bg-white/20"
+                      onClick={async () => {
+                        if (!selectedId) return;
+                        if (!globalThis.window.confirm(t('deleteConversationConfirm'))) return;
+                        await deleteSocialConversationAPI(selectedId);
+                        setSelectedId(null);
+                        queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+                      }}
+                    >
+                      {t('delete')}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
 
@@ -789,6 +759,32 @@ export const InboxPage: React.FC = () => {
                 {threadFetching && messages.length === 0 && (
                   <p className="text-center text-xs text-gray-500">{t('loading')}</p>
                 )}
+                {isWhatsappThread &&
+                  threadCalls.map((call) => (
+                    <ChatCallBubble
+                      key={`call-${call.id}`}
+                      call={call}
+                      t={t}
+                      timeLabel={formatTime(call.started_at || call.created_at, language)}
+                      onCallback={
+                        waCalling
+                          ? () => {
+                              const target = inboxWhatsappThreadAdapter.callTarget({
+                                peerPhone: call.peer_phone,
+                                clientId: call.client ?? threadConversation?.client?.id,
+                                conversationId: selected.id,
+                              });
+                              if (!target) return;
+                              void waCalling.startOutboundCall({
+                                to: target.to,
+                                clientId: target.clientId,
+                                conversationId: target.conversationId,
+                              });
+                            }
+                          : undefined
+                      }
+                    />
+                  ))}
                 {messages.map((message) => {
                   const outbound = message.direction === 'outbound';
                   const failed = message.delivery_status === 'failed';
@@ -802,7 +798,7 @@ export const InboxPage: React.FC = () => {
                           outbound ? (failed ? WA_BUBBLE_OUT_FAILED : WA_BUBBLE_OUT) : WA_BUBBLE_IN
                         }`}
                       >
-                        <MessageAttachment message={message} t={t} onOpenMedia={openMedia} />
+                        <InboxMessageAttachment message={message} t={t} onOpenMedia={openMedia} />
                         {message.body ? (
                           <p className="whitespace-pre-wrap break-words [unicode-bidi:plaintext]" dir="auto">
                             {message.body}
@@ -825,19 +821,19 @@ export const InboxPage: React.FC = () => {
               </div>
 
               <div className={`${WA_COMPOSER_BG} space-y-1.5 px-2 py-1.5 sm:px-3`}>
-                {window && window.mode === 'response' && window.expires_at && (
+                {sendWindow && sendWindow.mode === 'response' && sendWindow.expires_at && (
                   <div className={WA_ALERT_INFO}>
                     {t('replyWindowOpen').replace(
                       '{time}',
-                      humanizeRemaining(window.expires_at, language)
+                      humanizeRemaining(sendWindow.expires_at, t)
                     )}
                   </div>
                 )}
-                {window && window.mode === 'human_agent' && window.expires_at && (
+                {sendWindow && sendWindow.mode === 'human_agent' && sendWindow.expires_at && (
                   <div className={WA_ALERT_WARN}>
                     {t('replyWindowHumanAgent').replace(
                       '{time}',
-                      humanizeRemaining(window.expires_at, language)
+                      humanizeRemaining(sendWindow.expires_at, t)
                     )}
                   </div>
                 )}
@@ -859,7 +855,7 @@ export const InboxPage: React.FC = () => {
                         ))}
                       </select>
                       <Button
-                        size="sm"
+                        className="!h-8 !px-3 !text-xs"
                         disabled={!templateId || templateSending || !selectedId}
                         loading={templateSending}
                         onClick={async () => {
@@ -876,7 +872,7 @@ export const InboxPage: React.FC = () => {
                             });
                           } catch (e: any) {
                             setSendError(
-                              e?.message || t('social_send_failed') || 'Send failed'
+                              resolveLocalizedApiError(e, t, t('socialSendFailed'))
                             );
                           } finally {
                             setTemplateSending(false);
@@ -970,6 +966,18 @@ export const InboxPage: React.FC = () => {
                         >
                           <PaperclipIcon className="size-[1.2rem]" />
                         </button>
+                        {isWhatsappThread && waCapabilities.location ? (
+                          <button
+                            type="button"
+                            className="flex size-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/10"
+                            disabled={composerBlocked || sending}
+                            onClick={() => setShareLocationOpen(true)}
+                            aria-label={t('whatsappShareLocation')}
+                            title={t('whatsappShareLocation')}
+                          >
+                            <MapPinIcon className="size-[1.2rem]" />
+                          </button>
+                        ) : null}
                         <textarea
                           ref={textareaRef}
                           rows={1}
@@ -1057,6 +1065,26 @@ export const InboxPage: React.FC = () => {
           onSubmit={handleConvert}
           isSubmitting={convert.isPending}
           errorMessage={convertError}
+        />
+      ) : null}
+
+      {shareLocationOpen && selectedId && isWhatsappThread ? (
+        <ShareLocationModal
+          isOpen={shareLocationOpen}
+          onClose={() => setShareLocationOpen(false)}
+          t={t}
+          onSend={async (loc) => {
+            if (!selectedId) return;
+            await sendSocialInboxLocationAPI({
+              conversation: selectedId,
+              latitude: loc.latitude,
+              longitude: loc.longitude,
+              name: loc.name,
+              address: loc.address,
+            });
+            setShareLocationOpen(false);
+            queryClient.invalidateQueries({ queryKey: queryKeys.socialMessages(selectedId) });
+          }}
         />
       ) : null}
 

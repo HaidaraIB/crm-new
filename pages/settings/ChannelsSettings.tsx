@@ -22,8 +22,8 @@ export const ChannelsSettings = () => {
     
     // Fetch channels using React Query
     const { data: channelsData } = useChannels();
-    const channels = Array.isArray(channelsData) 
-        ? channelsData 
+    const channels: Channel[] = Array.isArray(channelsData)
+        ? channelsData
         : (channelsData?.results || []);
     
     // Delete and update mutations
@@ -164,7 +164,12 @@ export const ChannelsSettings = () => {
                                             (channel.priority?.toLowerCase() || 'medium') === 'medium' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300' :
                                             'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
                                         }`}>
-                                            {t((channel.priority?.toLowerCase() || 'medium'))}
+                                            {(() => {
+                                                const p = (channel.priority?.toLowerCase() || 'medium') as string;
+                                                if (p === 'high') return t('high');
+                                                if (p === 'low') return t('low');
+                                                return t('medium');
+                                            })()}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">

@@ -10,7 +10,7 @@ export const FIB_LATEST_SUBSCRIPTION_ID_KEY = 'fibPaymentLatestSubscriptionId';
 const FIB_DATA_PREFIX = 'fibPaymentData:';
 
 export type FibPaymentSessionPayload = {
-  payment_id: string;
+  payment_id: string | number;
   qr_code?: string | null;
   readable_code?: string | null;
   business_app_link?: string | null;
@@ -128,7 +128,9 @@ export function resolveSubscriptionIdFromContext(
   return null;
 }
 
-export function isFibSessionPayload(response: unknown): boolean {
+export function isFibSessionPayload(
+  response: unknown,
+): response is FibPaymentSessionPayload {
   if (!response || typeof response !== 'object') return false;
   const r = response as Record<string, unknown>;
   return (

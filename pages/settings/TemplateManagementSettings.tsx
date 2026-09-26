@@ -15,6 +15,9 @@ import {
     type MessageTemplateType,
     resolveLocalizedApiError,
 } from '../../services/api';
+import { translations } from '../../constants';
+
+type TFn = (key: keyof typeof translations.en) => string;
 
 function isWhatsAppTemplate(channelType: string | undefined | null): boolean {
     const ch = (channelType || '').toLowerCase();
@@ -67,7 +70,7 @@ function isTemplateOnMeta(tpl: MessageTemplateType): boolean {
     return ['APPROVED', 'PENDING', 'REJECTED'].includes(metaStatus);
 }
 
-function deleteTemplateConfirmMessage(tpl: MessageTemplateType, t: (key: string) => string): string {
+function deleteTemplateConfirmMessage(tpl: MessageTemplateType, t: TFn): string {
     return isTemplateOnMeta(tpl) ? t('deleteTemplateConfirmMeta') : t('deleteTemplateConfirm');
 }
 

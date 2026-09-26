@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { IntegrationPlatformIcon } from '../components/integrations/IntegrationPlatformIcon';
 import { PageHelpVideoButton } from '../components/PageHelpVideoButton';
 import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
@@ -30,17 +30,12 @@ import { useWhatsAppConnected } from '../hooks/useWhatsAppConnected';
 import {
   deleteWhatsAppConversationAPI,
   deleteWhatsAppMessageAPI,
-  getMessageTemplatesAPI,
-  getWhatsAppCallsAPI,
   getWhatsAppContactByPhoneAPI,
-  getWhatsAppSessionWindowAPI,
   resolveLocalizedApiError,
   sendWhatsAppLocationAPI,
   sendWhatsAppMediaAPI,
   sendWhatsAppMessageAPI,
   sendWhatsAppTemplateAPI,
-  type MessageTemplateType,
-  type WhatsAppCallRecord,
 } from '../services/api';
 import type { WhatsAppChatFilters } from '../types';
 import { getUserDisplayName } from '../types';
@@ -71,8 +66,13 @@ import {
   preloadIncomingWhatsAppSound,
 } from '../utils/whatsappIncomingSound';
 import { replaceTemplatePlaceholders } from '../utils/messagePlaceholders';
-
-const SESSION_MS = 24 * 60 * 60 * 1000;
+import {
+  crmWhatsappThreadAdapter,
+  mapWhatsAppSendErrorToComposer,
+  useThreadCalls,
+  useThreadSessionGate,
+  useThreadTemplates,
+} from '../hooks/whatsappThread';
 
 function inferChatAttachmentKind(file: File): 'image' | 'video' | 'audio' | 'document' {
   const t = (file.type || '').toLowerCase();
@@ -80,17 +80,6 @@ function inferChatAttachmentKind(file: File): 'image' | 'video' | 'audio' | 'doc
   if (t.startsWith('video/')) return 'video';
   if (t.startsWith('audio/')) return 'audio';
   return 'document';
-}
-
-function deriveSessionFromMessages(messages: { direction?: string; created_at?: string }[]): boolean {
-  let latest = 0;
-  for (const m of messages) {
-    if (m.direction !== 'inbound' || !m.created_at) continue;
-    const ts = new Date(m.created_at).getTime();
-    if (!Number.isNaN(ts) && ts > latest) latest = ts;
-  }
-  if (!latest) return false;
-  return Date.now() - latest < SESSION_MS;
 }
 
 export const ChatsPage: React.FC = () => {
@@ -120,7 +109,9 @@ export const ChatsPage: React.FC = () => {
   const role = normalizeRole(currentUser?.role);
   const isStaff = role === 'Employee' || role === 'Doctor';
   const isOwner = role === 'Owner';
-  const canDeleteWhatsAppHistory = isOwner;
+  const canDeleteWhatsAppHistory = Boolean(
+    currentUser?.is_company_owner ?? currentUser?.isCompanyOwner
+  );
   const canSeeAllLeads =
     role === 'Owner' ||
     role === 'Reception' ||
@@ -198,7 +189,6 @@ export const ChatsPage: React.FC = () => {
     items: ChatMediaAlbumItem[];
     index: number;
   } | null>(null);
-  const lastInboundKeyRef = useRef<string>('');
   const markReadClientKeyRef = useRef<string>('');
   /** Hydrate-safe tracker so opening a thread with history does not play sound. */
   const inboundSoundHydratedRef = useRef(false);
@@ -348,106 +338,37 @@ export const ChatsPage: React.FC = () => {
     refetchInterval: selectedChatClient ? chatPollMs : false,
   });
 
-  const { data: threadCallsData, refetch: refetchThreadCalls } = useQuery({
-    queryKey: ['whatsappCalls', 'thread', selectedChatLeadId, selectedChatPhone],
-    queryFn: async () => {
-      if (typeof selectedChatLeadId === 'number') {
-        return getWhatsAppCallsAPI({
-          client: selectedChatLeadId,
-          ordering: 'started_at',
-          limit: 100,
-        });
-      }
-      const phone = selectedChatPhone.replace(/\D/g, '');
-      if (phone.length < 7) return { count: 0, results: [] as WhatsAppCallRecord[] };
-      return getWhatsAppCallsAPI({
-        search: phone,
-        ordering: 'started_at',
-        limit: 100,
-      });
-    },
-    enabled:
-      !!selectedChatClient &&
-      (typeof selectedChatLeadId === 'number' ||
-        (!!selectedChatPhone && selectedChatPhone.replace(/\D/g, '').length >= 7)),
-    refetchInterval: selectedChatClient ? chatPollMs : false,
+  const { threadCalls, refetchThreadCalls } = useThreadCalls({
+    enabled: !!selectedChatClient,
+    pollMs: selectedChatClient ? chatPollMs : false,
+    clientId: selectedChatLeadId,
+    peerPhone: selectedChatPhone,
   });
 
-  const threadCalls = useMemo(() => {
-    const rows = threadCallsData?.results || [];
-    // For phone-only search, keep rows that match this peer closely.
-    if (typeof selectedChatLeadId === 'number') return rows;
-    const phone = selectedChatPhone.replace(/\D/g, '');
-    if (!phone) return rows;
-    return rows.filter((c) => {
-      const peer = String(c.peer_phone || '').replace(/\D/g, '');
-      return peer === phone || peer.endsWith(phone.slice(-10)) || phone.endsWith(peer.slice(-10));
-    });
-  }, [threadCallsData, selectedChatLeadId, selectedChatPhone]);
-
-  const { data: waSessionApi, refetch: refetchWaSession } = useQuery({
-    queryKey: ['whatsappSession', selectedChatLeadId, selectedChatPhone],
-    queryFn: () =>
-      typeof selectedChatLeadId === 'number'
-        ? getWhatsAppSessionWindowAPI({ clientId: selectedChatLeadId })
-        : getWhatsAppSessionWindowAPI({ phone: selectedChatPhone }),
-    enabled:
-      !!selectedChatClient &&
-      (typeof selectedChatLeadId === 'number' ||
-        (!!selectedChatPhone && selectedChatPhone.replace(/\D/g, '').length >= 7)),
-    staleTime: 0,
-  });
-
-  // Derive session from loaded inbound messages so UI doesn't lag the poll.
-  const derivedInSession = deriveSessionFromMessages(leadWhatsAppMessages as any[]);
-  const blockFreeText =
-    typeof selectedChatClient?.id === 'number' &&
-    ((waSessionApi != null && !waSessionApi.in_session && !derivedInSession) ||
-      (waSessionApi == null && !derivedInSession));
-
-  const effectiveSession = useMemo(() => {
-    if (derivedInSession) {
-      return {
-        in_session: true,
-        hours_remaining: waSessionApi?.hours_remaining ?? null,
-        last_inbound_at: waSessionApi?.last_inbound_at ?? null,
-      };
-    }
-    return waSessionApi
-      ? {
-          in_session: !!waSessionApi.in_session,
-          hours_remaining: waSessionApi.hours_remaining,
-          last_inbound_at: waSessionApi.last_inbound_at,
-        }
-      : null;
-  }, [derivedInSession, waSessionApi]);
-
-  // Invalidate session when a newer inbound appears in the thread.
-  useEffect(() => {
-    const inbounds = (leadWhatsAppMessages as any[]).filter((m) => m.direction === 'inbound');
-    if (!inbounds.length) return;
-    const newest = inbounds.reduce((a, b) =>
-      new Date(a.created_at).getTime() >= new Date(b.created_at).getTime() ? a : b
-    );
-    const key = `${newest.id}:${newest.created_at}`;
-    if (key !== lastInboundKeyRef.current) {
-      lastInboundKeyRef.current = key;
-      void queryClient.invalidateQueries({ queryKey: ['whatsappSession'] });
-      void refetchWaSession();
-      // Thread is open: new inbound should not keep the sidebar badge elevated.
+  const {
+    refetchWaSession,
+    blockFreeText,
+    effectiveSession,
+    resetSessionTrackers,
+  } = useThreadSessionGate({
+    enabled: !!selectedChatClient,
+    clientId: selectedChatLeadId,
+    peerPhone: selectedChatPhone,
+    inboundMessages: leadWhatsAppMessages as { id?: number; direction?: string; created_at?: string }[],
+    onNewInbound: () => {
       if (typeof selectedChatLeadId === 'number') {
         markConversationRead.mutate({ clientId: selectedChatLeadId });
       }
-    }
-  }, [leadWhatsAppMessages, queryClient, refetchWaSession, selectedChatLeadId, markConversationRead]);
+    },
+  });
 
   // Reset trackers when switching conversations (must run before in-thread sound hydrate).
   useEffect(() => {
     inboundSoundHydratedRef.current = false;
     inboundSoundLatestIdRef.current = null;
-    lastInboundKeyRef.current = '';
+    resetSessionTrackers();
     setNewMessagesBeforeApiId(null);
-  }, [selectedChatClient?.id, selectedChatPhone]);
+  }, [selectedChatClient?.id, selectedChatPhone, resetSessionTrackers]);
 
   // Capture first unread inbound once (before mark-read clears is_read).
   useEffect(() => {
@@ -592,20 +513,7 @@ export const ChatsPage: React.FC = () => {
     saveManualConversations(companyId, extraConversations);
   }, [companyId, extraConversations, isStaff]);
 
-  const { data: templates = [] } = useQuery({
-    queryKey: ['messageTemplates'],
-    queryFn: getMessageTemplatesAPI,
-  });
-
-  const approvedWaTemplates = useMemo(
-    () =>
-      (templates as MessageTemplateType[]).filter((tpl) => {
-        const ch = (tpl.channel_type || '').toLowerCase();
-        if (ch !== 'whatsapp' && ch !== 'whatsapp_api') return false;
-        return (tpl.meta_status || '').toUpperCase() === 'APPROVED';
-      }),
-    [templates]
-  );
+  const { approvedTemplates: approvedWaTemplates } = useThreadTemplates(crmWhatsappThreadAdapter);
 
   const conversations = useMemo(() => {
     const fromApi = (conversationsList as any[]).map((c: any) => ({
@@ -671,12 +579,14 @@ export const ChatsPage: React.FC = () => {
       selectedChatClient && typeof selectedChatClient.id === 'number'
         ? selectedChatClient.id
         : null;
+    const override = threadStateOverride;
     if (
+      override &&
       clientId != null &&
-      threadStateOverride?.clientId === clientId &&
-      threadStateOverride.status
+      override.clientId === clientId &&
+      override.status
     ) {
-      return threadStateOverride.status;
+      return override.status;
     }
     return selectedConversationMeta?.status || 'open';
   }, [selectedChatClient, selectedConversationMeta, threadStateOverride]);
@@ -686,12 +596,14 @@ export const ChatsPage: React.FC = () => {
       selectedChatClient && typeof selectedChatClient.id === 'number'
         ? selectedChatClient.id
         : null;
+    const override = threadStateOverride;
     if (
+      override &&
       clientId != null &&
-      threadStateOverride?.clientId === clientId &&
-      threadStateOverride.isStarred !== undefined
+      override.clientId === clientId &&
+      override.isStarred !== undefined
     ) {
-      return threadStateOverride.isStarred;
+      return override.isStarred;
     }
     return Boolean(selectedConversationMeta?.isStarred);
   }, [selectedChatClient, selectedConversationMeta, threadStateOverride]);
@@ -701,12 +613,14 @@ export const ChatsPage: React.FC = () => {
       selectedChatClient && typeof selectedChatClient.id === 'number'
         ? selectedChatClient.id
         : null;
+    const override = threadStateOverride;
     if (
+      override &&
       clientId != null &&
-      threadStateOverride?.clientId === clientId &&
-      threadStateOverride.isUnsubscribed !== undefined
+      override.clientId === clientId &&
+      override.isUnsubscribed !== undefined
     ) {
-      return threadStateOverride.isUnsubscribed;
+      return override.isUnsubscribed;
     }
     return Boolean(selectedConversationMeta?.isUnsubscribed);
   }, [selectedChatClient, selectedConversationMeta, threadStateOverride]);
@@ -818,22 +732,23 @@ export const ChatsPage: React.FC = () => {
   // picked a specific number, so a lead with several numbers opens the right thread —
   // and it always re-opens, even for the lead already showing.
   useEffect(() => {
-    const leadId = selectedLead?.id;
-    if (typeof leadId !== 'number') return;
+    const lead = selectedLead;
+    const leadId = lead?.id;
+    if (!lead || typeof leadId !== 'number') return;
     if (!pendingChatPhone && autoOpenedChatLeadRef.current === leadId) return;
 
     const match = conversations.find((c) => c.client?.id === leadId);
     const base =
       match?.client ??
       ({
-        id: selectedLead.id,
-        name: selectedLead.name,
+        id: lead.id,
+        name: lead.name,
         phone_number:
-          selectedLead.phone ||
-          selectedLead.phoneNumbers?.find((p) => p.is_primary)?.phone_number ||
-          selectedLead.phoneNumbers?.[0]?.phone_number ||
+          lead.phone ||
+          lead.phoneNumbers?.find((p) => p.is_primary)?.phone_number ||
+          lead.phoneNumbers?.[0]?.phone_number ||
           '',
-        lead_company_name: selectedLead.leadCompanyName || '',
+        lead_company_name: lead.leadCompanyName || '',
       } as const);
     const client = pendingChatPhone ? { ...base, phone_number: pendingChatPhone } : base;
 
@@ -873,41 +788,12 @@ export const ChatsPage: React.FC = () => {
     selectChatClient(client);
   };
 
-  const mapApiErrorToComposer = (e: any) => {
-    const key = e?.error_key || e?.code || '';
-    if (key === 'whatsapp_display_name_not_approved') {
-      setComposerAlert({
-        variant: 'error',
-        message: t('whatsapp_display_name_not_approved'),
-      });
-      return;
-    }
-    if (key === 'whatsapp_outside_session_use_template') {
-      setComposerAlert({
-        variant: 'warning',
-        message:
-          t('whatsappOutsideSessionUseTemplate') ||
-          'Outside the 24-hour window. Send an approved template instead.',
-      });
-      return;
-    }
-    if (key === 'whatsapp_template_not_found_or_language') {
-      setComposerAlert({
-        variant: 'error',
-        message: t('whatsapp_template_not_found_or_language'),
-      });
-      return;
-    }
-    if (key === 'whatsapp_contact_not_found') {
-      showToast(t('whatsappContactNotFound') || 'Contact not found', { variant: 'warning' });
-      return;
-    }
-    if (key === 'whatsapp_voice_note_requires_ogg') {
-      showAlert(t('whatsapp_voice_note_requires_ogg'), 'error');
-      return;
-    }
-    showAlert(resolveLocalizedApiError(e, t, t('error') || 'Error'), 'error');
-  };
+  const mapApiErrorToComposer = (e: unknown) =>
+    mapWhatsAppSendErrorToComposer(e, t, {
+      setComposerAlert,
+      showToast,
+      showAlert,
+    });
 
   const sendOutbound = async (
     client: any,

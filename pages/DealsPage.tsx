@@ -259,8 +259,8 @@ export const DealsPage = () => {
     const unitsRaw = unitsResponse?.results || [];
     
     // Transform deals: convert client, project, unit from object/ID to string
-    const allDeals = useMemo(() => {
-        return dealsRaw.map((deal: any) => {
+    const allDeals = useMemo((): Deal[] => {
+        return dealsRaw.map((deal: any): Deal => {
             // Handle clientName - API might return client_name, clientName, or client object
             let clientName = '';
             if (deal.client_name) {

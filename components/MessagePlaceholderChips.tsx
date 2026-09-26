@@ -1,14 +1,15 @@
 import React from 'react';
+import { translations } from '../constants';
 import {
   MESSAGE_PLACEHOLDER_CHIPS,
   LEGACY_TEMPLATE_PLACEHOLDER_CHIPS,
   type PlaceholderChip,
 } from '../utils/messagePlaceholders';
 
-type TranslateFn = (key: string) => string;
+type TFn = (key: keyof typeof translations.en) => string;
 
 type MessagePlaceholderChipsProps = {
-  t: TranslateFn;
+  t: TFn;
   language: string;
   onInsert: (token: string) => void;
   /** Include Amount / Invoice Number chips (WhatsApp template editor). */
@@ -30,8 +31,8 @@ export function insertTextAtCaret(
   return { next, caret: start + token.length };
 }
 
-function chipLabel(chip: PlaceholderChip, t: TranslateFn, language: string): string {
-  const translated = t(chip.key);
+function chipLabel(chip: PlaceholderChip, t: TFn, language: string): string {
+  const translated = t(chip.key as keyof typeof translations.en);
   if (translated && translated !== chip.key) return translated;
   return language === 'ar' ? chip.insertAr : chip.insertEn;
 }

@@ -7,8 +7,10 @@ import { IntegrationPlatformIcon } from './IntegrationPlatformIcon';
 import { SettingsIcon, TrashIcon } from '../index';
 import { SectionLoadingState } from '../SectionLoadingState';
 import { useAppContext } from '../../context/AppContext';
+import { WhatsAppCallHoursPanel } from '../whatsapp/WhatsAppCallHoursPanel';
 import {
   deleteWhatsappInboxNumberAPI,
+  enableWhatsAppCallingAPI,
   getWhatsappInboxNumbersAPI,
   resolveLocalizedApiError,
 } from '../../services/api';
@@ -28,7 +30,11 @@ export const WhatsAppInboxSection: React.FC<Props> = ({
   connectingAccountId,
   isStartingConnect,
 }) => {
-  const { t, showToast, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
+  const { t, showToast, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, currentUser } =
+    useAppContext();
+  const canManageCallHours = Boolean(
+    currentUser?.is_company_owner || currentUser?.isCompanyOwner
+  );
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
@@ -125,6 +131,36 @@ export const WhatsAppInboxSection: React.FC<Props> = ({
                     </PhoneText>
                   </div>
                   {connectedNumber.status === 'connected' && (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {!connectedNumber.calling_enabled ? (
+                        <Button
+                          size="sm"
+                          disabled={busyId === connectedNumber.id}
+                          onClick={async () => {
+                            setBusyId(connectedNumber.id);
+                            try {
+                              await enableWhatsAppCallingAPI({
+                                wa_inbox_number_id: connectedNumber.id,
+                              });
+                              invalidate();
+                              showToast(t('enableWhatsAppCallingSuccess'), { variant: 'success' });
+                            } catch (err: any) {
+                              showToast(
+                                resolveLocalizedApiError(err, t, t('errorSavingAccount')),
+                                { variant: 'error' }
+                              );
+                            } finally {
+                              setBusyId(null);
+                            }
+                          }}
+                        >
+                          {t('enableWhatsAppCalling')}
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-emerald-600 dark:text-emerald-400">
+                          {t('whatsappCallingEnabled')}
+                        </span>
+                      )}
                     <Button
                       variant="ghost"
                       disabled={busyId === connectedNumber.id}
@@ -139,9 +175,17 @@ export const WhatsAppInboxSection: React.FC<Props> = ({
                     >
                       {t('removePage')}
                     </Button>
+                    </div>
                   )}
                 </div>
               )}
+              {connectedNumber?.calling_enabled ? (
+                <WhatsAppCallHoursPanel
+                  t={t}
+                  canManage={canManageCallHours}
+                  waInboxNumberId={connectedNumber.id}
+                />
+              ) : null}
             </li>
           </ul>
         ) : (

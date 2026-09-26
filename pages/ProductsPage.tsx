@@ -130,9 +130,9 @@ export const ProductsPage = () => {
     const { data: productsResponse, isLoading: productsLoading, isFetching: productsFetching, error: productsError, refetch: refetchProducts } = useProducts();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
-    const allProducts = useMemo(() => {
+    const allProducts = useMemo((): Product[] => {
         const products = productsResponse?.results || [];
-        return products.map((p: any) => {
+        return products.map((p: any): Product => {
             // Handle category - could be ID, object with name, or string
             let categoryName = '';
             if (p.category) {
@@ -171,8 +171,8 @@ export const ProductsPage = () => {
                 supplier: supplierName || p.supplier_name || undefined,
                 sku: p.sku || undefined,
                 image: p.image || undefined,
-                isActive: p.is_active !== undefined ? p.is_active : (p.isActive !== undefined ? p.isActive : true),
-            } as Product;
+                isActive: p.is_active !== undefined ? Boolean(p.is_active) : p.isActive !== undefined ? Boolean(p.isActive) : true,
+            };
         });
     }, [productsResponse]);
 

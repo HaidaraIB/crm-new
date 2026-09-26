@@ -20,8 +20,8 @@ export const StatusesSettings = () => {
     
     // Fetch statuses using React Query
     const { data: statusesData } = useStatuses();
-    const statuses = Array.isArray(statusesData) 
-        ? statusesData 
+    const statuses: Status[] = Array.isArray(statusesData)
+        ? statusesData
         : (statusesData?.results || []);
     
     // Delete and update mutations

@@ -11,6 +11,9 @@ import { SelectMediaModal } from './SelectMediaModal';
 import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
 import { clearFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { translations } from '../../constants';
+
+type TFn = (key: keyof typeof translations.en) => string;
 
 const NAME_MAX = 200;
 const BODY_MAX = 1000;
@@ -93,7 +96,7 @@ function isTemplateOnMeta(tpl: MessageTemplateType): boolean {
   return ['APPROVED', 'PENDING', 'REJECTED'].includes(metaStatus);
 }
 
-function deleteTemplateConfirmMessage(tpl: MessageTemplateType, t: (key: string) => string): string {
+function deleteTemplateConfirmMessage(tpl: MessageTemplateType, t: TFn): string {
   return isTemplateOnMeta(tpl) ? t('deleteTemplateConfirmMeta') : t('deleteTemplateConfirm');
 }
 
@@ -101,7 +104,7 @@ type EditTemplateModalProps = {
   isOpen: boolean;
   onClose: () => void;
   template: MessageTemplateType | null;
-  t(key: string): string;
+  t: TFn;
   language: 'en' | 'ar';
   onSuccess: () => void;
   onSendToReview?: (templateId: number, language: string) => Promise<void>;

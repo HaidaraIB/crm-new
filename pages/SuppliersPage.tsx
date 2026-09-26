@@ -107,20 +107,19 @@ export const SuppliersPage = () => {
     const { data: suppliersResponse, isLoading: suppliersLoading, isFetching: suppliersFetching, error: suppliersError, refetch: refetchSuppliers } = useSuppliers();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
-    const allSuppliers = useMemo(() => {
+    const allSuppliers = useMemo((): Supplier[] => {
         const suppliers = suppliersResponse?.results || [];
-        return suppliers.map((s: any) => ({
-            id: s.id,
-            code: s.code || '',
-            name: s.name || '',
-            logo: s.logo || '',
-            phone: s.phone || '',
-            email: s.email || '',
-            address: s.address || '',
-            contactPerson: s.contact_person || s.contactPerson || '',
-            specialization: s.specialization || '',
-            isActive: s.is_active !== undefined ? s.is_active : (s.isActive !== undefined ? s.isActive : true),
-        } as Supplier));
+        return suppliers.map((s: any): Supplier => ({
+            id: Number(s.id),
+            code: String(s.code || ''),
+            name: String(s.name || ''),
+            logo: String(s.logo || ''),
+            phone: String(s.phone || ''),
+            email: String(s.email || ''),
+            address: String(s.address || ''),
+            contactPerson: String(s.contact_person || s.contactPerson || ''),
+            specialization: String(s.specialization || ''),
+        }));
     }, [suppliersResponse]);
 
     // Delete supplier mutation

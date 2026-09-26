@@ -19,8 +19,8 @@ export const StagesSettings = () => {
     
     // Fetch stages using React Query
     const { data: stagesData } = useStages();
-    const stages = Array.isArray(stagesData) 
-        ? stagesData 
+    const stages: Stage[] = Array.isArray(stagesData)
+        ? stagesData
         : (stagesData?.results || []);
     
     // Delete and update mutations

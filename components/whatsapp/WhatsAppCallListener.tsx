@@ -21,6 +21,7 @@ import {
   sendWhatsAppCallPermissionRequestAPI,
   type WhatsAppCallRecord,
 } from '../../services/api';
+import { stashPendingInboxConversationId } from '../../utils/inboxDeepLink';
 import {
   dismissLiveCallToast,
   isLiveCallToastDismissed,
@@ -42,6 +43,8 @@ const INCOMING_CALL_TIMEOUT_MS = 30_000;
 type StartOutboundArgs = {
   to: string;
   clientId?: number;
+  conversationId?: number;
+  waInboxNumberId?: number;
   templateId?: number;
   templateName?: string;
 };
@@ -352,6 +355,8 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
         await session.startOutbound({
           to,
           clientId: args.clientId,
+          conversationId: args.conversationId,
+          waInboxNumberId: args.waInboxNumberId,
         });
         invalidateLists();
       } catch (e: any) {
@@ -470,6 +475,18 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
             stopWhatsAppIncomingCallRingtone();
             goToPage('Calls');
           }}
+          onOpenChat={
+            toastCall.call_source === 'inbox' && toastCall.social_conversation_id
+              ? () => {
+                  stashPendingInboxConversationId(toastCall.social_conversation_id!);
+                  dismissLiveCallToast(toastCall.id);
+                  setToastCall(null);
+                  setDismissTick((n) => n + 1);
+                  stopWhatsAppIncomingCallRingtone();
+                  goToPage('Inbox');
+                }
+              : undefined
+          }
           onAnswer={() => {
             void acceptIncoming(toastCall);
           }}

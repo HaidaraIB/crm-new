@@ -28,7 +28,9 @@ export const TeamsReportPage = () => {
 
   const { data, isLoading, isFetching, isError, refetch } = useTeamsReport(reportParams);
 
-  const teamStats = useMemo(() => (data?.rows ?? []).map(mapApiTeamReportRow), [data?.rows]);
+  const teamStats = useMemo((): TeamReportRow[] => {
+    return (data?.rows ?? []).map(mapApiTeamReportRow);
+  }, [data?.rows]);
 
   const reportHeroSubtitle = useMemo(
     () =>

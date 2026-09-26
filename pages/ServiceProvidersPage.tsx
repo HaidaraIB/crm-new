@@ -116,17 +116,17 @@ export const ServiceProvidersPage = () => {
     const { data: providersResponse, isLoading: providersLoading, isFetching: providersFetching, error: providersError, refetch: refetchProviders } = useServiceProviders();
     
     // Normalize API fields to frontend naming (snake_case to camelCase)
-    const allProviders = useMemo(() => {
+    const allProviders = useMemo((): ServiceProvider[] => {
         const providers = providersResponse?.results || [];
-        return providers.map((p: any) => ({
-            id: p.id,
-            code: p.code || '',
-            name: p.name || '',
-            phone: p.phone || '',
-            email: p.email || '',
-            specialization: p.specialization || '',
+        return providers.map((p: any): ServiceProvider => ({
+            id: Number(p.id),
+            code: String(p.code || ''),
+            name: String(p.name || ''),
+            phone: String(p.phone || ''),
+            email: String(p.email || ''),
+            specialization: String(p.specialization || ''),
             rating: p.rating !== undefined && p.rating !== null ? Number(p.rating) : undefined,
-        } as ServiceProvider));
+        }));
     }, [providersResponse]);
 
     // Delete service provider mutation

@@ -29,8 +29,8 @@ export const CallMethodsSettings = () => {
     
     // Fetch call methods using React Query
     const { data: callMethodsData } = useCallMethods();
-    const callMethods = Array.isArray(callMethodsData) 
-        ? callMethodsData 
+    const callMethods: CallMethod[] = Array.isArray(callMethodsData)
+        ? callMethodsData
         : (callMethodsData?.results || []);
     
     // Delete and update mutations

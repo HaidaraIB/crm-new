@@ -110,9 +110,10 @@ export const LeadsPage = () => {
     }, [currentPage]);
 
     const setActiveStatusFilter = (status: Lead['status']) => {
-        setActiveStatusFilterState(status);
+        const next = status ?? 'All';
+        setActiveStatusFilterState(next);
         try {
-            localStorage.setItem(`${LEADS_STATUS_TAB_STORAGE_KEY}:${currentPage}`, status);
+            localStorage.setItem(`${LEADS_STATUS_TAB_STORAGE_KEY}:${currentPage}`, next);
         } catch {
             // Ignore storage errors (private mode, etc.)
         }

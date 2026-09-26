@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
-import { Lead, PhoneNumber, Tag } from '../types';
+import { Channel, Lead, PhoneNumber, Status, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { TagMultiSelect } from '../components/leads/TagMultiSelect';
 import { useUsers, useStatuses, useChannels, useTags, useCreateLead } from '../hooks/useQueries';
@@ -51,12 +51,12 @@ export const CreateLeadPage = () => {
     const companyTz = currentUser?.company?.timezone ?? 'UTC';
 
     const { data: statusesData } = useStatuses();
-    const statuses = Array.isArray(statusesData)
+    const statuses: Status[] = Array.isArray(statusesData)
         ? statusesData
         : (statusesData?.results || []);
 
     const { data: channelsData } = useChannels();
-    const channels = Array.isArray(channelsData)
+    const channels: Channel[] = Array.isArray(channelsData)
         ? channelsData
         : (channelsData?.results || []);
 

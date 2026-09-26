@@ -15,6 +15,18 @@ import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPa
 
 type Tab = 'units' | 'projects' | 'developers';
 
+/** Normalized for table display: related entity is always a label string. */
+type DisplayProject = Omit<Project, 'developer'> & { developer: string };
+type DisplayUnit = Omit<Unit, 'project'> & { project: string; projectId?: number | null };
+
+const formatInventoryRef = (
+    value: string | number | { id: number; name?: string } | null | undefined
+): string => {
+    if (value == null || value === '') return '-';
+    if (typeof value === 'object') return value.name?.trim() || String(value.id);
+    return String(value);
+};
+
 const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
     if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
     const items: Array<number | 'ellipsis'> = [1];
@@ -27,7 +39,7 @@ const getPaginationItems = (current: number, total: number): Array<number | 'ell
     return items;
 };
 
-const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { developers: Developer[], onUpdate: (dev: Developer) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
+const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { developers: Developer[]; onUpdate: (dev: Developer) => void; onDelete: (id: number) => void; isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
@@ -74,7 +86,7 @@ const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { develope
     );
 };
 
-const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Project[], onUpdate: (proj: Project) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
+const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: DisplayProject[]; onUpdate: (proj: DisplayProject) => void; onDelete: (id: number) => void; isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
@@ -97,7 +109,7 @@ const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Pr
                                 <tr key={proj.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                     <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm whitespace-nowrap text-center">{proj.code}</td>
                                     <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm whitespace-nowrap text-center">{proj.name}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.developer}</td>
+                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{formatInventoryRef(proj.developer)}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.type || '-'}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.city || '-'}</td>
                                     <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{proj.paymentMethod || '-'}</td>
@@ -129,7 +141,7 @@ const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Pr
     );
 }
 
-const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: Unit[], onUpdate: (unit: Unit) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
+const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: DisplayUnit[]; onUpdate: (unit: DisplayUnit) => void; onDelete: (id: number) => void; isAdmin: boolean }) => {
     const { t } = useAppContext();
     return (
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
@@ -167,7 +179,7 @@ const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: Unit[], onU
                                 return (
                                     <tr key={`${unit.id}-${unit.project}`} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
                                         <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm whitespace-nowrap text-center">{unit.code}</td>
-                                        <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm whitespace-nowrap text-center">{unit.project}</td>
+                                        <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm whitespace-nowrap text-center">{formatInventoryRef(unit.project)}</td>
                                         <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.bedrooms}</td>
                                         <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm whitespace-nowrap text-center">{unit.bathrooms}</td>
                                         <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm whitespace-nowrap text-center">{formattedPrice}</td>
@@ -248,22 +260,19 @@ export const PropertiesPage = () => {
 
     // Fetch data using React Query
     const { data: developersResponse, isLoading: developersLoading, isFetching: developersFetching, refetch: refetchDevelopers } = useDevelopers(developersPageNumber, undefined, developersPageSize);
-    const developersRaw = developersResponse?.results || [];
-    
-    // Transform developers (already in correct format)
-    const developers = developersRaw;
+    const developers: Developer[] = developersResponse?.results || [];
 
     const { data: projectsResponse, isLoading: projectsLoading, isFetching: projectsFetching, refetch: refetchProjects } = useProjects(projectsPageNumber, undefined, projectsPageSize);
     const projectsRaw = projectsResponse?.results || [];
     
     // Transform projects: convert developer from object/ID to string name, and normalize paymentMethod
-    const projects = useMemo(() => {
-        return projectsRaw.map((proj: any) => {
+    const projects = useMemo((): DisplayProject[] => {
+        return projectsRaw.map((proj: any): DisplayProject => {
             let developerName = '';
             if (typeof proj.developer === 'object' && proj.developer?.name) {
                 developerName = proj.developer.name;
             } else if (typeof proj.developer === 'number') {
-                const dev = developers.find(d => d.id === proj.developer);
+                const dev = developers.find((d) => d.id === proj.developer);
                 developerName = dev?.name || '';
             } else if (typeof proj.developer === 'string') {
                 developerName = proj.developer;
@@ -273,7 +282,11 @@ export const PropertiesPage = () => {
             const paymentMethod = proj.paymentMethod || proj.payment_method || '';
             
             return {
-                ...proj,
+                id: Number(proj.id),
+                code: String(proj.code || ''),
+                name: String(proj.name || ''),
+                type: String(proj.type || ''),
+                city: String(proj.city || ''),
                 developer: developerName,
                 paymentMethod: paymentMethod,
             };
@@ -284,8 +297,8 @@ export const PropertiesPage = () => {
     const unitsRaw = unitsResponse?.results || [];
     
     // Transform units: keep project name for display + projectId for filter matching
-    const units = useMemo(() => {
-        return unitsRaw.map((unit: any) => {
+    const units = useMemo((): DisplayUnit[] => {
+        return unitsRaw.map((unit: any): DisplayUnit => {
             let projectName = '';
             let projectId: number | null = null;
             if (typeof unit.project === 'object' && unit.project?.name) {
@@ -302,9 +315,22 @@ export const PropertiesPage = () => {
             }
 
             return {
-                ...unit,
+                id: Number(unit.id),
+                code: String(unit.code || ''),
+                name: unit.name,
                 project: projectName,
                 projectId,
+                bedrooms: Number(unit.bedrooms) || 0,
+                bathrooms: Number(unit.bathrooms) || 0,
+                price: Number(unit.price) || 0,
+                type: String(unit.type || ''),
+                finishing: String(unit.finishing || ''),
+                city: String(unit.city || ''),
+                district: String(unit.district || ''),
+                zone: String(unit.zone || ''),
+                lounge: unit.lounge,
+                area: unit.area,
+                isSold: Boolean(unit.is_sold ?? unit.isSold),
             };
         });
     }, [unitsRaw, projectsRaw]);
@@ -551,7 +577,7 @@ export const PropertiesPage = () => {
     const filteredUnits = useMemo(() => {
         let filtered = units;
         if (unitFilters.project && unitFilters.project !== 'All') {
-            filtered = filtered.filter((unit: any) => {
+            filtered = filtered.filter((unit) => {
                 // Prefer id match (drawer stores project id); fall back to name for legacy values
                 if (unit.projectId != null && String(unit.projectId) === unitFilters.project) return true;
                 return (unit.project || '') === unitFilters.project;

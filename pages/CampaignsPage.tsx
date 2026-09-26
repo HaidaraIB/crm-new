@@ -116,11 +116,18 @@ export const CampaignsPage = () => {
     const allCampaignsRaw = campaignsResponse?.results || [];
     
     // Normalize API fields to frontend naming (created_at -> createdAt, is_active -> isActive)
-    const allCampaigns = useMemo(() => {
-        return allCampaignsRaw.map((campaign: any) => ({
-            ...campaign,
+    const allCampaigns = useMemo((): Campaign[] => {
+        return allCampaignsRaw.map((campaign: any): Campaign => ({
+            id: Number(campaign.id),
+            name: String(campaign.name ?? ''),
+            code: String(campaign.code ?? ''),
             createdAt: campaign.created_at || campaign.createdAt || '',
-            isActive: campaign.is_active !== undefined ? campaign.is_active : (campaign.isActive !== undefined ? campaign.isActive : true),
+            isActive:
+                campaign.is_active !== undefined
+                    ? Boolean(campaign.is_active)
+                    : campaign.isActive !== undefined
+                      ? Boolean(campaign.isActive)
+                      : true,
             budget: typeof campaign.budget === 'number' ? campaign.budget : Number(campaign.budget) || 0,
         }));
     }, [allCampaignsRaw]);

@@ -78,7 +78,7 @@ export const OwnersPage = () => {
 
     // Fetch owners using React Query
     const { data: ownersResponse, isLoading: ownersLoading, isFetching: ownersFetching, error: ownersError, refetch: refetchOwners } = useOwners();
-    const allOwners = ownersResponse?.results || [];
+    const allOwners: Owner[] = ownersResponse?.results || [];
 
     // Delete owner mutation
     const deleteOwnerMutation = useDeleteOwner();

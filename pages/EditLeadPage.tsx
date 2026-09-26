@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
-import { Lead, PhoneNumber, Tag } from '../types';
+import { Channel, Lead, PhoneNumber, Status, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useTags, usePatchLead } from '../hooks/useQueries';
 import { TagMultiSelect } from '../components/leads/TagMultiSelect';
@@ -55,7 +55,7 @@ export const EditLeadPage = () => {
     
     const { data: statusesData } = useStatuses();
     // Handle both array response and object with results property
-    const statuses = Array.isArray(statusesData)
+    const statuses: Status[] = Array.isArray(statusesData)
         ? statusesData
         : (statusesData?.results || []);
 
@@ -63,7 +63,7 @@ export const EditLeadPage = () => {
 
     const { data: channelsData } = useChannels();
     // Handle both array response and object with results property
-    const channels = Array.isArray(channelsData)
+    const channels: Channel[] = Array.isArray(channelsData)
         ? channelsData
         : (channelsData?.results || []);
 
@@ -141,8 +141,12 @@ export const EditLeadPage = () => {
             setSelectedLead(editingLead);
             
             // Convert type and priority to lowercase for form state
-            const typeValue = editingLead.type ? editingLead.type.toLowerCase() as 'fresh' | 'hot' | 'cold' : '';
-            const priorityValue = editingLead.priority ? editingLead.priority.toLowerCase() as 'low' | 'medium' | 'high' : '';
+            const typeValue: 'fresh' | 'hot' | 'cold' | '' = editingLead.type
+                ? (editingLead.type.toLowerCase() as 'fresh' | 'hot' | 'cold')
+                : '';
+            const priorityValue: 'low' | 'medium' | 'high' | '' = editingLead.priority
+                ? (editingLead.priority.toLowerCase() as 'low' | 'medium' | 'high')
+                : '';
             
             // Find channel and status IDs from names
             // API may return names, but we need IDs for the form
@@ -422,16 +426,14 @@ export const EditLeadPage = () => {
             <PageWrapper title={t('editLead') || 'Edit Lead'}>
                 <div className="text-center py-8">
                     <p className="text-gray-500 dark:text-gray-400">{t('noLeadSelected') || 'No lead selected for editing'}</p>
-                    <Button variant="secondary" onClick={() => {
- if (editingLead) {
-                            setSelectedLead(editingLead);
-                            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
-                            setCurrentPage('ViewLead');
-                        } else {
+                    <Button
+                        variant="secondary"
+                        onClick={() => {
                             window.history.pushState({}, '', '/leads');
                             setCurrentPage('Leads');
-                        }
-                    }} className="mt-4">
+                        }}
+                        className="mt-4"
+                    >
                         {t('back') || 'Back'}
                     </Button>
                 </div>

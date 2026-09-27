@@ -6946,6 +6946,100 @@ export async function unpinTenantChatMessageAPI(conversationId: number, messageI
   );
 }
 
+// --- Owner ↔ platform support chat (LOOP Support) ---
+
+export type SupportChatConversation = {
+  id: number;
+  status: 'open' | 'resolved';
+  last_message_at: string | null;
+  last_message_side: 'tenant' | 'support' | null;
+  last_message_preview: string;
+  awaiting_reply: boolean;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type SupportChatMessage = {
+  id: number;
+  side: 'tenant' | 'support';
+  body: string;
+  created_at: string;
+  is_mine: boolean;
+  display_name: string | null;
+  read_by_peer: boolean;
+  reply_to: {
+    id: number;
+    side: string;
+    display_name: string;
+    body: string;
+    attachment_kind: string | null;
+  } | null;
+  attachment_kind: string | null;
+  attachment_mime: string | null;
+  attachment_size: number | null;
+  attachment_width: number | null;
+  attachment_height: number | null;
+  original_filename: string | null;
+  attachment_url: string | null;
+  sender: { id: number; label: string } | null;
+};
+
+export async function getSupportConversationAPI() {
+  return apiRequest<SupportChatConversation>('/support-chat/conversation/');
+}
+
+export async function getSupportMessagesAPI(params?: {
+  before_id?: number;
+  after_id?: number;
+  page_size?: number;
+}) {
+  const search = new URLSearchParams();
+  if (params?.before_id != null) search.set('before_id', String(params.before_id));
+  if (params?.after_id != null) search.set('after_id', String(params.after_id));
+  if (params?.page_size != null) search.set('page_size', String(params.page_size));
+  const q = search.toString();
+  const path = `/support-chat/messages/${q ? `?${q}` : ''}`;
+  return conditionalGet<{
+    results: SupportChatMessage[];
+    has_older: boolean;
+    has_newer: boolean;
+    conversation: SupportChatConversation;
+  }>(path);
+}
+
+export async function sendSupportMessageAPI(body: string, opts?: { replyToMessageId?: number }) {
+  const payload: Record<string, unknown> = { body };
+  if (opts?.replyToMessageId != null) payload.reply_to_message_id = opts.replyToMessageId;
+  return apiRequest<SupportChatMessage>('/support-chat/messages/', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function sendSupportMessageWithAttachmentAPI(
+  file: File,
+  opts?: { body?: string; replyToMessageId?: number }
+) {
+  const form = new FormData();
+  form.append('file', file);
+  if (opts?.body) form.append('body', opts.body);
+  if (opts?.replyToMessageId != null) {
+    form.append('reply_to_message_id', String(opts.replyToMessageId));
+  }
+  return apiRequest<SupportChatMessage>('/support-chat/messages/', {
+    method: 'POST',
+    body: form,
+  });
+}
+
+export async function markSupportReadAPI(messageId: number) {
+  return apiRequest<{ message_id: number }>('/support-chat/mark-read/', {
+    method: 'POST',
+    body: JSON.stringify({ message_id: messageId }),
+  });
+}
+
 export async function markTenantChatReadAPI(conversationId: number, messageId: number) {
   return apiRequest<{ last_read_message_id: number | null }>(
     `/tenant-chat/conversations/${conversationId}/mark-read/`,
@@ -7020,6 +7114,7 @@ export type SyncDigest = {
   social_inbox_unread: number | null;
   whatsapp_calls_pending: number | null;
   tenant_chat_unread: number;
+  support_chat_unread: number;
   notifications_unread: number;
   news_unread: number;
   pbx_screen_pop: { notification_id: number; client_id: number | null } | null;
@@ -7058,6 +7153,8 @@ export type SyncSliceVersions = {
   arrivals: number;
   /** Internal team-chat messages. */
   tenant_chat: number;
+  /** Owner ↔ LOOP Support chat messages. */
+  support_chat: number;
   /** Omni-channel inbox: Instagram DM + Messenger conversations and messages. */
   inbox: number;
 };

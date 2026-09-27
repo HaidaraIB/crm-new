@@ -15,6 +15,7 @@ import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, Ed
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
+import { SupportChatLauncher } from './components/supportChat';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import ImpersonationBanner from './components/ImpersonationBanner';
@@ -1158,6 +1159,7 @@ const TheApp = () => {
             <PbxScreenPopListener />
             <ArrivalAlertHost />
             <WorkSessionTrackerHost />
+            <SupportChatLauncher />
         </div>
         );
     };

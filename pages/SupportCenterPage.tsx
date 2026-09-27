@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Input, Button, Modal, TableHorizontalScroll, RefreshButton } from '../components/index';
 import { EyeIcon } from '../components/icons';
+import { SupportChatThread } from '../components/supportChat';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
 import { withLatinDigits } from '../utils/dateUtils';
 import { translations } from '../constants';
@@ -44,7 +45,9 @@ const statusLabelKey: Record<string, TranslationKey> = {
 };
 
 export const SupportCenterPage = () => {
-  const { t } = useAppContext();
+  const { t, currentUser } = useAppContext();
+  const isOwner = Boolean(currentUser?.is_company_owner ?? currentUser?.isCompanyOwner);
+  const [activeTab, setActiveTab] = useState<'chat' | 'tickets'>('chat');
   const [formData, setFormData] = useState({ title: '', description: '' });
   const [screenshots, setScreenshots] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -104,6 +107,37 @@ export const SupportCenterPage = () => {
   return (
     <PageWrapper title={t('supportCenter') || 'Support Center'}>
       <div className="space-y-6 w-full">
+        {isOwner ? (
+          <div className="flex gap-2 border-b border-gray-200 dark:border-gray-700 pb-2">
+            <button
+              type="button"
+              onClick={() => setActiveTab('chat')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                activeTab === 'chat'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              {t('supportLiveChat')}
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('tickets')}
+              className={`px-4 py-2 rounded-lg text-sm font-medium ${
+                activeTab === 'tickets'
+                  ? 'bg-primary text-white'
+                  : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}
+            >
+              {t('supportTicketsTab')}
+            </button>
+          </div>
+        ) : null}
+        {isOwner && activeTab === 'chat' ? (
+          <SupportChatThread className="max-h-[calc(100vh-12rem)]" />
+        ) : null}
+        {(!isOwner || activeTab === 'tickets') ? (
+        <>
         <section className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 sm:p-6 border border-gray-200 dark:border-gray-700">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">
             {t('submitTicket') || 'Submit a request'}
@@ -291,6 +325,8 @@ export const SupportCenterPage = () => {
             </TableHorizontalScroll>
           )}
         </section>
+        </>
+        ) : null}
       </div>
 
       <Modal

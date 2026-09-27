@@ -11,10 +11,10 @@ import {
   fetchChatMediaBlob,
 } from '../../utils/chatMediaAuthBlob';
 
-function LazyAspectSizer({ aspectRatio }: { aspectRatio: string }) {
+function LazyAspectSizer({ aspectRatio, maxHeightClass }: { aspectRatio: string; maxHeightClass: string }) {
   return (
     <div
-      className="pointer-events-none block w-full max-h-64"
+      className={`pointer-events-none block w-full ${maxHeightClass}`}
       style={{ aspectRatio }}
       aria-hidden
     />
@@ -32,6 +32,8 @@ export type ChatBlobMediaProps = {
   onIntrinsicLayout?: () => void;
   /** Open fullscreen media viewer (image/video after load). */
   onOpen?: () => void;
+  /** Larger in-thread preview (e.g. support chat widget). */
+  visualScale?: 'default' | 'medium' | 'large';
 };
 
 export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
@@ -44,7 +46,10 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
   t,
   onIntrinsicLayout,
   onOpen,
+  visualScale = 'default',
 }) => {
+  const maxHeightClass =
+    visualScale === 'large' ? 'max-h-80' : visualScale === 'medium' ? 'max-h-52' : 'max-h-64';
   const urlIdentity = useMemo(() => chatMediaBinaryUrlIdentity(url), [url]);
   const lazyVisual = kind === 'image' || kind === 'video';
 
@@ -61,6 +66,10 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
     attachmentHeight != null &&
     attachmentWidth > 0 &&
     attachmentHeight > 0;
+
+  /** Support-chat in-bubble previews: stable 4:3 frame (avoids tiny strips from odd metadata). */
+  const inThreadAspect = visualScale === 'medium' ? '4 / 3' : aspectRatioCss;
+  const useFixedThreadFrame = visualScale === 'medium' && lazyVisual;
 
   const [blobUrl, setBlobUrl] = useState<string | null>(() =>
     lazyVisual ? chatMediaBlobCacheTake(urlIdentity) : null
@@ -148,7 +157,8 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
     );
   }
 
-  const mediaShellClass = `relative w-full overflow-hidden rounded-lg max-h-64 ${
+  const mediumWidthClass = visualScale === 'medium' ? 'min-w-[12rem]' : '';
+  const mediaShellClass = `relative w-full min-w-0 overflow-hidden rounded-lg ${maxHeightClass} ${mediumWidthClass} ${
     mine
       ? 'bg-white/10'
       : 'bg-gradient-to-br from-gray-200/90 to-gray-300/80 dark:from-gray-700/80 dark:to-gray-800/70'
@@ -157,10 +167,10 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
   if (lazyVisual && !blobUrl) {
     return (
       <div className={mediaShellClass}>
-        <LazyAspectSizer aspectRatio={aspectRatioCss} />
+        <LazyAspectSizer aspectRatio={inThreadAspect} maxHeightClass={maxHeightClass} />
         <button
           type="button"
-          className="absolute inset-0 z-10 flex w-full flex-col items-center justify-center gap-2 border-0 bg-transparent p-3 outline-none ring-primary/40 focus-visible:ring-2"
+          className="absolute inset-0 z-10 flex h-full w-full flex-col items-center justify-center gap-2 border-0 bg-transparent p-3 outline-none ring-primary/40 focus-visible:ring-2"
           aria-label={t('teamChatTapToLoadAria')}
           onClick={startLazyLoad}
           disabled={lazyLoading}
@@ -173,7 +183,7 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
             )}
           </span>
           <span
-            className={`pointer-events-none max-w-[90%] text-center text-[11px] font-medium leading-snug ${
+            className={`pointer-events-none max-w-[92%] whitespace-normal text-center text-[10px] font-medium leading-tight ${
               mine ? 'text-white/90' : 'text-gray-700 dark:text-gray-200'
             }`}
           >
@@ -189,13 +199,13 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
   }
 
   const docName = filename || t('chatMediaDefaultFileName');
-  const lazyAspectBoxClass = 'relative w-full overflow-hidden rounded-lg max-h-64';
+  const lazyAspectBoxClass = `relative w-full min-w-0 overflow-hidden rounded-lg ${maxHeightClass} ${mediumWidthClass}`;
   const openAria = t('chatMediaOpenAria');
 
   if (kind === 'image') {
-    const img = hasKnownAspect ? (
+    const img = hasKnownAspect || useFixedThreadFrame ? (
       <>
-        <LazyAspectSizer aspectRatio={aspectRatioCss} />
+        <LazyAspectSizer aspectRatio={inThreadAspect} maxHeightClass={maxHeightClass} />
         <img
           src={blobUrl}
           alt=""
@@ -208,7 +218,7 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
       <img
         src={blobUrl}
         alt=""
-        className="max-h-64 w-full rounded-lg object-contain"
+        className={`${maxHeightClass} w-full rounded-lg object-contain`}
         onLoad={onIntrinsicLayout}
         draggable={false}
       />
@@ -218,7 +228,7 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
       return (
         <button
           type="button"
-          className={`${hasKnownAspect ? lazyAspectBoxClass : 'block w-full overflow-hidden rounded-lg'} cursor-zoom-in border-0 bg-transparent p-0 outline-none ring-primary/40 focus-visible:ring-2`}
+          className={`${hasKnownAspect || useFixedThreadFrame ? lazyAspectBoxClass : 'block w-full overflow-hidden rounded-lg'} cursor-zoom-in border-0 bg-transparent p-0 outline-none ring-primary/40 focus-visible:ring-2`}
           onClick={(e) => {
             e.stopPropagation();
             onOpen();
@@ -229,22 +239,28 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
         </button>
       );
     }
-    return hasKnownAspect ? <div className={lazyAspectBoxClass}>{img}</div> : img;
+    return hasKnownAspect || useFixedThreadFrame ? (
+      <div className={lazyAspectBoxClass}>{img}</div>
+    ) : (
+      img
+    );
   }
 
   if (kind === 'video') {
     const videoInner = (
       <>
-        {hasKnownAspect ? <LazyAspectSizer aspectRatio={aspectRatioCss} /> : null}
+        {hasKnownAspect || useFixedThreadFrame ? (
+          <LazyAspectSizer aspectRatio={inThreadAspect} maxHeightClass={maxHeightClass} />
+        ) : null}
         <video
           src={blobUrl}
           muted
           playsInline
           preload="metadata"
           className={
-            hasKnownAspect
+            hasKnownAspect || useFixedThreadFrame
               ? 'absolute inset-0 h-full w-full object-contain'
-              : 'max-h-64 w-full rounded-lg object-contain'
+              : `${maxHeightClass} w-full rounded-lg object-contain`
           }
           onLoadedMetadata={onIntrinsicLayout}
         />
@@ -256,9 +272,9 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
       </>
     );
 
-    const boxClass = hasKnownAspect
+    const boxClass = hasKnownAspect || useFixedThreadFrame
       ? lazyAspectBoxClass
-      : 'relative max-h-64 w-full overflow-hidden rounded-lg';
+      : `relative ${maxHeightClass} w-full overflow-hidden rounded-lg`;
 
     if (onOpen) {
       return (

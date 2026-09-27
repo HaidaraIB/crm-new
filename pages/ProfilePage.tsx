@@ -6,6 +6,7 @@ import { Alert } from '../components/Alert';
 import { useAppContext } from '../context/AppContext';
 import { normalizeUser } from '../utils/userUtils';
 import { PageWrapper, Card, Input, Button, Loader, EmailVerificationModal, PaymentGatewaySelector, Modal, LegalLinks, PaymentResultBanner } from '../components/index';
+import { WebPushOptIn } from '../components/WebPushOptIn';
 import { changeEmailAPI, createPaymentSessionAPI, getPublicPlansAPI, updateUserAPI, type CreatePaymentSessionResult } from '../services/api';
 import { useCurrentUser, useUpdateUser, queryKeys } from '../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
@@ -555,6 +556,8 @@ export const ProfilePage = () => {
                         </div>
                     </div>
                 </Card>
+
+                <WebPushOptIn variant="section" />
 
                 <Card>
                     <h2 className="text-xl font-semibold mb-4 border-b pb-2 dark:border-gray-700">{t('security')}</h2>

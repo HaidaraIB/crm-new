@@ -16,6 +16,7 @@ import { formatDateTimeToLocal } from '../utils/dateUtils';
 import { getNotificationDisplay } from '../utils/notificationDisplay';
 import { getCompanyViewLeadRoute, navigateToCompanyRoute } from '../utils/routing';
 import { PhoneText, isPhoneLike } from './PhoneText';
+import { WebPushOptIn } from './WebPushOptIn';
 import { queryKeys, useSyncDigest } from '../hooks/useQueries';
 
 const NOTIFICATIONS_QK = ['notifications', 'list'] as const;
@@ -315,6 +316,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
           </div>
         </div>
         <div className="custom-scrollbar min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+          <WebPushOptIn variant="banner" />
           {listQuery.isLoading ? (
             <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500 dark:text-gray-300">
               <Loader size="md" variant="primary" />

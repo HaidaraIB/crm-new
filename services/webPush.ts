@@ -69,14 +69,14 @@ export function isWebPushSupported(): boolean {
   );
 }
 
+/** True when Firebase web + VAPID env vars are present (permission not required). */
+export function isWebPushConfigured(): boolean {
+  return isWebPushSupported() && readConfig() !== null && Boolean(vapidKey());
+}
+
 /** True when push could work here: supported, configured, and already granted. */
 export function isWebPushReady(): boolean {
-  return (
-    isWebPushSupported() &&
-    readConfig() !== null &&
-    Boolean(vapidKey()) &&
-    Notification.permission === 'granted'
-  );
+  return isWebPushConfigured() && Notification.permission === 'granted';
 }
 
 let registrationPromise: Promise<string | null> | null = null;

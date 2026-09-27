@@ -1,0 +1,136 @@
+import React from 'react';
+
+import { translations } from '../../constants';
+import { ChatBlobMedia } from '../chat/ChatBlobMedia';
+import { CheckIcon } from '../icons';
+import { PhoneText, isPhoneLike } from '../PhoneText';
+import type { SupportChatMessage } from '../../services/api';
+
+function supportQuoteLabel(
+  kind: string | null | undefined,
+  body: string,
+  t: (key: keyof typeof translations.en) => string
+): string {
+  const cap = (body || '').trim();
+  let label = '';
+  if (kind === 'image') label = t('teamChatMediaPhoto');
+  else if (kind === 'video') label = t('teamChatMediaVideo');
+  else if (kind === 'audio') label = t('teamChatMediaAudio');
+  else if (kind === 'document') label = t('teamChatMediaDocument');
+  if (label && cap) return `${label}: ${cap}`;
+  if (cap) return cap;
+  return label;
+}
+
+type Props = {
+  message: SupportChatMessage;
+  t: (key: keyof typeof translations.en) => string;
+  compact?: boolean;
+  onOpenMedia?: (message: SupportChatMessage) => void;
+};
+
+export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onOpenMedia }) => {
+  const mine = message.is_mine;
+  const label = message.display_name;
+  const body = (message.body || '').trim();
+
+  const attachmentKind = message.attachment_kind;
+  const attachmentUrl = message.attachment_url;
+  const hasVisualMedia =
+    attachmentUrl && attachmentKind && (attachmentKind === 'image' || attachmentKind === 'video');
+
+  const renderBody = () => {
+    if (!body) return null;
+    if (isPhoneLike(body)) {
+      return <PhoneText className="whitespace-pre-wrap break-words text-sm">{body}</PhoneText>;
+    }
+    return <p className="whitespace-pre-wrap break-words text-sm">{body}</p>;
+  };
+
+  /** Widget media: fixed band so the 4:3 frame never collapses to caption width. */
+  const bubbleMaxClass = hasVisualMedia
+    ? compact
+      ? 'w-full max-w-[19rem] min-w-[14rem] shrink-0'
+      : 'max-w-[min(100%,22rem)]'
+    : compact
+      ? 'max-w-[min(100%,18rem)]'
+      : 'max-w-[min(100%,20rem)]';
+
+  return (
+    <div className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+      <div
+        className={`${bubbleMaxClass} rounded-2xl px-3 py-2 shadow-sm border ${
+          mine
+            ? 'bg-primary text-white border-primary/30 rounded-br-md'
+            : 'bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700 rounded-bl-md'
+        }`}
+      >
+        {!mine && label ? (
+          <p className="text-xs font-semibold mb-1 opacity-80">{label}</p>
+        ) : null}
+        {message.reply_to ? (
+          <div
+            className={`mb-2 rounded-lg border-l-2 pl-2 text-xs opacity-90 ${
+              mine ? 'border-white/60' : 'border-primary/50'
+            }`}
+          >
+            <span className="font-medium">{message.reply_to.display_name}</span>
+            <p className="truncate">
+              {supportQuoteLabel(message.reply_to.attachment_kind, message.reply_to.body, t)}
+            </p>
+          </div>
+        ) : null}
+        {attachmentUrl && attachmentKind && attachmentKind !== 'document' ? (
+          <div className={hasVisualMedia ? 'mb-1 w-full min-w-0' : 'w-full min-w-0'}>
+            <ChatBlobMedia
+              url={attachmentUrl}
+              kind={attachmentKind as 'image' | 'video' | 'audio'}
+              mine={mine}
+              filename={message.original_filename}
+              attachmentWidth={message.attachment_width}
+              attachmentHeight={message.attachment_height}
+              t={t}
+              visualScale={hasVisualMedia ? 'medium' : 'default'}
+              onOpen={
+                hasVisualMedia && onOpenMedia
+                  ? () => onOpenMedia(message)
+                  : undefined
+              }
+            />
+          </div>
+        ) : null}
+        {attachmentKind === 'document' && attachmentUrl ? (
+          <a
+            href={attachmentUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={`text-sm underline ${mine ? 'text-white' : 'text-primary'}`}
+          >
+            {message.original_filename || 'Document'}
+          </a>
+        ) : null}
+        {renderBody()}
+        {mine ? (
+          <div className="mt-1 flex items-center justify-end">
+            <span
+              className={`inline-flex shrink-0 items-center ${
+                message.read_by_peer ? 'text-sky-200' : 'text-white/60'
+              }`}
+              title={message.read_by_peer ? t('teamChatRead') : t('teamChatDelivered')}
+              aria-label={message.read_by_peer ? t('teamChatRead') : t('teamChatDelivered')}
+            >
+              {message.read_by_peer ? (
+                <>
+                  <CheckIcon className="size-3.5" aria-hidden />
+                  <CheckIcon className="size-3.5 -ms-2" aria-hidden />
+                </>
+              ) : (
+                <CheckIcon className="size-3.5" aria-hidden />
+              )}
+            </span>
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+};

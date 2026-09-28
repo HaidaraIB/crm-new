@@ -961,6 +961,7 @@ export const IntegrationsPage = () => {
             typeof selectedChatLeadId === 'number'
                 ? getWhatsAppSessionWindowAPI({ clientId: selectedChatLeadId })
                 : getWhatsAppSessionWindowAPI({ phone: selectedChatPhone }),
+        retry: false,
         enabled:
             isChatPollingPage &&
             (typeof selectedChatLeadId === 'number' ||

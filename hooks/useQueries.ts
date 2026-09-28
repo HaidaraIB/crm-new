@@ -957,6 +957,7 @@ export const useMarkWhatsAppConversationRead = () => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: markWhatsAppConversationReadAPI,
+    retry: false,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.whatsAppUnreadCount });
       queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });

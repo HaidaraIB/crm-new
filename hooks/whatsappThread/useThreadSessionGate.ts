@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { getWhatsAppSessionWindowAPI } from '../../services/api';
 import { deriveSessionFromMessages } from './sessionUtils';
@@ -24,6 +24,9 @@ export function useThreadSessionGate({
 }: Args) {
   const queryClient = useQueryClient();
   const lastInboundKeyRef = useRef('');
+  // Callers pass `onNewInbound` inline; keeping it out of effect deps prevents a render loop.
+  const onNewInboundRef = useRef(onNewInbound);
+  onNewInboundRef.current = onNewInbound;
   const phoneDigits = peerPhone.replace(/\D/g, '');
 
   const { data: waSessionApi, refetch: refetchWaSession } = useQuery({
@@ -35,7 +38,8 @@ export function useThreadSessionGate({
     enabled:
       enabled &&
       (typeof clientId === 'number' || phoneDigits.length >= 7),
-    staleTime: 0,
+    staleTime: 15_000,
+    retry: false,
   });
 
   const derivedInSession = deriveSessionFromMessages(inboundMessages);
@@ -70,14 +74,19 @@ export function useThreadSessionGate({
     const newest = inbounds.reduce((a, b) =>
       new Date(a.created_at || 0).getTime() >= new Date(b.created_at || 0).getTime() ? a : b
     );
-    const key = `${newest.id}:${newest.created_at}`;
-    if (key !== lastInboundKeyRef.current) {
-      lastInboundKeyRef.current = key;
-      void queryClient.invalidateQueries({ queryKey: ['whatsappSession'] });
-      void refetchWaSession();
-      onNewInbound?.();
-    }
-  }, [inboundMessages, queryClient, refetchWaSession, onNewInbound]);
+    const threadPrefix = `${clientId ?? ''}|${peerPhone}|`;
+    const key = `${threadPrefix}${newest.id}:${newest.created_at}`;
+    const prev = lastInboundKeyRef.current;
+    if (key === prev) return;
+    lastInboundKeyRef.current = key;
+    if (!prev.startsWith(threadPrefix)) return;
+    void queryClient.invalidateQueries({ queryKey: ['whatsappSession', clientId, peerPhone] });
+    onNewInboundRef.current?.();
+  }, [inboundMessages, queryClient, clientId, peerPhone]);
+
+  const resetSessionTrackers = useCallback(() => {
+    lastInboundKeyRef.current = '';
+  }, []);
 
   return {
     waSessionApi,
@@ -85,8 +94,6 @@ export function useThreadSessionGate({
     derivedInSession,
     blockFreeText,
     effectiveSession,
-    resetSessionTrackers: () => {
-      lastInboundKeyRef.current = '';
-    },
+    resetSessionTrackers,
   };
 }

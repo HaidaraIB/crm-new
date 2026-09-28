@@ -151,7 +151,7 @@ function collapseConsecutiveSocialThreads(
 }
 
 export const ViewLeadPage = () => {
-    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered } = useAppContext();
+    const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered, goBackFromLead } = useAppContext();
     const isMedicalCompany = isMedicalSpecialization(currentUser?.company?.specialization);
     
     const canPbxDial = usePbxDialEnabled();
@@ -220,8 +220,6 @@ export const ViewLeadPage = () => {
     
     const { data: leadSMSMessages = [], refetch: refetchLeadSMS } = useLeadSMSMessages(leadId ?? undefined);
     const { data: leadWhatsAppMessages = [] } = useLeadWhatsAppMessages(leadId ?? undefined);
-    // 403 for roles without inbox access (reception, data entry) — the hook does
-    // not retry and the timeline simply carries no social entries for them.
     const { data: leadSocialMessages = [] } = useLeadSocialMessages(leadId ?? undefined);
     
     const { data: statusesData } = useStatuses();
@@ -960,14 +958,7 @@ export const ViewLeadPage = () => {
                 <div className="flex min-w-0 w-full items-center gap-2 sm:gap-3">
                     <button
                         type="button"
-                        onClick={() => {
-                            const returnPage = getLeadsReturnPage();
-                            const route = currentUser?.company
-                                ? getCompanyRoute(currentUser.company.name, currentUser.company.domain, returnPage, currentUser.company.specialization)
-                                : `/${returnPage.toLowerCase().replace(/\s+/g, '-')}`;
-                            window.history.pushState({}, '', route);
-                            setCurrentPage(returnPage);
-                        }}
+                        onClick={goBackFromLead}
                         className="shrink-0 rounded-md p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
                         title={t('back') || 'Back'}
                     >

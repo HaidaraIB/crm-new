@@ -33,7 +33,7 @@ import { WhatsAppTeamCallStatusPanel } from '../components/whatsapp/WhatsAppTeam
 import { CallErrorLogsPanel } from '../components/messaging/CallErrorLogsPanel';
 import { normalizeRole } from '../utils/roles';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { getCompanyViewLeadRoute } from '../utils/routing';
+import { consumePendingCallsTab } from '../utils/leadReturn';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { stashPendingInboxConversationId } from '../utils/inboxDeepLink';
 import {
@@ -183,7 +183,7 @@ export const CallsPage: React.FC = () => {
     t,
     language,
     setCurrentPage,
-    setSelectedLead,
+    openLeadDetails,
     currentUser,
     callFilters,
     setCallFilters,
@@ -192,7 +192,19 @@ export const CallsPage: React.FC = () => {
   const whatsappCalling = useWhatsAppCallingOptional();
   const [selected, setSelected] = useState<WhatsAppCallRecord | null>(null);
   const [searchDraft, setSearchDraft] = useState(callFilters.search);
-  const [activeTab, setActiveTab] = useState<CallsPageTab>('history');
+  const [activeTab, setActiveTab] = useState<CallsPageTab>(() => {
+    const pending = consumePendingCallsTab();
+    if (
+      pending === 'history' ||
+      pending === 'live' ||
+      pending === 'team' ||
+      pending === 'hours' ||
+      pending === 'error-logs'
+    ) {
+      return pending;
+    }
+    return 'history';
+  });
 
   const role = normalizeRole(currentUser?.role);
   // Live / Team / Call hours are supervisory views: employees with WhatsApp
@@ -384,18 +396,14 @@ export const CallsPage: React.FC = () => {
 
   const openLead = (call: WhatsAppCallRecord) => {
     if (!call.client) return;
-    setSelectedLead({
-      id: call.client,
-      name: call.client_name || call.peer_name || '',
-      phone: call.peer_phone,
-    } as any);
-    const route = getCompanyViewLeadRoute(
-      currentUser?.company?.name,
-      currentUser?.company?.domain,
-      call.client
+    openLeadDetails(
+      {
+        id: call.client,
+        name: call.client_name || call.peer_name || '',
+        phone: call.peer_phone,
+      },
+      { callsTab: activeTab }
     );
-    window.history.pushState({}, '', route);
-    setCurrentPage('ViewLead');
   };
 
   const displayName = (call: WhatsAppCallRecord) =>

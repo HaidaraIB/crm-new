@@ -14,6 +14,7 @@ const LEADS_FAMILY_PAGES: ReadonlySet<Page> = new Set([
 
 /** Remember which Leads-family page (Leads/Fresh/Hot/Cold/My/Rotated/All) opened a lead's detail view. */
 export const setLeadsReturnPage = (page: Page): void => {
+    if (!LEADS_FAMILY_PAGES.has(page)) return;
     try {
         sessionStorage.setItem(STORAGE_KEY, page);
     } catch {

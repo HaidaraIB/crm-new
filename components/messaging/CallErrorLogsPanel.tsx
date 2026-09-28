@@ -8,9 +8,7 @@ import {
 } from '../../services/api';
 import { Button, Card, Loader, SectionLoadingState, PhoneText, RefreshButton } from '../index';
 import { SearchIcon, ClockIcon } from '../icons';
-import { getCompanyViewLeadRoute } from '../../utils/routing';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
-import type { Lead } from '../../types';
 
 const PAGE_SIZE = 30;
 
@@ -152,7 +150,7 @@ function CallErrorTimelineItem({
 }
 
 export function CallErrorLogsPanel() {
-  const { t, language, currentUser, setCurrentPage, setSelectedLead } = useAppContext();
+  const { t, language, openLeadDetails } = useAppContext();
   const [searchDraft, setSearchDraft] = useState('');
   const [searchApplied, setSearchApplied] = useState('');
   const [source, setSource] = useState<CallErrorLogFilters['source']>('all');
@@ -185,13 +183,10 @@ export function CallErrorLogsPanel() {
 
   const handleViewLead = (entry: CallErrorLogEntry) => {
     if (!entry.client_id) return;
-    const lead = { id: entry.client_id, name: entry.client_name || `#${entry.client_id}` } as Lead;
-    setSelectedLead(lead);
-    const path = currentUser?.company
-      ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, entry.client_id)
-      : `/view-lead/${entry.client_id}`;
-    window.history.pushState({}, '', path);
-    setCurrentPage('ViewLead');
+    openLeadDetails(
+      { id: entry.client_id, name: entry.client_name || `#${entry.client_id}` },
+      { callsTab: 'error-logs' }
+    );
   };
 
   const filterSelectClass =

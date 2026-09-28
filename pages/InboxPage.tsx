@@ -63,9 +63,7 @@ import { PhoneIcon } from '../components/icons';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { inboxWhatsappThreadAdapter } from '../hooks/whatsappThread/inboxThreadAdapter';
 import type { SocialConversationPayload, SocialMessagePayload } from '../services/api';
-import type { Lead } from '../types';
 import { consumePendingInboxConversationId } from '../utils/inboxDeepLink';
-import { getCompanyViewLeadRoute } from '../utils/routing';
 import {
   canConvertSocialConversation,
   isSocialInboxStaffScoped,
@@ -190,7 +188,7 @@ function composerTextDir(text: string, uiIsRtl: boolean): 'ltr' | 'rtl' {
 }
 
 export const InboxPage: React.FC = () => {
-  const { t, language, currentUser, setCurrentPage, setSelectedLead } = useAppContext();
+  const { t, language, currentUser, openLeadDetails } = useAppContext();
   const queryClient = useQueryClient();
   const realtimeConnected = useRealtimeConnected();
   const isRtl = language === 'ar';
@@ -491,18 +489,12 @@ export const InboxPage: React.FC = () => {
   // company-scoped path, then switch the page.
   const openLead = useCallback(
     (clientId: number, clientName: string) => {
-      setSelectedLead({ id: clientId, name: clientName || `#${clientId}` } as Lead);
-      const path = currentUser?.company
-        ? getCompanyViewLeadRoute(
-            currentUser.company.name,
-            currentUser.company.domain,
-            clientId
-          )
-        : `/view-lead/${clientId}`;
-      globalThis.history.pushState({}, '', path);
-      setCurrentPage('ViewLead');
+      openLeadDetails(
+        { id: clientId, name: clientName || `#${clientId}` },
+        selectedId ? { inboxConversationId: selectedId } : undefined
+      );
     },
-    [currentUser, setCurrentPage, setSelectedLead]
+    [openLeadDetails, selectedId]
   );
 
   return (

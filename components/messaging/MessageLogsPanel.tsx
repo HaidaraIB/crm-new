@@ -5,9 +5,7 @@ import { getMessageLogsAPI, type MessageLogEntry, type MessageLogFilters } from 
 import { IntegrationPlatformIcon } from '../integrations/IntegrationPlatformIcon';
 import { Button, Card, Loader, SectionLoadingState, PhoneText, RefreshButton } from '../index';
 import { SearchIcon, ClockIcon } from '../icons';
-import { getCompanyViewLeadRoute } from '../../utils/routing';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
-import type { Lead } from '../../types';
 
 const PAGE_SIZE = 30;
 
@@ -180,7 +178,7 @@ function MessageLogTimelineItem({
 }
 
 export function MessageLogsPanel() {
-    const { t, language, currentUser, setCurrentPage, setSelectedLead } = useAppContext();
+    const { t, language, openLeadDetails } = useAppContext();
     const [searchDraft, setSearchDraft] = useState('');
     const [searchApplied, setSearchApplied] = useState('');
     const [channel, setChannel] = useState<MessageLogFilters['channel']>('all');
@@ -215,13 +213,10 @@ export function MessageLogsPanel() {
 
     const handleViewLead = (entry: MessageLogEntry) => {
         if (!entry.client_id) return;
-        const lead = { id: entry.client_id, name: entry.client_name || `#${entry.client_id}` } as Lead;
-        setSelectedLead(lead);
-        const path = currentUser?.company
-            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, entry.client_id)
-            : `/view-lead/${entry.client_id}`;
-        window.history.pushState({}, '', path);
-        setCurrentPage('ViewLead');
+        openLeadDetails({
+            id: entry.client_id,
+            name: entry.client_name || `#${entry.client_id}`,
+        });
     };
 
     const filterSelectClass =

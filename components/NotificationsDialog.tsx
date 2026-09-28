@@ -14,7 +14,7 @@ import {
 } from '../services/api';
 import { formatDateTimeToLocal } from '../utils/dateUtils';
 import { getNotificationDisplay } from '../utils/notificationDisplay';
-import { getCompanyViewLeadRoute, navigateToCompanyRoute } from '../utils/routing';
+import { navigateToCompanyRoute } from '../utils/routing';
 import { PhoneText, isPhoneLike } from './PhoneText';
 import { WebPushOptIn } from './WebPushOptIn';
 import { queryKeys, useSyncDigest } from '../hooks/useQueries';
@@ -51,6 +51,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
     language,
     setCurrentPage,
     setSelectedLead,
+    openLeadDetails,
     currentUser,
     setConfirmDeleteConfig,
     setIsConfirmDeleteModalOpen,
@@ -117,13 +118,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
   ]);
 
   const openLead = (leadId: number) => {
-    setSelectedLead({ id: leadId } as any);
-    window.history.pushState(
-      {},
-      '',
-      getCompanyViewLeadRoute(companyName, companyDomain, leadId),
-    );
-    setCurrentPage('ViewLead');
+    openLeadDetails({ id: leadId });
     onClose();
   };
 

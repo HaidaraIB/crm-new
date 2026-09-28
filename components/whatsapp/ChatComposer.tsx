@@ -8,6 +8,7 @@ import { translations } from '../../constants';
 import { AttachmentSourceModal } from '../modals/AttachmentSourceModal';
 import { ChatComposerAlerts } from '../chat/ChatComposerAlerts';
 import { ChatTemplatePicker } from '../chat/ChatTemplatePicker';
+import { Button } from '../Button';
 import { WA_COMPOSER_BG, WA_INPUT_SHELL, WA_SEND_BTN } from './whatsappChatTheme';
 import type { MessageTemplateType } from '../../services/api';
 export type SessionInfo = {

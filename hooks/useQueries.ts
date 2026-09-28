@@ -9,6 +9,7 @@ import { companyHasServiceInventory } from '../utils/serviceInventorySpecializat
 import type { LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
 import { normalizeUser } from '../utils/userUtils';
+import { canAccessSocialInbox } from '../utils/socialInboxAccess';
 import {
   getLeadsAPI, getLeadAPI, getLeadStatusCountsAPI, getMissionBarSummaryAPI, getDashboardSummaryAPI, getUsersAPI, getDealsAPI, getTasksAPI, getClientTasksAPI, getClientCallsAPI, getClientVisitsAPI, getClientFieldVisitsAPI, getClientEventsAPI,
   getDevelopersAPI, getProjectsAPI, getUnitsAPI, getOwnersAPI,
@@ -736,21 +737,23 @@ export const useLeadWhatsAppMessages = (
 /**
  * Instagram DM / Messenger messages on this lead, for the timeline.
  *
- * Scoped by the inbox ACL, which is narrower than lead access: reception and
- * data entry can open a lead and get 403 here. That is the expected answer, not
- * a failure, so it never retries and the caller renders no social entries.
+ * Scoped by the inbox ACL, which is narrower than lead access. Users without
+ * inbox access never hit the API; the timeline simply carries no social entries.
  */
 export const useLeadSocialMessages = (
   leadId: number | undefined,
   options?: Omit<UseQueryOptions<LeadSocialMessageResponse[], Error>, 'queryKey' | 'queryFn'>
 ) => {
+  const { data: currentUser } = useCurrentUser();
+  const inboxAccess = canAccessSocialInbox(currentUser);
+  const { enabled: enabledOption = true, ...restOptions } = options ?? {};
   return useQuery({
     queryKey: queryKeys.leadSocialMessages(leadId),
     queryFn: () => getLeadSocialMessagesAPI(leadId!),
-    enabled: !!leadId,
+    enabled: !!leadId && inboxAccess && enabledOption,
     staleTime: 1 * 60 * 1000, // 1 minute, same as the WhatsApp source
     retry: false,
-    ...options,
+    ...restOptions,
   });
 };
 

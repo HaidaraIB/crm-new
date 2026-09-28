@@ -39,7 +39,7 @@ function isPbxScreenPop(n: AppNotification) {
 
 /** Shows a non-blocking PBX screen-pop toast from the sync digest. */
 export const PbxScreenPopListener = () => {
-  const { setCurrentPage, setSelectedLead, t, language } = useAppContext();
+  const { openLeadDetails, t, language } = useAppContext();
   const queryClient = useQueryClient();
   const [active, setActive] = useState<AppNotification | null>(null);
   const shownRef = useRef<Set<number>>(loadShownIds());
@@ -128,8 +128,7 @@ export const PbxScreenPopListener = () => {
 
   const openLead = () => {
     if (leadId) {
-      setSelectedLead({ id: Number(leadId) } as any);
-      setCurrentPage('ViewLead');
+      openLeadDetails({ id: Number(leadId) });
     }
     dismiss();
   };

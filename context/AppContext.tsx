@@ -17,7 +17,16 @@ import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI, resetConditionalRequestCaches } from '../services/api';
 import { sendRealtime } from '../hooks/useRealtimeChannel';
 import { getRoleLandingPage, normalizeRole, roleReportsPresence, userTracksWorkHours } from '../utils/roles';
-import { navigateToPage, NavigateToPageOptions } from '../utils/routing';
+import { getCompanyRoute, getCompanyViewLeadRoute, navigateToPage, NavigateToPageOptions } from '../utils/routing';
+import { setLeadsReturnPage, getLeadsReturnPage } from '../utils/leadsReturnPage';
+import {
+  consumeLeadReturnTarget,
+  isLeadDetailPage,
+  setLeadReturnTarget,
+  stashPendingCallsTab,
+  type LeadOpenExtras,
+} from '../utils/leadReturn';
+import { stashPendingInboxConversationId } from '../utils/inboxDeepLink';
 import { DEFAULT_CALL_FILTERS, callFiltersToQuery } from '../utils/callFilters';
 import { DEFAULT_ARRIVAL_FILTERS } from '../utils/arrivalFilters';
 
@@ -47,19 +56,6 @@ const getCompanyId = (company: any): number | null => {
 export const resolveFallbackPage = (canAccessPage: (page: Page) => boolean, role?: string): Page => {
   const priority: Page[] = [getRoleLandingPage(role), 'Dashboard', 'All Leads', 'Profile'];
   return priority.find(canAccessPage) ?? 'Profile';
-};
-
-/**
- * Get company route path
- */
-const getCompanyRoute = (companyDomain?: string, page?: string): string => {
-  if (!companyDomain) {
-    return '/';
-  }
-  if (page && page !== 'Dashboard') {
-    return `/company/${companyDomain}/${page.toLowerCase()}`;
-  }
-  return `/company/${companyDomain}`;
 };
 
 const hexToHsl = (hex: string): [number, number, number] | null => {
@@ -122,6 +118,14 @@ export interface AppContextType {
   setPendingChatPhone: (phone: string | null) => void;
   /** Open a lead's WhatsApp conversation in Chats, optionally on a given number. */
   openLeadInChats: (lead: Lead, phone?: string) => void;
+  /**
+   * Open lead details and remember the current screen so the back arrow can return
+   * there (Chats thread, Inbox conversation, Calls tab, leads list, and so on).
+   * Opening from Edit/Create/View does not replace that remembered screen.
+   */
+  openLeadDetails: (lead: { id: number } & Partial<Lead>, extras?: LeadOpenExtras) => void;
+  /** Leave lead details for the screen that opened it. */
+  goBackFromLead: () => void;
   selectedLeadForDeal: number | null;
   setSelectedLeadForDeal: (leadId: number | null) => void;
   selectedUser: User | null;
@@ -1622,6 +1626,61 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     [goToPage]
   );
 
+  const openLeadDetails = useCallback(
+    (lead: { id: number } & Partial<Lead>, extras?: LeadOpenExtras) => {
+      if (!isLeadDetailPage(currentPage)) {
+        const chatPhone = extras?.chatPhone?.trim() || null;
+        const inboxId = extras?.inboxConversationId;
+        setLeadReturnTarget({
+          page: currentPage,
+          chatPhone,
+          inboxConversationId:
+            typeof inboxId === 'number' && inboxId > 0 ? inboxId : null,
+          callsTab: extras?.callsTab || null,
+        });
+        setLeadsReturnPage(currentPage);
+      }
+      setSelectedLead(lead as Lead);
+      const path = getCompanyViewLeadRoute(
+        currentUser?.company?.name,
+        currentUser?.company?.domain,
+        lead.id,
+        currentUser?.company?.specialization,
+      );
+      window.history.pushState({}, '', path);
+      setCurrentPage('ViewLead');
+    },
+    [currentPage, currentUser?.company?.domain, currentUser?.company?.name, currentUser?.company?.specialization]
+  );
+
+  const goBackFromLead = useCallback(() => {
+    const target = consumeLeadReturnTarget();
+    const page = target ? target.page : getLeadsReturnPage();
+    if (target?.page === 'Chats' && target.chatPhone) {
+      setPendingChatPhone(target.chatPhone);
+    }
+    if (
+      target?.page === 'Inbox' &&
+      typeof target.inboxConversationId === 'number' &&
+      target.inboxConversationId > 0
+    ) {
+      stashPendingInboxConversationId(target.inboxConversationId);
+    }
+    if (target?.page === 'Calls') {
+      stashPendingCallsTab(target.callsTab);
+    }
+    const route = currentUser?.company
+      ? getCompanyRoute(
+          currentUser.company.name,
+          currentUser.company.domain,
+          page,
+          currentUser.company.specialization,
+        )
+      : `/${page.toLowerCase().replace(/\s+/g, '-')}`;
+    window.history.pushState({}, '', route);
+    setCurrentPage(page);
+  }, [currentUser?.company]);
+
   const openCallsFiltered = useCallback(
     (partial: Partial<CallFilters>) => {
       const next = { ...DEFAULT_CALL_FILTERS, ...partial };
@@ -1643,6 +1702,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     selectedLead, setSelectedLead,
     pendingChatPhone, setPendingChatPhone,
     openLeadInChats,
+    openLeadDetails,
+    goBackFromLead,
     selectedLeadForDeal, setSelectedLeadForDeal,
     selectedUser, setSelectedUser,
     currentUser, setCurrentUser,

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { PhoneText, isPhoneLike, RefreshButton } from '../index';
+import { PhoneText, isPhoneLike, PHONE_BIDI_CLASS, RefreshButton } from '../index';
 import { RefreshIcon, PhoneIcon, ListIcon, ChatBubbleIcon } from '../icons';
 import {
   getWhatsAppContactAvatarLabel,
@@ -48,6 +48,8 @@ type Props = {
   /** WhatsApp account missing/disconnected — disable call chrome. */
   whatsappCallBlocked?: boolean;
   onViewCalls?: () => void;
+  /** Open this conversation's lead details. Omitted for manual numbers with no lead. */
+  onOpenLead?: () => void;
   onDeleteMessage?: (msg: ChatBubbleMessage) => void;
   onResendMessage?: (msg: ChatBubbleMessage) => void;
   deletingMessageId?: string | null;
@@ -80,6 +82,7 @@ export const ChatThread: React.FC<Props> = ({
   isWhatsAppCalling,
   whatsappCallBlocked = false,
   onViewCalls,
+  onOpenLead,
   onDeleteMessage,
   onResendMessage,
   deletingMessageId,
@@ -259,7 +262,20 @@ export const ChatThread: React.FC<Props> = ({
           {getWhatsAppContactAvatarLabel(selectedClient)}
         </div>
         <div className="min-w-0 flex-1 leading-tight">
-          {isPhoneLike(title) ? (
+          {onOpenLead ? (
+            <button
+              type="button"
+              onClick={onOpenLead}
+              title={t('viewLead')}
+              aria-label={t('viewLead')}
+              dir={isPhoneLike(title) ? 'ltr' : undefined}
+              className={`block w-full min-w-0 truncate text-start text-sm font-semibold ${
+                isPhoneLike(title) ? PHONE_BIDI_CLASS : ''
+              }`}
+            >
+              {title}
+            </button>
+          ) : isPhoneLike(title) ? (
             <PhoneText as="p" className="truncate text-sm font-semibold">
               {title}
             </PhoneText>

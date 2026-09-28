@@ -18,8 +18,6 @@ import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/
 import { exportToExcel } from '../utils/exportToExcel';
 import { normalizeLead } from '../utils/normalizeLead';
 import { resolvePrimaryPhone } from '../utils/resolvePrimaryPhone';
-import { getCompanyViewLeadRoute } from '../utils/routing';
-import { setLeadsReturnPage } from '../utils/leadsReturnPage';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { formatLeadBudget } from '../utils/budgetRange';
@@ -65,8 +63,8 @@ export const LeadsPage = () => {
     const { 
         t, 
         currentPage,
-        setCurrentPage, 
-        setSelectedLead, 
+        setCurrentPage,
+        openLeadDetails, 
         setIsAddActionModalOpen, 
         setIsAssignLeadModalOpen, 
         setIsFilterDrawerOpen,
@@ -536,13 +534,7 @@ export const LeadsPage = () => {
     };
 
     const handleViewLead = (lead: Lead) => {
-        setSelectedLead(lead);
-        setLeadsReturnPage(currentPage);
-        const viewLeadPath = currentUser?.company
-            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, lead.id, currentUser.company.specialization)
-            : `/view-lead/${lead.id}`;
-        window.history.pushState({}, '', viewLeadPath);
-        setCurrentPage('ViewLead');
+        openLeadDetails(lead);
     };
 
     const handleDeleteLead = (lead: Lead) => {

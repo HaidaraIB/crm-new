@@ -16,7 +16,6 @@ import {
     dashboardHeavyListQueryOptions,
 } from '../hooks/useQueries';
 import { presetTodosFromMissionBar, todayDateInputValue } from '../utils/missionBarNavigation';
-import { getCompanyViewLeadRoute } from '../utils/routing';
 import { AIInsightsCard } from '../components/dashboard/AIInsightsCard';
 import { ManagementReportCard } from '../components/dashboard/ManagementReportCard';
 import { normalizeRole, getRoleTranslation } from '../utils/roles';
@@ -53,9 +52,8 @@ export const DashboardPage = () => {
         t,
         currentUser,
         language,
-        setSelectedLead,
-        setCurrentPage,
         goToPage,
+        openLeadDetails,
         setLeadFilters,
         setTodosPagePreset,
         theme,
@@ -76,15 +74,9 @@ export const DashboardPage = () => {
         dashboardHeavyListQueryOptions,
     );
 
-    const openViewLead = useCallback((leadId: number, lead?: any) => {
-        if (lead) setSelectedLead(lead);
-        window.history.pushState(
-            {},
-            '',
-            getCompanyViewLeadRoute(currentUser?.company?.name, currentUser?.company?.domain, leadId),
-        );
-        setCurrentPage('ViewLead');
-    }, [currentUser?.company?.domain, currentUser?.company?.name, setCurrentPage, setSelectedLead]);
+    const openViewLead = useCallback((leadId: number, lead?: object) => {
+        openLeadDetails({ ...(lead || {}), id: leadId });
+    }, [openLeadDetails]);
 
     const { data: stagesResponse } = useStages(dashboardHeavyListQueryOptions);
     const stages = Array.isArray(stagesResponse)

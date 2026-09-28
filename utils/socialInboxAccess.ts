@@ -14,6 +14,17 @@ import { normalizeRole } from './roles';
 
 type InboxUser = Pick<User, 'role' | 'supervisor_permissions'> | null | undefined;
 
+/** Whether this user may open the Inbox at all (mirrors backend `user_can_access_social_inbox`). */
+export function canAccessSocialInbox(user: InboxUser): boolean {
+  if (!user) return false;
+  const role = normalizeRole(user.role);
+  if (role === 'Owner' || role === 'CallCenter') return true;
+  if (role === 'Supervisor') return supervisorPermission(user, 'can_manage_social_inbox');
+  if (role === 'Reception' || role === 'DataEntry') return false;
+  if (role === 'Employee' || role === 'Doctor') return true;
+  return false;
+}
+
 function supervisorPermission(
   user: InboxUser,
   key: 'can_manage_social_inbox' | 'can_manage_leads',

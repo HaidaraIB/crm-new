@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, PlusIcon, EditIcon, TrashIcon, EyeIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode, PageLoadingState, RefreshButton } from '../components/index';
 import { TodosKanbanView } from '../components/todos/TodosKanbanView';
 import type { TodoKanbanItem } from '../components/todos/TodoKanbanCard';
-import { TaskStage, Stage, Lead, Deal } from '../types';
+import { TaskStage, Stage, Deal } from '../types';
 
 type CallMethodItem = { id: number; name: string; color?: string };
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
@@ -15,7 +15,6 @@ import {
     isOverdueFollowUpTask,
     type MissionBarTodosPreset,
 } from '../utils/missionBarNavigation';
-import { getCompanyViewLeadRoute } from '../utils/routing';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
 import {
     useTasks,
@@ -90,8 +89,7 @@ export const TodosPage = () => {
         setIsConfirmDeleteModalOpen,
         todosPagePreset,
         setTodosPagePreset,
-        setSelectedLead,
-        setCurrentPage,
+        openLeadDetails,
         setViewingDeal,
         setIsViewDealModalOpen,
         currentUser,
@@ -489,12 +487,7 @@ export const TodosPage = () => {
             showError(t('taskNotFound') || 'Task not found');
             return;
         }
-        setSelectedLead({ id: Number(clientId) } as Lead);
-        const route = currentUser?.company
-            ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, Number(clientId))
-            : `/view-lead/${clientId}`;
-        window.history.pushState({}, '', route);
-        setCurrentPage('ViewLead');
+        openLeadDetails({ id: Number(clientId) });
     };
 
     const handleDeleteTodo = (id: number | string) => {

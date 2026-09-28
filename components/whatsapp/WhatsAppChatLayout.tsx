@@ -43,6 +43,7 @@ type Props = {
   isWhatsAppCalling?: boolean;
   whatsappCallBlocked?: boolean;
   onViewCalls?: () => void;
+  onOpenLead?: () => void;
   onDeleteMessage?: (msg: ChatBubbleMessage) => void;
   onResendMessage?: (msg: ChatBubbleMessage) => void;
   deletingMessageId?: string | null;
@@ -86,6 +87,7 @@ export const WhatsAppChatLayout: React.FC<Props> = (props) => {
         isWhatsAppCalling={props.isWhatsAppCalling}
         whatsappCallBlocked={props.whatsappCallBlocked}
         onViewCalls={props.onViewCalls}
+        onOpenLead={props.onOpenLead}
         onDeleteMessage={props.onDeleteMessage}
         onResendMessage={props.onResendMessage}
         deletingMessageId={props.deletingMessageId}

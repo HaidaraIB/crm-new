@@ -39,6 +39,7 @@ import {
 } from '../services/api';
 import type { WhatsAppChatFilters } from '../types';
 import { getUserDisplayName } from '../types';
+import { getWhatsAppContactTitle } from '../utils/whatsappContactDisplay';
 import { compressImageForChat } from '../utils/compressImageForChat';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { normalizeRole, usersForOperationalEmployeeLists } from '../utils/roles';
@@ -88,6 +89,7 @@ export const ChatsPage: React.FC = () => {
     language,
     currentUser,
     selectedLead,
+    openLeadDetails,
     pendingChatPhone,
     setPendingChatPhone,
     setAlertMessage,
@@ -1337,6 +1339,29 @@ export const ChatsPage: React.FC = () => {
               whatsappCalling?.phase === 'ringing'
           )}
           whatsappCallBlocked={whatsappSendBlocked}
+          onOpenLead={
+            selectedChatClient &&
+            !isManualChatClient(selectedChatClient) &&
+            Number(selectedChatClient.id) > 0
+              ? () => {
+                  const id = Number(selectedChatClient.id);
+                  const phone = String(
+                    selectedChatClient.phone_number ||
+                      selectedChatClient.phone ||
+                      selectedChatClient.manual_phone ||
+                      ''
+                  );
+                  openLeadDetails(
+                    {
+                      id,
+                      name: getWhatsAppContactTitle(selectedChatClient) || `#${id}`,
+                      phone,
+                    },
+                    { chatPhone: phone }
+                  );
+                }
+              : undefined
+          }
           onViewCalls={() => {
             if (!selectedChatClient) return;
             const id =

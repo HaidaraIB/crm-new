@@ -18,6 +18,7 @@ import { getCompanyViewLeadRoute, navigateToCompanyRoute } from '../utils/routin
 import { PhoneText, isPhoneLike } from './PhoneText';
 import { WebPushOptIn } from './WebPushOptIn';
 import { queryKeys, useSyncDigest } from '../hooks/useQueries';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 
 const NOTIFICATIONS_QK = ['notifications', 'list'] as const;
 
@@ -57,6 +58,8 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
   const queryClient = useQueryClient();
   const companyName = currentUser?.company?.name;
   const companyDomain = currentUser?.company?.domain;
+
+  useInvalidateOnSliceChange('user', [NOTIFICATIONS_QK]);
 
   const listQuery = useQuery({
     queryKey: NOTIFICATIONS_QK,

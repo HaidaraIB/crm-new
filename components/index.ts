@@ -18,6 +18,7 @@ export * from './WeekLeadsChart';
 export * from './Header';
 export * from './NotificationsDialog';
 export * from './WebPushOptIn';
+export * from './WebPushPrompt';
 export * from './Sidebar';
 export * from './Loader';
 export * from './bulk/BulkActionBar';

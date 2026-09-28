@@ -1,6 +1,8 @@
 import React from 'react';
 
 import { translations } from '../../constants';
+import { useAppContext } from '../../context/AppContext';
+import { withLatinDigits } from '../../utils/dateUtils';
 import { ChatBlobMedia } from '../chat/ChatBlobMedia';
 import { CheckIcon } from '../icons';
 import { PhoneText, isPhoneLike } from '../PhoneText';
@@ -22,6 +24,17 @@ function supportQuoteLabel(
   return label;
 }
 
+function formatBubbleTime(iso: string, language: string): string {
+  try {
+    return new Date(iso).toLocaleString(
+      language === 'ar' ? 'ar' : undefined,
+      withLatinDigits({ hour: '2-digit', minute: '2-digit' })
+    );
+  } catch {
+    return '';
+  }
+}
+
 type Props = {
   message: SupportChatMessage;
   t: (key: keyof typeof translations.en) => string;
@@ -30,9 +43,11 @@ type Props = {
 };
 
 export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onOpenMedia }) => {
+  const { language } = useAppContext();
   const mine = message.is_mine;
   const label = message.display_name;
   const body = (message.body || '').trim();
+  const timeLabel = formatBubbleTime(message.created_at, language);
 
   const attachmentKind = message.attachment_kind;
   const attachmentUrl = message.attachment_url;
@@ -110,8 +125,14 @@ export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onO
           </a>
         ) : null}
         {renderBody()}
-        {mine ? (
-          <div className="mt-1 flex items-center justify-end">
+        <div
+          dir="ltr"
+          className={`mt-1.5 flex items-center gap-1.5 tabular-nums ${
+            mine ? 'justify-end text-white/75' : 'justify-start text-gray-400 dark:text-gray-500'
+          }`}
+        >
+          {timeLabel ? <span className="text-[10px]">{timeLabel}</span> : null}
+          {mine ? (
             <span
               className={`inline-flex shrink-0 items-center ${
                 message.read_by_peer ? 'text-sky-200' : 'text-white/60'
@@ -128,8 +149,8 @@ export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onO
                 <CheckIcon className="size-3.5" aria-hidden />
               )}
             </span>
-          </div>
-        ) : null}
+          ) : null}
+        </div>
       </div>
     </div>
   );

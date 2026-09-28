@@ -340,6 +340,26 @@
             scrollbar-color: hsl(var(--color-primary-400)) #1f2937;
         }
 
+        /* Chat composers: no scrollbar gutter until the field hits max height. */
+        .composer-textarea {
+            overflow-y: hidden !important;
+            scrollbar-width: none !important;
+        }
+        .composer-textarea::-webkit-scrollbar {
+            width: 0 !important;
+            height: 0 !important;
+            display: none !important;
+        }
+        .composer-textarea.composer-textarea-scroll {
+            overflow-y: auto !important;
+            scrollbar-width: thin !important;
+        }
+        .composer-textarea.composer-textarea-scroll::-webkit-scrollbar {
+            width: 8px !important;
+            height: 8px !important;
+            display: block !important;
+        }
+
         /* Wide tables: one visible horizontal scrollbar (top), synced with hidden main bar.
            Keep z-index below header (20) and overlays (40+) so sticky bars never paint over modals. */
         .table-horizontal-scroll-top {

@@ -3,7 +3,9 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, PageLoadingState, RefreshButton, FilterButton } from '../components/index';
 import { hasActiveFilters } from '../components/filters';
 import { PhoneText } from '../components/PhoneText';
-import { useLeadArrivals, useAcknowledgeLeadArrival } from '../hooks/useQueries';
+import { queryKeys, useLeadArrivals, useAcknowledgeLeadArrival } from '../hooks/useQueries';
+import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { getTextDirection } from '../utils/textDirection';
 import {
   DEFAULT_ARRIVAL_DRAWER_FILTERS,
@@ -26,10 +28,14 @@ const STATUS_BADGE: Record<LeadArrivalStatus, { key: 'arrivalWaiting' | 'arrival
 export const ArrivalsPage = () => {
   const { t, arrivalFilters, setArrivalFilters, setIsArrivalsFilterDrawerOpen } = useAppContext();
   const statusFilter = arrivalFilters.status;
+  const realtimeConnected = useRealtimeConnected();
+  const arrivalParams = arrivalFiltersToApiParams(arrivalFilters);
 
-  const { data, isLoading, isFetching, refetch } = useLeadArrivals(
-    arrivalFiltersToApiParams(arrivalFilters),
-  );
+  useInvalidateOnSliceChange('arrivals', [['leadArrivals'], queryKeys.pendingLeadArrivals]);
+
+  const { data, isLoading, isFetching, refetch } = useLeadArrivals(arrivalParams, {
+    refetchInterval: realtimeConnected ? 60_000 : 15_000,
+  });
   const acknowledgeMutation = useAcknowledgeLeadArrival();
 
   const results: LeadArrival[] = data?.results || [];

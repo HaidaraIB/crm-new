@@ -10,6 +10,7 @@ import {
   type SupportChatMessage,
 } from '../services/api';
 import { useRealtimeConnected } from './useRealtimeChannel';
+import { useSupportConversationSync } from './useSupportConversationSync';
 import { useInvalidateOnSliceChange } from './useSliceVersion';
 
 const MESSAGES_KEY = ['support-chat-messages'] as const;
@@ -42,6 +43,8 @@ export function useSupportChat(options?: { enabled?: boolean }) {
   const messages = messagesQuery.data?.results ?? [];
   const conversation = messagesQuery.data?.conversation ?? conversationQuery.data;
   const hasOlder = messagesQuery.data?.has_older ?? false;
+
+  useSupportConversationSync(enabled ? (conversation?.id ?? null) : null);
 
   const latestIncoming = useMemo(() => {
     const incoming = messages.filter((m) => m.side === 'support');

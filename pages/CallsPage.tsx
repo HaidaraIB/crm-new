@@ -23,6 +23,7 @@ import { getWhatsAppCallsAPI, type WhatsAppCallRecord } from '../services/api';
 import { ChatVoicePlayer } from '../components/chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { queryKeys, useLead, useSyncDigest, useWhatsAppLiveCalls } from '../hooks/useQueries';
+import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
 import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { WhatsAppLiveCallsPanel } from '../components/whatsapp/WhatsAppLiveCallsPanel';
@@ -199,6 +200,7 @@ export const CallsPage: React.FC = () => {
   const canSeeSupervisorTabs = role === 'Owner' || role === 'Supervisor';
   const canSeeCallErrorLogs = role === 'Owner';
   const canManageHours = canSeeSupervisorTabs;
+  const realtimeConnected = useRealtimeConnected();
 
   // Reads the shared digest cache (the app-wide poller owns the interval) purely
   // to know whether anything is ringing right now.
@@ -326,7 +328,7 @@ export const CallsPage: React.FC = () => {
         ...apiParams,
         limit: 100,
       }),
-    refetchInterval: 8000,
+    refetchInterval: realtimeConnected ? 30_000 : 8_000,
     enabled: Boolean(currentUser),
   });
 
@@ -342,7 +344,7 @@ export const CallsPage: React.FC = () => {
         ...countParams,
         limit: 1,
       }),
-    refetchInterval: 8000,
+    refetchInterval: realtimeConnected ? 30_000 : 8_000,
     enabled: Boolean(currentUser),
   });
 

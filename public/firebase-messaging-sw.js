@@ -38,38 +38,37 @@ if (firebaseConfig.messagingSenderId && firebaseConfig.projectId) {
     const data = payload.data || {};
     const notification = payload.notification || {};
 
-    const title = notification.title || data.title || 'LOOP CRM';
-    const body = notification.body || data.body || '';
-
-    /**
-     * `tag` collapses repeats. A ringing call re-notified by a retried webhook
-     * should replace its own banner rather than stack a second one; `renotify`
-     * still alerts the user, so a genuinely new event is not silent.
-     */
-    const tag = data.type ? `crm-${data.type}-${data.call_id || data.client_id || ''}` : 'crm';
-
-    const options = {
-      body,
-      tag,
-      renotify: true,
-      icon: '/logo.png',
-      badge: '/browser_icon.png',
-      // Carried through to the notificationclick handler below.
-      data,
-      // A ringing call needs the user to act; everything else can auto-dismiss.
-      requireInteraction: data.type === 'whatsapp_call_incoming',
-    };
-
-    // Tell any open tab to refresh, so a user who *does* have the app open sees
-    // the change immediately without waiting for their next poll. Mirrors the
-    // `invalidate` convention the mobile app already uses.
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       clients.forEach((client) => {
         client.postMessage({ source: 'crm-push', data });
       });
     });
 
-    return self.registration.showNotification(title, options);
+    // Web pushes from our API are data-only. If a legacy payload still carries
+    // ``notification``, the browser already displayed it — do not show again.
+    if (notification.title || notification.body) {
+      return;
+    }
+
+    const title = data.title || 'LOOP CRM';
+    const body = data.body || '';
+    const dedupeKey =
+      data.message_id ||
+      data.call_id ||
+      data.conversation_id ||
+      data.client_id ||
+      '';
+    const tag = data.type ? `crm-${data.type}-${dedupeKey}` : `crm-${dedupeKey || 'general'}`;
+
+    return self.registration.showNotification(title, {
+      body,
+      tag,
+      renotify: Boolean(dedupeKey),
+      icon: '/notification-icon.png',
+      badge: '/notification-badge.png',
+      data,
+      requireInteraction: data.type === 'whatsapp_call_incoming',
+    });
   });
 }
 

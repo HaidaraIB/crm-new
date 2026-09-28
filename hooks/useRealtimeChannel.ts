@@ -23,7 +23,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { queryKeys } from './useQueries';
-import { BASE_URL } from '../services/api';
+import { BASE_URL, refreshTokenAPI } from '../services/api';
 
 /** Digest poll interval while the socket is healthy — a heartbeat, not the mechanism. */
 export const REALTIME_DIGEST_INTERVAL = 30_000;
@@ -330,12 +330,16 @@ export function sendRealtime(payload: OutboundPayload): boolean {
  * Subscriptions live on the connection, so they are replayed on every reconnect.
  */
 const conversationSubscribers = new Map<number, number>();
+const supportConversationSubscribers = new Map<number, number>();
 
 if (typeof window !== 'undefined') {
   onRealtimeStatus((connected) => {
     if (!connected) return;
     conversationSubscribers.forEach((_count, conversationId) => {
       sendRealtime({ action: 'subscribe', conversation: conversationId });
+    });
+    supportConversationSubscribers.forEach((_count, conversationId) => {
+      sendRealtime({ action: 'subscribe', kind: 'support', conversation: conversationId });
     });
   });
 }
@@ -375,6 +379,38 @@ export function subscribeToConversation(conversationId: number): {
   };
 }
 
+export function subscribeToSupportConversation(conversationId: number): {
+  delivered: boolean;
+  release: () => void;
+} {
+  const previous = supportConversationSubscribers.get(conversationId) ?? 0;
+  supportConversationSubscribers.set(conversationId, previous + 1);
+  const delivered =
+    previous > 0
+      ? isRealtimeConnected()
+      : sendRealtime({
+          action: 'subscribe',
+          kind: 'support',
+          conversation: conversationId,
+        });
+
+  let released = false;
+  return {
+    delivered,
+    release: () => {
+      if (released) return;
+      released = true;
+      const count = (supportConversationSubscribers.get(conversationId) ?? 1) - 1;
+      if (count > 0) {
+        supportConversationSubscribers.set(conversationId, count);
+        return;
+      }
+      supportConversationSubscribers.delete(conversationId);
+      sendRealtime({ action: 'unsubscribe', kind: 'support', conversation: conversationId });
+    },
+  };
+}
+
 export function useRealtimeChannel(enabled: boolean): { digestInterval: number } {
   const queryClient = useQueryClient();
   const active = enabled && REALTIME_ENABLED;
@@ -385,8 +421,13 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
     if (enabled) announceConfigOnce();
   }, [enabled]);
 
+  const digestDebounceRef = useRef<number | undefined>(undefined);
   const refreshDigest = useCallback(() => {
-    void queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
+    if (digestDebounceRef.current) window.clearTimeout(digestDebounceRef.current);
+    digestDebounceRef.current = window.setTimeout(() => {
+      digestDebounceRef.current = undefined;
+      void queryClient.invalidateQueries({ queryKey: queryKeys.syncDigest });
+    }, 250);
   }, [queryClient]);
 
   // Followers learn from the leader over BroadcastChannel and refetch their own
@@ -541,6 +582,18 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
         );
         setConnected(false);
         broadcast?.postMessage({ type: 'status', connected: false });
+        if (event.code === 4401) {
+          void refreshTokenAPI()
+            .then(() => {
+              if (disposed) return;
+              attempt = 0;
+              connect();
+            })
+            .catch(() => {
+              scheduleRetry();
+            });
+          return;
+        }
         scheduleRetry();
       };
 

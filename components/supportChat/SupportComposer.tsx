@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { translations } from '../../constants';
 import { ChatMediaThumb } from '../chat/ChatMediaThumb';
@@ -34,6 +34,14 @@ function supportReplySnippet(
   return label;
 }
 
+const COMPOSER_MAX_H = 112;
+
+function syncComposerHeight(el: HTMLTextAreaElement | null) {
+  if (!el) return;
+  el.style.height = '0px';
+  el.style.height = `${Math.max(Math.min(el.scrollHeight, COMPOSER_MAX_H), 40)}px`;
+}
+
 const iconBtnClass =
   'flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-gray-600 hover:bg-gray-100 disabled:opacity-50 dark:text-gray-200 dark:hover:bg-gray-800';
 
@@ -50,6 +58,7 @@ export const SupportComposer: React.FC<Props> = ({
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const voice = useChatVoiceRecorder({
     enabled: !disabled && !sending,
@@ -57,6 +66,10 @@ export const SupportComposer: React.FC<Props> = ({
     onRecordingComplete: (file) => setPendingFile(file),
     micDeniedKey: 'teamChatMicDenied',
   });
+
+  useEffect(() => {
+    syncComposerHeight(textareaRef.current);
+  }, [text]);
 
   const handleSend = async () => {
     const body = text.trim();
@@ -80,6 +93,26 @@ export const SupportComposer: React.FC<Props> = ({
         compact ? 'p-2 bg-white/90 dark:bg-gray-900/90' : 'p-3 bg-white dark:bg-gray-900'
       }`}
     >
+      <style>{`
+        textarea.support-chat-composer-input,
+        textarea.support-chat-composer-input:focus,
+        textarea.support-chat-composer-input:hover {
+          scrollbar-width: none !important;
+          -ms-overflow-style: none !important;
+        }
+        textarea.support-chat-composer-input::-webkit-scrollbar,
+        textarea.support-chat-composer-input::-webkit-scrollbar-thumb,
+        textarea.support-chat-composer-input::-webkit-scrollbar-track,
+        textarea.support-chat-composer-input::-webkit-scrollbar-button,
+        textarea.support-chat-composer-input::-webkit-scrollbar-corner {
+          width: 0 !important;
+          height: 0 !important;
+          display: none !important;
+          background: transparent !important;
+          appearance: none !important;
+          -webkit-appearance: none !important;
+        }
+      `}</style>
       {replyTo ? (
         <div className="flex items-center gap-3 rounded-xl border border-primary/40 bg-primary/[0.08] px-3 py-2 dark:border-primary/50 dark:bg-primary/25">
           {replyTo.attachment_url &&
@@ -141,18 +174,16 @@ export const SupportComposer: React.FC<Props> = ({
           variant="team"
         />
       ) : (
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-end gap-1.5">
           <textarea
+            ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
-            rows={compact ? 1 : 2}
+            rows={1}
             disabled={disabled || sending}
             placeholder={t('supportChatSendPlaceholder')}
-            className={`flex-1 min-w-0 resize-none rounded-xl border border-gray-300 dark:border-gray-500 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-primary/80 ${
-              compact
-                ? 'h-10 max-h-24 py-2 px-3 text-sm leading-5'
-                : 'min-h-[2.75rem] max-h-28 py-2 px-3 text-sm leading-5'
-            }`}
+            className="support-chat-composer-input flex-1 min-h-10 max-h-28 min-w-0 resize-none overflow-y-auto rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm leading-5 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/80 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-400"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();

@@ -1,6 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import { usePendingLeadArrivals, useAcknowledgeLeadArrival, useSyncDigest } from '../../hooks/useQueries';
+import {
+  queryKeys,
+  usePendingLeadArrivals,
+  useAcknowledgeLeadArrival,
+  useSyncDigest,
+} from '../../hooks/useQueries';
+import { useRealtimeConnected } from '../../hooks/useRealtimeChannel';
+import { useInvalidateOnSliceChange } from '../../hooks/useSliceVersion';
 import { Button } from '../Button';
 import { BellIcon } from '../icons';
 import { PhoneText } from '../PhoneText';
@@ -34,9 +41,13 @@ export const ArrivalAlertHost = () => {
     refetchInterval: false,
   });
   const hasPending = (digest?.arrivals_pending ?? 0) > 0;
+  const realtimeConnected = useRealtimeConnected();
+
+  useInvalidateOnSliceChange('arrivals', [queryKeys.pendingLeadArrivals]);
 
   const { data: pending } = usePendingLeadArrivals({
     enabled: Boolean(currentUser?.company?.id) && hasPending,
+    refetchInterval: realtimeConnected ? 60_000 : 20_000,
   });
 
   // Disabling a query stops it refetching but does NOT clear what it already

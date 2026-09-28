@@ -7143,6 +7143,8 @@ export type SyncSliceVersions = {
   global: number;
   /** This user alone: notifications, read cursors. */
   user: number;
+  /** Role, permissions, and company membership for this user. */
+  access: number;
   /** Any company-visible change — moves whenever any slice below moves. */
   company: number;
   /** Inbound/outbound WhatsApp messages. */
@@ -7157,6 +7159,8 @@ export type SyncSliceVersions = {
   support_chat: number;
   /** Omni-channel inbox: Instagram DM + Messenger conversations and messages. */
   inbox: number;
+  /** Company subscription and activation state. */
+  account: number;
 };
 
 export type SyncSliceName = keyof SyncSliceVersions;

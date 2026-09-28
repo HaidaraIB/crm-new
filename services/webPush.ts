@@ -116,6 +116,21 @@ export function registerWebPush(): Promise<string | null> {
       const swUrl = `/firebase-messaging-sw.js?${new URLSearchParams(
         config as unknown as Record<string, string>
       ).toString()}`;
+
+      // Drop stale messaging workers (e.g. old script URL without query). Two
+      // active workers can each show the same push.
+      const existing = await navigator.serviceWorker.getRegistrations();
+      for (const reg of existing) {
+        const script =
+          reg.active?.scriptURL ||
+          reg.waiting?.scriptURL ||
+          reg.installing?.scriptURL ||
+          '';
+        if (script.includes('firebase-messaging-sw.js')) {
+          await reg.unregister();
+        }
+      }
+
       const registration = await navigator.serviceWorker.register(swUrl);
 
       const token = await getToken(getMessaging(app), {

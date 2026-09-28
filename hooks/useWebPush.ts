@@ -27,6 +27,7 @@ const INVALIDATION_MAP: Record<string, QueryKey[]> = {
   'crm:deals': [['deals'], ['dashboardSummary']],
   'crm:arrivals': [['leadArrivals'], queryKeys.pendingLeadArrivals],
   'pbx:screen_pop': [['notifications']],
+  'support_chat:messages': [['support-chat-messages'], ['support-chat-conversation']],
 };
 
 export function useWebPush(enabled: boolean): void {

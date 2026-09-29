@@ -1184,7 +1184,8 @@ export const translations = {
     leadApiAdminOnly: "Only company owners can manage API keys.",
     leadApiLastReceived: "Last lead received:",
     leadApiSetupStep1: "Generate an API key below and store it securely on your server.",
-    leadApiSetupStep2: "POST lead data (name, phone, external_id) to the endpoint URL.",
+    leadApiSetupStep2:
+      "POST lead data (name, lead_company_name, profession, phone, external_id) to the endpoint URL.",
     leadApiSetupStep3: "Use the same external_id when retrying to avoid duplicate leads.",
     leadApiStatusConnected: "Active",
     leadApiStatusPending: "Not configured",
@@ -4264,7 +4265,8 @@ export const translations = {
     leadApiAdminOnly: "مالك الشركة فقط يمكنه إدارة مفاتيح API.",
     leadApiLastReceived: "آخر ليد مستلم:",
     leadApiSetupStep1: "أنشئ مفتاح API واحفظه على السيرفر بشكل آمن.",
-    leadApiSetupStep2: "أرسل بيانات الليد (الاسم، الهاتف، external_id) إلى رابط الـ API.",
+    leadApiSetupStep2:
+      "أرسل بيانات الليد (name، lead_company_name، profession، الهاتف، external_id) إلى رابط الـ API.",
     leadApiSetupStep3: "استخدم نفس external_id عند إعادة المحاولة لتجنب التكرار.",
     leadApiStatusConnected: "نشط",
     leadApiStatusPending: "غير مُعدّ",

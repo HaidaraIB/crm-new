@@ -114,20 +114,32 @@ export function LeadApiDocumentation({
   const exampleRequest = useMemo(
     () =>
       JSON.stringify(
-        {
-          name: 'Jane Doe',
-          phone: '+9647700000001',
-          external_id: 'form-submission-uuid-123',
-          email: 'jane@example.com',
-          notes: 'Interested in villa',
-          priority: 'high',
-          type: 'fresh',
-          custom_fields: { budget: '50000', city: 'Baghdad' },
-        },
+        docLanguage === 'ar'
+          ? {
+              name: 'علي حسن',
+              lead_company_name: 'عيادة الفرح',
+              profession: 'عيادة طبية',
+              phone: '+9647700000001',
+              external_id: 'form-submission-uuid-123',
+              email: 'ali@example.com',
+              notes: 'تسجيل من دليل أعمال',
+            }
+          : {
+              name: 'Jane Doe',
+              lead_company_name: 'Sunrise Clinic',
+              profession: 'Medical clinic',
+              phone: '+9647700000001',
+              external_id: 'form-submission-uuid-123',
+              email: 'jane@example.com',
+              notes: 'Interested in villa',
+              priority: 'high',
+              type: 'fresh',
+              custom_fields: { budget: '50000', city: 'Baghdad' },
+            },
         null,
         2
       ),
-    []
+    [docLanguage]
   );
 
   const success201 = useMemo(
@@ -244,6 +256,7 @@ data = resp.json()`;
     { id: 'endpoint', key: 'leadApiDocSectionEndpoint' },
     { id: 'auth', key: 'leadApiDocSectionAuth' },
     { id: 'request', key: 'leadApiDocSectionRequest' },
+    { id: 'mapping', key: 'leadApiDocSectionMapping' },
     { id: 'response', key: 'leadApiDocSectionResponse' },
     { id: 'errors', key: 'leadApiDocSectionErrors' },
     { id: 'idempotency', key: 'leadApiDocSectionIdempotency' },
@@ -255,6 +268,16 @@ data = resp.json()`;
 
   const fieldRows = [
     { field: t('leadApiDocFieldName'), required: t('leadApiDocRequiredYes'), description: t('leadApiDocDescName') },
+    {
+      field: t('leadApiDocFieldLeadCompanyName'),
+      required: t('leadApiDocRequiredNo'),
+      description: t('leadApiDocDescLeadCompanyName'),
+    },
+    {
+      field: t('leadApiDocFieldProfession'),
+      required: t('leadApiDocRequiredNo'),
+      description: t('leadApiDocDescProfession'),
+    },
     { field: t('leadApiDocFieldPhone'), required: t('leadApiDocRequiredRecommended'), description: t('leadApiDocDescPhone') },
     { field: t('leadApiDocFieldExternalId'), required: t('leadApiDocRequiredRecommended'), description: t('leadApiDocDescExternalId') },
     { field: t('leadApiDocFieldEmail'), required: t('leadApiDocRequiredNo'), description: t('leadApiDocDescEmail') },
@@ -265,6 +288,17 @@ data = resp.json()`;
     { field: t('leadApiDocFieldPriority'), required: t('leadApiDocRequiredNo'), description: t('leadApiDocDescPriority') },
     { field: t('leadApiDocFieldType'), required: t('leadApiDocRequiredNo'), description: t('leadApiDocDescType') },
     { field: t('leadApiDocFieldCustomFields'), required: t('leadApiDocRequiredNo'), description: t('leadApiDocDescCustomFields') },
+    { field: t('leadApiDocFieldImageUrl'), required: t('leadApiDocRequiredNo'), description: t('leadApiDocDescImageUrl') },
+    {
+      field: t('leadApiDocFieldLocationLatitude'),
+      required: t('leadApiDocRequiredNo'),
+      description: t('leadApiDocDescLocationLatitude'),
+    },
+    {
+      field: t('leadApiDocFieldLocationLongitude'),
+      required: t('leadApiDocRequiredNo'),
+      description: t('leadApiDocDescLocationLongitude'),
+    },
   ];
 
   const tableHeaders: [string, string, string] =
@@ -367,6 +401,15 @@ data = resp.json()`;
               copiedLabel={copiedLabel}
               isRtl={isRtl}
             />
+          </DocSection>
+
+          <DocSection id="mapping" title={t('leadApiDocSectionMapping')}>
+            <p className="mb-3">{t('leadApiDocMappingIntro')}</p>
+            <ul className="list-disc list-inside space-y-2 font-mono text-xs sm:text-sm" dir="ltr">
+              <li>{t('leadApiDocMappingRow1')}</li>
+              <li>{t('leadApiDocMappingRow2')}</li>
+              <li>{t('leadApiDocMappingRow3')}</li>
+            </ul>
           </DocSection>
 
           <DocSection id="response" title={t('leadApiDocSectionResponse')}>

@@ -9,8 +9,10 @@ import {
     formatClientLocationPair,
 } from '../utils/leadLocation';
 import { ChatVoicePlayer } from './chat/ChatVoicePlayer';
+import { ChatMediaViewer } from './chat/ChatMediaViewer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { PhoneText } from './PhoneText';
+import { PlainTextWithLinks } from './PlainTextWithLinks';
 
 const TimelineRecordingPlayer: React.FC<{ url: string; t: (key: string) => string }> = ({
     url,
@@ -471,6 +473,7 @@ function chipColorClass(type?: TimelineEntryType['type']): string {
 export const Timeline = ({ history, chatLead }: TimelineProps) => {
     const { t, language, goToPage, openLeadInChats: openLeadInChatsPage } = useAppContext();
     const [sortOrder, setSortOrder] = useState<TimelineSortOrder>(readSortOrder);
+    const [viewerUrl, setViewerUrl] = useState<string | null>(null);
 
     const openLeadInChats = () => {
         if (!chatLead) {
@@ -505,6 +508,7 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
     const isRtl = language === 'ar';
 
     return (
+        <>
         <section
             dir={isRtl ? 'rtl' : 'ltr'}
             className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-dark-card overflow-hidden"
@@ -676,8 +680,8 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                             <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                                                 {t('statusChangeReasonLabel')}
                                             </p>
-                                            <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
-                                                {entry.reason}
+                                            <p className="mt-0.5 text-sm text-gray-800 dark:text-gray-200">
+                                                <PlainTextWithLinks text={entry.reason} />
                                             </p>
                                         </div>
                                     )}
@@ -732,8 +736,8 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                         entry.type !== 'location_update' &&
                                         entry.type !== 'whatsapp_thread' &&
                                         entry.type !== 'social_thread' && (
-                                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-2 whitespace-pre-wrap break-words">
-                                            {entry.details}
+                                        <p className="text-sm text-gray-600 dark:text-gray-300 mt-2">
+                                            <PlainTextWithLinks text={entry.details} />
                                         </p>
                                     )}
 
@@ -753,12 +757,11 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                         </p>
                                     ) : null}
 
-                                    {entry.type === 'field_visit' && entry.locationPhotoUrl && (
-                                        <a
-                                            href={entry.locationPhotoUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="mt-2 block max-w-xs sm:max-w-sm"
+                                    {entry.locationPhotoUrl && (
+                                        <button
+                                            type="button"
+                                            onClick={() => setViewerUrl(entry.locationPhotoUrl || null)}
+                                            className="mt-2 block max-w-xs cursor-pointer border-0 bg-transparent p-0 text-start sm:max-w-sm"
                                         >
                                             <span className="flex h-48 max-h-48 w-full items-center justify-center overflow-hidden rounded-lg border border-gray-200 bg-gray-100 dark:border-gray-600 dark:bg-gray-800">
                                                 <img
@@ -768,11 +771,11 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                                     decoding="async"
                                                     className="max-h-full max-w-full object-contain"
                                                     onError={(e) => {
-                                                        e.currentTarget.closest('a')?.remove();
+                                                        e.currentTarget.closest('button')?.remove();
                                                     }}
                                                 />
                                             </span>
-                                        </a>
+                                        </button>
                                     )}
 
                                     {(entry.type === 'call' ||
@@ -816,5 +819,14 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                 </ol>
             )}
         </section>
+        {viewerUrl ? (
+            <ChatMediaViewer
+                items={[{ id: 'timeline-photo', kind: 'image', url: viewerUrl }]}
+                initialIndex={0}
+                onClose={() => setViewerUrl(null)}
+                t={t}
+            />
+        ) : null}
+        </>
     );
 };

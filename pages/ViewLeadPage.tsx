@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TagMultiSelect, LeadContactPhoneList } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TagMultiSelect, LeadContactPhoneList, PlainTextWithLinks } from '../components/index';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
@@ -29,6 +29,7 @@ import {
     getEditFieldLabel,
     getTimelineEventAction,
     localizeTimelineEventNotes,
+    extractStorefrontImageUrl,
     parseTagsChangeNotes,
     resolveTimelineActor,
     timelineEventActorFallback,
@@ -831,6 +832,7 @@ export const ViewLeadPage = () => {
                       : newFormatted,
                 reason: (ce as any).reason || undefined,
                 color: eventColor,
+                locationPhotoUrl: extractStorefrontImageUrl(ce.notes),
             };
         });
 
@@ -953,9 +955,10 @@ export const ViewLeadPage = () => {
     }
 
     return (
-        <PageWrapper 
+        <PageWrapper
+            fullWidthTitle
             title={
-                <div className="flex min-w-0 w-full items-center gap-2 sm:gap-3">
+                <div className="relative z-30 flex w-full min-w-0 items-center gap-2 overflow-x-auto p-1.5 -m-1.5">
                     <button
                         type="button"
                         onClick={goBackFromLead}
@@ -964,19 +967,18 @@ export const ViewLeadPage = () => {
                     >
                         <ArrowLeftIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
                     </button>
-                    <MarqueeText
-                        text={displayLead.name}
-                        className="min-w-0 flex-1"
-                        contentClassName="text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg md:text-xl"
-                    />
-                </div>
-            }
-            actions={
-                <div className="flex min-w-0 max-w-full shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap">
+                    <h1 className="min-w-0 shrink overflow-hidden text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg md:text-xl">
+                        <MarqueeText
+                            text={displayLead.name}
+                            className="max-w-full"
+                            contentClassName="font-semibold text-gray-900 dark:text-gray-100"
+                        />
+                    </h1>
+                    <div className="relative z-30 flex shrink-0 flex-nowrap items-center gap-2">
                     <Button
                         variant="secondary"
                         type="button"
-                        className="w-full sm:w-auto shrink-0"
+                        className="shrink-0"
                         onClick={() => {
                             if (!displayLead) return;
                             setEditingLead(displayLead);
@@ -993,7 +995,7 @@ export const ViewLeadPage = () => {
                         <Button
                             variant="danger"
                             type="button"
-                            className="w-full sm:w-auto shrink-0"
+                            className="shrink-0"
                             onClick={() => handleDeleteLead(displayLead)}
                         >
                             <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
@@ -1005,7 +1007,7 @@ export const ViewLeadPage = () => {
                     <Button
                         variant="secondary"
                         type="button"
-                        className="w-full sm:w-auto shrink-0"
+                        className="shrink-0"
                         onClick={() => {
                             if (!displayLead) return;
                             setSelectedLeadForDeal(displayLead.id);
@@ -1021,7 +1023,7 @@ export const ViewLeadPage = () => {
                     <Button
                         variant="secondary"
                         type="button"
-                        className="w-full sm:w-auto shrink-0"
+                        className="shrink-0"
                         onClick={() => setIsAddCallModalOpen(true)}
                     >
                         <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
@@ -1033,7 +1035,7 @@ export const ViewLeadPage = () => {
                         <Button
                             variant="secondary"
                             type="button"
-                            className="w-full sm:w-auto shrink-0"
+                            className="shrink-0"
                             onClick={() => setIsAddVisitModalOpen(true)}
                         >
                             <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
@@ -1046,7 +1048,7 @@ export const ViewLeadPage = () => {
                     <Button
                         variant="secondary"
                         type="button"
-                        className="w-full sm:w-auto shrink-0"
+                        className="shrink-0"
                         onClick={() => setIsAddFieldVisitModalOpen(true)}
                     >
                         <span className="flex items-center gap-2 rtl:flex-row-reverse whitespace-nowrap">
@@ -1055,10 +1057,11 @@ export const ViewLeadPage = () => {
                         </span>
                     </Button>
                     )}
-                    <Button onClick={() => setIsAddActionModalOpen(true)} className="w-full sm:w-auto shrink-0">
+                    <Button onClick={() => setIsAddActionModalOpen(true)} className="shrink-0">
                         <PlusIcon className="w-4 h-4 shrink-0" />
                         <span className="whitespace-nowrap">{t('add_action')}</span>
                     </Button>
+                    </div>
                 </div>
             }
         >
@@ -1069,16 +1072,16 @@ export const ViewLeadPage = () => {
                     <div className="space-y-4">
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('leadCompanyName')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || '—'}</p>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100 break-words [unicode-bidi:plaintext]">{(displayLead.leadCompanyName ?? (displayLead as any).lead_company_name) || '—'}</p>
                         </div>
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('profession')}</label>
-                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : '—'}</p>
+                            <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100 break-words [unicode-bidi:plaintext]">{(displayLead.profession && String(displayLead.profession).trim()) ? displayLead.profession : '—'}</p>
                         </div>
                         {isMedicalCompany && (
                             <div>
                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('residence')}</label>
-                                <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : '—'}</p>
+                                <p className="mt-2 text-base font-medium text-gray-900 dark:text-gray-100 break-words [unicode-bidi:plaintext]">{((displayLead as Lead).residence && String((displayLead as Lead).residence).trim()) ? (displayLead as Lead).residence : '—'}</p>
                             </div>
                         )}
                         {hasLeadLocation && (
@@ -1518,14 +1521,16 @@ export const ViewLeadPage = () => {
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('lastFeedback')}</label>
                             <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
-                                {displayLead.lastFeedback || (displayLead as any).last_feedback || '-'}
+                                <PlainTextWithLinks
+                                    text={displayLead.lastFeedback || (displayLead as any).last_feedback || '-'}
+                                />
                             </p>
                         </div>
                         {(displayLead.notes != null && String(displayLead.notes).trim() !== '') && (
                             <div>
                                 <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('notes')}</label>
-                                <p className="text-sm text-gray-900 dark:text-gray-100 mt-1 whitespace-pre-wrap">
-                                    {String(displayLead.notes).trim()}
+                                <p className="text-sm text-gray-900 dark:text-gray-100 mt-1">
+                                    <PlainTextWithLinks text={String(displayLead.notes).trim()} />
                                 </p>
                             </div>
                         )}

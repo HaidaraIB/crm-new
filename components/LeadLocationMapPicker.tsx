@@ -31,10 +31,9 @@ type LeadLocationMapPickerProps = {
   className?: string;
 };
 
-/** OSM.org tiles are often slow/rate-limited; Carto CDN is faster for interactive pickers. */
-const MAP_TILE_URL = 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png';
+const MAP_TILE_URL = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 const MAP_TILE_ATTRIBUTION =
-  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>';
+  '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>';
 
 function MapInvalidateSize() {
   const map = useMap();
@@ -272,8 +271,8 @@ export const LeadLocationMapPicker: React.FC<LeadLocationMapPickerProps> = ({
             <TileLayer
               attribution={MAP_TILE_ATTRIBUTION}
               url={MAP_TILE_URL}
-              subdomains="abcd"
-              maxZoom={20}
+              maxZoom={19}
+              referrerPolicy="strict-origin-when-cross-origin"
               updateWhenIdle
               keepBuffer={4}
             />

@@ -54,7 +54,7 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
 
     if (!text || text === '-') {
         return (
-            <div className={`min-w-0 max-w-full ${className}`}>
+            <div className={`min-w-0 max-w-full overflow-hidden ${className}`}>
                 <span className={contentClassName}>{text}</span>
             </div>
         );
@@ -63,7 +63,10 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
     const durationSec = Math.min(Math.max(text.length * 0.1, 10), 45);
 
     return (
-        <div ref={outerRef} className={`relative min-w-0 max-w-full overflow-hidden ${className}`}>
+        <div
+            ref={outerRef}
+            className={`relative min-w-0 max-w-full overflow-hidden ${className}`}
+        >
             <span
                 ref={measureRef}
                 className={`pointer-events-none fixed top-0 max-w-none whitespace-nowrap opacity-0 ${contentClassName}`}
@@ -73,7 +76,7 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
                 {text}
             </span>
             {useMarquee ? (
-                <div className="deal-marquee-track overflow-hidden" dir="ltr">
+                <div className="deal-marquee-track max-w-full overflow-hidden" dir="ltr">
                     <div
                         className="deal-marquee-inner inline-flex w-max"
                         style={{ ['--deal-marquee-duration' as string]: `${durationSec}s` }}
@@ -87,7 +90,7 @@ export const MarqueeText: React.FC<MarqueeTextProps> = ({
                     </div>
                 </div>
             ) : (
-                <span className={`block truncate ${contentClassName}`}>{text}</span>
+                <span dir="auto" className={`block truncate ${contentClassName}`}>{text}</span>
             )}
         </div>
     );

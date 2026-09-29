@@ -197,6 +197,12 @@ export function getTimelineEventAction(
     return t('timeline');
 }
 
+export function extractStorefrontImageUrl(notes: string | null | undefined): string | undefined {
+    const match = notes?.match(/storefront_image_url:\s*(\S+)/i);
+    const url = match?.[1]?.trim();
+    return url || undefined;
+}
+
 export function localizeTimelineEventNotes(
     notes: string | null | undefined,
     eventType: string,

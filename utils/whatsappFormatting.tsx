@@ -6,6 +6,7 @@
  * Compose/send formatting (toolbar → insert markers) is a follow-up.
  */
 import React from 'react';
+import { linkifyHttpUrls } from './linkifyText';
 
 type InlineKind = 'bold' | 'italic' | 'strike';
 
@@ -16,46 +17,8 @@ const INLINE_RULES: Array<{ kind: InlineKind; re: RegExp }> = [
   { kind: 'strike', re: /~([^~\n]+?)~/ },
 ];
 
-const URL_RE = /https?:\/\/[^\s<>"']+/g;
-
-function trimTrailingUrlPunctuation(url: string): { href: string; trailing: string } {
-  let href = url;
-  let trailing = '';
-  while (href && /[),.!?;:]$/.test(href)) {
-    trailing = href.slice(-1) + trailing;
-    href = href.slice(0, -1);
-  }
-  return { href, trailing };
-}
-
 function linkifyPlain(text: string, keyPrefix: string): React.ReactNode[] {
-  const nodes: React.ReactNode[] = [];
-  let last = 0;
-  let m: RegExpExecArray | null;
-  const re = new RegExp(URL_RE.source, 'g');
-  let i = 0;
-  while ((m = re.exec(text)) !== null) {
-    if (m.index > last) {
-      nodes.push(text.slice(last, m.index));
-    }
-    const { href, trailing } = trimTrailingUrlPunctuation(m[0]);
-    nodes.push(
-      <a
-        key={`${keyPrefix}-a-${i++}`}
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="underline break-all opacity-95 hover:opacity-100"
-        onClick={(e) => e.stopPropagation()}
-      >
-        {href}
-      </a>
-    );
-    if (trailing) nodes.push(trailing);
-    last = m.index + m[0].length;
-  }
-  if (last < text.length) nodes.push(text.slice(last));
-  return nodes;
+  return linkifyHttpUrls(text, keyPrefix, 'underline break-all opacity-95 hover:opacity-100');
 }
 
 function wrapInline(kind: InlineKind, children: React.ReactNode, key: string): React.ReactNode {

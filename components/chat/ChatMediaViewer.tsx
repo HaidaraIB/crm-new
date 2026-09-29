@@ -50,6 +50,11 @@ function useViewerBlobUrl(url: string): { blobUrl: string | null; failed: boolea
       setLoading(false);
       return;
     }
+    if (!mediaUrlNeedsAuthFetch(url)) {
+      setBlobUrl(url);
+      setLoading(false);
+      return;
+    }
     const cached = chatMediaBlobCacheTake(urlIdentity);
     if (cached) {
       chatMediaBlobCacheTouch(urlIdentity, cached);
@@ -79,6 +84,22 @@ function useViewerBlobUrl(url: string): { blobUrl: string | null; failed: boolea
   }, [url, urlIdentity]);
 
   return { blobUrl, failed, loading };
+}
+
+/** CRM-hosted files need an authenticated fetch. Public listing photos load directly. */
+function mediaUrlNeedsAuthFetch(url: string): boolean {
+  try {
+    const target = new URL(url);
+    if (typeof window !== 'undefined' && target.origin === window.location.origin) return true;
+    const apiBase = import.meta.env.VITE_API_URL as string | undefined;
+    if (apiBase) {
+      const apiOrigin = new URL(apiBase, window.location.origin).origin;
+      if (target.origin === apiOrigin) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
 }
 
 const MIN_ZOOM = 1;

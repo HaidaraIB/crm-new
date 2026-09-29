@@ -8,6 +8,8 @@ import { CheckIcon } from '../icons';
 import { PhoneText, isPhoneLike } from '../PhoneText';
 import type { SupportChatMessage } from '../../services/api';
 
+const CHAT_BUBBLE_PLAINTEXT_CLASS = '[unicode-bidi:plaintext]';
+
 function supportQuoteLabel(
   kind: string | null | undefined,
   body: string,
@@ -44,6 +46,18 @@ type Props = {
 
 export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onOpenMedia }) => {
   const { language } = useAppContext();
+  if (message.side === 'system') {
+    return (
+      <div className="flex justify-center px-2">
+        <p
+          dir="auto"
+          className={`max-w-md rounded-xl bg-gray-200/80 px-3 py-2 text-center text-xs text-gray-700 dark:bg-gray-700/80 dark:text-gray-200 ${CHAT_BUBBLE_PLAINTEXT_CLASS}`}
+        >
+          {message.body}
+        </p>
+      </div>
+    );
+  }
   const mine = message.is_mine;
   const label = message.display_name;
   const body = (message.body || '').trim();
@@ -59,7 +73,14 @@ export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onO
     if (isPhoneLike(body)) {
       return <PhoneText className="whitespace-pre-wrap break-words text-sm">{body}</PhoneText>;
     }
-    return <p className="whitespace-pre-wrap break-words text-sm">{body}</p>;
+    return (
+      <p
+        dir="auto"
+        className={`whitespace-pre-wrap break-words text-sm ${CHAT_BUBBLE_PLAINTEXT_CLASS}`}
+      >
+        {body}
+      </p>
+    );
   };
 
   /** Widget media: fixed band so the 4:3 frame never collapses to caption width. */
@@ -81,25 +102,40 @@ export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onO
         }`}
       >
         {!mine && label ? (
-          <p className="text-xs font-semibold mb-1 opacity-80">{label}</p>
+          <p
+            dir="auto"
+            className={`text-xs font-semibold mb-1 opacity-80 ${CHAT_BUBBLE_PLAINTEXT_CLASS}`}
+          >
+            {label}
+          </p>
         ) : null}
         {message.reply_to ? (
           <div
-            className={`mb-2 rounded-lg border-l-2 pl-2 text-xs opacity-90 ${
+            className={`mb-2 rounded-lg border-s-2 ps-2 text-xs opacity-90 ${
               mine ? 'border-white/60' : 'border-primary/50'
             }`}
           >
-            <span className="font-medium">{message.reply_to.display_name}</span>
-            <p className="truncate">
+            <span dir="auto" className={`font-medium ${CHAT_BUBBLE_PLAINTEXT_CLASS}`}>
+              {message.reply_to.display_name}
+            </span>
+            <p dir="auto" className={`truncate ${CHAT_BUBBLE_PLAINTEXT_CLASS}`}>
               {supportQuoteLabel(message.reply_to.attachment_kind, message.reply_to.body, t)}
             </p>
           </div>
         ) : null}
-        {attachmentUrl && attachmentKind && attachmentKind !== 'document' ? (
-          <div className={hasVisualMedia ? 'mb-1 w-full min-w-0' : 'w-full min-w-0'}>
+        {attachmentUrl && attachmentKind ? (
+          <div
+            className={
+              attachmentKind === 'document'
+                ? 'mb-1 w-[min(70vw,16rem)] max-w-full'
+                : hasVisualMedia
+                  ? 'mb-1 w-full min-w-0'
+                  : 'w-full min-w-0'
+            }
+          >
             <ChatBlobMedia
               url={attachmentUrl}
-              kind={attachmentKind as 'image' | 'video' | 'audio'}
+              kind={attachmentKind as 'image' | 'video' | 'audio' | 'document'}
               mine={mine}
               filename={message.original_filename}
               attachmentWidth={message.attachment_width}
@@ -113,16 +149,6 @@ export const SupportMessageBubble: React.FC<Props> = ({ message, t, compact, onO
               }
             />
           </div>
-        ) : null}
-        {attachmentKind === 'document' && attachmentUrl ? (
-          <a
-            href={attachmentUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={`text-sm underline ${mine ? 'text-white' : 'text-primary'}`}
-          >
-            {message.original_filename || 'Document'}
-          </a>
         ) : null}
         {renderBody()}
         <div

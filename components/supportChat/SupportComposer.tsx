@@ -6,11 +6,14 @@ import { ChatPendingAttachmentChip } from '../chat/ChatPendingAttachmentChip';
 import { ChatVoiceRecordingBar } from '../chat/ChatVoiceRecordingBar';
 import { MicrophoneIcon, PaperclipIcon, SendPlaneIcon } from '../icons';
 import { useChatVoiceRecorder } from '../../hooks/useChatVoiceRecorder';
+import { inputTextDir } from '../../utils/inputAutoDir';
+import { useAppContext } from '../../context/AppContext';
 import type { SupportChatMessage } from '../../services/api';
 
 type Props = {
   t: (key: keyof typeof translations.en) => string;
   disabled?: boolean;
+  placeholderKey?: keyof typeof translations.en;
   replyTo: SupportChatMessage | null;
   onCancelReply: () => void;
   onSend: (payload: { body: string; file?: File }) => Promise<void>;
@@ -48,21 +51,21 @@ const iconBtnClass =
 export const SupportComposer: React.FC<Props> = ({
   t,
   disabled,
+  placeholderKey = 'supportChatSendPlaceholder',
   replyTo,
   onCancelReply,
   onSend,
   onOpenPending,
   compact = false,
 }) => {
+  const { language } = useAppContext();
   const [text, setText] = useState('');
   const [pendingFile, setPendingFile] = useState<File | null>(null);
-  const [sending, setSending] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const voice = useChatVoiceRecorder({
-    enabled: !disabled && !sending,
-    busy: sending,
+    enabled: !disabled,
     onRecordingComplete: (file) => setPendingFile(file),
     micDeniedKey: 'teamChatMicDenied',
   });
@@ -71,18 +74,17 @@ export const SupportComposer: React.FC<Props> = ({
     syncComposerHeight(textareaRef.current);
   }, [text]);
 
-  const handleSend = async () => {
+  const handleSend = () => {
     const body = text.trim();
-    if (!body && !pendingFile) return;
-    setSending(true);
-    try {
-      await onSend({ body, file: pendingFile ?? undefined });
-      setText('');
-      setPendingFile(null);
-      onCancelReply();
-    } finally {
-      setSending(false);
-    }
+    const file = pendingFile ?? undefined;
+    if (disabled || (!body && !file)) return;
+    setText('');
+    setPendingFile(null);
+    onCancelReply();
+    void onSend({ body, file }).catch(() => {
+      setText((current) => (current.trim() ? current : body));
+      if (file) setPendingFile((current) => current ?? file);
+    });
   };
 
   const canSend = Boolean(text.trim() || pendingFile);
@@ -174,16 +176,21 @@ export const SupportComposer: React.FC<Props> = ({
           variant="team"
         />
       ) : (
-        <div className="flex items-end gap-1.5">
+        <div className="flex items-end gap-1.5" dir="ltr">
           <textarea
             ref={textareaRef}
             value={text}
             onChange={(e) => setText(e.target.value)}
             rows={1}
-            disabled={disabled || sending}
-            placeholder={t('supportChatSendPlaceholder')}
+            disabled={disabled}
+            placeholder={t(placeholderKey)}
+            dir={inputTextDir(text, language === 'ar')}
             className="support-chat-composer-input flex-1 min-h-10 max-h-28 min-w-0 resize-none overflow-y-auto rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm leading-5 text-gray-900 placeholder:text-gray-500 focus:outline-none focus:ring-2 focus:ring-primary/80 dark:border-gray-500 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-400"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            style={{
+              scrollbarWidth: 'none',
+              msOverflowStyle: 'none',
+              textAlign: inputTextDir(text, language === 'ar') === 'rtl' ? 'right' : 'left',
+            }}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -203,7 +210,7 @@ export const SupportComposer: React.FC<Props> = ({
           />
           <button
             type="button"
-            disabled={disabled || sending}
+            disabled={disabled}
             onClick={() => fileRef.current?.click()}
             className={iconBtnClass}
             aria-label="Attach file"
@@ -212,7 +219,7 @@ export const SupportComposer: React.FC<Props> = ({
           </button>
           <button
             type="button"
-            disabled={disabled || sending}
+            disabled={disabled}
             onClick={() => voice.startVoiceRecording()}
             className={iconBtnClass}
             aria-label="Voice note"
@@ -221,13 +228,13 @@ export const SupportComposer: React.FC<Props> = ({
           </button>
           <button
             type="button"
-            disabled={disabled || sending || !canSend}
+            disabled={disabled || !canSend}
             onClick={() => void handleSend()}
             aria-label={t('send')}
             title={t('send')}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-white shadow-md shadow-primary/25 transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-500 disabled:shadow-none dark:disabled:bg-gray-600 dark:disabled:text-gray-400"
           >
-            <SendPlaneIcon className="h-[1.125rem] w-[1.125rem] rtl:-scale-x-100" aria-hidden />
+            <SendPlaneIcon className="h-[1.125rem] w-[1.125rem]" aria-hidden />
           </button>
         </div>
       )}

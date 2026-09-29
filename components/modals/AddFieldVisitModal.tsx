@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { AutoDirTextarea } from '../Input';
 import { Alert } from '../Alert';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
@@ -207,7 +208,7 @@ export const AddFieldVisitModal = () => {
                 )}
                 <div>
                     <Label htmlFor="fieldVisitSummary">{t('visitSummary') || 'Summary'} <span className="text-red-500">*</span></Label>
-                    <textarea
+                    <AutoDirTextarea
                         id="fieldVisitSummary"
                         rows={4}
                         value={summary}
@@ -215,7 +216,6 @@ export const AddFieldVisitModal = () => {
                             setSummary(e.target.value);
                             clearError('summary');
                         }}
-                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.summary ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
                     />
                     {errors.summary && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.summary}</p>}

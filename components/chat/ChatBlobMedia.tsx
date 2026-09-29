@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ArrowDownToLineIcon, PlayIcon } from '../icons';
+import { ArrowDownToLineIcon, FileTextIcon, PlayIcon } from '../icons';
 import { Loader } from '../Loader';
 import { ChatVoicePlayer } from './ChatVoicePlayer';
 import { translations } from '../../constants';
@@ -149,6 +149,60 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
     setLazyRequested(true);
   }, [urlIdentity]);
 
+  if (kind === 'document') {
+    const rawName = (filename || '').trim();
+    const docName = rawName || t('whatsappMediaDocumentPlaceholder');
+    const dot = rawName.lastIndexOf('.');
+    const ext =
+      dot > 0 && dot < rawName.length - 1 ? rawName.slice(dot + 1).toUpperCase() : '';
+    const ready = Boolean(blobUrl) && !failed;
+    const meta = failed
+      ? t('chatMediaCouldNotLoad')
+      : !ready
+        ? t('loading')
+        : ext || t('teamChatDownload');
+    return (
+      <a
+        href={ready ? blobUrl! : undefined}
+        download={ready ? docName : undefined}
+        onClick={ready ? undefined : (e) => e.preventDefault()}
+        aria-disabled={ready ? undefined : true}
+        aria-label={ready ? `${docName}. ${t('teamChatDownload')}` : docName}
+        className={`flex w-full min-w-[11rem] items-center gap-2.5 rounded-md px-2 py-1.5 no-underline ${
+          mine
+            ? 'bg-black/10 text-white'
+            : 'bg-black/[0.04] text-gray-900 dark:bg-white/5 dark:text-gray-50'
+        } ${ready ? 'hover:opacity-90' : ''}`}
+      >
+        <span
+          className={`flex size-9 shrink-0 items-center justify-center rounded-md ${
+            mine ? 'bg-white/20' : 'bg-primary/15 text-primary dark:text-primary-200'
+          }`}
+        >
+          <FileTextIcon className="size-5" aria-hidden />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-sm font-medium" dir="auto">
+            {docName}
+          </span>
+          <span
+            className={`block truncate text-[11px] ${
+              mine ? 'text-white/70' : 'text-gray-500 dark:text-gray-400'
+            }`}
+            dir="auto"
+          >
+            {meta}
+          </span>
+        </span>
+        {ready ? (
+          <ArrowDownToLineIcon className="size-4 shrink-0 opacity-80" aria-hidden />
+        ) : failed ? null : (
+          <Loader size="sm" presentational tone={mine ? 'light' : 'muted'} />
+        )}
+      </a>
+    );
+  }
+
   if (failed) {
     return (
       <span className={`text-xs ${mine ? 'text-white/80' : 'text-gray-500 dark:text-gray-400'}`}>
@@ -198,7 +252,6 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
     return <span className={`text-xs ${mine ? 'text-white/70' : 'text-gray-400'}`}>…</span>;
   }
 
-  const docName = filename || t('chatMediaDefaultFileName');
   const lazyAspectBoxClass = `relative w-full min-w-0 overflow-hidden rounded-lg ${maxHeightClass} ${mediumWidthClass}`;
   const openAria = t('chatMediaOpenAria');
 
@@ -294,25 +347,12 @@ export const ChatBlobMedia: React.FC<ChatBlobMediaProps> = ({
     return <div className={boxClass}>{videoInner}</div>;
   }
 
-  if (kind === 'audio') {
-    return (
-      <ChatVoicePlayer
-        blobUrl={blobUrl}
-        mine={mine}
-        t={t}
-        onIntrinsicLayout={onIntrinsicLayout}
-      />
-    );
-  }
   return (
-    <a
-      href={blobUrl}
-      download={docName}
-      className={`inline-flex text-sm font-semibold underline ${
-        mine ? 'text-white' : 'text-primary dark:text-primary-200'
-      }`}
-    >
-      {t('teamChatDownload')}
-    </a>
+    <ChatVoicePlayer
+      blobUrl={blobUrl}
+      mine={mine}
+      t={t}
+      onIntrinsicLayout={onIntrinsicLayout}
+    />
   );
 };

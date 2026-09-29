@@ -1,4 +1,5 @@
 import React, { useMemo, useEffect, useState, useRef } from 'react';
+import { AutoDirTextarea } from '../components/Input';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Modal, PlusIcon, WhatsappIcon, TrashIcon, SettingsIcon, Loader, Alert, PageLoadingState, SectionLoadingState, NumberInput, TableHorizontalScroll, Input, PhoneText, isPhoneLike } from '../components/index';
@@ -3496,7 +3497,7 @@ export const IntegrationsPage = () => {
                                         <p className="text-xs text-amber-600 dark:text-amber-400 mb-2">{t('sms_error_not_configured')}</p>
                                     )}
                                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1 mt-1">{t('messageContent')}</label>
-                                    <textarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={6} placeholder={t('messageContent')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y" />
+                                    <AutoDirTextarea value={campaignMessage} onChange={(e) => setCampaignMessage(e.target.value)} rows={6} placeholder={t('messageContent')} className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm resize-y" />
                                     {campaignChannel === 'whatsapp' && whatsAppLimits?.messaging_limit_tier && <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('whatsAppMessagingLimit')}: {whatsAppLimits.messaging_limit_tier === 'TIER_250' ? '250' : whatsAppLimits.messaging_limit_tier === 'TIER_1K' ? '1,000' : whatsAppLimits.messaging_limit_tier === 'TIER_10K' ? '10,000' : whatsAppLimits.messaging_limit_tier === 'TIER_100K' ? '100,000' : whatsAppLimits.messaging_limit_tier} {t('conversationsPerDay')}{whatsAppLimits.quality_rating && ` Â· ${t('quality')}: ${whatsAppLimits.quality_rating}`}</p>}
                                     {campaignProgress !== null && <p className="text-sm text-gray-600 dark:text-gray-400 mt-2">{t('campaignSentCount').replace('{sent}', String(campaignProgress.sent)).replace('{failed}', String(campaignProgress.failed))}</p>}
                                     {isRestrictedCampaignRole ? (
@@ -3528,7 +3529,7 @@ export const IntegrationsPage = () => {
                                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                                     {t('campaignRejectionReasonLabel')}
                                 </label>
-                                <textarea
+                                <AutoDirTextarea
                                     value={rejectReasonDraft}
                                     onChange={(e) => setRejectReasonDraft(e.target.value)}
                                     rows={3}
@@ -3940,7 +3941,6 @@ export const IntegrationsPage = () => {
                                                 value={metaPixelDrafts[account.id] ?? String(account.metadata?.pixel_id ?? '')}
                                                 onChange={(e) => setMetaPixelDrafts((prev) => ({ ...prev, [account.id]: e.target.value }))}
                                                 placeholder={t('metaPixelIdPlaceholder')}
-                                                dir={language === 'ar' ? 'rtl' : 'ltr'}
                                                 className="sm:max-w-md"
                                             />
                                             <Button

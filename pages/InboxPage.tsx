@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/Button';
-import { Input } from '../components/Input';
+import {Input, AutoDirTextarea } from '../components/Input';
 import { ChatBlobMedia } from '../components/chat/ChatBlobMedia';
 import { ChatConversationStatusMenu } from '../components/chat/ChatConversationStatusMenu';
 import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
@@ -26,6 +26,7 @@ import {
   InboxMessageAttachment,
 } from '../components/inbox/InboxMessageList';
 import {
+  Loader,
   MapPinIcon,
   MicrophoneIcon,
   PaperclipIcon,
@@ -68,6 +69,11 @@ import {
   canConvertSocialConversation,
   isSocialInboxStaffScoped,
 } from '../utils/socialInboxAccess';
+import {
+  isWhatsAppTypeStubBody,
+  localizeWhatsAppListPreview,
+  localizeWhatsAppMessageBody,
+} from '../utils/whatsappMessageBodyDisplay';
 import {
   WA_ALERT_ERROR,
   WA_ALERT_INFO,
@@ -260,7 +266,7 @@ export const InboxPage: React.FC = () => {
     [conversations, selectedId]
   );
 
-  const { data: threadData, isFetching: threadFetching } = useSocialMessages(
+  const { data: threadData, isLoading: threadLoading } = useSocialMessages(
     selectedId ?? undefined,
     { refetchInterval: pollMs }
   );
@@ -633,7 +639,7 @@ export const InboxPage: React.FC = () => {
                     ) : null}
                   </div>
                   <p className="mt-0.5 truncate text-xs text-gray-600 dark:text-gray-300">
-                    {row.last_message_preview}
+                    {localizeWhatsAppListPreview(row.last_message_preview || '', t)}
                   </p>
                   {row.client ? (
                     <span className="mt-1 inline-block max-w-full truncate rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-100">
@@ -748,9 +754,16 @@ export const InboxPage: React.FC = () => {
               </div>
 
               <div className={`${WA_THREAD_WALLPAPER} min-h-0 flex-1 space-y-2 overflow-y-auto p-4`}>
-                {threadFetching && messages.length === 0 && (
-                  <p className="text-center text-xs text-gray-500">{t('loading')}</p>
-                )}
+                {threadLoading && messages.length === 0 ? (
+                  <div
+                    className="flex flex-col items-center justify-center gap-3 py-16 text-center"
+                    role="status"
+                    aria-live="polite"
+                  >
+                    <Loader variant="primary" size="lg" label={t('loading')} />
+                    <p className="text-sm text-gray-500 dark:text-gray-400">{t('loading')}</p>
+                  </div>
+                ) : null}
                 {isWhatsappThread &&
                   threadCalls.map((call) => (
                     <ChatCallBubble
@@ -780,6 +793,12 @@ export const InboxPage: React.FC = () => {
                 {messages.map((message) => {
                   const outbound = message.direction === 'outbound';
                   const failed = message.delivery_status === 'failed';
+                  const rawBody = message.body || '';
+                  const hideStub =
+                    (Boolean(blobMediaKind(message.attachment_kind) && message.has_attachment) ||
+                      message.location_latitude != null) &&
+                    isWhatsAppTypeStubBody(rawBody);
+                  const text = hideStub ? '' : localizeWhatsAppMessageBody(rawBody, t);
                   return (
                     <div
                       key={message.id}
@@ -791,9 +810,9 @@ export const InboxPage: React.FC = () => {
                         }`}
                       >
                         <InboxMessageAttachment message={message} t={t} onOpenMedia={openMedia} />
-                        {message.body ? (
+                        {text.trim() ? (
                           <p className="whitespace-pre-wrap break-words [unicode-bidi:plaintext]" dir="auto">
-                            {message.body}
+                            {text}
                           </p>
                         ) : null}
                         <div className="flex items-center justify-end gap-1.5 text-[10px] opacity-70">
@@ -970,7 +989,7 @@ export const InboxPage: React.FC = () => {
                             <MapPinIcon className="size-[1.2rem]" />
                           </button>
                         ) : null}
-                        <textarea
+                        <AutoDirTextarea
                           ref={textareaRef}
                           rows={1}
                           value={draft}
@@ -993,6 +1012,7 @@ export const InboxPage: React.FC = () => {
                             height: COMPOSER_MIN_H_PX,
                             minHeight: COMPOSER_MIN_H_PX,
                             maxHeight: COMPOSER_MAX_H_PX,
+                            textAlign: textDir === 'rtl' ? 'right' : 'left',
                           }}
                         />
                       </>

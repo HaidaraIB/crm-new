@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { PhoneText, isPhoneLike, PHONE_BIDI_CLASS, RefreshButton } from '../index';
+import { Loader, PhoneText, isPhoneLike, PHONE_BIDI_CLASS, RefreshButton } from '../index';
 import { RefreshIcon, PhoneIcon, ListIcon, ChatBubbleIcon } from '../icons';
 import {
   getWhatsAppContactAvatarLabel,
@@ -101,6 +101,19 @@ export const ChatThread: React.FC<Props> = ({
   const newDividerRef = useRef<HTMLDivElement | null>(null);
   const chatKey = `${selectedClient?.id ?? ''}|${selectedClient?.phone_number ?? ''}|${selectedClient?.manual_phone ?? ''}`;
   const hasSelection = !!selectedClient;
+
+  /**
+   * An empty transcript is "no messages" only after this chat's fetch has settled.
+   * Until then the list preview already shows a last message, and the thread would
+   * otherwise flash the empty state for the whole request (`isLoading` is false
+   * once a cached `[]` exists, and `refetchOnMount: 'always'` replaces it later).
+   * Background polls keep the settled key, so a genuinely empty chat does not
+   * flicker back to the spinner.
+   */
+  const [transcriptSettledKey, setTranscriptSettledKey] = useState('');
+  useEffect(() => {
+    if (!isLoading && !isFetching) setTranscriptSettledKey(chatKey);
+  }, [chatKey, isLoading, isFetching]);
 
   const threadItems = useMemo(
     () =>
@@ -351,20 +364,33 @@ export const ChatThread: React.FC<Props> = ({
         lang="und"
       >
         {threadItems.length === 0 ? (
-          <div
-            className="flex min-h-full flex-1 flex-col items-center justify-center px-6 py-16 text-center"
-            dir={language === 'ar' ? 'rtl' : 'ltr'}
-          >
-            <div className="mb-4 flex size-20 items-center justify-center rounded-full bg-primary/15 text-primary">
-              <ChatBubbleIcon className="size-10 opacity-90" aria-hidden />
+          transcriptSettledKey !== chatKey || isLoading ? (
+            <div
+              className="flex min-h-full flex-1 flex-col items-center justify-center gap-3 px-6 py-16 text-center"
+              dir={language === 'ar' ? 'rtl' : 'ltr'}
+              role="status"
+              aria-live="polite"
+              aria-busy="true"
+            >
+              <Loader variant="primary" size="lg" presentational />
+              <p className="text-sm text-gray-500 dark:text-gray-400">{t('loading')}</p>
             </div>
-            <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
-              {t('whatsappThreadEmpty')}
-            </p>
-            <p className="mt-1.5 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-              {t('whatsappThreadEmptyHint')}
-            </p>
-          </div>
+          ) : (
+            <div
+              className="flex min-h-full flex-1 flex-col items-center justify-center px-6 py-16 text-center"
+              dir={language === 'ar' ? 'rtl' : 'ltr'}
+            >
+              <div className="mb-4 flex size-20 items-center justify-center rounded-full bg-primary/15 text-primary">
+                <ChatBubbleIcon className="size-10 opacity-90" aria-hidden />
+              </div>
+              <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
+                {t('whatsappThreadEmpty')}
+              </p>
+              <p className="mt-1.5 max-w-sm text-sm text-gray-500 dark:text-gray-400">
+                {t('whatsappThreadEmptyHint')}
+              </p>
+            </div>
+          )
         ) : (
         <div ref={scrollerContentRef} className="mt-auto flex flex-col space-y-2 px-3 py-2">
           {threadItems.map((item) => {

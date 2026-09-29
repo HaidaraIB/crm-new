@@ -396,7 +396,6 @@ export const EditUserModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="edit-user-password">{t('newUserPassword')}</Label>
-                    <div className="relative">
                         <Input 
                             id="edit-user-password" 
                             type={passwordVisible ? 'text' : 'password'}
@@ -404,17 +403,18 @@ export const EditUserModal = () => {
                             onChange={handleChange} 
                             placeholder={t('leaveBlankPassword')}
                             autoComplete="new-password"
-                            className={`pe-10 ${errors.password ? 'border-red-500 dark:border-red-500' : ''}`}
+                            className={errors.password ? 'border-red-500 dark:border-red-500' : ''}
+                            endAdornment={
+                              <button
+                                type="button"
+                                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                                onClick={() => setPasswordVisible((v) => !v)}
+                                aria-label={passwordVisible ? (t('hidePassword') || 'Hide password') : (t('showPassword') || 'Show password')}
+                              >
+                                {passwordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                              </button>
+                            }
                         />
-                        <button
-                            type="button"
-                            className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                            onClick={() => setPasswordVisible((v) => !v)}
-                            aria-label={passwordVisible ? (t('hidePassword') || 'Hide password') : (t('showPassword') || 'Show password')}
-                        >
-                            {passwordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                        </button>
-                    </div>
                     {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                     {!errors.password && formState.password && (
                         <p className="text-gray-500 text-xs mt-1">{t('leaveBlankPassword') || 'Leave blank to keep current password'}</p>

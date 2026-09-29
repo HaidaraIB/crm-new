@@ -70,12 +70,12 @@ export const SupportChatThread: React.FC<Props> = ({
   };
 
   const handleSend = async (payload: { body: string; file?: File }) => {
+    const replyToMessageId = replyTo?.id;
     await sendMutation.mutateAsync({
       body: payload.body,
       file: payload.file,
-      replyToMessageId: replyTo?.id,
+      replyToMessageId,
     });
-    setReplyTo(null);
   };
 
   if (isLoading) {
@@ -87,6 +87,12 @@ export const SupportChatThread: React.FC<Props> = ({
   }
 
   const empty = messages.length === 0;
+  const status = conversation?.status;
+  const composerDisabled = status === 'pending' || sendMutation.isPending;
+  const composerPlaceholderKey =
+    status === 'resolved' || status === undefined
+      ? 'supportChatRequestPlaceholder'
+      : 'supportChatSendPlaceholder';
 
   const shellClass = isWidget
     ? `flex flex-col min-h-0 flex-1 overflow-hidden ${className}`
@@ -98,15 +104,23 @@ export const SupportChatThread: React.FC<Props> = ({
         <header className="px-4 py-3 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shrink-0">
           <h3 className="font-semibold text-gray-900 dark:text-gray-100">{t('supportChatTitle')}</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('supportChatIntro')}</p>
-          {conversation?.status === 'resolved' ? (
+          {status === 'resolved' ? (
             <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">{t('supportChatResolvedNotice')}</p>
+          ) : null}
+          {status === 'pending' ? (
+            <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">{t('supportChatPendingNotice')}</p>
           ) : null}
         </header>
       ) : null}
 
-      {isWidget && conversation?.status === 'resolved' ? (
+      {isWidget && status === 'resolved' ? (
         <p className="shrink-0 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50/90 dark:bg-amber-950/40 border-b border-amber-200/50 dark:border-amber-800/50">
           {t('supportChatResolvedNotice')}
+        </p>
+      ) : null}
+      {isWidget && status === 'pending' ? (
+        <p className="shrink-0 px-3 py-1.5 text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50/90 dark:bg-amber-950/40 border-b border-amber-200/50 dark:border-amber-800/50">
+          {t('supportChatPendingNotice')}
         </p>
       ) : null}
 
@@ -169,7 +183,8 @@ export const SupportChatThread: React.FC<Props> = ({
 
       <SupportComposer
         t={t as (key: keyof typeof import('../../constants').translations.en) => string}
-        disabled={sendMutation.isPending}
+        disabled={composerDisabled}
+        placeholderKey={composerPlaceholderKey}
         replyTo={replyTo}
         onCancelReply={() => setReplyTo(null)}
         onSend={handleSend}

@@ -6950,7 +6950,7 @@ export async function unpinTenantChatMessageAPI(conversationId: number, messageI
 
 export type SupportChatConversation = {
   id: number;
-  status: 'open' | 'resolved';
+  status: 'pending' | 'open' | 'resolved';
   last_message_at: string | null;
   last_message_side: 'tenant' | 'support' | null;
   last_message_preview: string;
@@ -6962,7 +6962,7 @@ export type SupportChatConversation = {
 
 export type SupportChatMessage = {
   id: number;
-  side: 'tenant' | 'support';
+  side: 'tenant' | 'support' | 'system';
   body: string;
   created_at: string;
   is_mine: boolean;

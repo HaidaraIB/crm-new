@@ -1,9 +1,12 @@
 import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AutoDirTextarea } from '../components/Input';
 import { createPortal } from 'react-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { translations } from '../constants';
 import { withLatinDigits } from '../utils/dateUtils';
+import { inputTextDir } from '../utils/inputAutoDir';
+import { localizeWhatsAppListPreview } from '../utils/whatsappMessageBodyDisplay';
 import { PageWrapper, Button, Modal, Loader } from '../components/index';
 import {
   ChatBubbleIcon,
@@ -1470,10 +1473,8 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
   const shellClass =
     'rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 shadow-sm dark:shadow-none overflow-hidden';
 
-  /** Empty: align placeholder with UI lang. Typing: auto like Telegram (first strong char sets paragraph direction). */
-  const composerDir = draft.length > 0 ? 'auto' : language === 'ar' ? 'rtl' : 'ltr';
-  const forwardCaptionDir =
-    forwardCaption.length > 0 ? 'auto' : language === 'ar' ? 'rtl' : 'ltr';
+  const composerDir = inputTextDir(draft, language === 'ar');
+  const forwardCaptionDir = inputTextDir(forwardCaption, language === 'ar');
 
   useEffect(() => {
     if (variant !== 'dialog' || !onClose) return;
@@ -1550,7 +1551,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                   const isGroup = tenantChatConvIsGroup(c);
                   const label = tenantChatConvTitle(c, t);
                   const initials = tenantChatConvInitials(c, t);
-                  const previewFull = c.last_message?.body || '';
+                  const previewFull = localizeWhatsAppListPreview(c.last_message?.body || '', t);
                   const preview = previewFull.slice(0, 80);
                   return (
                     <li key={c.id}>
@@ -1858,7 +1859,6 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                     {!mine && (
                                       <div
                                         className="mb-1 flex flex-wrap items-center gap-1.5 text-xs font-semibold text-primary dark:text-primary-200"
-                                        dir="auto"
                                       >
                                         <span className="min-w-0 truncate">{peerDisplayName(m.sender as TenantChatPeer)}</span>
                                         {selected && tenantChatConvIsGroup(selected) ? (
@@ -1934,7 +1934,9 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                                         className={
                                           m.attachment_kind === 'audio'
                                             ? 'mb-2 w-full min-w-0'
-                                            : 'mb-2 w-[min(85vw,28rem)] max-w-full'
+                                            : m.attachment_kind === 'document'
+                                              ? 'mb-2 w-[min(70vw,16rem)] max-w-full'
+                                              : 'mb-2 w-[min(85vw,28rem)] max-w-full'
                                         }
                                       >
                                         <ChatBlobMedia
@@ -2151,7 +2153,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                 {micError ? (
                   <p className="mx-auto mb-2 max-w-3xl text-center text-xs text-red-600 dark:text-red-400">{micError}</p>
                 ) : null}
-                <div className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2">
+                <div className="mx-auto flex w-full max-w-3xl min-w-0 items-center gap-2" dir="ltr">
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -2193,7 +2195,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                         >
                           <PaperclipIcon className="size-[1.35rem]" />
                         </button>
-                        <textarea
+                        <AutoDirTextarea
                           ref={composerRef}
                           rows={1}
                           placeholder={t('teamChatMessagePlaceholder')}
@@ -2203,7 +2205,8 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                           disabled={sendMutation.isPending || compressingAttachment}
                           autoComplete="off"
                           dir={composerDir}
-                          className={`custom-scrollbar m-0 box-border max-h-[min(40vh,15rem)] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0.5 py-2 text-base leading-normal text-gray-900 shadow-none placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500 ${chatAutoDirClass}`}
+                          className="custom-scrollbar m-0 box-border max-h-[min(40vh,15rem)] min-h-10 min-w-0 flex-1 resize-none overflow-y-auto border-0 bg-transparent px-0.5 py-2 text-base leading-normal text-gray-900 shadow-none placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-0 dark:text-gray-100 dark:placeholder:text-gray-500"
+                          style={{ textAlign: composerDir === 'rtl' ? 'right' : 'left' }}
                         />
                         <button
                           type="button"
@@ -2340,7 +2343,6 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                       <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
                         <span
                           className="inline-flex max-w-full rounded-full bg-gray-100 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-gray-600 ring-1 ring-gray-200/80 dark:bg-gray-800 dark:text-gray-300 dark:ring-gray-600"
-                          dir="auto"
                         >
                           {u.role}
                         </span>
@@ -2378,7 +2380,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
           <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">
             {t('teamChatForwardCaption')}
           </span>
-          <textarea
+          <AutoDirTextarea
             ref={forwardCaptionRef}
             rows={1}
             placeholder={t('teamChatForwardCaptionPlaceholder')}
@@ -2387,7 +2389,8 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
             disabled={forwardMutation.isPending}
             autoComplete="off"
             dir={forwardCaptionDir}
-            className={`custom-scrollbar m-0 box-border block w-full min-h-11 max-h-[min(40vh,15rem)] resize-none overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base leading-6 text-gray-900 shadow-sm placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500 ${chatAutoDirClass}`}
+            className="custom-scrollbar m-0 box-border block w-full min-h-11 max-h-[min(40vh,15rem)] resize-none overflow-y-auto rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 text-base leading-6 text-gray-900 shadow-sm placeholder:text-gray-400 placeholder:text-base focus:outline-none focus:ring-2 focus:ring-primary dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
+            style={{ textAlign: forwardCaptionDir === 'rtl' ? 'right' : 'left' }}
           />
         </label>
         <div className="max-h-72 overflow-y-auto custom-scrollbar">

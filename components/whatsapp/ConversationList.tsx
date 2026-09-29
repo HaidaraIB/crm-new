@@ -22,7 +22,8 @@ import {
 } from './whatsappChatTheme';
 import { translations } from '../../constants';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../../utils/dateUtils';
-import { localizeWhatsAppMessageBody } from '../../utils/whatsappMessageBodyDisplay';
+import { localizeWhatsAppListPreview } from '../../utils/whatsappMessageBodyDisplay';
+import { resolveInputDir } from '../../utils/inputAutoDir';
 import {
   WHATSAPP_STATUS_COLORS,
   chatStatusLabelKey,
@@ -118,6 +119,7 @@ export const ConversationList: React.FC<Props> = ({
   const [submenu, setSubmenu] = useState<'status' | 'snooze' | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
+  const searchDir = resolveInputDir('text', search, language === 'ar');
 
   useEffect(() => {
     if (!menuForId) return;
@@ -190,7 +192,7 @@ export const ConversationList: React.FC<Props> = ({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder={t('searchConversations')}
-            dir={language === 'ar' ? 'rtl' : 'ltr'}
+            dir={searchDir}
             className="w-full rounded-lg border border-gray-200 bg-gray-50 py-1.5 ps-8 pe-3 text-sm text-gray-900 placeholder:text-gray-400 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100"
           />
         </div>
@@ -216,7 +218,7 @@ export const ConversationList: React.FC<Props> = ({
           const title = getWhatsAppContactTitle(client);
           const rawPreview = lastMessagePreview || getWhatsAppContactSubtitle(client) || '';
           const subtitle = lastMessagePreview
-            ? localizeWhatsAppMessageBody(lastMessagePreview, t)
+            ? localizeWhatsAppListPreview(lastMessagePreview, t)
             : rawPreview;
           const isSnoozed = status === 'snoozed';
           const menuOpen = menuForId === id;

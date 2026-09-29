@@ -1352,7 +1352,7 @@ export const RegisterPage = () => {
                                             {t('password')} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
 
-                                        <div className="relative">
+                                        <div>
                                             <Input
                                                 id="password"
                                                 name="register-password"
@@ -1364,16 +1364,17 @@ export const RegisterPage = () => {
                                                     setPassword(e.target.value);
                                                     clearFieldError('password');
                                                 }}
-                                                className={`pe-10 ${errors.password ? 'border-red-500' : ''}`}
+                                                className={errors.password ? 'border-red-500' : ''}
+                                                endAdornment={
+                                                  <button
+                                                    type="button"
+                                                    className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                                                    onClick={handlePasswordVisibilityToggle}
+                                                  >
+                                                    {passwordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                                                  </button>
+                                                }
                                             />
-
-                                            <button
-                                                type="button"
-                                                className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
-                                                onClick={handlePasswordVisibilityToggle}
-                                            >
-                                                {passwordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                                            </button>
                                         </div>
 
                                         <p className="mt-2 text-xs text-secondary">
@@ -1391,7 +1392,7 @@ export const RegisterPage = () => {
                                             {t('confirmPassword')} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
 
-                                        <div className="relative">
+                                        <div>
                                             <Input
                                                 id="confirm-password"
                                                 name="register-confirm-password"
@@ -1403,16 +1404,17 @@ export const RegisterPage = () => {
                                                     setConfirmPassword(e.target.value);
                                                     clearFieldError('confirmPassword');
                                                 }}
-                                                className={`pe-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                                                className={errors.confirmPassword ? 'border-red-500' : ''}
+                                                endAdornment={
+                                                  <button
+                                                    type="button"
+                                                    className="text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
+                                                    onClick={handleConfirmPasswordVisibilityToggle}
+                                                  >
+                                                    {confirmPasswordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                                                  </button>
+                                                }
                                             />
-
-                                            <button
-                                                type="button"
-                                                className="absolute inset-y-0 end-0 flex items-center pe-3 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-100"
-                                                onClick={handleConfirmPasswordVisibilityToggle}
-                                            >
-                                                {confirmPasswordVisible ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                                            </button>
                                         </div>
 
                                         {errors.confirmPassword && (

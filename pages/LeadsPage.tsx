@@ -23,6 +23,7 @@ import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { ARABIC_DATE_LOCALE, formatTimelineDate, withLatinDigits } from '../utils/dateUtils';
 import { MarqueeText } from '../components/MarqueeText';
+import { resolveInputDir } from '../utils/inputAutoDir';
 import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 const LEADS_STATUS_TAB_STORAGE_KEY = 'crm:leadsStatusTab';
@@ -812,7 +813,7 @@ export const LeadsPage = () => {
                                     }
                                 }}
                                 placeholder={t('searchLeadsPlaceholderEnter') || 'Name or phone — press Enter to search'}
-                                dir={language === 'ar' ? 'rtl' : 'ltr'}
+                                dir={resolveInputDir('text', leadSearchDraft, language === 'ar')}
                                 autoComplete="off"
                                 className={`w-full min-w-0 py-2 ps-9 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${showLeadSearchClear ? 'pe-9' : 'pe-3'}`}
                                 aria-label={t('searchLeadsPlaceholderEnter') || t('searchLeadsByNameOrPhone')}

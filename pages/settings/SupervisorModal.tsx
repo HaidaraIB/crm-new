@@ -365,24 +365,23 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
           {!editingSupervisor && (
             <div>
               <Label htmlFor="supervisor-password">{t('password')} *</Label>
-              <div className="relative">
                 <Input
                   id="supervisor-password"
                   name="password"
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password || ''}
                   onChange={handleChange}
-                  className="pe-10"
+                  endAdornment={
+                    <button
+                      type="button"
+                      className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      aria-label={showPassword ? t('hidePassword') : t('showPassword')}
+                    >
+                      {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+                    </button>
+                  }
                 />
-                <button
-                  type="button"
-                  className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-                  onClick={() => setShowPassword((prev) => !prev)}
-                  aria-label={showPassword ? t('hidePassword') : t('showPassword')}
-                >
-                  {showPassword ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
-                </button>
-              </div>
               {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
             </div>
           )}

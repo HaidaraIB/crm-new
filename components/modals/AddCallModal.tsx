@@ -1,4 +1,5 @@
 import { Alert } from '../Alert';
+import { AutoDirTextarea } from '../Input';
 
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
@@ -174,7 +175,7 @@ export const AddCallModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="notes">{t('notes')} <span className="text-red-500">*</span></Label>
-                    <textarea 
+                    <AutoDirTextarea 
                         id="notes" 
                         rows={4} 
                         value={notes}
@@ -182,7 +183,6 @@ export const AddCallModal = () => {
                             setNotes(e.target.value);
                             clearError('notes');
                         }}
-                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.notes ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
                         placeholder={t('writeCallDetails') || 'Write call details...'}
                     />

@@ -107,7 +107,11 @@ export const InboxMessageAttachment: React.FC<{
       {mediaKind && url ? (
         <div
           className={
-            mediaKind === 'audio' ? 'mb-1 w-full min-w-0' : 'mb-1 w-[min(70vw,20rem)] max-w-full'
+            mediaKind === 'audio'
+              ? 'mb-1 w-full min-w-0'
+              : mediaKind === 'document'
+                ? 'mb-1 w-[min(70vw,16rem)] max-w-full'
+                : 'mb-1 w-[min(70vw,20rem)] max-w-full'
           }
         >
           <ChatBlobMedia

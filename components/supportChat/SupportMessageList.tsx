@@ -172,11 +172,15 @@ export const SupportMessageList: React.FC<Props> = ({
             {olderLoading ? '…' : t('supportChatLoadOlder')}
           </button>
         ) : null}
-        {messages.map((m) => (
-          <MessageReplyGesture key={m.id} label={t('supportChatReply')} onReply={() => onReply(m)}>
-            <SupportMessageBubble message={m} t={t} compact={compact} onOpenMedia={onOpenMedia} />
-          </MessageReplyGesture>
-        ))}
+        {messages.map((m) =>
+          m.side === 'system' ? (
+            <SupportMessageBubble key={m.id} message={m} t={t} compact={compact} onOpenMedia={onOpenMedia} />
+          ) : (
+            <MessageReplyGesture key={m.id} label={t('supportChatReply')} onReply={() => onReply(m)}>
+              <SupportMessageBubble message={m} t={t} compact={compact} onOpenMedia={onOpenMedia} />
+            </MessageReplyGesture>
+          )
+        )}
       </div>
       {showJumpToLatest && onJumpToLatest ? (
         <button

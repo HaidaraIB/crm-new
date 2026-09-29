@@ -312,24 +312,23 @@ export const AddUserModal = () => {
                     />
                     {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                 </div>
-                <div>
+                    <div>
                     <Label htmlFor="add-user-password">{t('password')} *</Label>
-                    <div className="relative">
                         <Input 
                             id="add-user-password" 
                             type={passwordVisible ? 'text' : 'password'}
                             value={formData.password}
                             onChange={(e) => handleChange('password', e.target.value)}
-                            className="pe-10"
+                            endAdornment={
+                              <button 
+                                type="button"
+                                className="text-gray-400"
+                                onClick={() => setPasswordVisible(!passwordVisible)}
+                              >
+                                {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
+                              </button>
+                            }
                         />
-                        <button 
-                            type="button"
-                            className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400"
-                            onClick={() => setPasswordVisible(!passwordVisible)}
-                        >
-                            {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
-                        </button>
-                    </div>
                     {errors.password && <p className="text-red-500 text-xs mt-1">{errors.password}</p>}
                 </div>
                 <div>

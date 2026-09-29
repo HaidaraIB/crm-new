@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { SectionLoadingState } from '../components/SectionLoadingState';
 import {
   PageWrapper,
@@ -68,24 +68,29 @@ export const LibraryPage = () => {
     null,
   );
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await listCompanyLibraryAPI();
-      setFiles(data.results || []);
-      setQuota(data.quota || null);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : t('libraryLoadError');
-      setError(message);
-    } finally {
-      setLoading(false);
-    }
-  }, [t]);
-
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    void (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const data = await listCompanyLibraryAPI();
+        if (cancelled) return;
+        setFiles(data.results || []);
+        setQuota(data.quota || null);
+      } catch (err: unknown) {
+        if (cancelled) return;
+        setError(err instanceof Error ? err.message : t('libraryLoadError'));
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Mount-only: `t` is recreated on every AppContext render (modals/notifications).
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional
+  }, []);
 
   const mediaAlbum = useMemo((): ChatMediaAlbumItem[] => {
     return files
@@ -228,12 +233,17 @@ export const LibraryPage = () => {
           <div className="mb-6">
             <div className="mb-1 flex justify-between text-sm text-gray-600 dark:text-gray-300">
               <span>
-                {t('libraryStorageUsed') || 'Storage used'}: {formatBytes(used)}
-                {maxStorage != null ? ` / ${formatBytes(maxStorage)}` : ''}
+                {t('libraryStorageUsed') || 'Storage used'}:{' '}
+                <span dir="ltr" className="inline-block tabular-nums [unicode-bidi:isolate]">
+                  {formatBytes(used)}
+                  {maxStorage != null ? ` / ${formatBytes(maxStorage)}` : ''}
+                </span>
               </span>
               <span>
                 {t('libraryMaxFileSize') || 'Max file size'}:{' '}
-                {formatBytes(quota.max_file_size_bytes)}
+                <span dir="ltr" className="inline-block tabular-nums [unicode-bidi:isolate]">
+                  {formatBytes(quota.max_file_size_bytes)}
+                </span>
               </span>
             </div>
             {pct != null && (

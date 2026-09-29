@@ -1,0 +1,23 @@
+---
+description: Free-text inputs follow first strong letter (dir=auto); structured fields stay LTR
+alwaysApply: true
+---
+
+# Input text direction (first letter)
+
+Free-text **inputs** and **textareas** use `resolveInputDir()` / `inputTextDir()` from [`utils/inputAutoDir.ts`](utils/inputAutoDir.ts): **empty → UI language**; once the user types, **first strong letter** wins. Do **not** use bare `dir="auto"` on fields (empty placeholders misalign in Chrome).
+
+- [`components/Input.tsx`](components/Input.tsx): wraps field + optional `endAdornment` (password reveal) in one `dir={resolvedDir}` shell so inline-end controls stay opposite the text.
+- [`AutoDirTextarea`](components/Input.tsx) for bare textareas; filter/settings inputs use the same resolver.
+- Do **not** use [`getTextDirection`](utils/textDirection.ts) for inputs — that is for row layout when any RTL char appears anywhere.
+
+## Exceptions (always LTR when filled)
+
+Phone (`PhoneInput`, `type=tel`), email, URL, dates, API keys, webhooks, monospace secrets.
+
+**Numbers:** use [`NumberInput`](components/NumberInput.tsx) or `Input type="number"`. Empty → UI language (Arabic placeholder aligns right); non-empty value → LTR. Do not force `dir="ltr"` on empty numeric fields.
+
+## Related
+
+- Display phones: `phone-rtl-display` rule (`PhoneText`), not inputs.
+- Chat composers may compute direction explicitly; same first-letter semantics.

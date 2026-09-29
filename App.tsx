@@ -16,7 +16,6 @@ import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, Ed
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
-import { SupportChatLauncher } from './components/supportChat';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import ImpersonationBanner from './components/ImpersonationBanner';
@@ -31,6 +30,7 @@ import {
     isGatewayPaymentReturnSearch,
     isPaymentSuccessPath,
 } from './utils/paymentSession';
+import { syncInputDirections } from './utils/inputAutoDir';
 
 /** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
 function CurrentPageContent({ currentPage }: { currentPage: Page }) {
@@ -549,6 +549,7 @@ const TheApp = () => {
     React.useEffect(() => {
         document.documentElement.lang = language;
         document.documentElement.dir = language === 'ar' ? 'rtl' : 'ltr';
+        syncInputDirections();
     }, [language]);
 
     // Single scroll container: main only (prevents body + main double scroll / white gap below app)
@@ -1163,7 +1164,6 @@ const TheApp = () => {
             <PbxScreenPopListener />
             <ArrivalAlertHost />
             <WorkSessionTrackerHost />
-            <SupportChatLauncher />
         </div>
         );
     };

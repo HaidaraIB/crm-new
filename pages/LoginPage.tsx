@@ -530,7 +530,7 @@ export const LoginPage = () => {
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.username}</p>
                             )}
                         </div>
-                        <div className="relative">
+                        <div>
                            <label htmlFor="password" className="sr-only">{t('password')}</label>
                            <Input 
                                 id="password" 
@@ -538,6 +538,15 @@ export const LoginPage = () => {
                                 placeholder={t('password')} 
                                 value={password}
                                 className={errors.password ? 'border-red-500' : ''}
+                                endAdornment={
+                                  <button 
+                                    type="button"
+                                    className="text-gray-400"
+                                    onClick={() => setPasswordVisible(!passwordVisible)}
+                                  >
+                                    {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
+                                  </button>
+                                }
                                 onChange={(e) => {
                                     setPassword(e.target.value);
                                     setErrors((prev) => {
@@ -554,13 +563,6 @@ export const LoginPage = () => {
                                     }
                                 }}
                            />
-                           <button 
-                                type="button"
-                                className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400"
-                                onClick={() => setPasswordVisible(!passwordVisible)}
-                           >
-                            {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
-                           </button>
                            {errors.password && (
                                 <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.password}</p>
                            )}

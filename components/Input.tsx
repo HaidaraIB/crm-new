@@ -1,41 +1,116 @@
-
-
-import React, { ReactNode, InputHTMLAttributes, forwardRef } from 'react';
+import React, { forwardRef, InputHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { resolveInputDir } from '../utils/inputAutoDir';
 
-// FIX: Added `defaultValue` prop to support uncontrolled inputs.
-// FIX: Allow any native input attributes.
-// FIX: Added forwardRef to support ref forwarding
-export const Input = forwardRef<HTMLInputElement, {
-    id?: string; 
-    type?: string; 
-    placeholder?: string; 
-    value?: string; 
-    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void; 
-    className?: string; 
-    icon?: ReactNode; 
+/** Tailwind classes for a trailing control (password reveal, etc.) inside the same `dir` wrapper as the field. */
+export const INPUT_TRAILING_ADORNMENT_PAD = 'pe-10';
+export const INPUT_TRAILING_ADORNMENT_BTN =
+  'absolute inset-y-0 end-0 z-10 flex items-center pe-3 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300';
+
+export const Input = forwardRef<
+  HTMLInputElement,
+  {
+    id?: string;
+    type?: string;
+    placeholder?: string;
+    value?: string;
+    onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    className?: string;
+    icon?: React.ReactNode;
     defaultValue?: string;
-} & InputHTMLAttributes<HTMLInputElement>>(({ id, type = 'text', placeholder, value, onChange, className = '', icon, defaultValue, ...rest }, ref) => {
+    /** Renders inside the field direction wrapper at inline-end (password reveal, etc.). */
+    endAdornment?: React.ReactNode;
+  } & InputHTMLAttributes<HTMLInputElement>
+>(
+  (
+    {
+      id,
+      type = 'text',
+      placeholder,
+      value,
+      onChange,
+      className = '',
+      icon,
+      defaultValue,
+      dir,
+      endAdornment,
+      ...rest
+    },
+    ref,
+  ) => {
     const { language } = useAppContext();
-    const paddingClass = icon ? (language === 'ar' ? 'pe-10' : 'ps-10') : '';
-    const iconPosition = language === 'ar' ? 'end-0 pe-3' : 'start-0 ps-3';
-    
+    const uiIsRtl = language === 'ar';
+    const text = String(value ?? defaultValue ?? '');
+    const resolvedDir = dir ?? resolveInputDir(type, text, uiIsRtl);
+    const leadingPad = icon ? 'ps-10' : '';
+    const trailingPad = endAdornment ? INPUT_TRAILING_ADORNMENT_PAD : '';
+
     return (
-        <div className="relative">
-            <input
-                ref={ref}
-                id={id}
-                type={type}
-                placeholder={placeholder}
-                value={value}
-                onChange={onChange}
-                defaultValue={defaultValue}
-                dir={language === 'ar' ? 'rtl' : 'ltr'}
-                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-300 ${paddingClass} ${className}`}
-                {...rest}
-            />
-            {icon && <div className={`absolute inset-y-0 ${iconPosition} flex items-center text-gray-600 dark:text-gray-400`}>{icon}</div>}
-        </div>
+      <div className="relative w-full" dir={resolvedDir}>
+        <input
+          ref={ref}
+          id={id}
+          type={type}
+          placeholder={placeholder}
+          value={value}
+          onChange={onChange}
+          defaultValue={defaultValue}
+          dir={resolvedDir}
+          className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-300 ${leadingPad} ${trailingPad} ${className}`}
+          {...rest}
+        />
+        {icon ? (
+          <div className="pointer-events-none absolute inset-y-0 start-0 flex items-center ps-3 text-gray-600 dark:text-gray-400">
+            {icon}
+          </div>
+        ) : null}
+        {endAdornment ? (
+          <div className="absolute inset-y-0 end-0 flex items-center pe-3">{endAdornment}</div>
+        ) : null}
+      </div>
     );
-});
+  },
+);
 Input.displayName = 'Input';
+
+export const AutoDirTextarea = forwardRef<
+  HTMLTextAreaElement,
+  TextareaHTMLAttributes<HTMLTextAreaElement>
+>(({ dir, value, defaultValue, ...rest }, ref) => {
+  const { language } = useAppContext();
+  const text = String(value ?? defaultValue ?? '');
+  const resolvedDir = dir ?? resolveInputDir('text', text, language === 'ar');
+  return (
+    <textarea
+      ref={ref}
+      dir={resolvedDir}
+      value={value}
+      defaultValue={defaultValue}
+      {...rest}
+    />
+  );
+});
+AutoDirTextarea.displayName = 'AutoDirTextarea';
+
+export const AutoDirInput = forwardRef<
+  HTMLInputElement,
+  InputHTMLAttributes<HTMLInputElement>
+>(({ dir, value, defaultValue, type, className = '', ...rest }, ref) => {
+  const { language } = useAppContext();
+  const text = String(value ?? defaultValue ?? '');
+  const resolvedDir = dir ?? resolveInputDir(type, text, language === 'ar');
+  return (
+    <div className="relative w-full" dir={resolvedDir}>
+      <input
+        ref={ref}
+        type={type}
+        dir={resolvedDir}
+        value={value}
+        defaultValue={defaultValue}
+        className={className}
+        {...rest}
+      />
+    </div>
+  );
+});
+AutoDirInput.displayName = 'AutoDirInput';

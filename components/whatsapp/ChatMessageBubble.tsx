@@ -212,7 +212,9 @@ export const ChatMessageBubble: React.FC<Props> = ({
             className={
               msg.attachmentKind === 'audio'
                 ? 'mb-1 w-full min-w-0'
-                : 'mb-1 w-[min(70vw,20rem)] max-w-full'
+                : msg.attachmentKind === 'document'
+                  ? 'mb-1 w-[min(70vw,16rem)] max-w-full'
+                  : 'mb-1 w-[min(70vw,20rem)] max-w-full'
             }
           >
             <ChatBlobMedia

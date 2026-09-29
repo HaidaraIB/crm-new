@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Alert } from '../Alert';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
-import { Input } from '../Input';
+import {Input, AutoDirTextarea } from '../Input';
 import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Checkbox } from '../Checkbox';
@@ -238,12 +238,11 @@ export const AddProductModal = () => {
                 </div>
                 <div>
                     <Label htmlFor="description">{t('description')}</Label>
-                    <textarea
+                    <AutoDirTextarea
                         id="description"
                         rows={3}
                         value={formState.description}
                         onChange={handleChange}
-                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
                         placeholder={t('enterProductDescription') || 'Enter product description'}
                     />

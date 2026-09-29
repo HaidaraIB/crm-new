@@ -158,7 +158,7 @@ export const ResetPasswordPage = () => {
                                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
                                     )}
                                 </div>
-                                <div className="relative">
+                                <div>
                                     <label htmlFor="newPassword" className="sr-only">{t('newPassword') || 'New Password'}</label>
                                     <Input
                                         id="newPassword"
@@ -166,6 +166,15 @@ export const ResetPasswordPage = () => {
                                         placeholder={t('newPassword') || 'New password'}
                                         value={newPassword}
                                         className={errors.newPassword ? 'border-red-500' : ''}
+                                        endAdornment={
+                                          <button
+                                            type="button"
+                                            className="text-gray-400"
+                                            onClick={togglePasswordVisibility}
+                                          >
+                                            {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
+                                          </button>
+                                        }
                                         onChange={(e) => {
                                             setNewPassword(e.target.value);
                                             clearField('newPassword');
@@ -176,18 +185,11 @@ export const ResetPasswordPage = () => {
                                             }
                                         }}
                                     />
-                                    <button
-                                        type="button"
-                                        className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400"
-                                        onClick={togglePasswordVisibility}
-                                    >
-                                        {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
-                                    </button>
                                     {errors.newPassword && (
                                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.newPassword}</p>
                                     )}
                                 </div>
-                                <div className="relative">
+                                <div>
                                     <label htmlFor="confirmPassword" className="sr-only">{t('confirmPassword') || 'Confirm Password'}</label>
                                     <Input
                                         id="confirmPassword"
@@ -195,6 +197,15 @@ export const ResetPasswordPage = () => {
                                         placeholder={t('confirmPassword') || 'Confirm password'}
                                         value={confirmPassword}
                                         className={errors.confirmPassword ? 'border-red-500' : ''}
+                                        endAdornment={
+                                          <button
+                                            type="button"
+                                            className="text-gray-400"
+                                            onClick={togglePasswordVisibility}
+                                          >
+                                            {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
+                                          </button>
+                                        }
                                         onChange={(e) => {
                                             setConfirmPassword(e.target.value);
                                             clearField('confirmPassword');
@@ -205,13 +216,6 @@ export const ResetPasswordPage = () => {
                                             }
                                         }}
                                     />
-                                    <button
-                                        type="button"
-                                        className="absolute inset-y-0 end-0 pe-3 flex items-center text-gray-400"
-                                        onClick={togglePasswordVisibility}
-                                    >
-                                        {passwordVisible ? <EyeOffIcon className="h-5 w-5"/> : <EyeIcon className="h-5 w-5"/>}
-                                    </button>
                                     {errors.confirmPassword && (
                                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.confirmPassword}</p>
                                     )}

@@ -3,7 +3,7 @@ import { Alert } from '../Alert';
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
-import { Input } from '../Input';
+import {Input, AutoDirTextarea } from '../Input';
 import { Button } from '../Button';
 import { usePatchTask, useDeals, useStages, useTasks } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
@@ -330,12 +330,11 @@ export const EditTodoModal = ({ todoId, onClose }: EditTodoModalProps) => {
                 </div>
                 <div>
                     <Label htmlFor="notes">{t('notes')}</Label>
-                    <textarea 
+                    <AutoDirTextarea 
                         id="notes" 
                         rows={4} 
                         value={formState.notes}
                         onChange={handleChange}
-                        dir={language === 'ar' ? 'rtl' : 'ltr'}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" 
                         placeholder={t('enterNotes')}
                     />

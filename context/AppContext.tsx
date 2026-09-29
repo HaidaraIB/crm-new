@@ -18,6 +18,7 @@ import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresen
 import { sendRealtime } from '../hooks/useRealtimeChannel';
 import { getRoleLandingPage, normalizeRole, roleReportsPresence, userTracksWorkHours } from '../utils/roles';
 import { getCompanyRoute, getCompanyViewLeadRoute, navigateToPage, NavigateToPageOptions } from '../utils/routing';
+import { syncInputDirections } from '../utils/inputAutoDir';
 import { setLeadsReturnPage, getLeadsReturnPage } from '../utils/leadsReturnPage';
 import {
   consumeLeadReturnTarget,
@@ -1465,6 +1466,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     localStorage.setItem('language', lang);
     document.documentElement.lang = lang;
     document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    syncInputDirections();
     if (currentUser) {
       updateLanguageAPI(lang).catch(() => {});
       setCurrentUser({ ...currentUser, language: lang });

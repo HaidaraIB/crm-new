@@ -148,7 +148,7 @@ export const TagMultiSelect = ({
                 <div
                     role="listbox"
                     aria-multiselectable
-                    dir={language === 'ar' ? 'rtl' : 'ltr'}
+                    dir="auto"
                     className="absolute z-40 mt-1.5 w-full overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl ring-1 ring-black/5 dark:border-gray-700 dark:bg-gray-800 dark:ring-white/10"
                 >
                     {showSearch && (

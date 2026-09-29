@@ -1506,7 +1506,7 @@ export const IntegrationsPage = () => {
                                                 const dateOpts = withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' });
                                                 const createdLabel = k.created_at
                                                     ? new Date(k.created_at).toLocaleString(dateLocale, dateOpts)
-                                                    : 'â€”';
+                                                    : '\u2014';
                                                 const lastUsedLabel = k.last_used_at
                                                     ? new Date(k.last_used_at).toLocaleString(dateLocale, dateOpts)
                                                     : t('leadApiKeyNeverUsed');
@@ -1530,7 +1530,7 @@ export const IntegrationsPage = () => {
                                                                     >
                                                                         <span className="text-gray-900 dark:text-gray-100">{k.key_prefix}</span>
                                                                         <span className="text-gray-400 dark:text-gray-500 select-none tracking-wider">
-                                                                            {'â€¢'.repeat(12)}
+                                                                            {'\u2022'.repeat(12)}
                                                                         </span>
                                                                         {k.key_suffix ? (
                                                                             <span className="text-gray-900 dark:text-gray-100">{k.key_suffix}</span>
@@ -1863,7 +1863,7 @@ export const IntegrationsPage = () => {
                                                 const dateOpts = withLatinDigits({ dateStyle: 'medium', timeStyle: 'short' });
                                                 const createdLabel = k.created_at
                                                     ? new Date(k.created_at).toLocaleString(dateLocale, dateOpts)
-                                                    : 'â€”';
+                                                    : '\u2014';
                                                 const lastUsedLabel = k.last_used_at
                                                     ? new Date(k.last_used_at).toLocaleString(dateLocale, dateOpts)
                                                     : t('leadApiKeyNeverUsed');
@@ -1887,7 +1887,7 @@ export const IntegrationsPage = () => {
                                                                     >
                                                                         <span className="text-gray-900 dark:text-gray-100">{k.key_prefix}</span>
                                                                         <span className="text-gray-400 dark:text-gray-500 select-none tracking-wider">
-                                                                            {'â€¢'.repeat(12)}
+                                                                            {'\u2022'.repeat(12)}
                                                                         </span>
                                                                         {k.key_suffix ? (
                                                                             <span className="text-gray-900 dark:text-gray-100">{k.key_suffix}</span>

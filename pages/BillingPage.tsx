@@ -871,15 +871,23 @@ export const BillingPage = () => {
                                                   ? t('messageLogStatus_pending')
                                                   : statusKey === 'failed'
                                                     ? t('messageLogStatus_failed')
-                                                    : inv.payment_status || '—';
+                                                    : statusKey === 'canceled' || statusKey === 'cancelled'
+                                                      ? t('cancelled')
+                                                      : statusKey === 'refunded'
+                                                        ? t('refunded')
+                                                        : inv.payment_status || '—';
                                         const statusClass =
                                             statusKey === 'completed'
-                                                ? 'bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300'
+                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300'
                                                 : statusKey === 'pending'
-                                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300'
+                                                  ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300'
                                                   : statusKey === 'failed'
-                                                    ? 'bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300'
-                                                    : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
+                                                    ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300'
+                                                    : statusKey === 'canceled' || statusKey === 'cancelled'
+                                                      ? 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'
+                                                      : statusKey === 'refunded'
+                                                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-300'
+                                                        : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200';
                                         return (
                                             <tr
                                                 key={inv.id}

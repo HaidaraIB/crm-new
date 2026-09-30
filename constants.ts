@@ -3095,6 +3095,7 @@ export const translations = {
     invoiceDate: "Date",
     invoiceAmount: "Amount",
     invoiceStatus: "Status",
+    refunded: "Refunded",
     billingHistoryLoadError: "Could not load billing history.",
     phoneVerificationRequiredPayment:
       "Phone verification is required before payment. Complete WhatsApp verification from registration, then try again.",
@@ -6246,6 +6247,7 @@ export const translations = {
     invoiceDate: "التاريخ",
     invoiceAmount: "المبلغ",
     invoiceStatus: "الحالة",
+    refunded: "مسترد",
     billingHistoryLoadError: "تعذر تحميل سجل الفواتير.",
     phoneVerificationRequiredPayment:
       "يجب التحقق من رقم الهاتف قبل الدفع. أكمل التحقق عبر واتساب من التسجيل ثم حاول مرة أخرى.",

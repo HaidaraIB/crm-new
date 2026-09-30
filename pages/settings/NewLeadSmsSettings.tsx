@@ -13,7 +13,6 @@ import {
     getMessageTemplatesAPI,
     type MessageTemplateType,
 } from '../../services/api';
-import { navigateToCompanyRoute } from '../../utils/routing';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 const DEFAULT_TEMPLATE = "Hello [first_name], we'll contact you soon!";
@@ -25,7 +24,7 @@ function isApprovedWhatsAppTemplate(tpl: MessageTemplateType): boolean {
 }
 
 export const NewLeadSmsSettings = () => {
-    const { t, language, setCurrentPage, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
+    const { t, language, goToPage, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [enabled, setEnabled] = useState(false);
     const [template, setTemplate] = useState(DEFAULT_TEMPLATE);
     const [waEnabled, setWaEnabled] = useState(false);
@@ -152,8 +151,7 @@ export const NewLeadSmsSettings = () => {
     };
 
     const openSmsIntegrations = () => {
-        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Twilio');
-        setCurrentPage('Twilio');
+        goToPage('Twilio');
     };
 
     const openWhatsAppIntegrations = () => {
@@ -162,8 +160,7 @@ export const NewLeadSmsSettings = () => {
         } catch {
             /* ignore */
         }
-        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Messaging Center');
-        setCurrentPage('Messaging Center');
+        goToPage('Messaging Center');
     };
 
     const openTemplateManagement = () => {
@@ -172,8 +169,7 @@ export const NewLeadSmsSettings = () => {
         } catch {
             /* ignore */
         }
-        navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Messaging Center');
-        setCurrentPage('Messaging Center');
+        goToPage('Messaging Center');
     };
 
     if (loading) {

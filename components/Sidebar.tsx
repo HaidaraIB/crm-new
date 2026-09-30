@@ -8,8 +8,8 @@ import { navigateToCompanyRoute, getCompanyRoute } from '../utils/routing';
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
 import { ChevronDownIcon, CodeBracketsIcon, XIcon } from './icons';
-import { getIntegrationPolicyAPI } from '../services/api';
 import { normalizeRole } from '../utils/roles';
+import { blockedPolicyForPage } from '../utils/integrationPolicyGate';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { useSyncDigest } from '../hooks/useQueries';
 import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
@@ -184,20 +184,6 @@ export const Sidebar = () => {
         setOpenSubMenus(prev => ({ ...prev, [name]: !prev[name] }));
     };
     
-    const integrationPlatformByPage: Partial<Record<PageType, 'meta' | 'tiktok' | 'whatsapp' | 'twilio' | 'otpiq' | 'openai' | 'api' | 'mujeb' | 'pbx'>> = {
-        Integrations: 'meta',
-        Meta: 'meta',
-        TikTok: 'tiktok',
-        WhatsApp: 'whatsapp',
-        Chats: 'whatsapp',
-        'Messaging Center': 'whatsapp',
-        Twilio: 'twilio',
-        AI: 'openai',
-        'Lead API': 'api',
-        Mujeb: 'mujeb',
-        PBX: 'pbx',
-    };
-
     /** Sidebar labels for integration sub-pages (toCamelCase('AI') would wrongly yield aI). */
     const subItemTranslationKey = (sub: PageType): keyof typeof translations.en => {
         const special: Partial<Record<PageType, keyof typeof translations.en>> = {
@@ -212,36 +198,12 @@ export const Sidebar = () => {
     };
 
     const handleNavigation = async (page: PageType) => {
-        const platform = integrationPlatformByPage[page];
-        if (platform && currentUser?.company?.id) {
-            try {
-                const policies = await getIntegrationPolicyAPI();
-                if (page === 'Twilio') {
-                    const twilioOk = policies?.twilio?.enabled !== false;
-                    const otpiqOk = policies?.otpiq?.enabled !== false;
-                    if (!twilioOk && !otpiqOk) {
-                        const policy = policies?.otpiq?.enabled === false ? policies.otpiq : policies?.twilio;
-                        setAlertMessage(
-                            resolveIntegrationPolicyMessage(policy?.message, policy?.scope, t),
-                        );
-                        setAlertVariant('warning');
-                        setIsAlertModalOpen(true);
-                        return;
-                    }
-                } else {
-                    const policy = policies?.[platform];
-                    if (policy && policy.enabled === false) {
-                        setAlertMessage(
-                            resolveIntegrationPolicyMessage(policy.message, policy.scope, t),
-                        );
-                        setAlertVariant('warning');
-                        setIsAlertModalOpen(true);
-                        return;
-                    }
-                }
-            } catch {
-                // Ignore policy fetch failures to avoid blocking navigation.
-            }
+        const blocked = await blockedPolicyForPage(page, currentUser?.company?.id);
+        if (blocked) {
+            setAlertMessage(resolveIntegrationPolicyMessage(blocked.message, blocked.scope, t));
+            setAlertVariant('warning');
+            setIsAlertModalOpen(true);
+            return;
         }
         setCurrentPage(page);
         

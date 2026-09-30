@@ -36,6 +36,7 @@ import {
 import { TemplateManagementSettings } from './settings/TemplateManagementSettings';
 import { MessageLogsPanel } from '../components/messaging/MessageLogsPanel';
 import { navigateToCompanyRoute } from '../utils/routing';
+import { blockedPolicyForPage } from '../utils/integrationPolicyGate';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { PbxSettingsPage } from '../components/integrations/PbxSettingsForm';
 import { LeadApiDocumentation } from '../components/integrations/LeadApiDocumentation';
@@ -936,13 +937,27 @@ export const IntegrationsPage = () => {
         }
     }, [isEmployee, whatsAppTab]);
 
-    // Staff no longer use Integrations â†’ WhatsApp for chats; send them to Chats.
+    // Staff no longer use Integrations → WhatsApp for chats; send them to Chats.
+    // If WhatsApp itself is policy-disabled, show the same warning and stay off Chats.
     useEffect(() => {
-        if (isEmployee && currentPage === 'WhatsApp') {
+        if (!isEmployee || currentPage !== 'WhatsApp') return;
+        let cancelled = false;
+        void (async () => {
+            const blocked = await blockedPolicyForPage('Chats', currentUser?.company?.id);
+            if (cancelled) return;
+            if (blocked) {
+                showAlert(resolveIntegrationPolicyMessage(blocked.message, blocked.scope, t), 'warning');
+                setCurrentPage('Dashboard');
+                navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Dashboard');
+                return;
+            }
             setCurrentPage('Chats');
             navigateToCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, 'Chats');
-        }
-    }, [isEmployee, currentPage, currentUser?.company?.name, currentUser?.company?.domain, setCurrentPage]);
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [isEmployee, currentPage, currentUser?.company?.id, currentUser?.company?.name, currentUser?.company?.domain, setCurrentPage]);
 
     const isChatsPage = currentPage === 'Chats';
     const isChatPollingPage = false;

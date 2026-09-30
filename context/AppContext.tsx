@@ -29,6 +29,8 @@ import {
 } from '../utils/leadReturn';
 import { stashPendingInboxConversationId } from '../utils/inboxDeepLink';
 import { DEFAULT_CALL_FILTERS, callFiltersToQuery } from '../utils/callFilters';
+import { blockedPolicyForPage, pageHasIntegrationPolicy } from '../utils/integrationPolicyGate';
+import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { DEFAULT_ARRIVAL_FILTERS } from '../utils/arrivalFilters';
 
 // --- Helper Functions ---
@@ -1622,13 +1624,31 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // Components should use useQuery and useMutation hooks directly instead of AppContext
 
   const goToPage = useCallback((page: Page, opts?: NavigateToPageOptions) => {
-    navigateToPage(page, {
-      companyName: currentUser?.company?.name,
-      companyDomain: currentUser?.company?.domain,
-      ...opts,
-    });
-    setCurrentPage(page);
-  }, [currentUser?.company?.name, currentUser?.company?.domain]);
+    const navigate = () => {
+      navigateToPage(page, {
+        companyName: currentUser?.company?.name,
+        companyDomain: currentUser?.company?.domain,
+        ...opts,
+      });
+      setCurrentPage(page);
+    };
+    // Ungated pages stay synchronous. Gated ones (Chats, Calls, Inbox, …) show
+    // the same policy warning as the sidebar and do not open into a 403.
+    if (!pageHasIntegrationPolicy(page)) {
+      navigate();
+      return;
+    }
+    void (async () => {
+      const blocked = await blockedPolicyForPage(page, currentUser?.company?.id);
+      if (blocked) {
+        setAlertMessage(resolveIntegrationPolicyMessage(blocked.message, blocked.scope, t));
+        setAlertVariant('warning');
+        setIsAlertModalOpen(true);
+        return;
+      }
+      navigate();
+    })();
+  }, [currentUser?.company?.id, currentUser?.company?.name, currentUser?.company?.domain, t]);
 
   const openLeadInChats = useCallback(
     (lead: Lead, phone?: string) => {

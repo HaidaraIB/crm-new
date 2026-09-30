@@ -31,6 +31,8 @@ import {
     isPaymentSuccessPath,
 } from './utils/paymentSession';
 import { syncInputDirections } from './utils/inputAutoDir';
+import { blockedPolicyForPage, pageHasIntegrationPolicy } from './utils/integrationPolicyGate';
+import { resolveIntegrationPolicyMessage } from './utils/integrationPolicyMessage';
 
 /** Module scope so React keeps a stable component type; an inner function remounts children on every TheApp render (e.g. after chat query invalidation). */
 function CurrentPageContent({ currentPage }: { currentPage: Page }) {
@@ -160,6 +162,7 @@ const TheApp = () => {
     // losing the page the user actually navigated to. Deferring that effect until the first
     // pathname parse has run avoids acting on the stale default.
     const [initialPathResolved, setInitialPathResolved] = React.useState(false);
+    const integrationPolicyNavGen = React.useRef(0);
     // The page this role calls home. Every "we don't know where to send them" branch below
     // uses it instead of a hardcoded 'Dashboard', so a role without a Dashboard is never
     // routed through one on its way to the page it can actually see.
@@ -499,7 +502,27 @@ const TheApp = () => {
 
             if (matchedPage && currentPage !== matchedPage) {
                 console.log('[App] checkPathname - setting currentPage to:', matchedPage);
-                setCurrentPage(matchedPage);
+                if (!pageHasIntegrationPolicy(matchedPage)) {
+                    setCurrentPage(matchedPage);
+                } else {
+                    const pathAtStart = window.location.pathname;
+                    const navGen = ++integrationPolicyNavGen.current;
+                    void (async () => {
+                        const blocked = await blockedPolicyForPage(matchedPage, currentUser?.company?.id);
+                        if (navGen !== integrationPolicyNavGen.current) return;
+                        if (window.location.pathname !== pathAtStart) return;
+                        if (blocked) {
+                            setAlertMessage(resolveIntegrationPolicyMessage(blocked.message, blocked.scope, t));
+                            setAlertVariant('warning');
+                            setIsAlertModalOpen(true);
+                            const homeRoute = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
+                            window.history.replaceState({}, '', withCurrentSearchAndHash(homeRoute));
+                            setCurrentPage(landingPage);
+                            return;
+                        }
+                        setCurrentPage(matchedPage);
+                    })();
+                }
             } else if (!matchedPage && pageFromPath && pageFromPath !== '') {
                 console.warn('[App] checkPathname - No match found, redirecting to home page. currentPath:', currentPath);
                 const homeRoute = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
@@ -795,7 +818,27 @@ const TheApp = () => {
         
         if (matchedPage && currentPage !== matchedPage) {
             console.log('[App] Setting currentPage to:', matchedPage, 'from:', currentPage);
-            setCurrentPage(matchedPage);
+            if (!pageHasIntegrationPolicy(matchedPage)) {
+                setCurrentPage(matchedPage);
+            } else {
+                const pathAtStart = window.location.pathname;
+                const navGen = ++integrationPolicyNavGen.current;
+                void (async () => {
+                    const blocked = await blockedPolicyForPage(matchedPage, currentUser?.company?.id);
+                    if (navGen !== integrationPolicyNavGen.current) return;
+                    if (window.location.pathname !== pathAtStart) return;
+                    if (blocked) {
+                        setAlertMessage(resolveIntegrationPolicyMessage(blocked.message, blocked.scope, t));
+                        setAlertVariant('warning');
+                        setIsAlertModalOpen(true);
+                        const homeRoute = getCompanyRoute(currentUser?.company?.name, currentUser?.company?.domain, landingPage, currentUser?.company?.specialization);
+                        window.history.replaceState({}, '', withSearch(homeRoute));
+                        setCurrentPage(landingPage);
+                        return;
+                    }
+                    setCurrentPage(matchedPage);
+                })();
+            }
         } else if (!matchedPage && pageFromPath && pageFromPath !== '') {
             // If pathname doesn't match any route, redirect to the role's home page
             console.warn('[App] No match found, redirecting to home page. pageFromPath:', pageFromPath);

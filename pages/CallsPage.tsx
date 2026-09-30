@@ -182,7 +182,7 @@ export const CallsPage: React.FC = () => {
   const {
     t,
     language,
-    setCurrentPage,
+    goToPage,
     openLeadDetails,
     currentUser,
     callFilters,
@@ -388,7 +388,7 @@ export const CallsPage: React.FC = () => {
     const convId = call.social_conversation_id;
     if (!convId) return;
     stashPendingInboxConversationId(convId);
-    setCurrentPage('Inbox');
+    goToPage('Inbox');
   };
 
   const callSourceLabel = (call: WhatsAppCallRecord) =>

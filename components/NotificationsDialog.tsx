@@ -14,7 +14,6 @@ import {
 } from '../services/api';
 import { formatDateTimeToLocal } from '../utils/dateUtils';
 import { getNotificationDisplay } from '../utils/notificationDisplay';
-import { navigateToCompanyRoute } from '../utils/routing';
 import { PhoneText, isPhoneLike } from './PhoneText';
 import { WebPushOptIn } from './WebPushOptIn';
 import { queryKeys, useSyncDigest } from '../hooks/useQueries';
@@ -49,16 +48,13 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
   const {
     t,
     language,
-    setCurrentPage,
+    goToPage,
     setSelectedLead,
     openLeadDetails,
-    currentUser,
     setConfirmDeleteConfig,
     setIsConfirmDeleteModalOpen,
   } = useAppContext();
   const queryClient = useQueryClient();
-  const companyName = currentUser?.company?.name;
-  const companyDomain = currentUser?.company?.domain;
 
   useInvalidateOnSliceChange('user', [NOTIFICATIONS_QK]);
 
@@ -122,9 +118,8 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
     onClose();
   };
 
-  const openPage = (page: Parameters<typeof setCurrentPage>[0]) => {
-    navigateToCompanyRoute(companyName, companyDomain, page);
-    setCurrentPage(page);
+  const openPage = (page: Parameters<typeof goToPage>[0]) => {
+    goToPage(page);
     onClose();
   };
 

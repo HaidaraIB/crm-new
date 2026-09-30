@@ -8,6 +8,7 @@ import {
     hasLoggedInPaymentSession,
     pathForPaymentReturn,
     peekPaymentCheckoutContext,
+    peekPaymentFeedback,
     setPaymentFeedback,
     type PaymentReturnTo,
 } from '../utils/paymentFeedback';
@@ -76,25 +77,48 @@ export const PaymentSuccessPage = () => {
         window.location.replace('/login?payment_success=true');
     };
 
-    const recordPaymentFailure = (message: string) => {
+    const setPendingPaymentFeedback = () => {
+        setPaymentFeedback({
+            status: 'pending',
+            messageKey: 'paymentPendingMessage',
+            titleKey: 'paymentPendingTitle',
+            subscriptionId,
+        });
+    };
+
+    const redirectToBillingIfInApp = () => {
         const ctx = peekPaymentCheckoutContext();
+        const returnTo: PaymentReturnTo | undefined =
+            ctx?.returnTo && ctx.returnTo !== 'Login' ? ctx.returnTo : 'Billing';
+        if (hasLoggedInPaymentSession()) {
+            clearPaymentSessionHandoff(subscriptionId);
+            window.location.replace(pathForPaymentReturn(returnTo));
+            return true;
+        }
+        return false;
+    };
+
+    const recordPaymentFailure = (message: string) => {
         setPaymentFeedback({
             status: 'failed',
-            messageKey: 'paymentFailed',
-            titleKey: 'paymentError',
+            messageKey: 'paymentFailedMessage',
+            titleKey: 'paymentFailedTitle',
             message,
             subscriptionId,
         });
-        setError(message);
-        if ((ctx?.returnTo && ctx.returnTo !== 'Login') || hasLoggedInPaymentSession()) {
-            setRedirectHint('app');
-        }
+        if (redirectToBillingIfInApp()) return;
+        setError(message || t('paymentFailedMessage') || t('paymentFailed') || 'Payment failed.');
+        setRedirectHint('app');
     };
 
     const urlParams = new URLSearchParams(window.location.search);
     const subscriptionIdParam = urlParams.get('subscription_id');
     const urlStatus = urlParams.get('status');
-    const tranRef = urlParams.get('tranRef') || urlParams.get('tran_ref');
+    const tranRef =
+        urlParams.get('tranRef') ||
+        urlParams.get('tran_ref') ||
+        urlParams.get('paymentId') ||
+        urlParams.get('payment_id');
     const sessionId = urlParams.get('session_id');
     const zaincashToken = urlParams.get('token');
     const subscriptionId = subscriptionIdParam ? parseInt(subscriptionIdParam, 10) : null;
@@ -105,15 +129,19 @@ export const PaymentSuccessPage = () => {
         if (!statusResult || typeof statusResult !== 'object') return false;
         const s = statusResult as Record<string, unknown>;
 
-        const isActive =
-            s.subscription_active === true ||
-            s.subscription_active === 'true' ||
-            s.subscription_active === 1 ||
-            String(s.subscription_active).toLowerCase() === 'true';
+        if (
+            s.payment_status === 'failed' ||
+            s.payment_status === 'canceled' ||
+            s.payment_status === 'cancelled' ||
+            s.gateway_status === 'failed'
+        ) {
+            return false;
+        }
         const isCompleted = s.payment_status === 'completed';
+        const gatewayOk = s.gateway_status === 'success';
         const isApproved = s.paytabs_status === 'A' || s.paytabs_status === 'Approved';
 
-        return isActive || isCompleted || isApproved;
+        return isCompleted || gatewayOk || isApproved;
     };
 
     useEffect(() => {
@@ -122,9 +150,23 @@ export const PaymentSuccessPage = () => {
         const handlePaymentSuccess = async () => {
             processingRef.current = true;
             try {
-                if (urlStatus === 'failed') {
+                if (urlStatus === 'failed' || urlStatus === 'error') {
                     const message = urlParams.get('message');
-                    recordPaymentFailure(message || t('paymentFailed') || 'Payment failed. Please try again.');
+                    recordPaymentFailure(
+                        message || t('paymentFailedMessage') || t('paymentFailed') || 'Payment failed. Please try again.',
+                    );
+                    processingRef.current = false;
+                    return;
+                }
+
+                if (urlStatus === 'pending') {
+                    setPendingPaymentFeedback();
+                    if (redirectToBillingIfInApp()) return;
+                    setError(
+                        urlParams.get('message') ||
+                            t('paymentPendingMessage') ||
+                            'Payment is still being processed. Please wait and refresh.',
+                    );
                     processingRef.current = false;
                     return;
                 }
@@ -164,28 +206,30 @@ export const PaymentSuccessPage = () => {
                     const sr = statusResult as Record<string, unknown>;
                     if (
                         sr.payment_status === 'failed' ||
+                        sr.payment_status === 'canceled' ||
+                        sr.payment_status === 'cancelled' ||
+                        sr.gateway_status === 'failed' ||
                         (sr.paytabs_status &&
                             sr.paytabs_status !== 'A' &&
                             sr.paytabs_status !== 'pending')
                     ) {
-                        recordPaymentFailure(t('paymentFailed') || 'Payment failed. Please try again.');
+                        recordPaymentFailure(
+                            t('paymentFailedMessage') || t('paymentFailed') || 'Payment failed. Please try again.',
+                        );
                         processingRef.current = false;
                         return;
                     }
                 } catch (err: unknown) {
                     console.error('Error checking payment status:', err);
-                    // Backend return URL already finalized PayTabs/Stripe — don't mark paid checkouts as auth failures
-                    if (gatewayMarkedSuccess) {
-                        isPaymentCompleted = true;
-                    } else if (isAuthError(err)) {
+                    // Return handlers verify with the gateway before redirecting status=success.
+                    if (urlStatus === 'success' && tranRef) {
+                        finishAfterSuccessfulPayment(subscriptionId);
+                        return;
+                    }
+                    if (isAuthError(err)) {
                         if (hasLoggedInPaymentSession()) {
                             // Token/header glitch while already signed in: keep session, send to billing with pending note
-                            setPaymentFeedback({
-                                status: 'pending',
-                                messageKey: 'paymentPending',
-                                titleKey: 'paymentPending',
-                                subscriptionId,
-                            });
+                            setPendingPaymentFeedback();
                             clearPaymentSessionHandoff(subscriptionId);
                             window.location.replace(pathForPaymentReturn('Billing'));
                             return;
@@ -224,22 +268,17 @@ export const PaymentSuccessPage = () => {
                     }
                 }
 
-                if (gatewayMarkedSuccess && !isPaymentCompleted) {
-                    isPaymentCompleted = true;
-                }
-
                 if (isPaymentCompleted) {
                     finishAfterSuccessfulPayment(subscriptionId);
                     return;
                 }
 
-                setPaymentFeedback({
-                    status: 'pending',
-                    messageKey: 'paymentPending',
-                    titleKey: 'paymentPending',
-                    subscriptionId,
-                });
-                setError(t('paymentPending') || 'Payment is still being processed. Please wait and refresh.');
+                setPendingPaymentFeedback();
+                if (redirectToBillingIfInApp()) return;
+                setError(
+                    t('paymentPendingMessage') ||
+                        'Payment is still being processed. Please wait and refresh.',
+                );
                 processingRef.current = false;
             } catch (outerErr: unknown) {
                 console.error('Error in payment success handler:', outerErr);
@@ -279,7 +318,9 @@ export const PaymentSuccessPage = () => {
             <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
                 <div className="text-red-500 text-5xl mb-4">⚠️</div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
-                    {t('paymentError') || 'Payment Error'}
+                    {peekPaymentFeedback()?.status === 'pending'
+                        ? t('paymentPendingTitle') || 'Payment not completed'
+                        : t('paymentError') || 'Payment Error'}
                 </h2>
                 <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
                 <div className="flex flex-col gap-3">

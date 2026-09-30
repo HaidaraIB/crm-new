@@ -46,7 +46,7 @@ const statusStyles: Record<
 };
 
 function resolveText(
-  t: (key: string) => string,
+  t: (key: any) => string,
   key: string | undefined,
   fallbackKey: string,
   override?: string,
@@ -91,15 +91,15 @@ export const PaymentResultBanner: React.FC<PaymentResultBannerProps> = ({
     feedback.status === 'success'
       ? resolveText(t, feedback.titleKey, 'paymentSuccess')
       : feedback.status === 'failed'
-        ? resolveText(t, feedback.titleKey, 'paymentError')
-        : resolveText(t, feedback.titleKey, 'paymentPending');
+        ? resolveText(t, feedback.titleKey, 'paymentFailedTitle')
+        : resolveText(t, feedback.titleKey, 'paymentPendingTitle');
 
   const message =
     feedback.status === 'success'
       ? resolveText(t, feedback.messageKey, 'paymentSuccessMessage', feedback.message)
       : feedback.status === 'failed'
-        ? resolveText(t, feedback.messageKey, 'paymentFailed', feedback.message)
-        : resolveText(t, feedback.messageKey, 'paymentPending', feedback.message);
+        ? resolveText(t, feedback.messageKey, 'paymentFailedMessage', feedback.message)
+        : resolveText(t, feedback.messageKey, 'paymentPendingMessage', feedback.message);
 
   if (compact) {
     const compactWrap =

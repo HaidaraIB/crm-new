@@ -3112,6 +3112,9 @@ export const translations = {
     paymentSuccessNoData: "Payment successful but user data not found. Please login.",
     paymentSuccessError: "Error processing payment success",
     paymentPending: "Payment is still being processed. Please wait a moment and refresh.",
+    paymentPendingTitle: "Payment not completed",
+    paymentPendingMessage:
+        "We have not received confirmation from the payment provider yet. Refresh this page, or start a new checkout from Billing if you closed or canceled the payment window.",
     noActiveSubscription: "Your subscription is not active. Please contact support or Complete Your Payment to access the system.",
     noActiveSubscriptionBeforeLink: "Your subscription is not active. Please contact support, ",
     noActiveSubscriptionMiddleLink: " or ",
@@ -3147,6 +3150,9 @@ export const translations = {
     errorLoadingPaymentLink: "Error loading payment link",
     subscriptionActiveButCanUpgrade: "Your subscription is active. You can still upgrade or downgrade your plan. Please try again or contact support.",
     paymentFailed: "Payment failed. Please try again.",
+    paymentFailedTitle: "Payment not completed",
+    paymentFailedMessage:
+        "Your card was not charged. Start a new checkout from Billing to try again.",
     paymentVerificationFailed: "Payment verification failed. Please contact support.",
     subscriptionNotFound: "Subscription not found",
     errorRenewingSubscription: "Error renewing subscription",
@@ -6248,6 +6254,9 @@ export const translations = {
     paymentSuccessNoData: "تم الدفع بنجاح لكن لم يتم العثور على بيانات المستخدم. يرجى تسجيل الدخول.",
     paymentSuccessError: "خطأ في معالجة نجاح الدفع",
     paymentPending: "جاري معالجة الدفع. يرجى الانتظار قليلاً وإعادة التحديث.",
+    paymentPendingTitle: "لم يكتمل الدفع",
+    paymentPendingMessage:
+        "لم نستلم تأكيداً من مزود الدفع بعد. حدّث الصفحة، أو ابدأ عملية دفع جديدة من الفوترة إذا أغلقت نافذة الدفع أو ألغيتها.",
     noActiveSubscription: "اشتراكك غير نشط. يرجى التواصل مع الدعم أو إكمال عملية الدفع للوصول إلى النظام.",
     noActiveSubscriptionBeforeLink: "اشتراكك غير نشط. يرجى التواصل مع الدعم، ",
     noActiveSubscriptionMiddleLink: " أو ",
@@ -6283,6 +6292,8 @@ export const translations = {
     errorLoadingPaymentLink: "خطأ في تحميل رابط الدفع",
     subscriptionActiveButCanUpgrade: "اشتراكك نشط. يمكنك ترقية أو تخفيض خطتك. يرجى المحاولة مرة أخرى أو التواصل مع الدعم.",
     paymentFailed: "فشل الدفع. يرجى المحاولة مرة أخرى.",
+    paymentFailedTitle: "لم يكتمل الدفع",
+    paymentFailedMessage: "لم يتم خصم المبلغ. ابدأ عملية دفع جديدة من الفوترة للمحاولة مرة أخرى.",
     paymentVerificationFailed: "فشل التحقق من الدفع. يرجى التواصل مع الدعم.",
     subscriptionNotFound: "الاشتراك غير موجود",
     errorRenewingSubscription: "خطأ في تجديد الاشتراك",

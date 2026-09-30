@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
+import { installLatinDigits } from './utils/latinNumerals';
 import { installInputAutoDir } from './utils/inputAutoDir';
 
 // Clear any old primary color from localStorage to ensure consistency
@@ -29,6 +30,7 @@ if (!rootElement) {
   throw new Error("Could not find root element to mount to");
 }
 
+installLatinDigits();
 installInputAutoDir();
 
 const root = ReactDOM.createRoot(rootElement);

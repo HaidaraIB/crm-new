@@ -3,7 +3,7 @@
  */
 
 /**
- * Render seconds as a compact localized duration, e.g. `7h 42m` / `٧س ٤٢د`.
+ * Render seconds as a compact localized duration, e.g. `7h 42m` / `7س 42د`.
  *
  * Minute granularity on purpose: the tracker updates once per ping, so a seconds
  * display would sit visibly stale. Template-literal interpolation always emits Latin

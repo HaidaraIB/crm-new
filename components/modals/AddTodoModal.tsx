@@ -6,6 +6,7 @@ import { Modal } from '../Modal';
 import {Input, AutoDirTextarea } from '../Input';
 import { Button } from '../Button';
 import { useCreateTask, useDeals, useStages } from '../../hooks/useQueries';
+import { userCanListDealsApi } from '../../utils/roles';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -25,10 +26,10 @@ const Select = ({ id, children, value, onChange, className }: { id: string; chil
 };
 
 export const AddTodoModal = () => {
-    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { isAddTodoModalOpen, setIsAddTodoModalOpen, t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     
     // Fetch data using React Query
-    const { data: dealsResponse } = useDeals();
+    const { data: dealsResponse } = useDeals({ enabled: userCanListDealsApi(currentUser?.role) });
     const deals = Array.isArray(dealsResponse) 
         ? dealsResponse 
         : (dealsResponse?.results || []);

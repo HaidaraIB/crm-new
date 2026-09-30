@@ -1041,6 +1041,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   // Use refs to avoid triggering re-renders that could affect forms
   const currentUserRef = React.useRef(currentUser);
   const isLoggedInRef = React.useRef(isLoggedIn);
+  const subscriptionPollForbiddenRef = React.useRef(false);
   
   // Update refs when values change
   React.useEffect(() => {
@@ -1052,9 +1053,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (!isLoggedIn || !currentUser?.company?.subscription?.id) {
       return;
     }
+
+    subscriptionPollForbiddenRef.current = false;
     
     const subscriptionId = currentUser.company.subscription.id;
     const pollSubscriptionStatus = async () => {
+      if (subscriptionPollForbiddenRef.current) {
+        return;
+      }
       try {
         const status = await checkPaymentStatusAPI(subscriptionId);
         
@@ -1124,7 +1130,12 @@ export const AppProvider = ({ children }: AppProviderProps) => {
         } else {
           localStorage.removeItem('subscriptionExpiringWarning');
         }
-      } catch (error) {
+      } catch (error: unknown) {
+        const err = error as { status?: number; code?: string };
+        if (err?.status === 403 || err?.code === 'permission_denied') {
+          subscriptionPollForbiddenRef.current = true;
+          return;
+        }
         console.error('Error polling subscription status:', error);
       }
     };

@@ -7,6 +7,7 @@ import {Input, AutoDirTextarea } from '../Input';
 import { Button } from '../Button';
 import { usePatchTask, useDeals, useStages, useTasks } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { userCanListDealsApi } from '../../utils/roles';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -31,10 +32,10 @@ interface EditTodoModalProps {
 }
 
 export const EditTodoModal = ({ todoId, onClose }: EditTodoModalProps) => {
-    const { t, language, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { t, language, setIsSuccessModalOpen, setSuccessMessage, currentUser } = useAppContext();
     
     // Fetch data using React Query
-    const { data: dealsResponse } = useDeals();
+    const { data: dealsResponse } = useDeals({ enabled: userCanListDealsApi(currentUser?.role) });
     const deals = Array.isArray(dealsResponse) 
         ? dealsResponse 
         : (dealsResponse?.results || []);

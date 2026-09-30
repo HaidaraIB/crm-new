@@ -216,7 +216,28 @@ function TwilioSMSForm({
                 setAuthTokenMasked(data.auth_token_masked ?? authTokenMasked);
                 setOtpiqApiKeyMasked(data.otpiq_api_key_masked ?? otpiqApiKeyMasked);
             })
-            .catch((e: any) => setErrors({ general: e?.message || t('failedToSaveTwilioSettings') }))
+            .catch((e: any) => {
+                const apiFields = e?.fields as Record<string, string | string[]> | undefined;
+                const mapped: Record<string, string> = {};
+                if (apiFields) {
+                    const pick = (key: string, stateKey: string) => {
+                        const raw = apiFields[key];
+                        if (raw == null) return;
+                        mapped[stateKey] = Array.isArray(raw) ? raw.join(' ') : String(raw);
+                    };
+                    pick('account_sid', 'accountSid');
+                    pick('twilio_number', 'twilioNumber');
+                    pick('auth_token', 'authToken');
+                    pick('otpiq_api_key', 'otpiqApiKey');
+                    pick('api_key', 'otpiqApiKey');
+                    pick('sender_id', 'senderId');
+                }
+                if (Object.keys(mapped).length > 0) {
+                    setErrors(mapped);
+                } else {
+                    setErrors({ general: e?.message || t('failedToSaveTwilioSettings') });
+                }
+            })
             .finally(() => setSaving(false));
     };
 
@@ -426,9 +447,15 @@ function TwilioSMSForm({
                             autoComplete="off"
                             data-form-type="other"
                             data-lpignore="true"
-                            className="w-full rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm"
+                            className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.senderId ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                             placeholder={t('senderIdPlaceholder')}
                         />
+                        {errors.senderId && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.senderId}</p>
+                        )}
+                        {provider === 'twilio' ? (
+                            <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{t('twilioSenderIdHelp')}</p>
+                        ) : null}
                         {provider === 'otpiq' ? (
                             <div className="mt-1 space-y-1">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">

@@ -16,6 +16,7 @@ import {
     type MissionBarTodosPreset,
 } from '../utils/missionBarNavigation';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
+import { userCanListDealsApi } from '../utils/roles';
 import {
     useTasks,
     useCompleteTask,
@@ -190,7 +191,7 @@ export const TodosPage = () => {
     const allTasksRaw = tasksResponse?.results || [];
     
     // Fetch deals to get deal stage information (since deal_stage might not be in TaskSerializer)
-    const { data: dealsResponse } = useDeals();
+    const { data: dealsResponse } = useDeals({ enabled: userCanListDealsApi(currentUser?.role) });
     const allDeals = dealsResponse?.results || [];
     
     // Fetch client tasks and client calls

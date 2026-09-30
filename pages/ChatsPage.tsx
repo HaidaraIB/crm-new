@@ -123,6 +123,10 @@ export const ChatsPage: React.FC = () => {
     role === 'Supervisor'
       ? hasSupervisorPermission('can_manage_whatsapp_chats')
       : currentUser?.whatsapp_chat_enabled !== false;
+  const whatsappCallsAllowed =
+    role === 'Supervisor'
+      ? hasSupervisorPermission('can_manage_whatsapp_calls')
+      : currentUser?.whatsapp_call_enabled !== false;
 
   const [chatFilters, setChatFilters] = useState<WhatsAppChatFilters>(DEFAULT_WHATSAPP_CHAT_FILTERS);
   const [searchDraft, setSearchDraft] = useState('');
@@ -263,7 +267,7 @@ export const ChatsPage: React.FC = () => {
     { enabled: chatsAllowed }
   );
   useInvalidateOnSliceChange('calls', [['whatsappCalls', 'thread']], {
-    enabled: chatsAllowed,
+    enabled: chatsAllowed && whatsappCallsAllowed,
   });
 
   // Same reasoning as Team Chat: the slice subscriptions above deliver sooner,
@@ -341,8 +345,8 @@ export const ChatsPage: React.FC = () => {
   });
 
   const { threadCalls, refetchThreadCalls } = useThreadCalls({
-    enabled: !!selectedChatClient,
-    pollMs: selectedChatClient ? chatPollMs : false,
+    enabled: !!selectedChatClient && whatsappCallsAllowed,
+    pollMs: selectedChatClient && whatsappCallsAllowed ? chatPollMs : false,
     clientId: selectedChatLeadId,
     peerPhone: selectedChatPhone,
   });

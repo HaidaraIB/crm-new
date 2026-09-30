@@ -93,6 +93,7 @@ export const VerifyPhonePage = () => {
     const phoneHint = useMemo(() => {
         if (!otpChannel) return t('preLoginVerifyPhoneIntro');
         if (otpChannel === 'twilio_sms') return t('verifyPhoneSmsHint');
+        if (otpChannel === 'otpiq') return t('verifyPhoneOtpiqHint');
         return t('verifyPhoneWhatsAppHint');
     }, [otpChannel, t]);
 
@@ -335,7 +336,9 @@ export const VerifyPhonePage = () => {
                                     <label htmlFor="phone-prelogin-otp" className="block text-sm font-medium text-secondary mb-1">
                                         {otpChannel === 'twilio_sms'
                                             ? t('verificationCodeLabelSms')
-                                            : otpChannel
+                                            : otpChannel === 'otpiq'
+                                              ? t('verificationCodeLabelOtpiq')
+                                              : otpChannel
                                                 ? t('verificationCodeLabelWhatsApp')
                                                 : t('verificationCode')}
                                     </label>

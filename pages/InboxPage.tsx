@@ -66,6 +66,7 @@ import { inboxWhatsappThreadAdapter } from '../hooks/whatsappThread/inboxThreadA
 import type { SocialConversationPayload, SocialMessagePayload } from '../services/api';
 import { consumePendingInboxConversationId } from '../utils/inboxDeepLink';
 import {
+  canAccessSocialInbox,
   canConvertSocialConversation,
   isSocialInboxStaffScoped,
 } from '../utils/socialInboxAccess';
@@ -198,6 +199,7 @@ export const InboxPage: React.FC = () => {
   const queryClient = useQueryClient();
   const realtimeConnected = useRealtimeConnected();
   const isRtl = language === 'ar';
+  const inboxAccessAllowed = canAccessSocialInbox(currentUser);
   const canConvert = canConvertSocialConversation(currentUser);
   const staffScopedInbox = isSocialInboxStaffScoped(currentUser);
 
@@ -256,7 +258,8 @@ export const InboxPage: React.FC = () => {
   ]);
 
   const { data: listData, isLoading: listLoading } = useSocialConversations(listParams, {
-    refetchInterval: pollMs,
+    refetchInterval: inboxAccessAllowed ? pollMs : false,
+    enabled: inboxAccessAllowed,
   });
   const conversations: SocialConversationPayload[] = listData?.results ?? [];
   const statusCounts = listData?.status_counts ?? {};
@@ -268,7 +271,7 @@ export const InboxPage: React.FC = () => {
 
   const { data: threadData, isLoading: threadLoading } = useSocialMessages(
     selectedId ?? undefined,
-    { refetchInterval: pollMs }
+    { refetchInterval: inboxAccessAllowed ? pollMs : false, enabled: inboxAccessAllowed }
   );
   const messages: SocialMessagePayload[] = threadData?.results ?? [];
   const threadConversation = threadData?.conversation ?? selected;

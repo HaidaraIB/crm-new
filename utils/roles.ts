@@ -97,6 +97,12 @@ export const normalizeRole = (role?: string): AppRole => {
   return 'Employee';
 };
 
+/** `/deals/` list is denied for data-entry and call-center roles (403 at the API). */
+export const userCanListDealsApi = (role?: string): boolean => {
+  const r = normalizeRole(role);
+  return r !== 'DataEntry' && r !== 'CallCenter';
+};
+
 /**
  * @param companySpecialization When not `medical`, clinic API roles `doctor` / `reception` are labeled like `employee` / `data_entry` so non-medical tenants never see clinic wording.
  */

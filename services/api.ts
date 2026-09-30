@@ -41,6 +41,60 @@ const API_KEY =
 // متغير لتتبع عملية refresh token الجارية لتجنب استدعاءات متعددة
 let refreshTokenPromise: Promise<void> | null = null;
 
+const ACCESS_TOKEN_REFRESH_LEAD_SECONDS = 60;
+
+function jwtExpSeconds(token: string): number | null {
+  try {
+    const part = token.split('.')[1];
+    if (!part) return null;
+    const padded = part.replace(/-/g, '+').replace(/_/g, '/');
+    const json = atob(padded.padEnd(padded.length + ((4 - padded.length % 4) % 4), '='));
+    const payload = JSON.parse(json) as { exp?: number };
+    return typeof payload.exp === 'number' ? payload.exp : null;
+  } catch {
+    return null;
+  }
+}
+
+function accessTokenExpiresWithinSeconds(token: string, withinSec: number): boolean {
+  const exp = jwtExpSeconds(token);
+  if (exp == null) return false;
+  return exp * 1000 <= Date.now() + withinSec * 1000;
+}
+
+async function ensureAccessTokenFresh(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (isTabSuperseded()) return;
+  const token = localStorage.getItem('accessToken');
+  const refresh = localStorage.getItem('refreshToken');
+  if (!token || !refresh) return;
+  if (!accessTokenExpiresWithinSeconds(token, ACCESS_TOKEN_REFRESH_LEAD_SECONDS)) return;
+
+  if (refreshTokenPromise) {
+    await refreshTokenPromise;
+    return;
+  }
+  refreshTokenPromise = refreshTokenAPI()
+    .then(() => {
+      refreshTokenPromise = null;
+    })
+    .catch((error) => {
+      refreshTokenPromise = null;
+      throw error;
+    });
+  await refreshTokenPromise;
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      void ensureAccessTokenFresh().catch(() => {
+        /* refresh failure handled on next apiRequest 401 */
+      });
+    }
+  });
+}
+
 /**
  * Helper function to add API Key to headers
  */
@@ -515,6 +569,14 @@ async function apiRequest<T>(
     throw err;
   }
 
+  if (retryOn401) {
+    try {
+      await ensureAccessTokenFresh();
+    } catch {
+      /* next request may 401 and trigger logout path */
+    }
+  }
+
   const token = localStorage.getItem('accessToken'); // JWT access token
   
   const isFormData = options.body instanceof FormData;
@@ -880,7 +942,7 @@ export interface RegisterCompanyResponse {
  * Body: { company: { name, domain, specialization }, owner: { first_name, last_name, email, username, password }, plan_id?, billing_cycle? }
  * Response: { access, refresh, user, company, subscription? }
  */
-export type RegistrationPhoneOtpChannel = 'whatsapp' | 'twilio_sms';
+export type RegistrationPhoneOtpChannel = 'whatsapp' | 'twilio_sms' | 'otpiq';
 export type RegistrationEmailRequirement = { email_verification_required: boolean };
 
 export const registerPhoneSendOtpAPI = async (phone: string, language: string = 'en') => {

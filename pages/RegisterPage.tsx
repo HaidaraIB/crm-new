@@ -20,6 +20,7 @@ import { navigateToCompanyRoute } from '../utils/routing';
 import { isRedundantPlanDescription } from '../utils/planEntitlements';
 import { withLatinDigits } from '../utils/dateUtils';
 import { setPendingSubscriptionId } from '../utils/paymentSession';
+import { isNetworkError } from '../utils/isNetworkError';
 import {
     validateEmailField,
     validateUsernameField,
@@ -157,6 +158,9 @@ export const RegisterPage = () => {
     const isPlanStep = currentStep === planStep;
 
     const mapRegisterPhoneOtpSendError = (e: unknown): string => {
+        if (isNetworkError(e)) {
+            return t('networkErrorRetry');
+        }
         const err = e as Error & { code?: string };
         const code = err.code;
         switch (code) {
@@ -165,11 +169,14 @@ export const RegisterPage = () => {
             case 'phone_otp_misconfigured':
             case 'whatsapp_otp_not_configured':
             case 'twilio_otp_not_configured':
+            case 'otpiq_otp_not_configured':
                 return t('phoneOtpMisconfigured');
             case 'whatsapp_send_failed':
                 return t('otpSendFailedWhatsApp');
             case 'twilio_send_failed':
                 return t('otpSendFailedSms');
+            case 'otpiq_send_failed':
+                return t('otpSendFailedOtpiq');
             case 'otp_rate_limited':
                 return t('otpRateLimitedUser');
             default:
@@ -178,6 +185,9 @@ export const RegisterPage = () => {
                 }
                 if (phoneOtpChannel === 'whatsapp') {
                     return err.message || t('otpSendFailedWhatsApp');
+                }
+                if (phoneOtpChannel === 'otpiq') {
+                    return err.message || t('otpSendFailedOtpiq');
                 }
                 return err.message || t('otpSendFailedGeneric');
         }
@@ -454,6 +464,13 @@ export const RegisterPage = () => {
             await checkRegistrationAvailabilityAPI(fields);
             return true;
         } catch (error: any) {
+            if (isNetworkError(error)) {
+                setErrors((prev) => ({
+                    ...prev,
+                    general: t('networkErrorRetry'),
+                }));
+                return false;
+            }
             const backendErrors = unwrapApiFieldErrors(error.fields || {});
             const fieldErrors: { [key: string]: string } = {};
 
@@ -829,7 +846,9 @@ export const RegisterPage = () => {
             nextErrors.phoneOtp =
                 phoneOtpChannel === 'twilio_sms'
                     ? t('verificationCodeHintSms')
-                    : t('verificationCodeHintWhatsApp');
+                    : phoneOtpChannel === 'otpiq'
+                      ? t('verificationCodeHintOtpiq')
+                      : t('verificationCodeHintWhatsApp');
         }
         if (emailVerificationRequired && !/^\d{4,8}$/.test(emailCode)) {
             nextErrors.emailOtp = t('verificationCodeHintEmail') || 'Enter the code from your email.';
@@ -863,7 +882,9 @@ export const RegisterPage = () => {
         } catch (e: any) {
             setErrors((prev) => ({
                 ...prev,
-                general: e.message || t('verificationFailed') || 'Invalid code. Try again.',
+                general: isNetworkError(e)
+                    ? t('networkErrorRetry')
+                    : e.message || t('verificationFailed') || 'Invalid code. Try again.',
             }));
         } finally {
             setOtpVerifying(false);
@@ -923,9 +944,11 @@ export const RegisterPage = () => {
             const msg =
                 phoneOtpChannel === 'twilio_sms'
                     ? t('phoneVerificationRequiredSms')
-                    : phoneOtpChannel === 'whatsapp'
-                      ? t('phoneVerificationRequiredWhatsApp')
-                      : t('phoneVerificationRequiredGeneric');
+                    : phoneOtpChannel === 'otpiq'
+                      ? t('phoneVerificationRequiredOtpiq')
+                      : phoneOtpChannel === 'whatsapp'
+                        ? t('phoneVerificationRequiredWhatsApp')
+                        : t('phoneVerificationRequiredGeneric');
             setErrors({
                 general: msg,
             });
@@ -1037,6 +1060,10 @@ export const RegisterPage = () => {
                 setCurrentPage('Dashboard');
             }, 100);
         } catch (error: any) {
+            if (isNetworkError(error)) {
+                setErrors({ general: t('networkErrorRetry') });
+                return;
+            }
             const backendFieldErrors = mapBackendErrorsToFields(error.fields || {});
             if (Object.keys(backendFieldErrors).length > 0) {
                 const withSummary = {
@@ -1434,14 +1461,18 @@ export const RegisterPage = () => {
                                         {phoneOtpRequired
                                             ? (phoneOtpChannel === 'twilio_sms'
                                                 ? t('verifyPhoneSms')
-                                                : t('verifyPhoneWhatsApp'))
+                                                : phoneOtpChannel === 'otpiq'
+                                                  ? t('verifyPhoneOtpiq')
+                                                  : t('verifyPhoneWhatsApp'))
                                             : (t('verifyRegistrationEmail') || 'Verify your email')}
                                     </h3>
                                     <p className="text-sm text-secondary">
                                         {phoneOtpRequired
                                             ? (phoneOtpChannel === 'twilio_sms'
                                                 ? t('verifyPhoneSmsHint')
-                                                : t('verifyPhoneWhatsAppHint'))
+                                                : phoneOtpChannel === 'otpiq'
+                                                  ? t('verifyPhoneOtpiqHint')
+                                                  : t('verifyPhoneWhatsAppHint'))
                                             : (t('verifyRegistrationEmailHint') || 'We sent a verification code to your email. Enter it below.')}
                                     </p>
                                     {phoneOtpRequired && (
@@ -1449,7 +1480,9 @@ export const RegisterPage = () => {
                                         <label htmlFor="phone-otp" className="block text-sm font-medium text-secondary mb-1">
                                             {phoneOtpChannel === 'twilio_sms'
                                                 ? (t('verificationCodeLabelSms') || 'SMS verification code')
-                                                : (t('verificationCodeLabelWhatsApp') || 'WhatsApp verification code')}
+                                                : phoneOtpChannel === 'otpiq'
+                                                  ? (t('verificationCodeLabelOtpiq') || 'Verification code')
+                                                  : (t('verificationCodeLabelWhatsApp') || 'WhatsApp verification code')}
                                         </label>
                                         <Input
                                             id="phone-otp"

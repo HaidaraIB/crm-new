@@ -3704,6 +3704,11 @@ export const IntegrationsPage = () => {
                                                         </span>
                                                     ) : null}
                                                 </span>
+                                                {account.status !== 'Connected' && account.metadata?.number_conflict_key && (
+                                                    <p className="mt-1 max-w-md text-xs text-red-600 dark:text-red-400">
+                                                        {t(account.metadata.number_conflict_key as any)}
+                                                    </p>
+                                                )}
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2">
@@ -3907,6 +3912,11 @@ export const IntegrationsPage = () => {
                                                   ? t('statusExpired') || 'Expired â€” reconnect required'
                                                   : t('disconnected')}
                                         </span>
+                                        {account.status !== 'Connected' && account.metadata?.number_conflict_key && (
+                                            <p className="mt-1 max-w-md text-xs text-red-600 dark:text-red-400">
+                                                {t(account.metadata.number_conflict_key as any)}
+                                            </p>
+                                        )}
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2 sm:gap-2">

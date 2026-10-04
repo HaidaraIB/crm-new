@@ -1405,6 +1405,12 @@ export const translations = {
     whatsapp_inbox_number_not_found: "WhatsApp inbox number not found.",
     whatsapp_inbox_number_in_use_by_crm:
       "This number is already used for CRM WhatsApp. Choose a different number for the inbox.",
+    whatsapp_number_in_use_by_inbox:
+      "This number is already used for your WhatsApp inbox. Choose a different number for CRM WhatsApp.",
+    whatsapp_number_in_use_by_other_company:
+      "This WhatsApp number is already connected to another account. Disconnect it there first, or contact support.",
+    whatsapp_number_is_platform_number:
+      "This WhatsApp number is reserved and can't be connected. Please connect a different number.",
     leadName: "Name",
     phoneOptional: "Phone (optional)",
     phoneOptionalHint: "Leave empty if you don't have a number.",
@@ -4504,6 +4510,12 @@ export const translations = {
     whatsapp_inbox_number_not_found: "رقم واتساب صندوق الوارد غير موجود.",
     whatsapp_inbox_number_in_use_by_crm:
       "هذا الرقم مستخدم لواتساب CRM. اختر رقماً مختلفاً لصندوق الوارد.",
+    whatsapp_number_in_use_by_inbox:
+      "هذا الرقم مستخدم لصندوق وارد واتساب. اختر رقماً مختلفاً لواتساب CRM.",
+    whatsapp_number_in_use_by_other_company:
+      "رقم واتساب هذا مربوط بحساب آخر. افصله من هناك أولاً، أو تواصل مع الدعم.",
+    whatsapp_number_is_platform_number:
+      "رقم واتساب هذا محجوز ولا يمكن ربطه. يرجى ربط رقم مختلف.",
     leadName: "الاسم",
     phoneOptional: "الهاتف (اختياري)",
     phoneOptionalHint: "اتركه فارغاً إن لم يتوفر رقم.",

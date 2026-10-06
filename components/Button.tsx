@@ -7,9 +7,10 @@ import { Loader } from './Loader';
 // FIX: Added type prop for forms and made children optional.
 // FIX: Added title prop for tooltips.
 // FIX: Extended React.ButtonHTMLAttributes to properly handle React special props like 'key'.
-type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: ReactNode, onClick?: () => void, className?: string, variant?: 'primary' | 'secondary' | 'ghost' | 'danger', disabled?: boolean, loading?: boolean, loadingText?: ReactNode, type?: 'button' | 'submit' | 'reset', title?: string };
-export const Button = ({ children, onClick, className = '', variant = 'primary', disabled, loading, loadingText, type = 'button', title, ...props }: ButtonProps) => {
-  const baseClasses = "h-9 px-4 py-2 rounded-md text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed";
+type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & { children?: ReactNode, onClick?: () => void, className?: string, variant?: 'primary' | 'secondary' | 'ghost' | 'danger', size?: 'sm' | 'md', disabled?: boolean, loading?: boolean, loadingText?: ReactNode, type?: 'button' | 'submit' | 'reset', title?: string };
+export const Button = ({ children, onClick, className = '', variant = 'primary', size = 'md', disabled, loading, loadingText, type = 'button', title, ...props }: ButtonProps) => {
+  const sizeClasses = size === 'sm' ? 'h-8 px-3 py-1.5 text-xs' : 'h-9 px-4 py-2 text-sm';
+  const baseClasses = `${sizeClasses} rounded-md font-semibold focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200 inline-flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed`;
   const variantClasses = {
     primary: 'bg-primary text-white hover:bg-primary/90 focus:ring-primary',
     secondary: 'bg-gray-200 text-gray-900 hover:bg-gray-300 focus:ring-gray-500 dark:bg-gray-600 dark:text-gray-50 dark:hover:bg-gray-500 disabled:dark:bg-gray-700 disabled:dark:text-gray-300',

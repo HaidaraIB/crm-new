@@ -325,10 +325,7 @@ export interface AppContextType {
   setConnectedAccounts: React.Dispatch<React.SetStateAction<{ facebook: ConnectedAccount[]; whatsapp: ConnectedAccount[] }>>;
   editingAccount: ConnectedAccount | null;
   setEditingAccount: React.Dispatch<React.SetStateAction<ConnectedAccount | null>>;
-  /** بعد إنشاء حساب تكامل جديد (Meta/WhatsApp) يُضبط هنا لفتح نافذة الربط تلقائياً */
-  pendingConnectAccountId: number | null;
-  setPendingConnectAccountId: (id: number | null) => void;
-  
+
   // Select Lead Form Modal state
   isSelectLeadFormModalOpen: boolean;
   setIsSelectLeadFormModalOpen: (isOpen: boolean) => void;
@@ -827,7 +824,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     whatsapp: [],
   });
   const [editingAccount, setEditingAccount] = useState<ConnectedAccount | null>(null);
-  const [pendingConnectAccountId, setPendingConnectAccountId] = useState<number | null>(null);
   
   // Change Password Modal state
   const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
@@ -1823,7 +1819,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isManageIntegrationAccountModalOpen, setIsManageIntegrationAccountModalOpen,
     connectedAccounts, setConnectedAccounts,
     editingAccount, setEditingAccount,
-    pendingConnectAccountId, setPendingConnectAccountId,
     isSelectLeadFormModalOpen, setIsSelectLeadFormModalOpen,
     selectLeadFormConfig, setSelectLeadFormConfig,
     isChangePasswordModalOpen, setIsChangePasswordModalOpen,

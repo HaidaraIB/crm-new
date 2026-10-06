@@ -14,6 +14,7 @@ import {
     type MessageTemplateType,
 } from '../../services/api';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+import { writePersistedTab } from '../../hooks/usePersistedTab';
 
 const DEFAULT_TEMPLATE = "Hello [first_name], we'll contact you soon!";
 
@@ -155,20 +156,12 @@ export const NewLeadSmsSettings = () => {
     };
 
     const openWhatsAppIntegrations = () => {
-        try {
-            localStorage.setItem('whatsapp_messaging_tab', 'accounts');
-        } catch {
-            /* ignore */
-        }
+        writePersistedTab('messagingCenter', 'campaign');
         goToPage('Messaging Center');
     };
 
     const openTemplateManagement = () => {
-        try {
-            localStorage.setItem('whatsapp_messaging_tab', 'templates');
-        } catch {
-            /* ignore */
-        }
+        writePersistedTab('messagingCenter', 'template');
         goToPage('Messaging Center');
     };
 

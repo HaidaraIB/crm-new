@@ -6,8 +6,13 @@ alwaysApply: false
 
 # Omni-Channel Inbox
 
-Instagram Direct + Facebook Messenger for the CALL_CENTER role. Sibling of the
-WhatsApp Chats page, deliberately **not** merged with it.
+Omni-channel inbox (Instagram, Messenger, and the inbox-purpose WhatsApp number)
+for the CALL_CENTER role. Sibling of the CRM WhatsApp Chats page.
+
+WhatsApp numbers are one `WhatsAppAccount` row with `purpose=crm|inbox`. Inbox
+threads stay lead-less until convert. New inbound threads are round-robin
+assigned to ready call-center agents (`integrations/services/inbox_assignment.py`).
+The Inbox composer reuses `ChatTemplatePicker` for WhatsApp templates.
 
 ## What makes this different from WhatsApp Chats
 
@@ -47,7 +52,7 @@ only** (`is_company_owner`), same as WhatsApp Chats message/conversation delete
 
 ## Messaging window — stricter than WhatsApp
 
-There are no approved templates to reopen a closed thread. Only two states send:
+Instagram and Messenger have no approved templates to reopen a closed thread. WhatsApp inbox threads do: send them with `POST /integrations/inbox/send-template/` and `ChatTemplatePicker`. Only two states send free text:
 
 - within 24h of the last **inbound** message → `messaging_type: RESPONSE`
 - 24h–7d → `messaging_type: MESSAGE_TAG` + `tag: HUMAN_AGENT`, **and only when
@@ -67,10 +72,9 @@ the window — abusing the tag risks app-level enforcement against the whole app
 - **Phone is required on every conversion.** Instagram/Messenger carry no phone
   number — the agent must enter one. WhatsApp inbox may prefill from the contact
   `external_id`. Never fabricate a placeholder number.
-- **WhatsApp inbox** uses a separate `WhatsAppInboxNumber` (connected under
-  Integrations → WhatsApp → Inbox number). It must differ from the CRM WhatsApp
-  number. Outside the 24h window, agents send approved templates via
-  `POST /integrations/inbox/send-template/`.
+- **WhatsApp inbox** is a `WhatsAppAccount` with `purpose=inbox` (connected under
+  Integrations → WhatsApp). It must differ from the CRM WhatsApp number.
+  Calling hours for both numbers live on the Calls page Settings tab.
 - If a phone *is* supplied and matches an existing lead, the conversation links
   to that lead (`duplicate: true`) rather than forking a second one.
 - Assignment reuses `crm/assignment.py`; notifications reuse

@@ -33,7 +33,9 @@ import {
 } from '../hooks/useQueries';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 
+const TODO_TABS = ['active', 'completed'] as const;
 type FilterType = 'all' | string;
 type TaskTypeFilter = 'all' | 'deal_task' | 'client_task' | 'client_call';
 
@@ -124,15 +126,12 @@ export const TodosPage = () => {
         () => readMissionBarTodosPreset() === 'overdue',
     );
     
-    // Load active tab from localStorage or default to 'active'
-    const [activeTab, setActiveTab] = useState<'active' | 'completed'>(() => {
-        const saved = localStorage.getItem('todosActiveTab');
-        if (saved === 'active' || saved === 'completed') {
-            return saved;
-        }
-        return 'active'; // Default to active
-    });
-    
+    const [activeTab, setActiveTab] = usePersistedTab<'active' | 'completed'>(
+        'todos',
+        TODO_TABS,
+        'active',
+        ['todosActiveTab'],
+    ); 
     const [weekDays, setWeekDays] = useState<Date[]>([]);
     const [editingTodoId, setEditingTodoId] = useState<number | null>(null);
     const [todosPageNumber, setTodosPageNumber] = useState(1);
@@ -180,11 +179,6 @@ export const TodosPage = () => {
             localStorage.setItem('todosSelectedDate', 'all'); // Save 'all' to preserve All selection
         }
     }, [selectedDate]);
-    
-    // Save active tab to localStorage when it changes
-    useEffect(() => {
-        localStorage.setItem('todosActiveTab', activeTab);
-    }, [activeTab]);
 
     // Fetch tasks using React Query
     const { data: tasksResponse, isLoading: tasksLoading, isFetching: tasksFetching, error: tasksError, refetch: refetchTasks } = useTasks();

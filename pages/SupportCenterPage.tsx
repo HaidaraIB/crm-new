@@ -5,9 +5,12 @@ import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Input, Button, Modal, TableHorizontalScroll, RefreshButton } from '../components/index';
 import { EyeIcon } from '../components/icons';
 import { SupportChatThread } from '../components/supportChat';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
 import { withLatinDigits } from '../utils/dateUtils';
 import { translations } from '../constants';
+
+const SUPPORT_TABS = ['chat', 'tickets'] as const;
 
 type TranslationKey = keyof typeof translations.en;
 
@@ -47,7 +50,11 @@ const statusLabelKey: Record<string, TranslationKey> = {
 export const SupportCenterPage = () => {
   const { t, currentUser } = useAppContext();
   const isOwner = Boolean(currentUser?.is_company_owner ?? currentUser?.isCompanyOwner);
-  const [activeTab, setActiveTab] = useState<'chat' | 'tickets'>('chat');
+  const [activeTab, setActiveTab] = usePersistedTab<'chat' | 'tickets'>(
+    'supportCenter',
+    SUPPORT_TABS,
+    'chat',
+  );
   const [formData, setFormData] = useState({ title: '', description: '' });
   const [screenshots, setScreenshots] = useState<File[]>([]);
   const [errors, setErrors] = useState<Record<string, string>>({});

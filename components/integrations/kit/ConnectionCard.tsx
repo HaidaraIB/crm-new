@@ -1,0 +1,107 @@
+import React from 'react';
+import { Button } from '../../Button';
+import { Card } from '../../Card';
+import { Dropdown, DropdownItem } from '../../Dropdown';
+import { MoreVerticalIcon } from '../../icons';
+import { PhoneText, isPhoneLike } from '../../PhoneText';
+import { useAppContext } from '../../../context/AppContext';
+import { IntegrationPlatform, IntegrationPlatformIcon } from '../IntegrationPlatformIcon';
+import { StatusBadge } from './StatusBadge';
+import { ConnectionStatus } from './status';
+
+export type ConnectionAction = {
+  key: string;
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  disabled?: boolean;
+};
+
+export type ConnectionPrimaryAction = {
+  label: string;
+  onClick: () => void;
+  loading?: boolean;
+  disabled?: boolean;
+};
+
+/**
+ * One connected account. The button is the single primary action;
+ * everything else lives in the overflow menu.
+ */
+export const ConnectionCard: React.FC<{
+  platform?: IntegrationPlatform;
+  name: string;
+  status: ConnectionStatus;
+  statusLabel?: string;
+  extra?: React.ReactNode;
+  primary?: ConnectionPrimaryAction;
+  menu?: ConnectionAction[];
+  children?: React.ReactNode;
+  footer?: React.ReactNode;
+}> = ({ platform, name, status, statusLabel, extra, primary, menu, children, footer }) => {
+  const { t } = useAppContext();
+  const visibleMenu = (menu || []).filter(Boolean);
+  return (
+    <Card className="overflow-hidden p-0">
+      <div className="p-5 sm:p-6 flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0">
+            {platform ? <IntegrationPlatformIcon platform={platform} size="md" /> : null}
+            <div className="min-w-0">
+              {isPhoneLike(name) ? (
+                <PhoneText as="p" className="font-semibold text-gray-900 dark:text-white truncate">
+                  {name}
+                </PhoneText>
+              ) : (
+                <p className="font-semibold text-gray-900 dark:text-white truncate">{name}</p>
+              )}
+              <div className="mt-1 flex flex-wrap items-center gap-2">
+                <StatusBadge status={status} label={statusLabel} />
+                {extra}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {primary ? (
+              <Button
+                variant="primary"
+                onClick={primary.onClick}
+                loading={primary.loading}
+                disabled={primary.disabled}
+                className="rounded-lg shadow-sm"
+              >
+                {primary.label}
+              </Button>
+            ) : null}
+            {visibleMenu.length > 0 ? (
+              <Dropdown
+                usePortal
+                trigger={
+                  <button
+                    type="button"
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
+                    aria-label={t('moreActions')}
+                  >
+                    <MoreVerticalIcon className="h-4 w-4" />
+                  </button>
+                }
+              >
+                {visibleMenu.map((action) => (
+                  <DropdownItem key={action.key} onClick={action.onClick}>
+                    <span className={action.danger ? 'text-red-600 dark:text-red-400' : undefined}>
+                      {action.label}
+                    </span>
+                  </DropdownItem>
+                ))}
+              </Dropdown>
+            ) : null}
+          </div>
+        </div>
+        {children}
+        {footer ? (
+          <div className="pt-3 border-t border-gray-200/80 dark:border-gray-700/80">{footer}</div>
+        ) : null}
+      </div>
+    </Card>
+  );
+};

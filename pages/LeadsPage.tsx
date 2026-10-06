@@ -25,19 +25,10 @@ import { ARABIC_DATE_LOCALE, formatTimelineDate, withLatinDigits } from '../util
 import { MarqueeText } from '../components/MarqueeText';
 import { resolveInputDir } from '../utils/inputAutoDir';
 import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 
-const LEADS_STATUS_TAB_STORAGE_KEY = 'crm:leadsStatusTab';
 const LEADS_SCROLL_STORAGE_KEY = 'crm:leadsScrollY';
-
-const readStoredStatusTab = (page: string): Lead['status'] => {
-    try {
-        const raw = localStorage.getItem(`${LEADS_STATUS_TAB_STORAGE_KEY}:${page}`);
-        return (raw as Lead['status']) || 'All';
-    } catch {
-        return 'All';
-    }
-};
-
+const LEADS_STATUS_LEGACY_PREFIX = 'crm:leadsStatusTab';
 const readStoredScrollY = (page: string): number => {
     try {
         const raw = localStorage.getItem(`${LEADS_SCROLL_STORAGE_KEY}:${page}`);
@@ -94,29 +85,18 @@ export const LeadsPage = () => {
     );
     const [leadsPageNumber, setLeadsPageNumber] = useState(1);
     const [leadsPageSize, setLeadsPageSize] = usePersistedPageSize('leads');
-    const [activeStatusFilter, setActiveStatusFilterState] = useState<Lead['status']>(() => readStoredStatusTab(currentPage));
+    const [activeStatusFilter, setActiveStatusFilter] = usePersistedTab<Lead['status']>(
+        `leadsStatus:${currentPage}`,
+        '*',
+        'All',
+        [`${LEADS_STATUS_LEGACY_PREFIX}:${currentPage}`],
+    );
     const [viewMode, setViewMode] = useEntityViewMode('leads');
     const isBoardView = viewMode === 'board';
     /** `ids` = explicit checkbox set; `all_matching` = every lead matching current filters minus excludes */
     const [leadSelectionMode, setLeadSelectionMode] = useState<'ids' | 'all_matching'>('ids');
     const [excludedLeadIds, setExcludedLeadIds] = useState<Set<number>>(() => new Set());
     const selectAllCheckboxRef = useRef<HTMLInputElement>(null);
-
-    // Re-sync the persisted tab when switching between Leads-family pages (Fresh/Hot/Cold/My/...)
-    // that share this component without unmounting it.
-    useEffect(() => {
-        setActiveStatusFilterState(readStoredStatusTab(currentPage));
-    }, [currentPage]);
-
-    const setActiveStatusFilter = (status: Lead['status']) => {
-        const next = status ?? 'All';
-        setActiveStatusFilterState(next);
-        try {
-            localStorage.setItem(`${LEADS_STATUS_TAB_STORAGE_KEY}:${currentPage}`, next);
-        } catch {
-            // Ignore storage errors (private mode, etc.)
-        }
-    };
 
     const baseLeadFilters = useMemo((): LeadApiFilters => {
         const filters: LeadApiFilters = {};

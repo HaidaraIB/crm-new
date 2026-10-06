@@ -7,7 +7,8 @@ import { navigateToCompanyRoute, getCompanyRoute } from '../utils/routing';
 // FIX: Import translations to be used for type casting.
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
-import { ChevronDownIcon, CodeBracketsIcon, XIcon } from './icons';
+import { ChevronDownIcon, CodeBracketsIcon, TikTokIcon, XIcon } from './icons';
+import { integrationByPage } from '../pages/integrations/registry';
 import { normalizeRole } from '../utils/roles';
 import { blockedPolicyForPage } from '../utils/integrationPolicyGate';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
@@ -28,7 +29,7 @@ type IntegrationLogoConfig = {
 /** Brand image logos / icons for Integrations sidebar sub-items. */
 const INTEGRATION_SUB_LOGOS: Partial<Record<PageType, IntegrationLogoConfig>> = {
     Meta: { src: '/meta_logo_icon.png' },
-    TikTok: { src: '/tiktok_logo_icon.webp', scale: 'scale-150' },
+    TikTok: { Icon: TikTokIcon },
     WhatsApp: { src: '/whatsapp_logo_icon.webp' },
     Twilio: { src: '/sms_logo_icon.png', mono: true },
     AI: { src: '/chatgpt_logo_icon.png', mono: true },
@@ -186,12 +187,9 @@ export const Sidebar = () => {
     
     /** Sidebar labels for integration sub-pages (toCamelCase('AI') would wrongly yield aI). */
     const subItemTranslationKey = (sub: PageType): keyof typeof translations.en => {
+        const fromRegistry = integrationByPage(sub)?.titleKey as keyof typeof translations.en | undefined;
+        if (fromRegistry) return fromRegistry;
         const special: Partial<Record<PageType, keyof typeof translations.en>> = {
-            AI: 'ai',
-            Twilio: 'twilio',
-            'Lead API': 'leadApi',
-            'Mujeb': 'mujeb',
-            PBX: 'pbxIntegration',
             'Call Reports': 'callReports',
         };
         return special[sub] ?? (toCamelCase(sub) as keyof typeof translations.en);

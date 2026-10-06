@@ -295,7 +295,7 @@ export interface TimelineWhatsAppThreadMessage {
 }
 
 /** Instagram Direct / Facebook Messenger. */
-export type TimelineSocialChannel = 'instagram' | 'messenger';
+export type TimelineSocialChannel = 'instagram' | 'messenger' | 'whatsapp';
 
 /** A tag as referenced from a timeline entry; color falls back when the tag was deleted. */
 export interface TimelineTagRef {

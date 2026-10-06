@@ -12,8 +12,10 @@ import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { withLatinDigits } from '../utils/dateUtils';
 import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 
 type Tab = 'units' | 'projects' | 'developers';
+const PROPERTY_TABS = ['units', 'projects', 'developers'] as const;
 
 /** Normalized for table display: related entity is always a label string. */
 type DisplayProject = Omit<Project, 'developer'> & { developer: string };
@@ -340,17 +342,12 @@ export const PropertiesPage = () => {
     const deleteProjectMutation = useDeleteProject();
     const deleteUnitMutation = useDeleteUnit();
 
-    // Load saved tab from localStorage, default to 'units'
-    const [activeTab, setActiveTab] = useState<Tab>(() => {
-        const savedTab = localStorage.getItem('propertiesActiveTab') as Tab;
-        return savedTab && ['units', 'projects', 'developers'].includes(savedTab) ? savedTab : 'units';
-    });
-
-    // Save active tab to localStorage whenever it changes
-    useEffect(() => {
-        localStorage.setItem('propertiesActiveTab', activeTab);
-    }, [activeTab]);
-
+    const [activeTab, setActiveTab] = usePersistedTab<Tab>(
+        'properties',
+        PROPERTY_TABS,
+        'units',
+        ['propertiesActiveTab'],
+    );
     useEffect(() => {
         setDevelopersPageNumber(1);
     }, [developerFilters.search]);

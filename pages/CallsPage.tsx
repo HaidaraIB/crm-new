@@ -19,7 +19,12 @@ import {
   SearchIcon,
   XIcon,
 } from '../components/icons';
-import { getWhatsAppCallsAPI, type WhatsAppCallRecord } from '../services/api';
+import {
+  enableWhatsAppCallingAPI,
+  getWhatsAppCallsAPI,
+  getWhatsappInboxNumbersAPI,
+  type WhatsAppCallRecord,
+} from '../services/api';
 import { ChatVoicePlayer } from '../components/chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { queryKeys, useLead, useSyncDigest, useWhatsAppLiveCalls } from '../hooks/useQueries';
@@ -34,6 +39,7 @@ import { CallErrorLogsPanel } from '../components/messaging/CallErrorLogsPanel';
 import { normalizeRole } from '../utils/roles';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { consumePendingCallsTab } from '../utils/leadReturn';
+import { readPersistedTab, writePersistedTab } from '../hooks/usePersistedTab';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { stashPendingInboxConversationId } from '../utils/inboxDeepLink';
 import {
@@ -45,6 +51,7 @@ import {
 } from '../utils/callFilters';
 
 type CallsPageTab = 'history' | 'live' | 'team' | 'hours' | 'error-logs';
+const CALLS_TABS = ['history', 'live', 'team', 'hours', 'error-logs'] as const;
 
 const STATUS_FILTERS = [
   { key: 'all' },
@@ -169,6 +176,67 @@ const CallRecordingPlayer: React.FC<{ url: string; t: (k: any) => string }> = ({
   return <ChatVoicePlayer blobUrl={blobUrl} mine={false} t={t} />;
 };
 
+function CallHoursSwitcher({
+  t,
+  canManage,
+}: {
+  t: (key: any) => string;
+  canManage: boolean;
+}) {
+  const [which, setWhich] = useState<'crm' | 'inbox'>('crm');
+  const [enabling, setEnabling] = useState(false);
+  const { data } = useQuery({
+    queryKey: ['whatsappInboxNumbers'],
+    queryFn: getWhatsappInboxNumbersAPI,
+    retry: false,
+  });
+  const inbox = data?.numbers?.find((row) => row.status === 'connected') ?? data?.numbers?.[0];
+  const inboxId = which === 'inbox' ? inbox?.id : undefined;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={which}
+          onChange={(e) => setWhich(e.target.value === 'inbox' ? 'inbox' : 'crm')}
+          className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+        >
+          <option value="crm">{t('crmWhatsAppNumber')}</option>
+          <option value="inbox">{t('whatsappInboxTab')}</option>
+        </select>
+        {canManage ? (
+          <Button
+            className="!h-8 !px-3 !text-xs"
+            loading={enabling}
+            disabled={which === 'inbox' && !inboxId}
+            onClick={async () => {
+              setEnabling(true);
+              try {
+                await enableWhatsAppCallingAPI(
+                  which === 'inbox' && inboxId ? { wa_inbox_number_id: inboxId } : {}
+                );
+              } finally {
+                setEnabling(false);
+              }
+            }}
+          >
+            {t('enableWhatsAppCalling')}
+          </Button>
+        ) : null}
+      </div>
+      {which === 'inbox' && !inboxId ? (
+        <p className="text-sm text-gray-500">{t('whatsappInboxConnectPrompt')}</p>
+      ) : (
+        <WhatsAppCallHoursPanel
+          t={t}
+          canManage={canManage}
+          waInboxNumberId={inboxId}
+        />
+      )}
+    </div>
+  );
+}
+
 const filterBtnBase =
   'flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-sm transition-colors';
 
@@ -203,8 +271,12 @@ export const CallsPage: React.FC = () => {
     ) {
       return pending;
     }
-    return 'history';
+    return readPersistedTab('calls', CALLS_TABS, 'history');
   });
+
+  useEffect(() => {
+    writePersistedTab('calls', activeTab);
+  }, [activeTab]);
 
   const role = normalizeRole(currentUser?.role);
   // Live / Team / Call hours are supervisory views: employees with WhatsApp
@@ -470,7 +542,7 @@ export const CallsPage: React.FC = () => {
                   activeTab === 'hours' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
                 }`}
               >
-                {t('callsTabHours')}
+                {t('callsTabSettings')}
               </button>
             </>
           ) : null}
@@ -509,7 +581,7 @@ export const CallsPage: React.FC = () => {
       {activeTab === 'team' && canSeeSupervisorTabs ? <WhatsAppTeamCallStatusPanel t={t} /> : null}
 
       {activeTab === 'hours' && canSeeSupervisorTabs ? (
-        <WhatsAppCallHoursPanel t={t} canManage={canManageHours} />
+        <CallHoursSwitcher t={t} canManage={canManageHours} />
       ) : null}
 
       {activeTab === 'error-logs' && canSeeCallErrorLogs ? <CallErrorLogsPanel /> : null}

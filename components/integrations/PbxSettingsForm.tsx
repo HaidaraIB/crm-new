@@ -13,11 +13,10 @@ import {
   downloadPbxConnectorPackageAPI,
   type PbxSettingsResponse,
 } from '../../services/api';
-import { Button, Card, Input, Loader, PageWrapper, RefreshButton } from '../index';
+import { Button, Card, Input, Loader, RefreshButton } from '../index';
 import { EditIcon, EyeIcon, EyeOffIcon, TrashIcon } from '../icons';
 import { formatDateTimeToLocal } from '../../utils/dateUtils';
 import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
-import { resolveIntegrationPolicyMessage } from '../../utils/integrationPolicyMessage';
 import { clearFieldError } from '../../utils/formFieldErrors';
 
 type IntegrationPolicyEntry = { enabled: boolean; message: string; scope: string };
@@ -284,16 +283,6 @@ export function PbxSettingsForm({
 
   return (
     <div className="space-y-6 max-w-3xl">
-      {pbxPolicyDisabled ? (
-        <div className="rounded-lg border px-4 py-3 text-sm bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-900/20 dark:border-amber-800 dark:text-amber-200">
-          {resolveIntegrationPolicyMessage(
-            integrationPolicyMap?.pbx?.message,
-            integrationPolicyMap?.pbx?.scope,
-            t,
-          )}
-        </div>
-      ) : null}
-
       <Card className="p-6 space-y-4">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{t('pbxConnection')}</h3>
         <div className="flex items-center gap-2">
@@ -681,10 +670,3 @@ export function PbxSettingsForm({
   );
 }
 
-export function PbxSettingsPage({ t, integrationPolicyMap }: { t(key: string): string; integrationPolicyMap?: Record<string, IntegrationPolicyEntry> }) {
-  return (
-    <PageWrapper title={t('pbxIntegrationTitle')} helpVideoPageKey="pbx">
-      <PbxSettingsForm t={t} integrationPolicyMap={integrationPolicyMap} />
-    </PageWrapper>
-  );
-}

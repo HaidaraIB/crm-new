@@ -12,7 +12,7 @@ import { useWebPush } from './hooks/useWebPush';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, AlertModal, ToastHost, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog, WebPushPrompt } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsHubPage, MetaIntegrationPage, TikTokIntegrationPage, WhatsAppIntegrationPage, SmsIntegrationPage, AiIntegrationPage, LeadApiIntegrationPage, MujebIntegrationPage, PbxIntegrationPage, MessagingCenterPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
 import { PbxScreenPopListener } from './components/PbxScreenPopListener';
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
@@ -85,7 +85,7 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
         case 'Campaigns':
             return <CampaignsPage />;
         case 'Messaging Center':
-            return <IntegrationsPage key="MessagingCenter" />;
+            return <MessagingCenterPage />;
         case 'Chats':
             return <ChatsPage />;
         case 'Calls':
@@ -105,15 +105,23 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
         case 'Call Reports':
             return <CallReportsPage />;
         case 'Integrations':
+            return <IntegrationsHubPage />;
         case 'Meta':
+            return <MetaIntegrationPage />;
         case 'TikTok':
+            return <TikTokIntegrationPage />;
         case 'WhatsApp':
+            return <WhatsAppIntegrationPage />;
         case 'Twilio':
+            return <SmsIntegrationPage />;
         case 'AI':
+            return <AiIntegrationPage />;
         case 'Lead API':
+            return <LeadApiIntegrationPage />;
         case 'Mujeb':
+            return <MujebIntegrationPage />;
         case 'PBX':
-            return <IntegrationsPage key={currentPage} />;
+            return <PbxIntegrationPage />;
         case 'Billing':
             return <BillingPage />;
         case 'Change Plan':

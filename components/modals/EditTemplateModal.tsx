@@ -6,7 +6,7 @@ import {
   insertTextAtCaret,
 } from '../MessagePlaceholderChips';
 import type { MessageTemplateType, TemplateButtonPayload } from '../../services/api';
-import { createMessageTemplateAPI, updateMessageTemplateAPI, deleteMessageTemplateAPI, resolveLocalizedApiError, getApiErrorDetails } from '../../services/api';
+import { createMessageTemplateAPI, updateMessageTemplateAPI, resolveLocalizedApiError, getApiErrorDetails } from '../../services/api';
 import { SelectMediaModal } from './SelectMediaModal';
 import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
 import { clearFieldError } from '../../utils/formFieldErrors';
@@ -61,7 +61,9 @@ const LANGUAGE_OPTIONS = [
   { value: 'tr', label: 'Turkish', code: 'TR' },
 ];
 
-const CATEGORY_OPTIONS: { value: string; labelKey: string; descKey: string; backendValue: string }[] = [
+type TKey = keyof typeof translations.en;
+
+const CATEGORY_OPTIONS: { value: string; labelKey: TKey; descKey: TKey; backendValue: string }[] = [
   { value: 'marketing', labelKey: 'categoryMarketingLabel', descKey: 'categoryMarketingDesc', backendValue: 'marketing' },
   { value: 'auth', labelKey: 'categoryAuthLabel', descKey: 'categoryAuthDesc', backendValue: 'auth' },
   { value: 'utility', labelKey: 'categoryUtilityLabel', descKey: 'categoryUtilityDesc', backendValue: 'utility' },
@@ -72,7 +74,7 @@ const CATEGORY_OPTIONS: { value: string; labelKey: string; descKey: string; back
   { value: 'limited_time_offer', labelKey: 'categoryLimitedTimeOfferLabel', descKey: 'categoryLimitedTimeOfferDesc', backendValue: 'utility' },
 ];
 
-const HEADER_OPTIONS: { value: string; labelKey: string }[] = [
+const HEADER_OPTIONS: { value: string; labelKey: TKey }[] = [
   { value: 'none', labelKey: 'templateHeaderNone' },
   { value: 'text', labelKey: 'templateHeaderText' },
   { value: 'image', labelKey: 'templateHeaderImage' },
@@ -96,10 +98,6 @@ function isTemplateOnMeta(tpl: MessageTemplateType): boolean {
   return ['APPROVED', 'PENDING', 'REJECTED'].includes(metaStatus);
 }
 
-function deleteTemplateConfirmMessage(tpl: MessageTemplateType, t: TFn): string {
-  return isTemplateOnMeta(tpl) ? t('deleteTemplateConfirmMeta') : t('deleteTemplateConfirm');
-}
-
 type EditTemplateModalProps = {
   isOpen: boolean;
   onClose: () => void;
@@ -108,8 +106,8 @@ type EditTemplateModalProps = {
   language: 'en' | 'ar';
   onSuccess: () => void;
   onSendToReview?: (templateId: number, language: string) => Promise<void>;
-  /** When provided, Delete button opens this callback instead of window.confirm (e.g. to show app ConfirmDeleteModal) */
-  onRequestDelete?: (template: MessageTemplateType) => void;
+  /** Opens app ConfirmDeleteModal (parent runs delete on confirm). */
+  onRequestDelete: (template: MessageTemplateType) => void;
 };
 
 export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSuccess, onSendToReview, onRequestDelete }: EditTemplateModalProps) => {
@@ -825,7 +823,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                     <>
                       <span className="text-2xl">{headerType === 'image' ? '🖼' : headerType === 'video' ? '🎬' : headerType === 'document' ? '📎' : '📍'}</span>
                       <span className="text-[10px] font-medium text-gray-500 dark:text-gray-400 mt-0.5">
-                        {t(HEADER_OPTIONS.find((opt) => opt.value === headerType)?.labelKey || 'templateHeader')}
+                        {t(HEADER_OPTIONS.find((opt) => opt.value === headerType)?.labelKey ?? 'templateHeader')}
                       </span>
                     </>
                   )}
@@ -853,7 +851,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                       )}
                       {btn.type === 'reply' && (
                         <span className="inline-flex items-center w-full justify-center py-2 rounded-lg border-2 border-[#0084ff] text-[#0084ff] dark:border-[#53bdeb] dark:text-[#53bdeb] text-[13px] font-medium bg-transparent">
-                          {btn.buttonText || (t('reply') || 'Reply')}
+                          {btn.buttonText || t('replyButtonAdd')}
                         </span>
                       )}
                       {btn.type === 'call_permission_request' && (
@@ -877,20 +875,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
           {isEdit && template && (
             <Button
               variant="danger"
-              onClick={() => {
-                if (onRequestDelete) {
-                  onRequestDelete(template);
-                } else if (window.confirm(deleteTemplateConfirmMessage(template, t))) {
-                  deleteMessageTemplateAPI(template.id)
-                    .then(onSuccess)
-                    .then(onClose)
-                    .catch((err) => {
-                      setErrors({
-                        general: resolveLocalizedApiError(err, t, t('meta_template_delete_failed')),
-                      });
-                    });
-                }
-              }}
+              onClick={() => onRequestDelete(template)}
             >
               {t('delete') || 'Delete'}
             </Button>

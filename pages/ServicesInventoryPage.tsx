@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
 import { Service, ServicePackage, ServiceProvider } from '../types';
@@ -19,10 +19,12 @@ import {
 } from '../hooks/useQueries';
 import { normalizeRole } from '../utils/roles';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { withLatinDigits } from '../utils/dateUtils';
 
 type Tab = 'services' | 'packages' | 'providers';
+const SERVICE_TABS = ['services', 'packages', 'providers'] as const;
 
 const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Service[], onUpdate: (service: Service) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -205,7 +207,7 @@ export const ServicesInventoryPage = () => {
         setIsEditServiceProviderModalOpen,
         setEditingServiceProvider,
     } = useAppContext();
-    const [activeTab, setActiveTab] = useState<Tab>('services');
+    const [activeTab, setActiveTab] = usePersistedTab<Tab>('servicesInventory', SERVICE_TABS, 'services');
 
     const { data: servicesResponse, isLoading: servicesLoading } = useServices();
     const { data: packagesResponse, isLoading: packagesLoading } = useServicePackages();

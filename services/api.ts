@@ -225,18 +225,22 @@ export function getApiErrorDetails(errorData: unknown): unknown {
  * When a code maps to i18n, do not append raw Meta/browser English text.
  */
 export function resolveLocalizedApiError(
-  e: { data?: unknown; message?: string; code?: string; name?: string } | null | undefined,
+  e: unknown,
   t?: (key: any) => string,
   fallback = 'Something went wrong'
 ): string {
-  const data = e?.data;
+  const err =
+    e != null && typeof e === 'object'
+      ? (e as { data?: unknown; message?: string; code?: string; name?: string })
+      : null;
+  const data = err?.data;
   const legacyKey =
     data && typeof data === 'object' && 'error_key' in data
       ? String((data as Record<string, unknown>).error_key)
       : undefined;
-  const rawCode = legacyKey || getApiErrorCode(data) || e?.code;
-  const micCode = detectMicPermissionErrorCode(e);
-  const apiMessage = getApiErrorMessage(data, '') || (typeof e?.message === 'string' ? e.message : '');
+  const rawCode = legacyKey || getApiErrorCode(data) || err?.code;
+  const micCode = detectMicPermissionErrorCode(err);
+  const apiMessage = getApiErrorMessage(data, '') || (typeof err?.message === 'string' ? err.message : '');
   // Some endpoints historically put the business key in `message` while leaving
   // `code` as the generic "error" — prefer a snake_case message as the lookup key.
   const messageAsKey =
@@ -320,8 +324,8 @@ export function resolveLocalizedApiError(
     }
   }
   const base =
-    (typeof e?.message === 'string' && e.message && !/^[a-z][a-z0-9_]+$/.test(e.message)
-      ? e.message
+    (typeof err?.message === 'string' && err.message && !/^[a-z][a-z0-9_]+$/.test(err.message)
+      ? err.message
       : '') ||
     (apiMessage && !/^[a-z][a-z0-9_]+$/.test(apiMessage) ? apiMessage : '') ||
     fallback;
@@ -3037,14 +3041,14 @@ export const bulkDeleteLeadsAPI = async (payload: BulkDeleteLeadsPayload) => {
   const path = qs ? `/clients/bulk_delete/?${qs}` : '/clients/bulk_delete/';
 
   const body =
-    'select_all' in payload && payload.select_all
+    'client_ids' in payload
       ? {
-          select_all: true,
-          exclude_ids: payload.exclude_ids ?? [],
+          client_ids: payload.client_ids,
           ...(payload.expected_count != null ? { expected_count: payload.expected_count } : {}),
         }
       : {
-          client_ids: payload.client_ids,
+          select_all: true,
+          exclude_ids: payload.exclude_ids ?? [],
           ...(payload.expected_count != null ? { expected_count: payload.expected_count } : {}),
         };
 
@@ -3695,6 +3699,18 @@ export const getIntegrationPolicyAPI = async (): Promise<Record<string, { enable
   return apiRequest('/integrations/policy/');
 };
 
+export type IntegrationOverviewRow = {
+  key: string;
+  status: string;
+  account_name: string;
+  last_activity_at: string | null;
+  policy_enabled: boolean;
+};
+
+export const getIntegrationsOverviewAPI = async (): Promise<IntegrationOverviewRow[]> => {
+  return apiRequest('/integrations/overview/');
+};
+
 /**
  * الحصول على تفاصيل حساب تكامل
  * GET /api/integrations/accounts/:id/
@@ -4272,6 +4288,33 @@ export const markWhatsAppConversationReadAPI = async (params: {
     }
   );
 };
+
+export interface QuickReplyPayload {
+  id: number;
+  title: string;
+  body: string;
+}
+
+export const getQuickRepliesAPI = () =>
+  apiRequest<QuickReplyPayload[]>('/integrations/quick-replies/');
+
+export const createQuickReplyAPI = (data: { title: string; body: string }) =>
+  apiRequest<QuickReplyPayload>('/integrations/quick-replies/', {
+    method: 'POST',
+    body: JSON.stringify(data),
+  });
+
+export const updateQuickReplyAPI = (
+  id: number,
+  data: { title: string; body: string },
+) =>
+  apiRequest<QuickReplyPayload>(`/integrations/quick-replies/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  });
+
+export const deleteQuickReplyAPI = (id: number) =>
+  apiRequest(`/integrations/quick-replies/${id}/`, { method: 'DELETE' });
 
 const INBOX_CONVERSATIONS_PATH = '/integrations/inbox/conversations/';
 const INBOX_CONNECTIONS_PATH = '/integrations/inbox/connections/';
@@ -5057,9 +5100,19 @@ export const updateWhatsAppCallHoursAPI = async (
   });
 };
 
-export const getWhatsAppCallPermissionsAPI = async (to: string) => {
+export const getWhatsAppCallPermissionsAPI = async (
+  to: string,
+  opts?: { waInboxNumberId?: number; conversationId?: number }
+) => {
+  const params = new URLSearchParams({ to });
+  if (opts?.waInboxNumberId != null) {
+    params.set('wa_inbox_number_id', String(opts.waInboxNumberId));
+  }
+  if (opts?.conversationId != null) {
+    params.set('conversation', String(opts.conversationId));
+  }
   return apiRequest<{ permissions: unknown; can_start_call: boolean }>(
-    `/integrations/whatsapp/calls/permissions/?to=${encodeURIComponent(to)}`
+    `/integrations/whatsapp/calls/permissions/?${params.toString()}`
   );
 };
 
@@ -5068,6 +5121,8 @@ export const sendWhatsAppCallPermissionRequestAPI = async (data: {
   template_id?: number;
   template_name?: string;
   language?: string;
+  wa_inbox_number_id?: number;
+  conversation?: number;
 }) => {
   return apiRequest('/integrations/whatsapp/calls/permission-request/', {
     method: 'POST',

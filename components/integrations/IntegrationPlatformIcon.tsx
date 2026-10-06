@@ -23,10 +23,13 @@ const ICON_FG: Record<IntegrationPlatform, string> = {
     sms: 'text-primary-700 dark:text-primary-200',
 };
 
+/** Solid black/white — gray badge + light glyph was unreadable in dark mode. */
+const TIKTOK_BADGE_FG = 'text-white dark:text-black';
+
 const BADGE_SHELL: Record<IntegrationPlatform, string> = {
     meta: 'bg-[#1877F2]/12 dark:bg-[#1877F2]/22 ring-[#1877F2]/30 dark:ring-[#1877F2]/45',
     meta_inbox: 'bg-[#C13584]/12 dark:bg-[#C13584]/22 ring-[#C13584]/30 dark:ring-[#C13584]/45',
-    tiktok: 'bg-gray-200/90 dark:bg-white/12 ring-gray-300/60 dark:ring-white/25',
+    tiktok: 'bg-black dark:bg-white ring-black/30 dark:ring-white/40',
     whatsapp: 'bg-[#25D366]/12 dark:bg-[#25D366]/22 ring-[#25D366]/30 dark:ring-[#25D366]/45',
     sms: 'bg-primary/12 dark:bg-primary/25 ring-primary/25 dark:ring-primary/40',
 };
@@ -73,13 +76,15 @@ export const IntegrationPlatformIcon = ({
         variant === 'muted'
             ? 'bg-gray-100 dark:bg-gray-700/60 ring-gray-200/80 dark:ring-gray-600/80'
             : BADGE_SHELL[platform];
+    const badgeFg =
+        variant === 'badge' && platform === 'tiktok' ? TIKTOK_BADGE_FG : fg;
 
     return (
         <span
             className={`flex-shrink-0 flex items-center justify-center ring-1 ${shell} ${shellTone} ${className}`.trim()}
             aria-hidden
         >
-            <Icon className={`${icon} ${fg}`} />
+            <Icon className={`${icon} ${badgeFg}`} />
         </span>
     );
 };

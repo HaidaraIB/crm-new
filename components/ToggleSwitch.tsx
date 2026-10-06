@@ -3,12 +3,14 @@ import React from 'react';
 type ToggleSwitchProps = {
     enabled: boolean;
     setEnabled: (enabled: boolean) => void;
+    disabled?: boolean;
 };
 
-export const ToggleSwitch = ({ enabled, setEnabled }: ToggleSwitchProps) => {
+export const ToggleSwitch = ({ enabled, setEnabled, disabled }: ToggleSwitchProps) => {
     return (
         <button
             type="button"
+            disabled={disabled}
             onClick={() => setEnabled(!enabled)}
             className={`${
                 enabled ? 'bg-primary' : 'bg-gray-200 dark:bg-gray-700'

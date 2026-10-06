@@ -284,7 +284,7 @@ export const ChatMessageBubble: React.FC<Props> = ({
                 disabled={resending}
                 onClick={() => onResend(msg)}
               >
-                {t('resend')}
+                {t('chatMessageResend')}
               </button>
             )}
             {onDelete && (

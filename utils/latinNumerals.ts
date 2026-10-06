@@ -53,7 +53,11 @@ export function installLatinDigits(): void {
     Intl.NumberFormat = wrapFormatCtor(Intl.NumberFormat);
     Intl.DateTimeFormat = wrapFormatCtor(Intl.DateTimeFormat);
     if (typeof Intl.RelativeTimeFormat === 'function') {
-        Intl.RelativeTimeFormat = wrapFormatCtor(Intl.RelativeTimeFormat);
+        Object.defineProperty(Intl, 'RelativeTimeFormat', {
+            value: wrapFormatCtor(Intl.RelativeTimeFormat),
+            writable: true,
+            configurable: true,
+        });
     }
 
     patchToLocale(Date.prototype, ['toLocaleString', 'toLocaleDateString', 'toLocaleTimeString']);

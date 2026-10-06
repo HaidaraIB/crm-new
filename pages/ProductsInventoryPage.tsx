@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
 import { Product, ProductCategory, Supplier } from '../types';
@@ -17,11 +17,13 @@ import {
     useProducts,
     useSuppliers,
 } from '../hooks/useQueries';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { withLatinDigits } from '../utils/dateUtils';
 
 type Tab = 'products' | 'categories' | 'suppliers';
+const PRODUCT_TABS = ['products', 'categories', 'suppliers'] as const;
 
 const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Product[], onUpdate: (product: Product) => void, onDelete: (id: number) => void, isAdmin: boolean }) => {
     const { t } = useAppContext();
@@ -203,7 +205,7 @@ export const ProductsInventoryPage = () => {
         setIsEditSupplierModalOpen,
         setEditingSupplier,
     } = useAppContext();
-    const [activeTab, setActiveTab] = useState<Tab>('products');
+    const [activeTab, setActiveTab] = usePersistedTab<Tab>('productsInventory', PRODUCT_TABS, 'products');
 
     const { data: productsResponse, isLoading: productsLoading } = useProducts();
     const { data: categoriesResponse, isLoading: categoriesLoading } = useProductCategories();

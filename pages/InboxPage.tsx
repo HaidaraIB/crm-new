@@ -12,6 +12,9 @@ import {
 } from '../components/chat/chatMediaAlbum';
 import { ChatPendingAttachmentChip } from '../components/chat/ChatPendingAttachmentChip';
 import { SocialContactAvatar } from '../components/chat/SocialContactAvatar';
+import { ChatTemplatePicker } from '../components/chat/ChatTemplatePicker';
+import { QuickReplyInsert } from '../components/chat/QuickRepliesPanel';
+import { WhatsAppAgentStatusControl } from '../components/whatsapp/WhatsAppAgentStatusControl';
 import { ChatVoiceRecordingBar } from '../components/chat/ChatVoiceRecordingBar';
 import {
   InboxFilterRail,
@@ -34,6 +37,7 @@ import {
   StarIcon,
 } from '../components/index';
 import { useAppContext } from '../context/AppContext';
+import { normalizeRole } from '../utils/roles';
 import type { translations } from '../constants';
 import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
 import {
@@ -46,6 +50,7 @@ import {
   useSocialMessages,
   useSocialSendWindow,
   useUpdateSocialConversationState,
+  useUsers,
 } from '../hooks/useQueries';
 import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
@@ -69,6 +74,7 @@ import {
   canAccessSocialInbox,
   canConvertSocialConversation,
   isSocialInboxStaffScoped,
+  userSeesAllSocialConversations,
 } from '../utils/socialInboxAccess';
 import {
   isWhatsAppTypeStubBody,
@@ -195,13 +201,26 @@ function composerTextDir(text: string, uiIsRtl: boolean): 'ltr' | 'rtl' {
 }
 
 export const InboxPage: React.FC = () => {
-  const { t, language, currentUser, openLeadDetails } = useAppContext();
+  const {
+    t,
+    language,
+    currentUser,
+    openLeadDetails,
+    setConfirmDeleteConfig,
+    setIsConfirmDeleteModalOpen,
+    showAlert,
+  } = useAppContext();
   const queryClient = useQueryClient();
   const realtimeConnected = useRealtimeConnected();
   const isRtl = language === 'ar';
   const inboxAccessAllowed = canAccessSocialInbox(currentUser);
   const canConvert = canConvertSocialConversation(currentUser);
   const staffScopedInbox = isSocialInboxStaffScoped(currentUser);
+  const role = normalizeRole(currentUser?.role);
+  const isCallCenter = role === 'CallCenter';
+  const canReassign =
+    role === 'Owner' ||
+    (role === 'Supervisor' && userSeesAllSocialConversations(currentUser));
 
   const [filtersInit] = useState(loadInboxFilters);
   const [channel, setChannel] = useState(filtersInit.channel);
@@ -209,6 +228,7 @@ export const InboxPage: React.FC = () => {
   const [unreplied, setUnreplied] = useState(filtersInit.unreplied);
   const [starredOnly, setStarredOnly] = useState(false);
   const [assignment, setAssignment] = useState<string>('all');
+  const [agentId, setAgentId] = useState<number | ''>('');
   const [search, setSearch] = useState('');
   const [shareLocationOpen, setShareLocationOpen] = useState(false);
   const waCalling = useWhatsAppCallingOptional();
@@ -239,9 +259,10 @@ export const InboxPage: React.FC = () => {
       unreplied: unreplied || undefined,
       starred: starredOnly || undefined,
       assignment: assignment !== 'all' ? assignment : undefined,
+      agent: agentId === '' ? undefined : agentId,
       limit: 100,
     }),
-    [channel, status, search, unreplied, starredOnly, assignment]
+    [channel, status, search, unreplied, starredOnly, assignment, agentId]
   );
 
   useEffect(() => {
@@ -256,6 +277,13 @@ export const InboxPage: React.FC = () => {
     queryKeys.socialConversations(listParams as Record<string, unknown>),
     queryKeys.socialMessages(selectedId ?? undefined),
   ]);
+
+  const { data: agentsData } = useUsers(undefined, { enabled: canReassign }, 200, {
+    roles: ['call_center'],
+  });
+  const agents: { id: number; full_name?: string; username?: string }[] = Array.isArray(agentsData)
+    ? agentsData
+    : agentsData?.results ?? [];
 
   const { data: listData, isLoading: listLoading } = useSocialConversations(listParams, {
     refetchInterval: inboxAccessAllowed ? pollMs : false,
@@ -297,10 +325,11 @@ export const InboxPage: React.FC = () => {
   const composerBlocked = sendWindow ? !sendWindow.open && !requiresTemplate : false;
   const [templateId, setTemplateId] = useState<number | ''>('');
   const [templateSending, setTemplateSending] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(false);
   const { data: messageTemplates } = useQuery({
     queryKey: ['messageTemplates', 'inbox'],
     queryFn: () => getMessageTemplatesAPI(),
-    enabled: requiresTemplate && Boolean(selectedId),
+    enabled: Boolean(selectedId && isWhatsappThread),
   });
   const approvedTemplates = useMemo(
     () =>
@@ -506,6 +535,37 @@ export const InboxPage: React.FC = () => {
     [openLeadDetails, selectedId]
   );
 
+  const handleDeleteConversation = useCallback(() => {
+    if (!selectedId || !selected) return;
+    const conversationId = selectedId;
+    const label = selected.contact.display_name;
+    setConfirmDeleteConfig({
+      title: t('delete'),
+      message: t('deleteConversationConfirm'),
+      itemName: label,
+      confirmButtonText: t('delete'),
+      confirmButtonVariant: 'danger',
+      onConfirm: async () => {
+        try {
+          await deleteSocialConversationAPI(conversationId);
+          setSelectedId(null);
+          queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+        } catch (e: unknown) {
+          showAlert(resolveLocalizedApiError(e, t, 'Delete failed'), 'error');
+        }
+      },
+    });
+    setIsConfirmDeleteModalOpen(true);
+  }, [
+    selected,
+    selectedId,
+    t,
+    setConfirmDeleteConfig,
+    setIsConfirmDeleteModalOpen,
+    queryClient,
+    showAlert,
+  ]);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-2 sm:p-3 md:p-4">
       <div className="flex shrink-0 items-center gap-2 px-0.5">
@@ -544,6 +604,9 @@ export const InboxPage: React.FC = () => {
         >
           <div className={`${WA_HEADER_BAR} ${WA_HEADER_TEXT}`}>
             <span className="font-semibold">{t('inbox')}</span>
+            {isCallCenter ? (
+              <WhatsAppAgentStatusControl t={t} />
+            ) : null}
           </div>
 
           <div className="space-y-2 border-b border-gray-200 p-2 dark:border-gray-800">
@@ -578,7 +641,7 @@ export const InboxPage: React.FC = () => {
                 {t('chatFilterStarred')}
               </label>
             </div>
-            {!staffScopedInbox && (channel === 'whatsapp' || channel === 'all') ? (
+            {!staffScopedInbox ? (
               <select
                 value={assignment}
                 onChange={(e) => setAssignment(e.target.value)}
@@ -587,6 +650,20 @@ export const InboxPage: React.FC = () => {
                 <option value="all">{t('chatFilterAll')}</option>
                 <option value="mine">{t('chatFilterAssignedToMe')}</option>
                 <option value="unassigned">{t('chatFilterUnassigned')}</option>
+              </select>
+            ) : null}
+            {canReassign && agents.length > 0 ? (
+              <select
+                value={agentId}
+                onChange={(e) => setAgentId(e.target.value ? Number(e.target.value) : '')}
+                className="w-full rounded-md border border-gray-300 bg-white px-2 py-1.5 text-xs dark:border-gray-600 dark:bg-gray-800"
+              >
+                <option value="">{t('inboxFilterByAgent')}</option>
+                {agents.map((agent) => (
+                  <option key={agent.id} value={agent.id}>
+                    {agent.full_name || agent.username}
+                  </option>
+                ))}
               </select>
             ) : null}
             <Input
@@ -641,6 +718,11 @@ export const InboxPage: React.FC = () => {
                       <StarIcon className="h-3.5 w-3.5 shrink-0 fill-amber-400 text-amber-400" />
                     ) : null}
                   </div>
+                  {row.assigned_to ? (
+                    <p className="truncate text-[10px] font-medium text-primary">
+                      {row.assigned_to.full_name || row.assigned_to.username}
+                    </p>
+                  ) : null}
                   <p className="mt-0.5 truncate text-xs text-gray-600 dark:text-gray-300">
                     {localizeWhatsAppListPreview(row.last_message_preview || '', t)}
                   </p>
@@ -678,6 +760,10 @@ export const InboxPage: React.FC = () => {
             <>
               <div className={`${WA_HEADER_BAR} ${WA_HEADER_TEXT} justify-between gap-2`}>
                 <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <SocialContactAvatar
+                    displayName={selected.contact.display_name}
+                    profilePicUrl={selected.contact.profile_pic_url}
+                  />
                   <InboxChannelBadge channel={selected.channel} className="h-4 w-4 shrink-0" />
                   <span className="min-w-0 truncate font-semibold">
                     {selected.contact.display_name}
@@ -717,17 +803,40 @@ export const InboxPage: React.FC = () => {
                           peerPhone: selected.contact.external_id,
                           clientId: threadConversation?.client?.id,
                           conversationId: selected.id,
+                          waInboxNumberId: selected.connection?.id,
                         });
                         if (!target) return;
                         void waCalling.startOutboundCall({
                           to: target.to,
                           clientId: target.clientId,
                           conversationId: target.conversationId,
+                          waInboxNumberId: target.waInboxNumberId,
                         });
                       }}
                     >
                       <PhoneIcon className="h-4 w-4" />
                     </button>
+                  ) : null}
+                  {canReassign ? (
+                    <select
+                      value={selected.assigned_to?.id ?? ''}
+                      aria-label={t('inboxAssignAgent')}
+                      onChange={(e) => {
+                        if (!selectedId) return;
+                        updateState.mutate({
+                          conversationId: selectedId,
+                          assignedTo: e.target.value ? Number(e.target.value) : null,
+                        });
+                      }}
+                      className="max-w-[9rem] rounded-md border border-white/30 bg-white/10 px-1.5 py-1 text-xs text-white"
+                    >
+                      <option value="">{t('chatFilterUnassigned')}</option>
+                      {agents.map((agent) => (
+                        <option key={agent.id} value={agent.id} className="text-gray-900">
+                          {agent.full_name || agent.username}
+                        </option>
+                      ))}
+                    </select>
                   ) : null}
                   <ChatConversationStatusMenu
                     t={t}
@@ -742,13 +851,7 @@ export const InboxPage: React.FC = () => {
                     <Button
                       variant="ghost"
                       className="!h-8 !text-white hover:!bg-white/20"
-                      onClick={async () => {
-                        if (!selectedId) return;
-                        if (!globalThis.window.confirm(t('deleteConversationConfirm'))) return;
-                        await deleteSocialConversationAPI(selectedId);
-                        setSelectedId(null);
-                        queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
-                      }}
+                      onClick={handleDeleteConversation}
                     >
                       {t('delete')}
                     </Button>
@@ -781,12 +884,14 @@ export const InboxPage: React.FC = () => {
                                 peerPhone: call.peer_phone,
                                 clientId: call.client ?? threadConversation?.client?.id,
                                 conversationId: selected.id,
+                                waInboxNumberId: selected.connection?.id,
                               });
                               if (!target) return;
                               void waCalling.startOutboundCall({
                                 to: target.to,
                                 clientId: target.clientId,
                                 conversationId: target.conversationId,
+                                waInboxNumberId: target.waInboxNumberId,
                               });
                             }
                           : undefined
@@ -855,49 +960,42 @@ export const InboxPage: React.FC = () => {
                   <div className={WA_ALERT_WARN}>
                     <p className="font-semibold">{t('replyWindowClosed')}</p>
                     <p>{t('inboxTemplateRequiredHint')}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <select
-                        value={templateId}
-                        onChange={(e) =>
-                          setTemplateId(e.target.value ? Number(e.target.value) : '')
-                        }
-                        className="min-w-[12rem] rounded-md border border-gray-300 bg-white px-2 py-1 text-sm dark:border-gray-600 dark:bg-gray-800"
-                      >
-                        <option value="">{t('inboxSendTemplate')}</option>
-                        {approvedTemplates.map((tpl: any) => (
-                          <option key={tpl.id} value={tpl.id}>{tpl.name}</option>
-                        ))}
-                      </select>
-                      <Button
-                        className="!h-8 !px-3 !text-xs"
-                        disabled={!templateId || templateSending || !selectedId}
-                        loading={templateSending}
-                        onClick={async () => {
-                          if (!selectedId || !templateId) return;
-                          setTemplateSending(true);
-                          try {
-                            await sendSocialInboxTemplateAPI({
-                              conversation: selectedId,
-                              template_id: Number(templateId),
-                            });
-                            setTemplateId('');
-                            queryClient.invalidateQueries({
-                              queryKey: queryKeys.socialMessages(selectedId),
-                            });
-                          } catch (e: any) {
-                            setSendError(
-                              resolveLocalizedApiError(e, t, t('socialSendFailed'))
-                            );
-                          } finally {
-                            setTemplateSending(false);
-                          }
-                        }}
-                      >
-                        {t('inboxSendTemplate')}
-                      </Button>
-                    </div>
                   </div>
                 )}
+                <QuickReplyInsert onInsert={(text) => setDraft(text)} />
+                {isWhatsappThread ? (
+                  <ChatTemplatePicker
+                    t={t}
+                    whatsappSendBlocked={composerBlocked}
+                    freeTextDisabled={requiresTemplate}
+                    showTemplates={showTemplates}
+                    setShowTemplates={setShowTemplates}
+                    approvedTemplates={approvedTemplates}
+                    chatTemplateSendId={templateId}
+                    setChatTemplateSendId={setTemplateId}
+                    chatTemplateSending={templateSending}
+                    onInsertQuickTemplate={(content) => setDraft(content)}
+                    onSendTemplate={async () => {
+                      if (!selectedId || !templateId) return;
+                      setTemplateSending(true);
+                      try {
+                        await sendSocialInboxTemplateAPI({
+                          conversation: selectedId,
+                          template_id: Number(templateId),
+                        });
+                        setTemplateId('');
+                        setShowTemplates(false);
+                        queryClient.invalidateQueries({
+                          queryKey: queryKeys.socialMessages(selectedId),
+                        });
+                      } catch (e: any) {
+                        setSendError(resolveLocalizedApiError(e, t, t('socialSendFailed')));
+                      } finally {
+                        setTemplateSending(false);
+                      }
+                    }}
+                  />
+                ) : null}
                 {composerBlocked && !requiresTemplate && (
                   <div className={WA_ALERT_WARN}>
                     <p className="font-semibold">{t('replyWindowClosed')}</p>

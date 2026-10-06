@@ -1,3 +1,5 @@
+import { writePersistedTab } from '../hooks/usePersistedTab';
+
 const MISSION_BAR_TODOS_PRESET_KEY = 'missionBarTodosPreset';
 
 export type MissionBarTodosPreset = 'today' | 'overdue';
@@ -19,13 +21,13 @@ export function presetTodosFromMissionBar(preset: MissionBarTodosPreset): void {
 
   if (preset === 'today') {
     localStorage.setItem('todosSelectedDate', today.toISOString());
-    localStorage.setItem('todosActiveTab', 'active');
+    writePersistedTab('todos', 'active');
     localStorage.removeItem(MISSION_BAR_TODOS_PRESET_KEY);
     return;
   }
 
   localStorage.setItem('todosSelectedDate', 'all');
-  localStorage.setItem('todosActiveTab', 'active');
+  writePersistedTab('todos', 'active');
   localStorage.setItem(MISSION_BAR_TODOS_PRESET_KEY, 'overdue');
 }
 

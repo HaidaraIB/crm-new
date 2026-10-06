@@ -8,9 +8,11 @@ import { reportPageContainer } from '../components/reports/reportStyles';
 import { ReportHero } from '../components/reports/ReportHero';
 import { ReportSummaryTile } from '../components/reports/ReportSummaryTile';
 import { ReportTableCard, ReportTableDefaults } from '../components/reports/ReportTableCard';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 import { downloadCsv } from '../utils/reportExport';
 
 type CallReportTab = 'combined' | 'crm' | 'pbx';
+const CALL_REPORT_TABS = ['combined', 'crm', 'pbx'] as const;
 
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -48,7 +50,11 @@ export const CallReportsPage = () => {
   const { t, goToPage, canAccessPage, language } = useAppContext();
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
-  const [activeTab, setActiveTab] = useState<CallReportTab>('combined');
+  const [activeTab, setActiveTab] = usePersistedTab<CallReportTab>(
+    'callReports',
+    CALL_REPORT_TABS,
+    'combined',
+  );
 
   const reportParams = useMemo(
     () => ({

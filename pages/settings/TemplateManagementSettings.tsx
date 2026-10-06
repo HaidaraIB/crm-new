@@ -158,7 +158,7 @@ export const TemplateManagementSettings = () => {
                     {t('sync')}
                 </Button>
                 <Button onClick={() => { setEditingTemplate(null); setIsEditTemplateOpen(true); }}>
-                    <PlusIcon className="w-4 h-4 me-2" /> {t('addTemplate')}
+                    <PlusIcon className="w-4 h-4" /> {t('addTemplate')}
                 </Button>
             </div>
             <div className="relative">

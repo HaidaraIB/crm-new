@@ -12,7 +12,8 @@ globs:
 
 ## Layout
 - **Chats** route (`/chats`, page `Chats`) → [`pages/ChatsPage.tsx`](pages/ChatsPage.tsx) + [`components/whatsapp/*`](components/whatsapp/).
-- **Integrations → WhatsApp** is account settings only (connect/disconnect). Do not put conversation UI back in `IntegrationsPage`.
+- **Integrations → WhatsApp** is connect/disconnect only. Calling hours for both the CRM number and the inbox number live on the Calls page Settings tab.
+- CRM and inbox WhatsApp numbers are the same `WhatsAppAccount` model (`purpose=crm|inbox`). CRM chats still auto-create a lead. Inbox threads do not.
 - Chats page fills the main viewport (`h-full` shell, no page-level scroll). Keep title compact; composer templates collapse behind a toggle so the thread stays visible without scrolling the page.
 - Theme tokens live in `components/whatsapp/whatsappChatTheme.ts`. Use CRM `primary` + gray surfaces so the chat chrome matches the sidebar.
 

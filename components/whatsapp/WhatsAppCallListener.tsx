@@ -326,13 +326,18 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
 
       setIsStartingOutbound(true);
       try {
-        const perms = await getWhatsAppCallPermissionsAPI(to);
+        const perms = await getWhatsAppCallPermissionsAPI(to, {
+          waInboxNumberId: args.waInboxNumberId,
+          conversationId: args.conversationId,
+        });
         if (!perms.can_start_call) {
           try {
             await sendWhatsAppCallPermissionRequestAPI({
               to,
               template_id: args.templateId,
               template_name: args.templateName,
+              wa_inbox_number_id: args.waInboxNumberId,
+              conversation: args.conversationId,
             });
             showAlert(t('whatsappCallPermissionSent'), 'info');
           } catch (sendErr: any) {
@@ -367,6 +372,8 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
               to,
               template_id: args.templateId,
               template_name: args.templateName,
+              wa_inbox_number_id: args.waInboxNumberId,
+              conversation: args.conversationId,
             });
             showAlert(t('whatsappCallPermissionSent'), 'info');
           } catch (sendErr: any) {

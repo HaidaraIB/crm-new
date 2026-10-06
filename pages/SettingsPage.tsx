@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { PageWrapper, LegalLinks } from '../components/index';
 import { ChannelsSettings } from './settings/ChannelsSettings';
 import { StagesSettings } from './settings/StagesSettings';
@@ -15,6 +15,7 @@ import { WorkHoursSettings } from './settings/WorkHoursSettings';
 import { useAppContext } from '../context/AppContext';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
+import { usePersistedTab } from '../hooks/usePersistedTab';
 
 type SettingsTab =
     | 'Channels'
@@ -67,18 +68,12 @@ export const SettingsPage = () => {
         [currentUser?.role, showVisitTypes]
     );
 
-    const [activeTab, setActiveTab] = useState<SettingsTab>(() => {
-        const savedTab = localStorage.getItem('settingsActiveTab');
-        if (savedTab === 'Library') return 'Channels';
-        return savedTab && ALL_SETTINGS_TAB_IDS.includes(savedTab as SettingsTab)
-            ? (savedTab as SettingsTab)
-            : 'Channels';
-    });
-
-    useEffect(() => {
-        localStorage.setItem('settingsActiveTab', activeTab);
-    }, [activeTab]);
-
+    const [activeTab, setActiveTab] = usePersistedTab<SettingsTab>(
+        'settings',
+        ALL_SETTINGS_TAB_IDS,
+        'Channels',
+        ['settingsActiveTab'],
+    );
     useEffect(() => {
         if (activeTab === 'Supervisors' && normalizeRole(currentUser?.role) !== 'Owner') {
             setActiveTab('Channels');

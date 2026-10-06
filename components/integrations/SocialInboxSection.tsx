@@ -1,12 +1,11 @@
-import { Alert } from '../Alert';
 import React, { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Card } from '../Card';
+import { Alert } from '../Alert';
 import { Button } from '../Button';
-import { IntegrationPlatformIcon } from './IntegrationPlatformIcon';
-import { InstagramIcon, MessengerIcon, SettingsIcon, TrashIcon } from '../index';
 import { SectionLoadingState } from '../SectionLoadingState';
+import { InstagramIcon, MessengerIcon } from '../index';
 import { useAppContext } from '../../context/AppContext';
+import { normalizeRole } from '../../utils/roles';
 import {
   checkSocialConnectionAPI,
   connectSocialPageAPI,
@@ -15,105 +14,66 @@ import {
   resolveLocalizedApiError,
   type MetaInboxConnectionPayload,
 } from '../../services/api';
+import { useOAuthConnect } from '../../hooks/integrations/useOAuthConnect';
+import { useConfirmDisconnect } from '../../hooks/integrations/useConfirmDisconnect';
+import {
+  ConnectionCard,
+  ConnectionSubItem,
+  EmptyConnectionState,
+  StatusBadge,
+  normalizeConnectionStatus,
+} from './kit';
 
 /**
- * Instagram & Messenger account configuration.
- *
- * Connect / disconnect only — conversations live on the Inbox page, following the
- * same split as WhatsApp (Integrations configures the account, Chats does the
- * messaging). Owner-only: the backend answers 403 meta_inbox_admin_only otherwise.
- *
- * The account row reuses Lead Ads furniture (icon + status pill + Connect/Edit).
- * Pages are a nested list under that row so they are not mistaken for a second
- * account. Check/Remove must report a result: a silent 200 looks like a dead button.
+ * Instagram & Messenger setup. Conversations live on the Inbox page.
+ * Owner-only: the backend answers 403 meta_inbox_admin_only otherwise.
  */
-interface SocialInboxSectionProps {
-  /** Creates the `meta_inbox` account if needed, then opens the OAuth popup. */
-  onConnect: () => void;
-  onEdit: (account: { id: number; name: string; status: string; platform: string }) => void;
-  onDisconnect: (accountId: number) => void;
-  /** Page-level connect lock, so both tabs disable together during a popup. */
-  connectingAccountId: number | null;
-  isStartingConnect: boolean;
+export const SocialInboxSection: React.FC<{
   integrationDisabled?: boolean;
   integrationDisabledMessage?: string;
-}
-
-const StatusPill: React.FC<{ tone: 'connected' | 'error' | 'idle'; children: React.ReactNode }> = ({
-  tone,
-  children,
-}) => (
-  <span
-    className={`inline-flex items-center gap-1.5 mt-0.5 text-xs font-medium px-2 py-0.5 rounded-full w-fit ${
-      tone === 'connected'
-        ? 'text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-500/20'
-        : tone === 'error'
-          ? 'text-amber-800 dark:text-amber-200 bg-amber-100 dark:bg-amber-500/20'
-          : 'text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-700/80'
-    }`}
-  >
-    <span
-      className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${
-        tone === 'connected' ? 'bg-green-500' : tone === 'error' ? 'bg-amber-500' : 'bg-gray-400'
-      }`}
-    />
-    {children}
-  </span>
-);
-
-export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
-  onConnect,
-  onEdit,
-  onDisconnect,
-  connectingAccountId,
-  isStartingConnect,
-  integrationDisabled = false,
-  integrationDisabledMessage,
-}) => {
-  const {
-    t,
-    showToast,
-    goToPage,
-    setConfirmDeleteConfig,
-    setIsConfirmDeleteModalOpen,
-  } = useAppContext();
+}> = ({ integrationDisabled = false, integrationDisabledMessage }) => {
+  const { t, showToast, goToPage, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, currentUser, setEditingAccount, setIsManageIntegrationAccountModalOpen } = useAppContext();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
   const [busyKey, setBusyKey] = useState<string | null>(null);
+  const oauth = useOAuthConnect();
+  const confirmDisconnect = useConfirmDisconnect(() => {
+    queryClient.invalidateQueries({ queryKey: ['socialInboxConnections'] });
+  });
 
+  const isOwner = normalizeRole(currentUser?.role) === 'Owner';
   const { data, isLoading, isError } = useQuery({
     queryKey: ['socialInboxConnections'],
     queryFn: getSocialConnectionsAPI,
     retry: false,
+    enabled: isOwner,
   });
 
-  const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ['socialInboxConnections'] });
-
-  const fail = (err: any, fallback: string) => {
-    const message = resolveLocalizedApiError(err, t, fallback);
+  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['socialInboxConnections'] });
+  const fail = (err: unknown, fallback: string) => {
+    const message = resolveLocalizedApiError(err as { message?: string }, t, fallback);
     setError(message);
     showToast(message, { variant: 'error' });
   };
 
-  const connect = useMutation({
+  const connectPage = useMutation({
     mutationFn: connectSocialPageAPI,
     onSuccess: () => {
       setError(null);
       showToast(t('messagingEnabled'), { variant: 'success' });
       invalidate();
     },
-    onError: (err: any) => fail(err, t('errorConnectingAccount')),
+    onError: (err: unknown) => fail(err, t('errorConnectingAccount')),
     onSettled: () => setBusyKey(null),
   });
-  const disconnect = useMutation({
+  const disconnectPage = useMutation({
     mutationFn: disconnectSocialPageAPI,
     onSuccess: () => {
       setError(null);
       showToast(t('pageRemoved'), { variant: 'success' });
       invalidate();
     },
-    onError: (err: any) => fail(err, t('errorDeletingAccount')),
+    onError: (err: unknown) => fail(err, t('errorDeletingAccount')),
     onSettled: () => setBusyKey(null),
   });
   const checkHealth = useMutation({
@@ -126,48 +86,30 @@ export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
         return;
       }
       const key = result?.health?.error_key;
-      const message =
-        (key ? t(key as any) : '') || t('socialInboxHealthFailed');
-      setError(message);
-      showToast(message, { variant: 'error' });
+      const message = (key ? t(key as 'connected') : '') || t('socialInboxHealthFailed');
+      setError(message === key ? t('socialInboxHealthFailed') : message);
+      if (!result?.health?.ok) showToast(message || t('socialInboxHealthFailed'), { variant: 'error' });
     },
-    onError: (err: any) => fail(err, t('socialInboxHealthFailed')),
+    onError: (err: unknown) => fail(err, t('socialInboxHealthFailed')),
     onSettled: () => setBusyKey(null),
   });
 
-  if (isLoading) {
-    return <SectionLoadingState className="py-16" label={t('loadingIntegrations')} />;
-  }
-
+  if (isLoading) return <SectionLoadingState className="py-16" label={t('loadingIntegrations')} />;
   if (isError || !data) {
-    const loadError = integrationDisabledMessage || t('socialInboxLoadFailed');
-    return (
-      <Alert variant="error">{loadError}</Alert>
-    );
+    return <Alert variant="error">{integrationDisabledMessage || t('socialInboxLoadFailed')}</Alert>;
   }
 
   const account = data.account;
   const connections = data.connections ?? [];
   const availablePages = data.available_pages ?? [];
-  const accountConnected = account?.status === 'connected';
-  const accountExpired = account?.status === 'expired';
+  const status = normalizeConnectionStatus(account?.status);
   const receivingCount = connections.filter((c) => c.messenger_subscribed).length;
-  const busy = busyKey != null || connectingAccountId != null || isStartingConnect;
+  const busy = busyKey != null || oauth.connectingId != null || oauth.isStarting;
 
-  const connectButton = (
-    <Button
-      variant="primary"
-      onClick={() => {
-        setError(null);
-        onConnect();
-      }}
-      loading={isStartingConnect || (account != null && connectingAccountId === account.id)}
-      disabled={integrationDisabled || connectingAccountId != null || isStartingConnect}
-      className="rounded-lg shadow-sm"
-    >
-      {accountExpired ? t('reconnect') : t('connect')}
-    </Button>
-  );
+  const startConnect = () => {
+    if (integrationDisabled) return;
+    void oauth.ensureAccountAndConnect('meta_inbox', t('connectInstagramMessenger'), account?.id ?? null);
+  };
 
   const requestRemovePage = (connection: MetaInboxConnectionPayload) => {
     setConfirmDeleteConfig({
@@ -179,7 +121,7 @@ export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
       showSuccessMessage: false,
       onConfirm: async () => {
         setBusyKey(`remove:${connection.id}`);
-        await disconnect.mutateAsync(connection.id);
+        await disconnectPage.mutateAsync(connection.id);
       },
     });
     setIsConfirmDeleteModalOpen(true);
@@ -187,258 +129,155 @@ export const SocialInboxSection: React.FC<SocialInboxSectionProps> = ({
 
   return (
     <>
-      <Alert variant="info" className="mb-4">
-        {t('socialInboxSetupHint')}
-      </Alert>
-
-      {error && (
-        <Alert variant="error" className="mb-4" onDismiss={() => setError(null)}>
-          {error}
-        </Alert>
-      )}
-
-      <Card className="overflow-hidden p-0">
-        {!account ? (
-          <div className="text-center py-16 px-6">
-            <IntegrationPlatformIcon
-              platform="meta_inbox"
-              size="xl"
-              variant="muted"
-              className="mx-auto mb-5"
-            />
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {t('noAccountsConnected')}
-            </h3>
-            <p className="text-gray-500 dark:text-gray-400 mt-2 max-w-sm mx-auto">
-              {t('connectInstagramMessengerPrompt')}
-            </p>
-          </div>
-        ) : (
-          <ul className="divide-y divide-gray-200/80 dark:divide-gray-700/80">
-            <li className="p-5 sm:p-6 flex flex-col gap-4 bg-white dark:bg-gray-800/50 first:rounded-t-lg last:rounded-b-lg">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
-                <div className="flex items-center gap-4 min-w-0">
-                  <IntegrationPlatformIcon platform="meta_inbox" size="md" />
-                  <div className="min-w-0">
-                    <p className="font-semibold text-gray-900 dark:text-white truncate">
-                      {account.name || t('connectInstagramMessenger')}
-                    </p>
-                    <StatusPill
-                      tone={accountConnected ? 'connected' : accountExpired ? 'error' : 'idle'}
-                    >
-                      {accountConnected
-                        ? t('connected')
-                        : accountExpired
-                          ? t('statusExpired')
-                          : t('disconnected')}
-                    </StatusPill>
-                  </div>
-                </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  {!accountConnected && connectButton}
-                  <Button
-                    variant="ghost"
-                    onClick={() =>
-                      onEdit({
-                        id: account.id,
-                        name: account.name,
-                        status: account.status,
-                        platform: 'meta_inbox',
-                      })
-                    }
-                    className="rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <SettingsIcon className="w-4 h-4" />{' '}
-                    <span className="sm:inline">{t('edit')}</span>
-                  </Button>
-                  {accountConnected && (
-                    <Button
-                      variant="danger"
-                      onClick={() => onDisconnect(account.id)}
-                      className="rounded-lg ml-auto sm:ml-0 border border-transparent hover:border-red-500/30"
-                    >
-                      <TrashIcon className="w-4 h-4" />{' '}
-                      <span className="sm:inline">{t('disconnect')}</span>
-                    </Button>
-                  )}
-                </div>
-              </div>
-
-              {!accountConnected && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 pt-3 border-t border-gray-200/80 dark:border-gray-700/80">
-                  {t('socialInboxReconnectHint')}
+      <Alert variant="info" className="mb-4">{t('socialInboxSetupHint')}</Alert>
+      {error ? (
+        <Alert variant="error" className="mb-4" onDismiss={() => setError(null)}>{error}</Alert>
+      ) : null}
+      {!account ? (
+        <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
+          <EmptyConnectionState
+            platform="meta_inbox"
+            title={t('noAccountsConnected')}
+            prompt={t('connectInstagramMessengerPrompt')}
+            actionLabel={t('connect')}
+            onAction={startConnect}
+            actionLoading={oauth.isStarting}
+            actionDisabled={integrationDisabled}
+          />
+        </div>
+      ) : (
+        <ConnectionCard
+          platform="meta_inbox"
+          name={account.name || t('connectInstagramMessenger')}
+          status={status}
+          primary={
+            status === 'connected'
+              ? undefined
+              : {
+                  label: status === 'expired' ? t('reconnect') : t('connect'),
+                  onClick: startConnect,
+                  loading: oauth.isStarting || oauth.connectingId === account.id,
+                  disabled: integrationDisabled || busy,
+                }
+          }
+          menu={[
+            {
+              key: 'edit',
+              label: t('edit'),
+              onClick: () => {
+                setEditingAccount({ id: account.id, name: account.name, status: account.status });
+                setIsManageIntegrationAccountModalOpen(true);
+              },
+            },
+            ...(status === 'connected'
+              ? [{
+                  key: 'disconnect',
+                  label: t('disconnect'),
+                  danger: true,
+                  onClick: () => confirmDisconnect({ id: account.id, name: account.name || t('connectInstagramMessenger') }),
+                }]
+              : []),
+          ]}
+          footer={status !== 'connected' ? <p className="text-sm text-gray-500 dark:text-gray-400">{t('socialInboxReconnectHint')}</p> : undefined}
+        >
+          {status === 'connected' ? (
+            <ul className="-mx-5 sm:-mx-6 border-t border-gray-200/80 dark:border-gray-700/80">
+              <li className="px-5 sm:px-6 py-3 bg-gray-50/80 dark:bg-gray-900/30 flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                  {t('socialInboxPagesHeading')}
                 </p>
-              )}
-            </li>
-
-            {accountConnected && (
-              <>
-                <li className="px-5 sm:px-6 pt-4 pb-2 bg-gray-50/80 dark:bg-gray-900/30">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                      {t('socialInboxPagesHeading')}
-                    </p>
-                    {receivingCount > 0 && (
-                      <Button
-                        variant="ghost"
-                        className="h-8 px-2 text-xs"
-                        onClick={() => goToPage('Inbox')}
-                      >
-                        {t('socialInboxOpenInbox')}
-                      </Button>
-                    )}
-                  </div>
-                </li>
-
-                {connections.length === 0 && availablePages.length === 0 && (
-                  <li className="px-5 sm:px-6 py-6 bg-white dark:bg-gray-800/50">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {t('socialNoPagesGranted')}
-                    </p>
-                  </li>
-                )}
-
-                {connections.length === 0 && availablePages.length > 0 && (
-                  <li className="px-5 sm:px-6 py-4 bg-white dark:bg-gray-800/50">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {t('socialInboxNoPagesYet')}
-                    </p>
-                  </li>
-                )}
-
-                {connections.map((connection) => {
-                  const subscribed = connection.messenger_subscribed;
-                  const unhealthy = connection.status === 'error' || !subscribed;
-                  return (
-                    <li
-                      key={connection.id}
-                      className="p-5 sm:p-6 flex flex-col gap-4 bg-white dark:bg-gray-800/50"
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
-                        <div className="flex items-center gap-4 min-w-0">
-                          <IntegrationPlatformIcon platform="meta" size="md" />
-                          <div className="min-w-0">
-                            <p className="font-semibold text-gray-900 dark:text-white truncate">
-                              {connection.page_name || connection.page_id}
-                            </p>
-                            <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${
-                                  subscribed
-                                    ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300'
-                                    : 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200'
-                                }`}
-                              >
-                                <MessengerIcon className="h-3 w-3" />
-                                {subscribed ? t('messengerReceiving') : t('messengerNotReceiving')}
-                              </span>
-                              {connection.ig_user_id ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300">
-                                  <InstagramIcon className="h-3 w-3" />
-                                  {t('instagramReceiving').replace(
-                                    '{username}',
-                                    connection.ig_username || connection.ig_user_id
-                                  )}
-                                </span>
-                              ) : (
-                                <span
-                                  className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600 dark:bg-gray-700/80 dark:text-gray-300"
-                                  title={t('instagramNotLinkedHint')}
-                                >
-                                  <InstagramIcon className="h-3 w-3" />
-                                  {t('instagramNotLinked')}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex flex-wrap items-center gap-2">
-                          {unhealthy ? (
-                            <Button
-                              variant="primary"
-                              className="rounded-lg text-sm"
-                              loading={connect.isPending && busyKey === `enable:${connection.page_id}`}
-                              disabled={busy}
-                              onClick={() => {
-                                setError(null);
-                                setBusyKey(`enable:${connection.page_id}`);
-                                connect.mutate(connection.page_id);
-                              }}
-                            >
-                              {t('enableMessaging')}
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="secondary"
-                              className="rounded-lg text-sm"
-                              loading={checkHealth.isPending && busyKey === `check:${connection.id}`}
-                              disabled={busy}
-                              onClick={() => {
-                                setError(null);
-                                setBusyKey(`check:${connection.id}`);
-                                checkHealth.mutate(connection.id);
-                              }}
-                            >
-                              {t('checkConnectionHealth')}
-                            </Button>
-                          )}
-                          <Button
-                            variant="danger"
-                            className="rounded-lg ml-auto sm:ml-0 border border-transparent hover:border-red-500/30"
-                            loading={disconnect.isPending && busyKey === `remove:${connection.id}`}
-                            disabled={busy}
-                            onClick={() => requestRemovePage(connection)}
-                          >
-                            <TrashIcon className="w-4 h-4" />{' '}
-                            <span className="sm:inline">{t('removePage')}</span>
-                          </Button>
-                        </div>
-                      </div>
-
-                      {unhealthy && connection.error_message && (
-                        <p className="text-xs text-amber-700 dark:text-amber-300 pt-3 border-t border-gray-200/80 dark:border-gray-700/80">
-                          {connection.error_message}
-                        </p>
-                      )}
-                    </li>
-                  );
-                })}
-
-                {availablePages.map((page) => (
-                  <li
-                    key={page.id}
-                    className="p-5 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white dark:bg-gray-800/50"
-                  >
-                    <div className="flex items-center gap-4 min-w-0">
-                      <IntegrationPlatformIcon platform="meta" size="md" variant="muted" />
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-900 dark:text-white truncate">
-                          {page.name || page.id}
-                        </p>
-                        <StatusPill tone="idle">{t('selectPagesToConnect')}</StatusPill>
-                      </div>
-                    </div>
-                    <Button
-                      variant="primary"
-                      className="rounded-lg shadow-sm"
-                      loading={connect.isPending && busyKey === `enable:${page.id}`}
-                      disabled={busy}
-                      onClick={() => {
+                {receivingCount > 0 ? (
+                  <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => goToPage('Inbox')}>
+                    {t('socialInboxOpenInbox')}
+                  </Button>
+                ) : null}
+              </li>
+              {connections.length === 0 && availablePages.length === 0 ? (
+                <li className="px-5 sm:px-6 py-6 text-sm text-gray-500">{t('socialNoPagesGranted')}</li>
+              ) : null}
+              {connections.length === 0 && availablePages.length > 0 ? (
+                <li className="px-5 sm:px-6 py-4 text-sm text-gray-500">{t('socialInboxNoPagesYet')}</li>
+              ) : null}
+              {connections.map((connection) => {
+                const subscribed = connection.messenger_subscribed;
+                const unhealthy = connection.status === 'error' || !subscribed;
+                return (
+                  <ConnectionSubItem
+                    key={connection.id}
+                    platform="meta"
+                    title={connection.page_name || connection.page_id}
+                    meta={
+                      <>
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 font-medium ${subscribed ? 'bg-green-100 text-green-700 dark:bg-green-500/20 dark:text-green-300' : 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200'}`}>
+                          <MessengerIcon className="h-3 w-3" />
+                          {subscribed ? t('messengerReceiving') : t('messengerNotReceiving')}
+                        </span>
+                        {connection.ig_user_id ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 font-medium text-green-700 dark:bg-green-500/20 dark:text-green-300">
+                            <InstagramIcon className="h-3 w-3" />
+                            {t('instagramReceiving').replace('{username}', connection.ig_username || connection.ig_user_id)}
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 font-medium text-gray-600 dark:bg-gray-700/80 dark:text-gray-300" title={t('instagramNotLinkedHint')}>
+                            <InstagramIcon className="h-3 w-3" />
+                            {t('instagramNotLinked')}
+                          </span>
+                        )}
+                      </>
+                    }
+                    primary={unhealthy ? {
+                      label: t('enableMessaging'),
+                      loading: connectPage.isPending && busyKey === `enable:${connection.page_id}`,
+                      disabled: busy,
+                      onClick: () => {
                         setError(null);
-                        setBusyKey(`enable:${page.id}`);
-                        connect.mutate(page.id);
-                      }}
-                    >
-                      {t('enableMessaging')}
-                    </Button>
-                  </li>
-                ))}
-              </>
-            )}
-          </ul>
-        )}
-      </Card>
+                        setBusyKey(`enable:${connection.page_id}`);
+                        connectPage.mutate(connection.page_id);
+                      },
+                    } : undefined}
+                    secondary={!unhealthy ? {
+                      label: t('checkConnectionHealth'),
+                      loading: checkHealth.isPending && busyKey === `check:${connection.id}`,
+                      disabled: busy,
+                      onClick: () => {
+                        setError(null);
+                        setBusyKey(`check:${connection.id}`);
+                        checkHealth.mutate(connection.id);
+                      },
+                    } : undefined}
+                    danger={{
+                      label: t('removePage'),
+                      loading: disconnectPage.isPending && busyKey === `remove:${connection.id}`,
+                      disabled: busy,
+                      onClick: () => requestRemovePage(connection),
+                    }}
+                    note={unhealthy && connection.error_message ? connection.error_message : undefined}
+                  />
+                );
+              })}
+              {availablePages.map((page) => (
+                <ConnectionSubItem
+                  key={page.id}
+                  platform="meta"
+                  muted
+                  title={page.name || page.id}
+                  meta={<StatusBadge status="disconnected" label={t('selectPagesToConnect')} />}
+                  primary={{
+                    label: t('enableMessaging'),
+                    loading: connectPage.isPending && busyKey === `enable:${page.id}`,
+                    disabled: busy,
+                    onClick: () => {
+                      setError(null);
+                      setBusyKey(`enable:${page.id}`);
+                      connectPage.mutate(page.id);
+                    },
+                  }}
+                />
+              ))}
+            </ul>
+          ) : null}
+        </ConnectionCard>
+      )}
     </>
   );
 };

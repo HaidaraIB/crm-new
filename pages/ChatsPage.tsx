@@ -42,6 +42,7 @@ import { getUserDisplayName } from '../types';
 import { getWhatsAppContactTitle } from '../utils/whatsappContactDisplay';
 import { compressImageForChat } from '../utils/compressImageForChat';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
+import { leadWhatsAppRowToBubble } from '../utils/chatBubbleMapping';
 import { normalizeRole, usersForOperationalEmployeeLists } from '../utils/roles';
 import {
   DEFAULT_WHATSAPP_CHAT_FILTERS,
@@ -1053,50 +1054,9 @@ export const ChatsPage: React.FC = () => {
 
   const threadMessages: ChatBubbleMessage[] = useMemo(() => {
     const apiMsgs = (leadWhatsAppMessages as any[])
-      .map((wa) => {
-        const delivery = String(wa.delivery_status || 'sent').toLowerCase();
-        let status: ChatBubbleMessage['status'] = 'sent';
-        if (delivery === 'failed') status = 'failed';
-        else if (delivery === 'delivered') status = 'delivered';
-        else if (delivery === 'read') status = 'read';
-        const msgPhoneId = String(wa.phone_number_id || '').trim();
-        const fromPreviousNumber = Boolean(
-          currentWhatsAppPhoneNumberId &&
-            msgPhoneId &&
-            msgPhoneId !== currentWhatsAppPhoneNumberId
-        );
-        return {
-          id: `api-${wa.id}`,
-          body: wa.body,
-          direction: (wa.direction === 'outbound' ? 'out' : 'in') as 'in' | 'out',
-          time: new Date(wa.created_at).toLocaleTimeString(
-            language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US',
-            withLatinDigits({ hour: '2-digit', minute: '2-digit' })
-          ),
-          createdAt: wa.created_at,
-          status,
-          deliveryError: wa.delivery_error || undefined,
-          createdByUsername: wa.created_by_username || null,
-          apiId: wa.id,
-          attachmentKind: wa.attachment_kind || null,
-          attachmentUrl: wa.attachment_url || null,
-          attachmentFilename: wa.original_filename || null,
-          attachmentWidth: wa.attachment_width ?? null,
-          attachmentHeight: wa.attachment_height ?? null,
-          isVoiceNote: Boolean(wa.is_voice_note),
-          locationLatitude:
-            wa.location_latitude != null && wa.location_latitude !== ''
-              ? Number(wa.location_latitude)
-              : null,
-          locationLongitude:
-            wa.location_longitude != null && wa.location_longitude !== ''
-              ? Number(wa.location_longitude)
-              : null,
-          locationName: wa.location_name || null,
-          locationAddress: wa.location_address || null,
-          fromPreviousNumber,
-        };
-      })
+      .map((wa) =>
+        leadWhatsAppRowToBubble(wa, language, currentWhatsAppPhoneNumberId)
+      )
       .reverse();
     const optimistic: ChatBubbleMessage[] = optimisticMessages.map((m) => ({
       id: m.id!,

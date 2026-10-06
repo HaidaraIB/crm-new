@@ -1,45 +1,28 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from '../components/Button';
-import {Input, AutoDirTextarea } from '../components/Input';
-import { ChatBlobMedia } from '../components/chat/ChatBlobMedia';
-import { ChatConversationStatusMenu } from '../components/chat/ChatConversationStatusMenu';
+import { Input } from '../components/Input';
 import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
 import {
   buildChatMediaAlbum,
   findChatMediaAlbumIndex,
   type ChatMediaAlbumItem,
 } from '../components/chat/chatMediaAlbum';
-import { ChatPendingAttachmentChip } from '../components/chat/ChatPendingAttachmentChip';
 import { SocialContactAvatar } from '../components/chat/SocialContactAvatar';
-import { ChatTemplatePicker } from '../components/chat/ChatTemplatePicker';
-import { QuickReplyInsert } from '../components/chat/QuickRepliesPanel';
 import { WhatsAppAgentStatusControl } from '../components/whatsapp/WhatsAppAgentStatusControl';
-import { ChatVoiceRecordingBar } from '../components/chat/ChatVoiceRecordingBar';
 import {
   InboxFilterRail,
   INBOX_CHANNEL_FILTERS,
   INBOX_STATUS_FILTERS,
 } from '../components/chat/InboxFilterRail';
 import { ConvertConversationModal } from '../components/modals/ConvertConversationModal';
-import { AttachmentSourceModal } from '../components/modals/AttachmentSourceModal';
-import {
-  blobMediaKind,
-  InboxChannelBadge,
-  InboxMessageAttachment,
-} from '../components/inbox/InboxMessageList';
-import {
-  Loader,
-  MapPinIcon,
-  MicrophoneIcon,
-  PaperclipIcon,
-  SearchIcon,
-  StarIcon,
-} from '../components/index';
+import { InboxChannelBadge } from '../components/inbox/InboxMessageList';
+import { SearchIcon, StarIcon } from '../components/index';
+import { ChatThread } from '../components/whatsapp/ChatThread';
+import type { ChatBubbleMessage } from '../components/whatsapp/ChatMessageBubble';
 import { useAppContext } from '../context/AppContext';
 import { normalizeRole } from '../utils/roles';
 import type { translations } from '../constants';
-import { useChatVoiceRecorder } from '../hooks/useChatVoiceRecorder';
 import {
   queryKeys,
   useConvertSocialConversation,
@@ -57,17 +40,15 @@ import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
 import {
   deleteSocialConversationAPI,
   getMessageTemplatesAPI,
-  getSocialMessageAttachmentUrl,
   getWhatsAppCallsAPI,
   resolveLocalizedApiError,
   sendSocialInboxLocationAPI,
   sendSocialInboxTemplateAPI,
 } from '../services/api';
-import { ChatCallBubble } from '../components/chat/ChatCallBubble';
 import { ShareLocationModal } from '../components/modals/ShareLocationModal';
-import { PhoneIcon } from '../components/icons';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { inboxWhatsappThreadAdapter } from '../hooks/whatsappThread/inboxThreadAdapter';
+import { socialMessageToBubble } from '../utils/chatBubbleMapping';
 import type { SocialConversationPayload, SocialMessagePayload } from '../services/api';
 import { consumePendingInboxConversationId } from '../utils/inboxDeepLink';
 import {
@@ -77,35 +58,22 @@ import {
   userSeesAllSocialConversations,
 } from '../utils/socialInboxAccess';
 import {
-  isWhatsAppTypeStubBody,
   localizeWhatsAppListPreview,
-  localizeWhatsAppMessageBody,
 } from '../utils/whatsappMessageBodyDisplay';
 import {
-  WA_ALERT_ERROR,
   WA_ALERT_INFO,
   WA_ALERT_WARN,
-  WA_BUBBLE_IN,
-  WA_BUBBLE_OUT,
-  WA_BUBBLE_OUT_FAILED,
-  WA_COMPOSER_BG,
-  WA_HEADER_BAR,
-  WA_HEADER_TEXT,
-  WA_INPUT_SHELL,
   WA_LAYOUT_SHELL,
   WA_LIST_ACTIVE,
   WA_LIST_BG,
   WA_LIST_HOVER,
-  WA_SEND_BTN,
-  WA_THREAD_WALLPAPER,
+  WA_HEADER_BAR,
+  WA_HEADER_TEXT,
 } from '../components/whatsapp/whatsappChatTheme';
 
 /** Backstop only — the `inbox` sync slice delivers changes sooner. */
 const POLL_WHEN_REALTIME_DOWN = 20000;
 const POLL_WHEN_REALTIME_UP = 60000;
-
-const COMPOSER_MIN_H_PX = 32;
-const COMPOSER_MAX_H_PX = 160;
 
 /** Survives refresh / leaving the page — same idea as WhatsApp messaging tabs. */
 const INBOX_FILTERS_STORAGE_KEY = 'crm.socialInboxFilters';
@@ -177,29 +145,6 @@ function humanizeRemaining(
   return t('inboxWindowTimeRemainingMinutes').replace('{minutes}', String(minutes));
 }
 
-/** Caret/base direction from UI language when empty, else first strong letter. */
-function composerTextDir(text: string, uiIsRtl: boolean): 'ltr' | 'rtl' {
-  for (const ch of text) {
-    const code = ch.codePointAt(0);
-    if (code == null) continue;
-    if (
-      (code >= 0x0590 && code <= 0x08ff) ||
-      (code >= 0xfb1d && code <= 0xfdff) ||
-      (code >= 0xfe70 && code <= 0xfeff)
-    ) {
-      return 'rtl';
-    }
-    if (
-      (code >= 0x41 && code <= 0x5a) ||
-      (code >= 0x61 && code <= 0x7a) ||
-      (code >= 0xc0 && code <= 0x24f)
-    ) {
-      return 'ltr';
-    }
-  }
-  return uiIsRtl ? 'rtl' : 'ltr';
-}
-
 export const InboxPage: React.FC = () => {
   const {
     t,
@@ -212,7 +157,6 @@ export const InboxPage: React.FC = () => {
   } = useAppContext();
   const queryClient = useQueryClient();
   const realtimeConnected = useRealtimeConnected();
-  const isRtl = language === 'ar';
   const inboxAccessAllowed = canAccessSocialInbox(currentUser);
   const canConvert = canConvertSocialConversation(currentUser);
   const staffScopedInbox = isSocialInboxStaffScoped(currentUser);
@@ -240,16 +184,11 @@ export const InboxPage: React.FC = () => {
   const [convertError, setConvertError] = useState<string | null>(null);
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
   const [pendingIsVoiceNote, setPendingIsVoiceNote] = useState(false);
-  const [attachSourceOpen, setAttachSourceOpen] = useState(false);
-  const [micError, setMicError] = useState<string | null>(null);
+  const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
   const [mediaViewer, setMediaViewer] = useState<{
     items: ChatMediaAlbumItem[];
     index: number;
   } | null>(null);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const threadEndRef = useRef<HTMLDivElement>(null);
 
   const listParams = useMemo(
     () => ({
@@ -325,7 +264,6 @@ export const InboxPage: React.FC = () => {
   const composerBlocked = sendWindow ? !sendWindow.open && !requiresTemplate : false;
   const [templateId, setTemplateId] = useState<number | ''>('');
   const [templateSending, setTemplateSending] = useState(false);
-  const [showTemplates, setShowTemplates] = useState(false);
   const { data: messageTemplates } = useQuery({
     queryKey: ['messageTemplates', 'inbox'],
     queryFn: () => getMessageTemplatesAPI(),
@@ -333,53 +271,12 @@ export const InboxPage: React.FC = () => {
   });
   const approvedTemplates = useMemo(
     () =>
-      (Array.isArray(messageTemplates) ? messageTemplates : []).filter(
-        (tpl: any) =>
-          (tpl.channel_type === 'whatsapp' || tpl.channel_type === 'whatsapp_api') &&
-          String(tpl.meta_status || 'APPROVED').toUpperCase() === 'APPROVED'
+      inboxWhatsappThreadAdapter.approvedTemplatesFilter(
+        Array.isArray(messageTemplates) ? messageTemplates : []
       ),
     [messageTemplates]
   );
   const sending = sendText.isPending || sendMedia.isPending;
-  const textDir = composerTextDir(draft, isRtl);
-  const canSend = Boolean(draft.trim() || pendingAttachment);
-  const showMic = !canSend;
-
-  const {
-    voiceRecording,
-    voicePaused,
-    elapsedLabel,
-    startVoiceRecording,
-    stopVoiceRecording,
-    pauseVoiceRecording,
-    resumeVoiceRecording,
-    cancelVoiceRecording,
-  } = useChatVoiceRecorder({
-    enabled: !composerBlocked,
-    busy: composerBlocked || sending,
-    onRecordingComplete: (file) => {
-      setPendingAttachment(file);
-      setPendingIsVoiceNote(true);
-    },
-    onError: (key) => setMicError(t(key) || key),
-  });
-
-  const mediaAlbum = useMemo(
-    () =>
-      buildChatMediaAlbum(
-        messages.map((m) => ({
-          id: m.id,
-          kind: m.has_attachment ? m.attachment_kind : null,
-          url: m.has_attachment && blobMediaKind(m.attachment_kind)
-            ? getSocialMessageAttachmentUrl(m.id)
-            : null,
-          filename: m.original_filename,
-          width: m.attachment_width,
-          height: m.attachment_height,
-        }))
-      ),
-    [messages]
-  );
 
   useEffect(() => {
     setMediaViewer(null);
@@ -387,8 +284,69 @@ export const InboxPage: React.FC = () => {
     setPendingIsVoiceNote(false);
     setDraft('');
     setSendError(null);
-    setMicError(null);
   }, [selectedId]);
+
+  const threadBubbleMessages: ChatBubbleMessage[] = useMemo(
+    () => messages.map((m) => socialMessageToBubble(m, language, t)),
+    [messages, language, t]
+  );
+
+  const mediaAlbum = useMemo(
+    () =>
+      buildChatMediaAlbum(
+        threadBubbleMessages.map((m) => ({
+          id: m.id,
+          kind: m.attachmentKind,
+          url: m.attachmentUrl,
+          filename: m.attachmentFilename,
+          width: m.attachmentWidth,
+          height: m.attachmentHeight,
+        }))
+      ),
+    [threadBubbleMessages]
+  );
+
+  const inboxSession = useMemo(() => {
+    if (!sendWindow?.open || !sendWindow.expires_at) return { in_session: false as const };
+    const ms = new Date(sendWindow.expires_at).getTime() - Date.now();
+    if (Number.isNaN(ms) || ms <= 0) return { in_session: false as const };
+    return { in_session: true as const, hours_remaining: ms / 3600000 };
+  }, [sendWindow]);
+
+  const inboxWindowAlerts = useMemo(() => {
+    const nodes: React.ReactNode[] = [];
+    if (sendWindow?.mode === 'response' && sendWindow.expires_at) {
+      nodes.push(
+        <div key="response" className={WA_ALERT_INFO}>
+          {t('replyWindowOpen').replace('{time}', humanizeRemaining(sendWindow.expires_at, t))}
+        </div>
+      );
+    }
+    if (sendWindow?.mode === 'human_agent' && sendWindow.expires_at) {
+      nodes.push(
+        <div key="human" className={WA_ALERT_WARN}>
+          {t('replyWindowHumanAgent').replace('{time}', humanizeRemaining(sendWindow.expires_at, t))}
+        </div>
+      );
+    }
+    if (requiresTemplate) {
+      nodes.push(
+        <div key="template" className={WA_ALERT_WARN}>
+          <p className="font-semibold">{t('replyWindowClosed')}</p>
+          <p>{t('inboxTemplateRequiredHint')}</p>
+        </div>
+      );
+    }
+    if (composerBlocked && !requiresTemplate) {
+      nodes.push(
+        <div key="closed" className={WA_ALERT_WARN}>
+          <p className="font-semibold">{t('replyWindowClosed')}</p>
+          <p>{t('replyWindowClosedHint')}</p>
+        </div>
+      );
+    }
+    return nodes.length ? <>{nodes}</> : null;
+  }, [sendWindow, requiresTemplate, composerBlocked, t]);
 
   // Opening a thread clears its unread badge.
   useEffect(() => {
@@ -399,31 +357,21 @@ export const InboxPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId, selected?.unread_count]);
 
-  useEffect(() => {
-    threadEndRef.current?.scrollIntoView({ block: 'end' });
-  }, [messages.length, selectedId]);
-
-  const resizeComposer = () => {
-    const el = textareaRef.current;
-    if (!el) return;
-    el.style.height = '0px';
-    const next = Math.min(Math.max(el.scrollHeight, COMPOSER_MIN_H_PX), COMPOSER_MAX_H_PX);
-    el.style.height = `${next}px`;
-  };
-
-  useEffect(() => {
-    resizeComposer();
-  }, [draft]);
-
-  const openMedia = useCallback(
-    (messageId: number) => {
-      if (!mediaAlbum.length) return;
-      setMediaViewer({
-        items: mediaAlbum,
-        index: findChatMediaAlbumIndex(mediaAlbum, String(messageId)),
-      });
+  const handleResendMessage = useCallback(
+    async (msg: ChatBubbleMessage) => {
+      if (!selectedId || !msg.body.trim()) return;
+      setResendingMessageId(msg.id);
+      try {
+        await sendText.mutateAsync({ conversationId: selectedId, text: msg.body.trim() });
+        queryClient.invalidateQueries({ queryKey: queryKeys.socialSendWindow(selectedId) });
+      } catch (err: any) {
+        const code = err?.code || err?.error?.code;
+        setSendError(code ? t(code as any) || err?.message : err?.message || t('socialSendFailed'));
+      } finally {
+        setResendingMessageId(null);
+      }
     },
-    [mediaAlbum]
+    [selectedId, sendText, queryClient, t]
   );
 
   const handleSend = useCallback(async () => {
@@ -757,19 +705,34 @@ export const InboxPage: React.FC = () => {
           )}
 
           {selected && (
-            <>
-              <div className={`${WA_HEADER_BAR} ${WA_HEADER_TEXT} justify-between gap-2`}>
-                <div className="flex min-w-0 flex-1 items-center gap-2">
-                  <SocialContactAvatar
-                    displayName={selected.contact.display_name}
-                    profilePicUrl={selected.contact.profile_pic_url}
-                  />
+            <ChatThread
+              t={t}
+              language={language}
+              selectedClient={{ id: selected.id }}
+              messages={threadBubbleMessages}
+              threadCalls={isWhatsappThread ? threadCalls : []}
+              isLoading={threadLoading}
+              isFetching={threadLoading}
+              conversationStatus={selected.status}
+              isStarred={selected.is_starred}
+              isUnsubscribed={selected.is_unsubscribed}
+              onThreadStatusChange={handleThreadStatusChange}
+              headerAvatar={
+                <SocialContactAvatar
+                  displayName={selected.contact.display_name}
+                  profilePicUrl={selected.contact.profile_pic_url}
+                />
+              }
+              headerTitle={
+                <div className="flex min-w-0 items-center gap-2">
                   <InboxChannelBadge channel={selected.channel} className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate font-semibold">
+                  <span className="min-w-0 truncate text-sm font-semibold">
                     {selected.contact.display_name}
                   </span>
                 </div>
-                <div className="flex shrink-0 items-center gap-2">
+              }
+              headerActions={
+                <>
                   {threadConversation?.client ? (
                     <Button
                       variant="ghost"
@@ -792,31 +755,6 @@ export const InboxPage: React.FC = () => {
                       {t('convertToLead')}
                     </Button>
                   ) : null}
-                  {isWhatsappThread && waCapabilities.calling && waCalling && selected.contact?.external_id ? (
-                    <button
-                      type="button"
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full text-white hover:bg-white/20"
-                      aria-label={t('whatsappThreadVoiceCall')}
-                      title={t('whatsappThreadVoiceCall')}
-                      onClick={() => {
-                        const target = inboxWhatsappThreadAdapter.callTarget({
-                          peerPhone: selected.contact.external_id,
-                          clientId: threadConversation?.client?.id,
-                          conversationId: selected.id,
-                          waInboxNumberId: selected.connection?.id,
-                        });
-                        if (!target) return;
-                        void waCalling.startOutboundCall({
-                          to: target.to,
-                          clientId: target.clientId,
-                          conversationId: target.conversationId,
-                          waInboxNumberId: target.waInboxNumberId,
-                        });
-                      }}
-                    >
-                      <PhoneIcon className="h-4 w-4" />
-                    </button>
-                  ) : null}
                   {canReassign ? (
                     <select
                       value={selected.assigned_to?.id ?? ''}
@@ -838,13 +776,6 @@ export const InboxPage: React.FC = () => {
                       ))}
                     </select>
                   ) : null}
-                  <ChatConversationStatusMenu
-                    t={t}
-                    status={selected.status}
-                    isStarred={selected.is_starred}
-                    isUnsubscribed={selected.is_unsubscribed}
-                    onChange={handleThreadStatusChange}
-                  />
                   {(currentUser?.is_company_owner || currentUser?.isCompanyOwner) &&
                   isWhatsappThread &&
                   waCapabilities.deleteConversation ? (
@@ -856,319 +787,107 @@ export const InboxPage: React.FC = () => {
                       {t('delete')}
                     </Button>
                   ) : null}
-                </div>
-              </div>
-
-              <div className={`${WA_THREAD_WALLPAPER} min-h-0 flex-1 space-y-2 overflow-y-auto p-4`}>
-                {threadLoading && messages.length === 0 ? (
-                  <div
-                    className="flex flex-col items-center justify-center gap-3 py-16 text-center"
-                    role="status"
-                    aria-live="polite"
-                  >
-                    <Loader variant="primary" size="lg" label={t('loading')} />
-                    <p className="text-sm text-gray-500 dark:text-gray-400">{t('loading')}</p>
-                  </div>
-                ) : null}
-                {isWhatsappThread &&
-                  threadCalls.map((call) => (
-                    <ChatCallBubble
-                      key={`call-${call.id}`}
-                      call={call}
-                      t={t}
-                      timeLabel={formatTime(call.started_at || call.created_at, language)}
-                      onCallback={
-                        waCalling
-                          ? () => {
-                              const target = inboxWhatsappThreadAdapter.callTarget({
-                                peerPhone: call.peer_phone,
-                                clientId: call.client ?? threadConversation?.client?.id,
-                                conversationId: selected.id,
-                                waInboxNumberId: selected.connection?.id,
-                              });
-                              if (!target) return;
-                              void waCalling.startOutboundCall({
-                                to: target.to,
-                                clientId: target.clientId,
-                                conversationId: target.conversationId,
-                                waInboxNumberId: target.waInboxNumberId,
-                              });
-                            }
-                          : undefined
-                      }
-                    />
-                  ))}
-                {messages.map((message) => {
-                  const outbound = message.direction === 'outbound';
-                  const failed = message.delivery_status === 'failed';
-                  const rawBody = message.body || '';
-                  const hideStub =
-                    (Boolean(blobMediaKind(message.attachment_kind) && message.has_attachment) ||
-                      message.location_latitude != null) &&
-                    isWhatsAppTypeStubBody(rawBody);
-                  const text = hideStub ? '' : localizeWhatsAppMessageBody(rawBody, t);
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${outbound ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[75%] space-y-1 rounded-lg px-3 py-2 text-sm ${
-                          outbound ? (failed ? WA_BUBBLE_OUT_FAILED : WA_BUBBLE_OUT) : WA_BUBBLE_IN
-                        }`}
-                      >
-                        <InboxMessageAttachment message={message} t={t} onOpenMedia={openMedia} />
-                        {text.trim() ? (
-                          <p className="whitespace-pre-wrap break-words [unicode-bidi:plaintext]" dir="auto">
-                            {text}
-                          </p>
-                        ) : null}
-                        <div className="flex items-center justify-end gap-1.5 text-[10px] opacity-70">
-                          {message.reaction && <span>{message.reaction}</span>}
-                          {/* An echo is the business replying from the native app. */}
-                          {message.is_echo && <span>· {t('facebookMessenger')}</span>}
-                          <span>{formatTime(message.sent_at || message.created_at, language)}</span>
-                        </div>
-                        {failed && message.delivery_error && (
-                          <p className="text-[10px]">{message.delivery_error}</p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={threadEndRef} />
-              </div>
-
-              <div className={`${WA_COMPOSER_BG} space-y-1.5 px-2 py-1.5 sm:px-3`}>
-                {sendWindow && sendWindow.mode === 'response' && sendWindow.expires_at && (
-                  <div className={WA_ALERT_INFO}>
-                    {t('replyWindowOpen').replace(
-                      '{time}',
-                      humanizeRemaining(sendWindow.expires_at, t)
-                    )}
-                  </div>
-                )}
-                {sendWindow && sendWindow.mode === 'human_agent' && sendWindow.expires_at && (
-                  <div className={WA_ALERT_WARN}>
-                    {t('replyWindowHumanAgent').replace(
-                      '{time}',
-                      humanizeRemaining(sendWindow.expires_at, t)
-                    )}
-                  </div>
-                )}
-                {requiresTemplate && (
-                  <div className={WA_ALERT_WARN}>
-                    <p className="font-semibold">{t('replyWindowClosed')}</p>
-                    <p>{t('inboxTemplateRequiredHint')}</p>
-                  </div>
-                )}
-                <QuickReplyInsert onInsert={(text) => setDraft(text)} />
-                {isWhatsappThread ? (
-                  <ChatTemplatePicker
-                    t={t}
-                    whatsappSendBlocked={composerBlocked}
-                    freeTextDisabled={requiresTemplate}
-                    showTemplates={showTemplates}
-                    setShowTemplates={setShowTemplates}
-                    approvedTemplates={approvedTemplates}
-                    chatTemplateSendId={templateId}
-                    setChatTemplateSendId={setTemplateId}
-                    chatTemplateSending={templateSending}
-                    onInsertQuickTemplate={(content) => setDraft(content)}
-                    onSendTemplate={async () => {
-                      if (!selectedId || !templateId) return;
-                      setTemplateSending(true);
-                      try {
-                        await sendSocialInboxTemplateAPI({
-                          conversation: selectedId,
-                          template_id: Number(templateId),
-                        });
-                        setTemplateId('');
-                        setShowTemplates(false);
-                        queryClient.invalidateQueries({
-                          queryKey: queryKeys.socialMessages(selectedId),
-                        });
-                      } catch (e: any) {
-                        setSendError(resolveLocalizedApiError(e, t, t('socialSendFailed')));
-                      } finally {
-                        setTemplateSending(false);
-                      }
-                    }}
-                  />
-                ) : null}
-                {composerBlocked && !requiresTemplate && (
-                  <div className={WA_ALERT_WARN}>
-                    <p className="font-semibold">{t('replyWindowClosed')}</p>
-                    <p>{t('replyWindowClosedHint')}</p>
-                  </div>
-                )}
-                {sendError && <div className={WA_ALERT_ERROR}>{sendError}</div>}
-                {micError ? (
-                  <p className="px-0.5 text-[10px] text-red-600 dark:text-red-400">{micError}</p>
-                ) : null}
-
-                {pendingAttachment ? (
-                  <ChatPendingAttachmentChip
-                    file={pendingAttachment}
-                    onClear={() => {
-                      setPendingAttachment(null);
-                      setPendingIsVoiceNote(false);
-                    }}
-                    clearAriaLabel={t('teamChatClearAttachment')}
-                    openAriaLabel={t('chatMediaOpenAria')}
-                    onOpen={(_previewUrl, kind) => {
-                      // Own blob URL so closing the viewer does not revoke the chip's preview.
-                      const ownUrl = URL.createObjectURL(pendingAttachment);
-                      setMediaViewer({
-                        items: [
-                          {
-                            id: 'pending-attachment',
-                            kind,
-                            url: ownUrl,
-                            filename: pendingAttachment.name,
-                          },
-                        ],
-                        index: 0,
+                </>
+              }
+              onWhatsAppCall={
+                isWhatsappThread &&
+                waCapabilities.calling &&
+                waCalling &&
+                selected.contact?.external_id
+                  ? () => {
+                      const target = inboxWhatsappThreadAdapter.callTarget({
+                        peerPhone: selected.contact.external_id,
+                        clientId: threadConversation?.client?.id,
+                        conversationId: selected.id,
+                        waInboxNumberId: selected.connection?.id,
                       });
-                    }}
-                  />
-                ) : null}
-
-                {/* dir=ltr keeps attach | input | action spacing stable under Arabic page RTL */}
-                <div className="flex w-full min-w-0 items-center gap-2" dir="ltr">
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) {
-                        setPendingAttachment(f);
-                        setPendingIsVoiceNote(false);
-                      }
-                      e.target.value = '';
-                    }}
-                  />
-                  <div
-                    className={`${WA_INPUT_SHELL} flex min-h-11 min-w-0 flex-1 items-center gap-0.5 rounded-3xl py-1.5 ${
-                      voiceRecording ? 'ring-1 ring-red-400/40 border-red-400/50' : ''
-                    }`}
-                  >
-                    {voiceRecording ? (
-                      <ChatVoiceRecordingBar
-                        variant="whatsapp"
-                        elapsedLabel={elapsedLabel}
-                        paused={voicePaused}
-                        onPause={pauseVoiceRecording}
-                        onResume={resumeVoiceRecording}
-                        onStop={stopVoiceRecording}
-                        onCancel={cancelVoiceRecording}
-                        t={t}
-                      />
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className="flex size-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/10"
-                          disabled={composerBlocked || sending}
-                          onClick={() => setAttachSourceOpen(true)}
-                          aria-label={t('teamChatAttach')}
-                          title={t('teamChatAttach')}
-                        >
-                          <PaperclipIcon className="size-[1.2rem]" />
-                        </button>
-                        {isWhatsappThread && waCapabilities.location ? (
-                          <button
-                            type="button"
-                            className="flex size-9 shrink-0 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-black/5 disabled:opacity-40 dark:text-gray-400 dark:hover:bg-white/10"
-                            disabled={composerBlocked || sending}
-                            onClick={() => setShareLocationOpen(true)}
-                            aria-label={t('whatsappShareLocation')}
-                            title={t('whatsappShareLocation')}
-                          >
-                            <MapPinIcon className="size-[1.2rem]" />
-                          </button>
-                        ) : null}
-                        <AutoDirTextarea
-                          ref={textareaRef}
-                          rows={1}
-                          value={draft}
-                          onChange={(e) => setDraft(e.target.value)}
-                          onInput={resizeComposer}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' && !e.shiftKey) {
-                              e.preventDefault();
-                              if (!composerBlocked && canSend) void handleSend();
-                            }
-                          }}
-                          disabled={composerBlocked || sending}
-                          placeholder={composerBlocked ? t('replyWindowClosed') : t('typeAMessage')}
-                          dir={textDir}
-                          wrap="soft"
-                          className={`custom-scrollbar box-border min-h-0 min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-1 py-1 text-sm leading-5 text-gray-900 outline-none placeholder:text-gray-400 disabled:opacity-60 dark:text-gray-100 [overflow-wrap:anywhere] whitespace-pre-wrap ${
-                            textDir === 'rtl' ? 'text-right' : 'text-left'
-                          }`}
-                          style={{
-                            height: COMPOSER_MIN_H_PX,
-                            minHeight: COMPOSER_MIN_H_PX,
-                            maxHeight: COMPOSER_MAX_H_PX,
-                            textAlign: textDir === 'rtl' ? 'right' : 'left',
-                          }}
-                        />
-                      </>
-                    )}
-                  </div>
-                  {voiceRecording ? null : showMic ? (
-                    <button
-                      type="button"
-                      className={`inline-flex shrink-0 items-center justify-center self-center ${WA_SEND_BTN}`}
-                      disabled={composerBlocked || sending}
-                      onClick={() => {
-                        setMicError(null);
-                        void startVoiceRecording();
-                      }}
-                      aria-label={t('teamChatRecordVoice')}
-                    >
-                      <MicrophoneIcon className="h-5 w-5 text-white" />
-                    </button>
-                  ) : (
-                    <Button
-                      className={`${WA_SEND_BTN} !self-center`}
-                      disabled={composerBlocked || !canSend || sending}
-                      loading={sending}
-                      onClick={() => void handleSend()}
-                      aria-label={t('send')}
-                    >
-                      <svg
-                        viewBox="0 0 24 24"
-                        className="h-5 w-5 text-white"
-                        fill="currentColor"
-                        aria-hidden
-                      >
-                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
-                      </svg>
-                    </Button>
-                  )}
-                </div>
-              </div>
-            </>
+                      if (!target) return;
+                      void waCalling.startOutboundCall({
+                        to: target.to,
+                        clientId: target.clientId,
+                        conversationId: target.conversationId,
+                        waInboxNumberId: target.waInboxNumberId,
+                      });
+                    }
+                  : undefined
+              }
+              onOpenMedia={(msg) => {
+                setMediaViewer({
+                  items: mediaAlbum,
+                  index: findChatMediaAlbumIndex(mediaAlbum, String(msg.id)),
+                });
+              }}
+              onResendMessage={handleResendMessage}
+              resendingMessageId={resendingMessageId}
+              composerProps={{
+                messageInput: draft,
+                setMessageInput: setDraft,
+                onSend: () => void handleSend(),
+                whatsappSendBlocked: composerBlocked && !requiresTemplate,
+                blockFreeText: requiresTemplate,
+                suppressBlockFreeTextAlert: requiresTemplate,
+                approvedTemplates,
+                chatTemplateSendId: templateId,
+                setChatTemplateSendId: setTemplateId,
+                chatTemplateSending: templateSending,
+                onSendTemplate: async () => {
+                  if (!selectedId || !templateId) return;
+                  setTemplateSending(true);
+                  try {
+                    await sendSocialInboxTemplateAPI({
+                      conversation: selectedId,
+                      template_id: Number(templateId),
+                    });
+                    setTemplateId('');
+                    queryClient.invalidateQueries({
+                      queryKey: queryKeys.socialMessages(selectedId),
+                    });
+                  } catch (e: any) {
+                    setSendError(resolveLocalizedApiError(e, t, t('socialSendFailed')));
+                  } finally {
+                    setTemplateSending(false);
+                  }
+                },
+                session: inboxSession,
+                composerAlert: sendError
+                  ? { variant: 'error' as const, message: sendError }
+                  : null,
+                windowAlerts: inboxWindowAlerts,
+                blockFreeTextMessage:
+                  composerBlocked && !requiresTemplate ? t('replyWindowClosedHint') : undefined,
+                showTemplatePicker: isWhatsappThread,
+                placeholder: composerBlocked ? t('replyWindowClosed') : t('typeAMessage'),
+                pendingAttachment,
+                setPendingAttachment,
+                pendingIsVoiceNote,
+                setPendingIsVoiceNote,
+                onInsertQuickTemplate: (content) => setDraft(content),
+                onShareLocation:
+                  isWhatsappThread && waCapabilities.location
+                    ? () => setShareLocationOpen(true)
+                    : undefined,
+                onOpenPendingMedia: (_previewUrl, kind) => {
+                  if (!pendingAttachment) return;
+                  const ownUrl = URL.createObjectURL(pendingAttachment);
+                  setMediaViewer({
+                    items: [
+                      {
+                        id: 'pending-attachment',
+                        kind,
+                        url: ownUrl,
+                        filename: pendingAttachment.name,
+                      },
+                    ],
+                    index: 0,
+                  });
+                },
+              }}
+            />
           )}
         </div>
       </div>
         </div>
       </div>
-
-      <AttachmentSourceModal
-        isOpen={attachSourceOpen}
-        onClose={() => setAttachSourceOpen(false)}
-        onPickDevice={() => fileInputRef.current?.click()}
-        onPickLibraryFile={(file) => {
-          setPendingAttachment(file);
-          setPendingIsVoiceNote(false);
-        }}
-        t={t}
-      />
 
       {canConvert ? (
         <ConvertConversationModal

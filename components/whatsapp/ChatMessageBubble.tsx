@@ -34,6 +34,11 @@ export type ChatBubbleMessage = {
   locationAddress?: string | null;
   /** True when this message used a different Meta phone_number_id than the currently connected one. */
   fromPreviousNumber?: boolean;
+  reaction?: string;
+  /** Inbound echo from native Meta app (Messenger / Instagram). */
+  isEcho?: boolean;
+  /** Expired attachment placeholder (story, reel, share). */
+  placeholderLabel?: string;
 };
 
 const AUTO_DIR_CLASS = '[unicode-bidi:plaintext]';
@@ -242,6 +247,9 @@ export const ChatMessageBubble: React.FC<Props> = ({
             className={`text-sm whitespace-pre-wrap break-words ${AUTO_DIR_CLASS}`}
           />
         ) : null}
+        {msg.placeholderLabel ? (
+          <p className="text-xs italic opacity-80">{msg.placeholderLabel}</p>
+        ) : null}
         {msg.fromPreviousNumber ? (
           <span
             className={`mt-1 inline-flex max-w-full rounded px-1.5 py-0.5 text-[10px] font-medium leading-none ${
@@ -254,6 +262,10 @@ export const ChatMessageBubble: React.FC<Props> = ({
           </span>
         ) : null}
         <div className={`mt-0.5 flex items-center justify-end gap-1.5 ${metaMuted}`}>
+          {msg.reaction ? <span className="text-[10px] leading-none">{msg.reaction}</span> : null}
+          {msg.isEcho ? (
+            <span className="text-[10px] leading-none opacity-70">· {t('facebookMessenger')}</span>
+          ) : null}
           {isOut && senderName ? (
             <span className="max-w-[9rem] truncate text-[10px] font-normal leading-none" dir="auto">
               {senderName}

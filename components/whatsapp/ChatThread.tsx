@@ -66,6 +66,12 @@ type Props = {
     isStarred?: boolean;
     isUnsubscribed?: boolean;
   }) => void;
+  /** Inbox / omni-channel: replace default WhatsApp avatar chip. */
+  headerAvatar?: React.ReactNode;
+  /** Inbox / omni-channel: replace default title block. */
+  headerTitle?: React.ReactNode;
+  /** Extra header controls (convert, assign, delete, …). */
+  headerActions?: React.ReactNode;
 };
 
 export const ChatThread: React.FC<Props> = ({
@@ -94,6 +100,9 @@ export const ChatThread: React.FC<Props> = ({
   isStarred = false,
   isUnsubscribed = false,
   onThreadStatusChange,
+  headerAvatar,
+  headerTitle,
+  headerActions,
 }) => {
   const scrollerRef = useRef<HTMLDivElement | null>(null);
   /** Inner transcript column: its height grows as blob media resolves, so it is observed too. */
@@ -271,39 +280,48 @@ export const ChatThread: React.FC<Props> = ({
   return (
     <div className="flex h-full min-h-0 min-w-0 flex-1 flex-col bg-white dark:bg-gray-900">
       <div className={`${WA_HEADER_BAR} ${WA_HEADER_TEXT} gap-3`}>
-        <div className={`${WA_AVATAR} !h-9 !w-9 !bg-white/20 !text-white !ring-white/30`}>
-          {getWhatsAppContactAvatarLabel(selectedClient)}
-        </div>
+        {headerAvatar ?? (
+          <div className={`${WA_AVATAR} !h-9 !w-9 !bg-white/20 !text-white !ring-white/30`}>
+            {getWhatsAppContactAvatarLabel(selectedClient)}
+          </div>
+        )}
         <div className="min-w-0 flex-1 leading-tight">
-          {onOpenLead ? (
-            <button
-              type="button"
-              onClick={onOpenLead}
-              title={t('viewLead')}
-              aria-label={t('viewLead')}
-              dir={isPhoneLike(title) ? 'ltr' : undefined}
-              className={`block w-full min-w-0 truncate text-start text-sm font-semibold ${
-                isPhoneLike(title) ? PHONE_BIDI_CLASS : ''
-              }`}
-            >
-              {title}
-            </button>
-          ) : isPhoneLike(title) ? (
-            <PhoneText as="p" className="truncate text-sm font-semibold">
-              {title}
-            </PhoneText>
-          ) : (
-            <p className="truncate text-sm font-semibold">{title}</p>
+          {headerTitle ?? (
+            <>
+              {onOpenLead ? (
+                <button
+                  type="button"
+                  onClick={onOpenLead}
+                  title={t('viewLead')}
+                  aria-label={t('viewLead')}
+                  dir={isPhoneLike(title) ? 'ltr' : undefined}
+                  className={`block w-full min-w-0 truncate text-start text-sm font-semibold ${
+                    isPhoneLike(title) ? PHONE_BIDI_CLASS : ''
+                  }`}
+                >
+                  {title}
+                </button>
+              ) : isPhoneLike(title) ? (
+                <PhoneText as="p" className="truncate text-sm font-semibold">
+                  {title}
+                </PhoneText>
+              ) : (
+                <p className="truncate text-sm font-semibold">{title}</p>
+              )}
+              {subtitle ? (
+                isPhoneLike(subtitle) ? (
+                  <PhoneText className="block truncate text-xs opacity-80">{subtitle}</PhoneText>
+                ) : (
+                  <p className="truncate text-xs opacity-80">{subtitle}</p>
+                )
+              ) : null}
+            </>
           )}
-          {subtitle ? (
-            isPhoneLike(subtitle) ? (
-              <PhoneText className="block truncate text-xs opacity-80">{subtitle}</PhoneText>
-            ) : (
-              <p className="truncate text-xs opacity-80">{subtitle}</p>
-            )
-          ) : null}
         </div>
-        {onThreadStatusChange && typeof selectedClient?.id === 'number' && selectedClient.id > 0 ? (
+        {headerActions}
+        {onThreadStatusChange &&
+        (headerTitle != null ||
+          (typeof selectedClient?.id === 'number' && selectedClient.id > 0)) ? (
           <ChatConversationStatusMenu
             t={t}
             status={conversationStatus || 'open'}

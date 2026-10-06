@@ -12,6 +12,9 @@ type Props = {
   displayNameBlockedHint?: string | null;
   composerAlert?: ComposerAlert | null;
   session: SessionInfo;
+  blockFreeTextMessage?: string;
+  windowAlerts?: React.ReactNode;
+  suppressBlockFreeTextAlert?: boolean;
 };
 
 export const ChatComposerAlerts: React.FC<Props> = ({
@@ -21,6 +24,9 @@ export const ChatComposerAlerts: React.FC<Props> = ({
   displayNameBlockedHint,
   composerAlert,
   session,
+  blockFreeTextMessage,
+  windowAlerts,
+  suppressBlockFreeTextAlert,
 }) => {
   const alertNode = whatsappSendBlocked ? (
     <div className={WA_ALERT_WARN}>
@@ -40,14 +46,15 @@ export const ChatComposerAlerts: React.FC<Props> = ({
     >
       {composerAlert.message}
     </div>
-  ) : blockFreeText ? (
+  ) : blockFreeText && !suppressBlockFreeTextAlert ? (
     <div className={WA_ALERT_WARN}>
-      {t('whatsappSessionClosedHint')}
+      {blockFreeTextMessage ?? t('whatsappSessionClosedHint')}
     </div>
   ) : null;
 
   return (
     <>
+      {windowAlerts}
       {alertNode}
       {!blockFreeText && session?.in_session && session.hours_remaining != null && (
         <p className="px-0.5 text-[10px] text-gray-500 dark:text-gray-400">

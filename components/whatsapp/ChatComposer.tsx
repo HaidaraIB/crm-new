@@ -6,7 +6,7 @@ import { useChatVoiceRecorder } from '../../hooks/useChatVoiceRecorder';
 import { useAppContext } from '../../context/AppContext';
 import { translations } from '../../constants';
 import { AttachmentSourceModal } from '../modals/AttachmentSourceModal';
-import { ChatComposerAlerts } from '../chat/ChatComposerAlerts';
+import { QuickReplyInsert } from '../chat/QuickRepliesPanel';
 import { ChatTemplatePicker } from '../chat/ChatTemplatePicker';
 import { Button } from '../Button';
 import { WA_COMPOSER_BG, WA_INPUT_SHELL, WA_SEND_BTN } from './whatsappChatTheme';
@@ -40,6 +40,12 @@ type Props = {
   compressingAttachment?: boolean;
   onOpenPendingMedia?: (previewUrl: string, kind: 'image' | 'video') => void;
   onShareLocation?: () => void;
+  showTemplatePicker?: boolean;
+  showQuickReplies?: boolean;
+  placeholder?: string;
+  blockFreeTextMessage?: string;
+  windowAlerts?: React.ReactNode;
+  suppressBlockFreeTextAlert?: boolean;
 };
 
 import { inputTextDir } from '../../utils/inputAutoDir';
@@ -74,6 +80,12 @@ export const ChatComposer: React.FC<Props> = ({
   compressingAttachment = false,
   onOpenPendingMedia,
   onShareLocation,
+  showTemplatePicker = true,
+  showQuickReplies = true,
+  placeholder,
+  blockFreeTextMessage,
+  windowAlerts,
+  suppressBlockFreeTextAlert,
 }) => {
   const { language } = useAppContext();
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
@@ -131,21 +143,28 @@ export const ChatComposer: React.FC<Props> = ({
         displayNameBlockedHint={displayNameBlockedHint}
         composerAlert={composerAlert}
         session={session}
+        blockFreeTextMessage={blockFreeTextMessage}
+        windowAlerts={windowAlerts}
+        suppressBlockFreeTextAlert={suppressBlockFreeTextAlert}
       />
 
-      <ChatTemplatePicker
-        t={t}
-        whatsappSendBlocked={whatsappSendBlocked}
-        freeTextDisabled={freeTextDisabled}
-        showTemplates={showTemplates}
-        setShowTemplates={setShowTemplates}
-        approvedTemplates={approvedTemplates}
-        chatTemplateSendId={chatTemplateSendId}
-        setChatTemplateSendId={setChatTemplateSendId}
-        onSendTemplate={onSendTemplate}
-        chatTemplateSending={chatTemplateSending}
-        onInsertQuickTemplate={onInsertQuickTemplate}
-      />
+      {showQuickReplies ? <QuickReplyInsert onInsert={onInsertQuickTemplate} /> : null}
+
+      {showTemplatePicker ? (
+        <ChatTemplatePicker
+          t={t}
+          whatsappSendBlocked={whatsappSendBlocked}
+          freeTextDisabled={freeTextDisabled}
+          showTemplates={showTemplates}
+          setShowTemplates={setShowTemplates}
+          approvedTemplates={approvedTemplates}
+          chatTemplateSendId={chatTemplateSendId}
+          setChatTemplateSendId={setChatTemplateSendId}
+          onSendTemplate={onSendTemplate}
+          chatTemplateSending={chatTemplateSending}
+          onInsertQuickTemplate={onInsertQuickTemplate}
+        />
+      ) : null}
 
       {pendingAttachment ? (
         <ChatPendingAttachmentChip
@@ -237,7 +256,10 @@ export const ChatComposer: React.FC<Props> = ({
                   }
                 }}
                 disabled={freeTextDisabled || compressingAttachment}
-                placeholder={t('typeMessageWhatsApp')}
+                placeholder={
+                  placeholder ??
+                  (freeTextDisabled ? t('replyWindowClosed') : t('typeMessageWhatsApp'))
+                }
                 dir={textDir}
                 wrap="soft"
                 className={`custom-scrollbar box-border min-h-0 min-w-0 flex-1 resize-none overflow-x-hidden overflow-y-auto border-0 bg-transparent px-1 py-1 text-sm leading-5 text-gray-900 outline-none placeholder:text-gray-400 disabled:opacity-60 dark:text-gray-100 [overflow-wrap:anywhere] whitespace-pre-wrap ${

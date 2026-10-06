@@ -16,6 +16,7 @@ import {
   INBOX_STATUS_FILTERS,
 } from '../components/chat/InboxFilterRail';
 import { ConvertConversationModal } from '../components/modals/ConvertConversationModal';
+import { InboxAssignAgentMenu } from '../components/inbox/InboxAssignAgentMenu';
 import { InboxChannelBadge } from '../components/inbox/InboxMessageList';
 import { SearchIcon, StarIcon } from '../components/index';
 import { ChatThread } from '../components/whatsapp/ChatThread';
@@ -836,25 +837,19 @@ export const InboxPage: React.FC = () => {
                     </Button>
                   ) : null}
                   {canReassign ? (
-                    <select
-                      value={selected.assigned_to?.id ?? ''}
-                      aria-label={t('inboxAssignAgent')}
-                      onChange={(e) => {
+                    <InboxAssignAgentMenu
+                      t={t}
+                      agents={agents}
+                      value={selected.assigned_to?.id ?? null}
+                      disabled={updateState.isPending}
+                      onChange={(assignedTo) => {
                         if (!selectedId) return;
                         updateState.mutate({
                           conversationId: selectedId,
-                          assignedTo: e.target.value ? Number(e.target.value) : null,
+                          assignedTo,
                         });
                       }}
-                      className="max-w-[9rem] rounded-md border border-white/30 bg-white/10 px-1.5 py-1 text-xs text-white"
-                    >
-                      <option value="">{t('chatFilterUnassigned')}</option>
-                      {agents.map((agent) => (
-                        <option key={agent.id} value={agent.id} className="text-gray-900">
-                          {agent.full_name || agent.username}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   ) : null}
                   {(currentUser?.is_company_owner || currentUser?.isCompanyOwner) ? (
                     <Button

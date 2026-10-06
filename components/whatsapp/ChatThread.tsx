@@ -402,10 +402,10 @@ export const ChatThread: React.FC<Props> = ({
                 <ChatBubbleIcon className="size-10 opacity-90" aria-hidden />
               </div>
               <p className="text-base font-semibold text-gray-900 dark:text-gray-100">
-                {t('whatsappThreadEmpty')}
+                {t('chatThreadEmpty')}
               </p>
               <p className="mt-1.5 max-w-sm text-sm text-gray-500 dark:text-gray-400">
-                {t('whatsappThreadEmptyHint')}
+                {t('chatThreadEmptyHint')}
               </p>
             </div>
           )

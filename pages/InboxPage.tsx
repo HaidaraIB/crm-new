@@ -306,13 +306,6 @@ export const InboxPage: React.FC = () => {
     [threadBubbleMessages]
   );
 
-  const inboxSession = useMemo(() => {
-    if (!sendWindow?.open || !sendWindow.expires_at) return { in_session: false as const };
-    const ms = new Date(sendWindow.expires_at).getTime() - Date.now();
-    if (Number.isNaN(ms) || ms <= 0) return { in_session: false as const };
-    return { in_session: true as const, hours_remaining: ms / 3600000 };
-  }, [sendWindow]);
-
   const inboxWindowAlerts = useMemo(() => {
     const nodes: React.ReactNode[] = [];
     if (sendWindow?.mode === 'response' && sendWindow.expires_at) {
@@ -823,9 +816,11 @@ export const InboxPage: React.FC = () => {
                 messageInput: draft,
                 setMessageInput: setDraft,
                 onSend: () => void handleSend(),
-                whatsappSendBlocked: composerBlocked && !requiresTemplate,
-                blockFreeText: requiresTemplate,
-                suppressBlockFreeTextAlert: requiresTemplate,
+                // Never map Meta reply-window closed → WhatsApp disconnect.
+                // ChatComposerAlerts treats whatsappSendBlocked as reconnect-required.
+                whatsappSendBlocked: false,
+                blockFreeText: composerBlocked || requiresTemplate,
+                suppressBlockFreeTextAlert: true,
                 approvedTemplates,
                 chatTemplateSendId: templateId,
                 setChatTemplateSendId: setTemplateId,
@@ -848,13 +843,11 @@ export const InboxPage: React.FC = () => {
                     setTemplateSending(false);
                   }
                 },
-                session: inboxSession,
+                session: null,
                 composerAlert: sendError
                   ? { variant: 'error' as const, message: sendError }
                   : null,
                 windowAlerts: inboxWindowAlerts,
-                blockFreeTextMessage:
-                  composerBlocked && !requiresTemplate ? t('replyWindowClosedHint') : undefined,
                 showTemplatePicker: isWhatsappThread,
                 placeholder: composerBlocked ? t('replyWindowClosed') : t('typeAMessage'),
                 pendingAttachment,

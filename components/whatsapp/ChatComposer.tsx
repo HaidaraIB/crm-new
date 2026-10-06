@@ -259,7 +259,7 @@ export const ChatComposer: React.FC<Props> = ({
                 disabled={freeTextDisabled || compressingAttachment}
                 placeholder={
                   placeholder ??
-                  (freeTextDisabled ? t('replyWindowClosed') : t('typeMessageWhatsApp'))
+                  (freeTextDisabled ? t('replyWindowClosed') : t('typeAMessage'))
                 }
                 dir={textDir}
                 wrap="soft"

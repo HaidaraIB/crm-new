@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { WhatsAppInboxSection } from '../../components/integrations/WhatsAppInboxSection';
 import { ConnectionCard, EmptyConnectionState, IntegrationPageLayout, StatusBadge } from '../../components/integrations/kit';
+import { PhoneText, isPhoneLike } from '../../components/PhoneText';
 import { useAppContext } from '../../context/AppContext';
 import { useTabParam } from '../../hooks/integrations/useTabParam';
 import { useIntegrationPolicy } from '../../hooks/integrations/useIntegrationPolicy';
@@ -79,6 +80,8 @@ export const WhatsAppIntegrationPage = () => {
 
   const tabs = entry.tabs!.map((item) => ({ id: item.id, label: t(item.labelKey as 'whatsApp') }));
   const coexistence = account?.metadata?.coexistence === true || account?.metadata?.is_on_biz_app === true;
+  const crmPhone = account?.displayPhoneNumber || String(account?.metadata?.display_phone_number || '');
+  const showCrmPhone = Boolean(crmPhone) && !isPhoneLike(account?.name);
 
   return (
     <IntegrationPageLayout
@@ -130,7 +133,7 @@ export const WhatsAppIntegrationPage = () => {
           }
           menu={[
             ...(account.status === 'connected'
-              ? [{ key: 'sync', label: syncing ? t('syncing') : t('refreshWhatsAppPhoneNumbers'), onClick: () => void syncNumbers(account.id) }]
+              ? [{ key: 'sync', label: syncing ? t('syncing') : t('refreshWhatsAppPhoneNumbers'), onClick: () => void syncNumbers(account.id), loading: syncing }]
               : []),
             {
               key: 'edit',
@@ -145,9 +148,14 @@ export const WhatsAppIntegrationPage = () => {
               : []),
           ]}
           footer={
-            account.status !== 'connected' && account.metadata?.number_conflict_key ? (
-              <p className="text-xs text-red-600 dark:text-red-400">{t(String(account.metadata.number_conflict_key) as 'connected')}</p>
-            ) : null
+            <>
+              {showCrmPhone ? (
+                <PhoneText className="font-medium text-gray-900 dark:text-white">{crmPhone}</PhoneText>
+              ) : null}
+              {account.status !== 'connected' && account.metadata?.number_conflict_key ? (
+                <p className="text-xs text-red-600 dark:text-red-400">{t(String(account.metadata.number_conflict_key) as 'connected')}</p>
+              ) : null}
+            </>
           }
         />
       )}

@@ -34,7 +34,6 @@ export const WhatsAppInboxSection: React.FC<{ disabled?: boolean }> = ({ disable
 
   const account = data?.account ?? null;
   const numbers = data?.numbers ?? [];
-  const connectedNumber = numbers.find((n) => n.status === 'connected') ?? numbers[0];
 
   const startConnect = () => {
     if (disabled) return;
@@ -89,46 +88,49 @@ export const WhatsAppInboxSection: React.FC<{ disabled?: boolean }> = ({ disable
             },
           ]}
         >
-          {connectedNumber ? (
+          {numbers.length > 0 ? (
             <ul className="-mx-5 sm:-mx-6 border-t border-gray-200/80 dark:border-gray-700/80">
-              <ConnectionSubItem
-                title={
-                  <PhoneText className="font-medium text-gray-900 dark:text-white">
-                    {connectedNumber.display_phone_number || connectedNumber.phone_number_id}
-                  </PhoneText>
-                }
-                meta={<span className="text-gray-500">{t('inboxPhoneNumber')}</span>}
-                danger={
-                  connectedNumber.status === 'connected'
-                    ? {
-                        label: t('disconnect'),
-                        loading: busyId === connectedNumber.id,
-                        onClick: () => {
-                          setConfirmDeleteConfig({
-                            title: t('disconnect'),
-                            message: t('whatsappInboxDisconnectNumberConfirm'),
-                            onConfirm: async () => {
-                              setBusyId(connectedNumber.id);
-                              try {
-                                await deleteWhatsappInboxNumberAPI(connectedNumber.id);
-                                queryClient.invalidateQueries({ queryKey: ['whatsappInboxNumbers'] });
-                                queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
-                                showToast(t('disconnected'), { variant: 'success' });
-                              } catch (err: unknown) {
-                                const message = resolveLocalizedApiError(err as { message?: string }, t, t('errorSavingAccount'));
-                                setError(message);
-                                showToast(message, { variant: 'error' });
-                              } finally {
-                                setBusyId(null);
-                              }
-                            },
-                          });
-                          setIsConfirmDeleteModalOpen(true);
-                        },
-                      }
-                    : undefined
-                }
-              />
+              {numbers.map((number) => (
+                <ConnectionSubItem
+                  key={number.id}
+                  title={
+                    <PhoneText className="font-medium text-gray-900 dark:text-white">
+                      {number.display_phone_number || number.phone_number_id}
+                    </PhoneText>
+                  }
+                  meta={<span className="text-gray-500">{t('inboxPhoneNumber')}</span>}
+                  danger={
+                    number.status === 'connected'
+                      ? {
+                          label: t('disconnect'),
+                          loading: busyId === number.id,
+                          onClick: () => {
+                            setConfirmDeleteConfig({
+                              title: t('disconnect'),
+                              message: t('whatsappInboxDisconnectNumberConfirm'),
+                              onConfirm: async () => {
+                                setBusyId(number.id);
+                                try {
+                                  await deleteWhatsappInboxNumberAPI(number.id);
+                                  queryClient.invalidateQueries({ queryKey: ['whatsappInboxNumbers'] });
+                                  queryClient.invalidateQueries({ queryKey: ['connectedAccounts'] });
+                                  showToast(t('disconnected'), { variant: 'success' });
+                                } catch (err: unknown) {
+                                  const message = resolveLocalizedApiError(err as { message?: string }, t, t('errorSavingAccount'));
+                                  setError(message);
+                                  showToast(message, { variant: 'error' });
+                                } finally {
+                                  setBusyId(null);
+                                }
+                              },
+                            });
+                            setIsConfirmDeleteModalOpen(true);
+                          },
+                        }
+                      : undefined
+                  }
+                />
+              ))}
             </ul>
           ) : null}
         </ConnectionCard>

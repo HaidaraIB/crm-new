@@ -1429,6 +1429,11 @@ export const translations = {
     whatsappInboxIntegrationHint:
       "Connect a WhatsApp number used only in the Omni-Channel Inbox. It must be different from your CRM WhatsApp number.",
     whatsappInboxConnectPrompt: "Connect a dedicated WhatsApp number for inbox conversations.",
+    callsSettingsCrmConnectPrompt: "Connect your CRM WhatsApp number under Integrations → WhatsApp first.",
+    callsSettingsInboxConnectPrompt: "Connect an Inbox WhatsApp number under Integrations → WhatsApp → Inbox number first.",
+    callsSettingsInboxNumberMissing: "The Inbox WhatsApp account is connected, but no phone number is linked yet. Reconnect the Inbox number.",
+    callsSettingsNumberLabelCrm: "CRM · {phone}",
+    callsSettingsNumberLabelInbox: "Inbox · {phone}",
     whatsappInboxDisconnectNumberConfirm: "Disconnect this inbox number? Conversation history will be kept.",
     inboxPhoneNumber: "Inbox number",
     inboxSendTemplate: "Send template",
@@ -4574,6 +4579,11 @@ export const translations = {
     whatsappInboxIntegrationHint:
       "اربط رقم واتساب يُستخدم فقط في صندوق الوارد الموحّد. يجب أن يختلف عن رقم واتساب CRM.",
     whatsappInboxConnectPrompt: "اربط رقم واتساب مخصّصاً لمحادثات صندوق الوارد.",
+    callsSettingsCrmConnectPrompt: "اربط رقم واتساب الـ CRM أولاً من التكاملات ← واتساب.",
+    callsSettingsInboxConnectPrompt: "اربط رقم واتساب صندوق الوارد أولاً من التكاملات ← واتساب ← رقم صندوق الوارد.",
+    callsSettingsInboxNumberMissing: "حساب واتساب صندوق الوارد متصل، لكن لا يوجد رقم مرتبط بعد. أعد ربط رقم صندوق الوارد.",
+    callsSettingsNumberLabelCrm: "CRM · {phone}",
+    callsSettingsNumberLabelInbox: "صندوق الوارد · {phone}",
     whatsappInboxDisconnectNumberConfirm: "فصل رقم صندوق الوارد؟ سيتم الاحتفاظ بسجل المحادثات.",
     inboxPhoneNumber: "رقم صندوق الوارد",
     inboxSendTemplate: "إرسال قالب",

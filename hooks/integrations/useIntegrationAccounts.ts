@@ -8,6 +8,7 @@ export type IntegrationAccount = {
   status: ConnectionStatus;
   platform?: string;
   metadata?: Record<string, unknown>;
+  displayPhoneNumber?: string;
   is_active?: boolean;
 };
 
@@ -25,6 +26,7 @@ export function useIntegrationAccounts(platform: string | undefined, enabled = t
       ),
       platform: acc.platform ? String(acc.platform) : undefined,
       metadata: (acc.metadata as Record<string, unknown>) || undefined,
+      displayPhoneNumber: acc.display_phone_number ? String(acc.display_phone_number) : undefined,
       is_active: acc.is_active !== false,
     }));
   }, [query.data]);

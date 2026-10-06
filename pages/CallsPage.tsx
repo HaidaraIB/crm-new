@@ -25,6 +25,7 @@ import {
   getWhatsappInboxNumbersAPI,
   type WhatsAppCallRecord,
 } from '../services/api';
+import { useWhatsAppConnected } from '../hooks/useWhatsAppConnected';
 import { ChatVoicePlayer } from '../components/chat/ChatVoicePlayer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { queryKeys, useLead, useSyncDigest, useWhatsAppLiveCalls } from '../hooks/useQueries';
@@ -185,13 +186,39 @@ function CallHoursSwitcher({
 }) {
   const [which, setWhich] = useState<'crm' | 'inbox'>('crm');
   const [enabling, setEnabling] = useState(false);
-  const { data } = useQuery({
+  const { isConnected: crmConnected, isLoading: crmLoading } = useWhatsAppConnected();
+  const { data: inboxData, isLoading: inboxLoading } = useQuery({
     queryKey: ['whatsappInboxNumbers'],
     queryFn: getWhatsappInboxNumbersAPI,
     retry: false,
   });
-  const inbox = data?.numbers?.find((row) => row.status === 'connected') ?? data?.numbers?.[0];
-  const inboxId = which === 'inbox' ? inbox?.id : undefined;
+  const inboxAccountConnected =
+    String(inboxData?.account?.status || '').toLowerCase() === 'connected';
+  const inboxNumber =
+    inboxData?.numbers?.find((row) => String(row.status).toLowerCase() === 'connected') ??
+    inboxData?.numbers?.[0] ??
+    null;
+  const inboxNumberReady =
+    !!inboxNumber && String(inboxNumber.status).toLowerCase() !== 'disconnected';
+  const inboxId = which === 'inbox' && inboxNumberReady ? inboxNumber!.id : undefined;
+  const selectedReady = which === 'crm' ? crmConnected : inboxNumberReady;
+  const selectedLabel =
+    which === 'crm'
+      ? t('crmWhatsAppNumber')
+      : inboxNumber?.display_phone_number
+        ? t('callsSettingsNumberLabelInbox').replace('{phone}', inboxNumber.display_phone_number)
+        : t('whatsappInboxTab');
+
+  let emptyHint: string | null = null;
+  if (!crmLoading && !inboxLoading) {
+    if (which === 'crm' && !crmConnected) {
+      emptyHint = t('callsSettingsCrmConnectPrompt');
+    } else if (which === 'inbox' && !inboxNumberReady) {
+      emptyHint = inboxAccountConnected
+        ? t('callsSettingsInboxNumberMissing')
+        : t('callsSettingsInboxConnectPrompt');
+    }
+  }
 
   return (
     <div className="space-y-3">
@@ -199,21 +226,30 @@ function CallHoursSwitcher({
         <select
           value={which}
           onChange={(e) => setWhich(e.target.value === 'inbox' ? 'inbox' : 'crm')}
-          className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800"
+          className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          aria-label={t('callsTabSettings')}
         >
           <option value="crm">{t('crmWhatsAppNumber')}</option>
-          <option value="inbox">{t('whatsappInboxTab')}</option>
+          <option value="inbox">
+            {inboxNumberReady && inboxNumber?.display_phone_number
+              ? t('callsSettingsNumberLabelInbox').replace(
+                  '{phone}',
+                  inboxNumber.display_phone_number,
+                )
+              : t('whatsappInboxTab')}
+          </option>
         </select>
         {canManage ? (
           <Button
             className="!h-8 !px-3 !text-xs"
             loading={enabling}
-            disabled={which === 'inbox' && !inboxId}
+            disabled={!selectedReady}
+            title={selectedReady ? selectedLabel : emptyHint || undefined}
             onClick={async () => {
               setEnabling(true);
               try {
                 await enableWhatsAppCallingAPI(
-                  which === 'inbox' && inboxId ? { wa_inbox_number_id: inboxId } : {}
+                  which === 'inbox' && inboxId ? { wa_inbox_number_id: inboxId } : {},
                 );
               } finally {
                 setEnabling(false);
@@ -224,8 +260,8 @@ function CallHoursSwitcher({
           </Button>
         ) : null}
       </div>
-      {which === 'inbox' && !inboxId ? (
-        <p className="text-sm text-gray-500">{t('whatsappInboxConnectPrompt')}</p>
+      {emptyHint ? (
+        <p className="text-sm text-gray-500 dark:text-gray-400">{emptyHint}</p>
       ) : (
         <WhatsAppCallHoursPanel
           t={t}

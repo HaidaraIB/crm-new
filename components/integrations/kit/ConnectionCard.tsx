@@ -1,10 +1,8 @@
 import React from 'react';
 import { Button } from '../../Button';
 import { Card } from '../../Card';
-import { Dropdown, DropdownItem } from '../../Dropdown';
-import { MoreVerticalIcon } from '../../icons';
+import { SettingsIcon, TrashIcon } from '../../icons';
 import { PhoneText, isPhoneLike } from '../../PhoneText';
-import { useAppContext } from '../../../context/AppContext';
 import { IntegrationPlatform, IntegrationPlatformIcon } from '../IntegrationPlatformIcon';
 import { StatusBadge } from './StatusBadge';
 import { ConnectionStatus } from './status';
@@ -15,6 +13,7 @@ export type ConnectionAction = {
   onClick: () => void;
   danger?: boolean;
   disabled?: boolean;
+  loading?: boolean;
 };
 
 export type ConnectionPrimaryAction = {
@@ -24,10 +23,7 @@ export type ConnectionPrimaryAction = {
   disabled?: boolean;
 };
 
-/**
- * One connected account. The button is the single primary action;
- * everything else lives in the overflow menu.
- */
+/** One connected account. Every action is a button on the row. */
 export const ConnectionCard: React.FC<{
   platform?: IntegrationPlatform;
   name: string;
@@ -39,8 +35,7 @@ export const ConnectionCard: React.FC<{
   children?: React.ReactNode;
   footer?: React.ReactNode;
 }> = ({ platform, name, status, statusLabel, extra, primary, menu, children, footer }) => {
-  const { t } = useAppContext();
-  const visibleMenu = (menu || []).filter(Boolean);
+  const actions = (menu || []).filter(Boolean);
   return (
     <Card className="overflow-hidden p-0">
       <div className="p-5 sm:p-6 flex flex-col gap-4">
@@ -73,28 +68,28 @@ export const ConnectionCard: React.FC<{
                 {primary.label}
               </Button>
             ) : null}
-            {visibleMenu.length > 0 ? (
-              <Dropdown
-                usePortal
-                trigger={
-                  <button
-                    type="button"
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700"
-                    aria-label={t('moreActions')}
-                  >
-                    <MoreVerticalIcon className="h-4 w-4" />
-                  </button>
-                }
-              >
-                {visibleMenu.map((action) => (
-                  <DropdownItem key={action.key} onClick={action.onClick}>
-                    <span className={action.danger ? 'text-red-600 dark:text-red-400' : undefined}>
-                      {action.label}
-                    </span>
-                  </DropdownItem>
-                ))}
-              </Dropdown>
-            ) : null}
+            {actions.map((action) => {
+              const danger = action.danger || action.key === 'disconnect';
+              const edit = action.key === 'edit';
+              return (
+                <Button
+                  key={action.key}
+                  variant={danger ? 'danger' : edit ? 'ghost' : 'secondary'}
+                  onClick={action.onClick}
+                  loading={action.loading}
+                  disabled={action.disabled}
+                  className={
+                    edit
+                      ? 'rounded-lg border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700'
+                      : 'rounded-lg text-sm'
+                  }
+                >
+                  {danger ? <TrashIcon className="w-4 h-4" /> : null}
+                  {edit ? <SettingsIcon className="w-4 h-4" /> : null}
+                  <span className="sm:inline">{action.label}</span>
+                </Button>
+              );
+            })}
           </div>
         </div>
         {children}

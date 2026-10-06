@@ -23,6 +23,7 @@ export const MujebIntegrationPage = () => {
     <IntegrationPageLayout
       title={t('mujebTitle')}
       subtitle={t('mujebDescription')}
+      platform="mujeb"
       helpVideoPageKey={entry.helpVideoPageKey}
       status={status}
       statusLabel={status === 'connected' ? t('mujebStatusConnected') : status === 'disabled' ? undefined : t('mujebStatusPending')}

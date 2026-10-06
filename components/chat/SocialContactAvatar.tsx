@@ -5,7 +5,10 @@ import { WA_AVATAR } from '../whatsapp/whatsappChatTheme';
 export function socialContactInitials(displayName: string): string {
   const parts = (displayName || '').trim().split(/\s+/).filter(Boolean);
   if (!parts.length) return '?';
-  return parts.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
+  // Drop trailing "· abcd" disambiguator from fallback labels.
+  const cleaned = parts.filter((p) => !p.startsWith('·') && !/^\d{2,4}$/.test(p));
+  const use = cleaned.length ? cleaned : parts;
+  return use.slice(0, 2).map((p) => p[0]?.toUpperCase() ?? '').join('');
 }
 
 /** Relative /media/... from Django must hit the API host, not Vite. */
@@ -24,13 +27,14 @@ function resolveProfilePicUrl(raw: string | null | undefined): string {
 type Props = {
   displayName: string;
   profilePicUrl?: string | null;
+  avatarUrl?: string | null;
   className?: string;
 };
 
-/** Meta CDN profile photo with initials fallback (Omni-Channel Inbox). */
-export function SocialContactAvatar({ displayName, profilePicUrl, className }: Props) {
+/** Meta profile photo with initials fallback (Omni-Channel Inbox). */
+export function SocialContactAvatar({ displayName, profilePicUrl, avatarUrl, className }: Props) {
   const [imgFailed, setImgFailed] = useState(false);
-  const url = resolveProfilePicUrl(profilePicUrl);
+  const url = resolveProfilePicUrl(avatarUrl || profilePicUrl);
   const shell = className || WA_AVATAR;
   const initials = socialContactInitials(displayName);
 

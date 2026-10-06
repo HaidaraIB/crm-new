@@ -177,69 +177,70 @@ const CallRecordingPlayer: React.FC<{ url: string; t: (k: any) => string }> = ({
   return <ChatVoicePlayer blobUrl={blobUrl} mine={false} t={t} />;
 };
 
-function CallHoursSwitcher({
+type CallsNumberScope = 'crm' | 'inbox';
+
+const CALLS_NUMBER_SCOPE_KEY = 'crm.callsNumberScope';
+
+function readCallsNumberScope(): CallsNumberScope {
+  try {
+    const raw = localStorage.getItem(CALLS_NUMBER_SCOPE_KEY);
+    return raw === 'inbox' ? 'inbox' : 'crm';
+  } catch {
+    return 'crm';
+  }
+}
+
+function CallsNumberSwitcher({
+  t,
+  which,
+  onChange,
+  inboxPhoneLabel,
+}: {
+  t: (key: any) => string;
+  which: CallsNumberScope;
+  onChange: (next: CallsNumberScope) => void;
+  inboxPhoneLabel?: string | null;
+}) {
+  return (
+    <select
+      value={which}
+      onChange={(e) => onChange(e.target.value === 'inbox' ? 'inbox' : 'crm')}
+      className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+      aria-label={t('whatsappCallSource')}
+    >
+      <option value="crm">{t('whatsappCallSourceCrm')}</option>
+      <option value="inbox">
+        {inboxPhoneLabel
+          ? t('callsSettingsNumberLabelInbox').replace('{phone}', inboxPhoneLabel)
+          : t('whatsappCallSourceInbox')}
+      </option>
+    </select>
+  );
+}
+
+function CallHoursPanel({
   t,
   canManage,
+  which,
+  inboxId,
+  selectedReady,
+  selectedLabel,
+  emptyHint,
 }: {
   t: (key: any) => string;
   canManage: boolean;
+  which: CallsNumberScope;
+  inboxId?: number;
+  selectedReady: boolean;
+  selectedLabel: string;
+  emptyHint: string | null;
 }) {
-  const [which, setWhich] = useState<'crm' | 'inbox'>('crm');
   const [enabling, setEnabling] = useState(false);
-  const { isConnected: crmConnected, isLoading: crmLoading } = useWhatsAppConnected();
-  const { data: inboxData, isLoading: inboxLoading } = useQuery({
-    queryKey: ['whatsappInboxNumbers'],
-    queryFn: getWhatsappInboxNumbersAPI,
-    retry: false,
-  });
-  const inboxAccountConnected =
-    String(inboxData?.account?.status || '').toLowerCase() === 'connected';
-  const inboxNumber =
-    inboxData?.numbers?.find((row) => String(row.status).toLowerCase() === 'connected') ??
-    inboxData?.numbers?.[0] ??
-    null;
-  const inboxNumberReady =
-    !!inboxNumber && String(inboxNumber.status).toLowerCase() !== 'disconnected';
-  const inboxId = which === 'inbox' && inboxNumberReady ? inboxNumber!.id : undefined;
-  const selectedReady = which === 'crm' ? crmConnected : inboxNumberReady;
-  const selectedLabel =
-    which === 'crm'
-      ? t('crmWhatsAppNumber')
-      : inboxNumber?.display_phone_number
-        ? t('callsSettingsNumberLabelInbox').replace('{phone}', inboxNumber.display_phone_number)
-        : t('whatsappInboxTab');
-
-  let emptyHint: string | null = null;
-  if (!crmLoading && !inboxLoading) {
-    if (which === 'crm' && !crmConnected) {
-      emptyHint = t('callsSettingsCrmConnectPrompt');
-    } else if (which === 'inbox' && !inboxNumberReady) {
-      emptyHint = inboxAccountConnected
-        ? t('callsSettingsInboxNumberMissing')
-        : t('callsSettingsInboxConnectPrompt');
-    }
-  }
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <select
-          value={which}
-          onChange={(e) => setWhich(e.target.value === 'inbox' ? 'inbox' : 'crm')}
-          className="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
-          aria-label={t('callsTabSettings')}
-        >
-          <option value="crm">{t('crmWhatsAppNumber')}</option>
-          <option value="inbox">
-            {inboxNumberReady && inboxNumber?.display_phone_number
-              ? t('callsSettingsNumberLabelInbox').replace(
-                  '{phone}',
-                  inboxNumber.display_phone_number,
-                )
-              : t('whatsappInboxTab')}
-          </option>
-        </select>
-        {canManage ? (
+      {canManage ? (
+        <div className="flex flex-wrap items-center gap-2">
           <Button
             className="!h-8 !px-3 !text-xs"
             loading={enabling}
@@ -258,8 +259,8 @@ function CallHoursSwitcher({
           >
             {t('enableWhatsAppCalling')}
           </Button>
-        ) : null}
-      </div>
+        </div>
+      ) : null}
       {emptyHint ? (
         <p className="text-sm text-gray-500 dark:text-gray-400">{emptyHint}</p>
       ) : (
@@ -295,6 +296,7 @@ export const CallsPage: React.FC = () => {
   } = useAppContext();
   const whatsappCalling = useWhatsAppCallingOptional();
   const [selected, setSelected] = useState<WhatsAppCallRecord | null>(null);
+  const [numberScope, setNumberScope] = useState<CallsNumberScope>(() => readCallsNumberScope());
   const [searchDraft, setSearchDraft] = useState(callFilters.search);
   const [activeTab, setActiveTab] = useState<CallsPageTab>(() => {
     const pending = consumePendingCallsTab();
@@ -314,6 +316,49 @@ export const CallsPage: React.FC = () => {
     writePersistedTab('calls', activeTab);
   }, [activeTab]);
 
+  useEffect(() => {
+    try {
+      localStorage.setItem(CALLS_NUMBER_SCOPE_KEY, numberScope);
+    } catch {
+      /* ignore */
+    }
+    setSelected(null);
+  }, [numberScope]);
+
+  const { isConnected: crmConnected, isLoading: crmLoading } = useWhatsAppConnected();
+  const { data: inboxData, isLoading: inboxLoading } = useQuery({
+    queryKey: ['whatsappInboxNumbers'],
+    queryFn: getWhatsappInboxNumbersAPI,
+    retry: false,
+  });
+  const inboxAccountConnected =
+    String(inboxData?.account?.status || '').toLowerCase() === 'connected';
+  const inboxNumber =
+    inboxData?.numbers?.find((row) => String(row.status).toLowerCase() === 'connected') ??
+    inboxData?.numbers?.[0] ??
+    null;
+  const inboxNumberReady =
+    !!inboxNumber && String(inboxNumber.status).toLowerCase() !== 'disconnected';
+  const inboxId =
+    numberScope === 'inbox' && inboxNumberReady ? inboxNumber!.id : undefined;
+  const selectedReady = numberScope === 'crm' ? crmConnected : inboxNumberReady;
+  const selectedLabel =
+    numberScope === 'crm'
+      ? t('crmWhatsAppNumber')
+      : inboxNumber?.display_phone_number
+        ? t('callsSettingsNumberLabelInbox').replace('{phone}', inboxNumber.display_phone_number)
+        : t('whatsappInboxTab');
+  let hoursEmptyHint: string | null = null;
+  if (!crmLoading && !inboxLoading) {
+    if (numberScope === 'crm' && !crmConnected) {
+      hoursEmptyHint = t('callsSettingsCrmConnectPrompt');
+    } else if (numberScope === 'inbox' && !inboxNumberReady) {
+      hoursEmptyHint = inboxAccountConnected
+        ? t('callsSettingsInboxNumberMissing')
+        : t('callsSettingsInboxConnectPrompt');
+    }
+  }
+
   const role = normalizeRole(currentUser?.role);
   // Live / Team / Call hours are supervisory views: employees with WhatsApp
   // calling permissions only get their own call History.
@@ -332,6 +377,7 @@ export const CallsPage: React.FC = () => {
   const { data: liveCalls = [], refetch: refetchLiveCalls, isFetching: isLiveFetching } =
     useWhatsAppLiveCalls({
       enabled: Boolean(currentUser) && canSeeSupervisorTabs,
+      callSource: numberScope,
       /**
        * 2s only while something is actually live; otherwise nothing at all.
        *
@@ -429,10 +475,13 @@ export const CallsPage: React.FC = () => {
     replaceCallsUrlQuery(callFilters);
   }, [callFilters]);
 
-  const apiParams = useMemo(() => callFiltersToApiParams(callFilters), [callFilters]);
+  const apiParams = useMemo(
+    () => ({ ...callFiltersToApiParams(callFilters), call_source: numberScope }),
+    [callFilters, numberScope]
+  );
   const countParams = useMemo(
-    () => callFiltersToCountParams(callFilters),
-    [callFilters]
+    () => ({ ...callFiltersToCountParams(callFilters), call_source: numberScope }),
+    [callFilters, numberScope]
   );
 
   const filteredClientId = callFilters.clientId ? Number(callFilters.clientId) : null;
@@ -528,7 +577,15 @@ export const CallsPage: React.FC = () => {
   return (
     <PageWrapper title={t('callsPageTitle')}>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm text-gray-500 dark:text-gray-400">{t('callsPageDescription')}</p>
+        <div className="flex min-w-0 flex-col gap-2">
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t('callsPageDescription')}</p>
+          <CallsNumberSwitcher
+            t={t}
+            which={numberScope}
+            onChange={setNumberScope}
+            inboxPhoneLabel={inboxNumber?.display_phone_number || null}
+          />
+        </div>
         <WhatsAppAgentStatusControl t={t} />
       </div>
 
@@ -617,10 +674,20 @@ export const CallsPage: React.FC = () => {
       {activeTab === 'team' && canSeeSupervisorTabs ? <WhatsAppTeamCallStatusPanel t={t} /> : null}
 
       {activeTab === 'hours' && canSeeSupervisorTabs ? (
-        <CallHoursSwitcher t={t} canManage={canManageHours} />
+        <CallHoursPanel
+          t={t}
+          canManage={canManageHours}
+          which={numberScope}
+          inboxId={inboxId}
+          selectedReady={selectedReady}
+          selectedLabel={selectedLabel}
+          emptyHint={hoursEmptyHint}
+        />
       ) : null}
 
-      {activeTab === 'error-logs' && canSeeCallErrorLogs ? <CallErrorLogsPanel /> : null}
+      {activeTab === 'error-logs' && canSeeCallErrorLogs ? (
+        <CallErrorLogsPanel callSource={numberScope} />
+      ) : null}
 
       {activeTab === 'history' ? (
         <>

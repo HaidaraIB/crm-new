@@ -149,7 +149,12 @@ function CallErrorTimelineItem({
   );
 }
 
-export function CallErrorLogsPanel() {
+export function CallErrorLogsPanel({
+  callSource,
+}: {
+  /** Scope logs to CRM or inbox WhatsApp number (Calls page switcher). */
+  callSource?: 'crm' | 'inbox';
+} = {}) {
   const { t, language, openLeadDetails } = useAppContext();
   const [searchDraft, setSearchDraft] = useState('');
   const [searchApplied, setSearchApplied] = useState('');
@@ -159,9 +164,10 @@ export function CallErrorLogsPanel() {
     () => ({
       search: searchApplied.trim() || undefined,
       source,
+      call_source: callSource,
       page_size: PAGE_SIZE,
     }),
-    [searchApplied, source]
+    [searchApplied, source, callSource]
   );
 
   const { data, isLoading, isFetching, fetchNextPage, hasNextPage, isFetchingNextPage, refetch } =

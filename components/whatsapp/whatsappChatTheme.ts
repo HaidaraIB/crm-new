@@ -21,7 +21,7 @@ export const WA_BUBBLE_IN =
 export const WA_TICK_READ = 'text-sky-300';
 export const WA_COMPOSER_BG = 'bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800';
 export const WA_AVATAR =
-  'w-10 h-10 rounded-full bg-primary/15 dark:bg-primary/30 flex items-center justify-center text-primary dark:text-primary-200 font-bold text-sm shrink-0 ring-2 ring-primary/20 dark:ring-primary/40';
+  'w-10 h-10 rounded-full bg-primary/15 dark:bg-primary/30 flex items-center justify-center text-primary-700 dark:text-primary-200 font-bold text-sm shrink-0 ring-2 ring-primary/25 dark:ring-primary-300/50';
 export const WA_SENDER_CHIP =
   'w-6 h-6 rounded-full bg-primary-700 dark:bg-primary-400 text-white dark:text-primary-950 text-[10px] font-bold flex items-center justify-center shrink-0';
 export const WA_SEND_BTN =

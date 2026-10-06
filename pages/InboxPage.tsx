@@ -44,6 +44,7 @@ import {
   resolveLocalizedApiError,
   sendSocialInboxLocationAPI,
   sendSocialInboxTemplateAPI,
+  updateSocialContactAPI,
 } from '../services/api';
 import { ShareLocationModal } from '../components/modals/ShareLocationModal';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
@@ -182,6 +183,9 @@ export const InboxPage: React.FC = () => {
   const [sendError, setSendError] = useState<string | null>(null);
   const [convertOpen, setConvertOpen] = useState(false);
   const [convertError, setConvertError] = useState<string | null>(null);
+  const [editingContactName, setEditingContactName] = useState(false);
+  const [contactNameDraft, setContactNameDraft] = useState('');
+  const [savingContactName, setSavingContactName] = useState(false);
   const [pendingAttachment, setPendingAttachment] = useState<File | null>(null);
   const [pendingIsVoiceNote, setPendingIsVoiceNote] = useState(false);
   const [resendingMessageId, setResendingMessageId] = useState<string | null>(null);
@@ -507,6 +511,30 @@ export const InboxPage: React.FC = () => {
     showAlert,
   ]);
 
+  useEffect(() => {
+    setEditingContactName(false);
+    setContactNameDraft(selected?.contact.name || selected?.contact.display_name || '');
+  }, [selectedId, selected?.contact.id, selected?.contact.name, selected?.contact.display_name]);
+
+  const saveContactName = useCallback(async () => {
+    if (!selected?.contact?.id) return;
+    const next = contactNameDraft.trim();
+    if (!next) {
+      showAlert(t('name'), 'error');
+      return;
+    }
+    setSavingContactName(true);
+    try {
+      await updateSocialContactAPI(selected.contact.id, next);
+      setEditingContactName(false);
+      queryClient.invalidateQueries({ queryKey: ['socialConversations'] });
+    } catch (e: unknown) {
+      showAlert(resolveLocalizedApiError(e, t, 'Save failed'), 'error');
+    } finally {
+      setSavingContactName(false);
+    }
+  }, [selected, contactNameDraft, queryClient, showAlert, t]);
+
   return (
     <div className="flex h-full min-h-0 flex-col gap-2 p-2 sm:p-3 md:p-4">
       <div className="flex shrink-0 items-center gap-2 px-0.5">
@@ -642,6 +670,7 @@ export const InboxPage: React.FC = () => {
               >
                 <SocialContactAvatar
                   displayName={row.contact.display_name}
+                  avatarUrl={row.contact.avatar_url}
                   profilePicUrl={row.contact.profile_pic_url}
                 />
                 <div className="min-w-0 flex-1">
@@ -660,7 +689,7 @@ export const InboxPage: React.FC = () => {
                     ) : null}
                   </div>
                   {row.assigned_to ? (
-                    <p className="truncate text-[10px] font-medium text-primary">
+                    <p className="truncate text-[10px] font-medium text-primary-700 dark:text-primary-200">
                       {row.assigned_to.full_name || row.assigned_to.username}
                     </p>
                   ) : null}
@@ -713,15 +742,73 @@ export const InboxPage: React.FC = () => {
               headerAvatar={
                 <SocialContactAvatar
                   displayName={selected.contact.display_name}
+                  avatarUrl={selected.contact.avatar_url}
                   profilePicUrl={selected.contact.profile_pic_url}
                 />
               }
               headerTitle={
                 <div className="flex min-w-0 items-center gap-2">
                   <InboxChannelBadge channel={selected.channel} className="h-4 w-4 shrink-0" />
-                  <span className="min-w-0 truncate text-sm font-semibold">
-                    {selected.contact.display_name}
-                  </span>
+                  {editingContactName ? (
+                    <form
+                      className="flex min-w-0 flex-1 items-center gap-1"
+                      onSubmit={(e) => {
+                        e.preventDefault();
+                        void saveContactName();
+                      }}
+                    >
+                      <input
+                        autoFocus
+                        value={contactNameDraft}
+                        onChange={(e) => setContactNameDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            setEditingContactName(false);
+                            setContactNameDraft(
+                              selected.contact.name || selected.contact.display_name
+                            );
+                          }
+                        }}
+                        dir="auto"
+                        className="min-w-0 flex-1 rounded border border-white/40 bg-white/15 px-1.5 py-0.5 text-sm font-semibold text-white outline-none placeholder:text-white/60"
+                        aria-label={t('name')}
+                      />
+                      <button
+                        type="submit"
+                        disabled={savingContactName}
+                        className="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold text-white hover:bg-white/20 disabled:opacity-50"
+                      >
+                        {t('save')}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingContactName}
+                        onClick={() => {
+                          setEditingContactName(false);
+                          setContactNameDraft(
+                            selected.contact.name || selected.contact.display_name
+                          );
+                        }}
+                        className="shrink-0 rounded px-1.5 py-0.5 text-xs text-white/80 hover:bg-white/20"
+                      >
+                        {t('cancel')}
+                      </button>
+                    </form>
+                  ) : (
+                    <button
+                      type="button"
+                      title={t('name')}
+                      onClick={() => {
+                        setContactNameDraft(
+                          selected.contact.name || selected.contact.display_name
+                        );
+                        setEditingContactName(true);
+                      }}
+                      className="min-w-0 truncate text-start text-sm font-semibold hover:underline"
+                    >
+                      {selected.contact.display_name}
+                    </button>
+                  )}
                 </div>
               }
               headerActions={
@@ -769,9 +856,7 @@ export const InboxPage: React.FC = () => {
                       ))}
                     </select>
                   ) : null}
-                  {(currentUser?.is_company_owner || currentUser?.isCompanyOwner) &&
-                  isWhatsappThread &&
-                  waCapabilities.deleteConversation ? (
+                  {(currentUser?.is_company_owner || currentUser?.isCompanyOwner) ? (
                     <Button
                       variant="ghost"
                       className="!h-8 !text-white hover:!bg-white/20"

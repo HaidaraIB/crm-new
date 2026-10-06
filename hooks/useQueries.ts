@@ -922,23 +922,34 @@ export const useWhatsAppLiveCalls = (
   options?: Omit<
     UseQueryOptions<{ results: WhatsAppCallRecord[] }, Error, WhatsAppCallRecord[]>,
     'queryKey' | 'queryFn'
-  > & { enabled?: boolean; /** Include answered in-progress (Calls page). */ includeAnswered?: boolean }
+  > & {
+    enabled?: boolean;
+    /** Include answered in-progress (Calls page). */
+    includeAnswered?: boolean;
+    /** Scope to CRM or inbox WhatsApp number. */
+    callSource?: 'crm' | 'inbox';
+  }
 ) => {
   const {
     refetchInterval = 2_000,
     enabled = true,
     includeAnswered = false,
+    callSource,
     ...rest
   } = options || {};
+  const sourceOpts = callSource ? { call_source: callSource } : undefined;
   return useQuery<
     { results: WhatsAppCallRecord[] },
     Error,
     WhatsAppCallRecord[]
   >({
     queryKey: includeAnswered
-      ? ([...queryKeys.whatsappCallsLive, 'withAnswered'] as const)
-      : queryKeys.whatsappCallsLive,
-    queryFn: includeAnswered ? getWhatsAppCallsLiveAPI : getWhatsAppCallsPendingAPI,
+      ? ([...queryKeys.whatsappCallsLive, 'withAnswered', callSource ?? 'all'] as const)
+      : ([...queryKeys.whatsappCallsLive, callSource ?? 'all'] as const),
+    queryFn: () =>
+      includeAnswered
+        ? getWhatsAppCallsLiveAPI(sourceOpts)
+        : getWhatsAppCallsPendingAPI(sourceOpts),
     staleTime: 1_000,
     refetchOnWindowFocus: true,
     refetchInterval,

@@ -1,7 +1,6 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Button, Card, PageWrapper } from '../../components/index';
-import { FileTextIcon } from '../../components/icons';
 import { IntegrationPlatformIcon } from '../../components/integrations/IntegrationPlatformIcon';
 import { StatusBadge, normalizeConnectionStatus } from '../../components/integrations/kit';
 import { useAppContext } from '../../context/AppContext';
@@ -40,11 +39,7 @@ export const IntegrationsHubPage = () => {
                       <div className="flex items-start justify-between gap-3">
                         {item.platform ? (
                           <IntegrationPlatformIcon platform={item.platform} size="md" />
-                        ) : (
-                          <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/25">
-                            <FileTextIcon className="h-6 w-6 text-primary-700 dark:text-primary-200" />
-                          </span>
-                        )}
+                        ) : null}
                         <StatusBadge status={status} />
                       </div>
                       <div className="min-w-0">

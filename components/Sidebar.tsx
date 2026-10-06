@@ -7,36 +7,17 @@ import { navigateToCompanyRoute, getCompanyRoute } from '../utils/routing';
 // FIX: Import translations to be used for type casting.
 import { SIDEBAR_ITEMS, SETTINGS_ITEM, translations } from '../constants';
 import { Page as PageType } from '../types';
-import { ChevronDownIcon, CodeBracketsIcon, TikTokIcon, XIcon } from './icons';
+import { ChevronDownIcon, XIcon } from './icons';
+import {
+    IntegrationPlatformIcon,
+    integrationPlatformFromPage,
+} from './integrations/IntegrationPlatformIcon';
 import { integrationByPage } from '../pages/integrations/registry';
 import { normalizeRole } from '../utils/roles';
 import { blockedPolicyForPage } from '../utils/integrationPolicyGate';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { useSyncDigest } from '../hooks/useQueries';
 import { useWhatsAppChatsAllowed } from '../hooks/useWhatsAppChatsAllowed';
-
-type IntegrationLogoConfig = {
-    /** Brand image under /public. Mutually exclusive with `Icon`. */
-    src?: string;
-    /** Stroke SVG for non-brand items (e.g. Custom Lead API). */
-    Icon?: React.FC<React.SVGProps<SVGSVGElement>>;
-    /** Black monochrome marks — invert in dark mode so they stay visible. */
-    mono?: boolean;
-    /** Optical zoom for assets with excess inner padding (TikTok, Mujeb). */
-    scale?: string;
-};
-
-/** Brand image logos / icons for Integrations sidebar sub-items. */
-const INTEGRATION_SUB_LOGOS: Partial<Record<PageType, IntegrationLogoConfig>> = {
-    Meta: { src: '/meta_logo_icon.png' },
-    TikTok: { Icon: TikTokIcon },
-    WhatsApp: { src: '/whatsapp_logo_icon.webp' },
-    Twilio: { src: '/sms_logo_icon.png', mono: true },
-    AI: { src: '/chatgpt_logo_icon.png', mono: true },
-    'Lead API': { Icon: CodeBracketsIcon },
-    Mujeb: { src: '/mujeb_logo_icon.png', scale: 'scale-150' },
-    PBX: { src: '/zycoo_logo_icon.webp' },
-};
 
 const IntegrationSubItemIcon = ({
     page,
@@ -45,33 +26,18 @@ const IntegrationSubItemIcon = ({
     page: PageType;
     iconMargin: string;
 }) => {
-    const logo = INTEGRATION_SUB_LOGOS[page];
-    if (!logo) {
+    const platform = integrationPlatformFromPage(page);
+    if (!platform) {
         // Reserve space so labels without logos stay aligned with icon rows.
         return <span className={`inline-block w-5 h-5 shrink-0 ${iconMargin}`} aria-hidden />;
     }
-    const slotClass = `inline-flex items-center justify-center shrink-0 w-5 h-5 overflow-hidden ${iconMargin}`;
-    if (logo.Icon) {
-        const SvgIcon = logo.Icon;
-        return (
-            <span className={slotClass} aria-hidden>
-                <SvgIcon className="w-5 h-5" />
-            </span>
-        );
-    }
-    if (!logo.src) {
-        return <span className={`inline-block w-5 h-5 shrink-0 ${iconMargin}`} aria-hidden />;
-    }
     return (
-        <span className={slotClass} aria-hidden>
-            <img
-                src={logo.src}
-                alt=""
-                className={`max-w-full max-h-full object-contain ${logo.scale ?? ''} ${
-                    logo.mono ? 'dark:invert' : ''
-                }`}
-            />
-        </span>
+        <IntegrationPlatformIcon
+            platform={platform}
+            size="xs"
+            variant="inline"
+            className={`shrink-0 ${iconMargin}`}
+        />
     );
 };
 

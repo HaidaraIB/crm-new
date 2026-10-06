@@ -30,6 +30,7 @@ export const LeadApiIntegrationPage = () => {
     <IntegrationPageLayout
       title={t('leadApiTitle')}
       subtitle={t('leadApiDescription')}
+      platform="lead_api"
       helpVideoPageKey={entry.helpVideoPageKey}
       status={status}
       statusLabel={status === 'connected' ? t('leadApiStatusConnected') : status === 'disabled' ? undefined : t('leadApiStatusPending')}

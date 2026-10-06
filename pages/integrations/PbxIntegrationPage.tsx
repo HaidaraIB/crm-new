@@ -16,6 +16,7 @@ export const PbxIntegrationPage = () => {
     <IntegrationPageLayout
       title={t('pbxIntegrationTitle')}
       subtitle={t('integrationHubPbxDesc')}
+      platform="pbx"
       helpVideoPageKey={entry.helpVideoPageKey}
       policy={policy.disabled ? { message: policy.entry?.message, scope: policy.entry?.scope } : null}
       policyDisabled={policy.disabled}

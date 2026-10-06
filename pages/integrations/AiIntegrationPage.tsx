@@ -127,6 +127,7 @@ export const AiIntegrationPage = () => {
     <IntegrationPageLayout
       title={t('aiIntegration')}
       subtitle={t('aiIntegrationDescription')}
+      platform="ai"
       helpVideoPageKey={entry.helpVideoPageKey}
       policy={policy.disabled ? { message: policy.entry?.message, scope: policy.entry?.scope } : null}
       policyDisabled={policy.disabled}

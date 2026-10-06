@@ -93,6 +93,7 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     category: 'ai',
     policyKeys: ['openai'],
     helpVideoPageKey: 'ai',
+    platform: 'ai',
     overviewKey: 'openai',
   },
   {
@@ -102,6 +103,7 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     category: 'developer',
     policyKeys: ['api'],
     helpVideoPageKey: 'lead_api',
+    platform: 'lead_api',
     overviewKey: 'api',
   },
   {
@@ -111,6 +113,7 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     category: 'leads',
     policyKeys: ['mujeb'],
     helpVideoPageKey: 'mujeb',
+    platform: 'mujeb',
     overviewKey: 'mujeb',
   },
   {
@@ -120,6 +123,7 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     category: 'communication',
     policyKeys: ['pbx'],
     helpVideoPageKey: 'pbx',
+    platform: 'pbx',
     overviewKey: 'pbx',
   },
 ];

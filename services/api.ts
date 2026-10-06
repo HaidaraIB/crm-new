@@ -4330,11 +4330,17 @@ export type SocialChannel = 'instagram' | 'messenger' | 'whatsapp';
 
 export interface SocialContactPayload {
   id: number;
+  channel?: SocialChannel;
   external_id: string;
   name: string;
   username: string;
   display_name: string;
+  /** Stable mirrored avatar URL (preferred). */
+  avatar_url?: string;
+  /** Legacy alias of avatar_url. */
   profile_pic_url: string;
+  name_manually_set?: boolean;
+  profile_fetch_status?: string;
 }
 
 export interface SocialConversationPayload {
@@ -4569,6 +4575,17 @@ export const markSocialConversationReadAPI = async (
   return apiRequest(INBOX_CONVERSATIONS_PATH + 'mark-read/', {
     method: 'POST',
     body: JSON.stringify({ conversation: conversationId }),
+  });
+};
+
+/** PATCH /api/integrations/inbox/contacts/<id>/ — sets name_manually_set. */
+export const updateSocialContactAPI = async (
+  contactId: number,
+  name: string
+): Promise<{ contact: SocialContactPayload }> => {
+  return apiRequest(`/integrations/inbox/contacts/${contactId}/`, {
+    method: 'PATCH',
+    body: JSON.stringify({ name }),
   });
 };
 
@@ -4918,6 +4935,8 @@ export const getWhatsAppCallsAPI = async (params?: {
   client?: number;
   conversation?: number;
   agent?: number;
+  /** Filter to CRM WhatsApp number or inbox WhatsApp number. */
+  call_source?: 'crm' | 'inbox';
   ordering?: string;
   limit?: number;
   offset?: number;
@@ -4935,6 +4954,7 @@ export const getWhatsAppCallsAPI = async (params?: {
   if (params?.client != null) q.set('client', String(params.client));
   if (params?.conversation != null) q.set('conversation', String(params.conversation));
   if (params?.agent != null) q.set('agent', String(params.agent));
+  if (params?.call_source) q.set('call_source', params.call_source);
   if (params?.ordering) q.set('ordering', params.ordering);
   if (params?.limit != null) q.set('limit', String(params.limit));
   if (params?.offset != null) q.set('offset', String(params.offset));
@@ -4942,17 +4962,27 @@ export const getWhatsAppCallsAPI = async (params?: {
   return conditionalGet(`/integrations/whatsapp/calls/${qs ? `?${qs}` : ''}`);
 };
 
-export const getWhatsAppCallsPendingAPI = async (): Promise<{
+export const getWhatsAppCallsPendingAPI = async (opts?: {
+  call_source?: 'crm' | 'inbox';
+}): Promise<{
   results: WhatsAppCallRecord[];
 }> => {
-  return conditionalGet('/integrations/whatsapp/calls/pending/');
+  const q = new URLSearchParams();
+  if (opts?.call_source) q.set('call_source', opts.call_source);
+  const qs = q.toString();
+  return conditionalGet(`/integrations/whatsapp/calls/pending/${qs ? `?${qs}` : ''}`);
 };
 
-export const getWhatsAppCallsLiveAPI = async (): Promise<{
+export const getWhatsAppCallsLiveAPI = async (opts?: {
+  call_source?: 'crm' | 'inbox';
+}): Promise<{
   results: WhatsAppCallRecord[];
   count?: number;
 }> => {
-  return conditionalGet('/integrations/whatsapp/calls/live/');
+  const q = new URLSearchParams();
+  if (opts?.call_source) q.set('call_source', opts.call_source);
+  const qs = q.toString();
+  return conditionalGet(`/integrations/whatsapp/calls/live/${qs ? `?${qs}` : ''}`);
 };
 
 export const getWhatsAppCallDetailAPI = async (id: number): Promise<WhatsAppCallRecord> => {
@@ -5803,6 +5833,8 @@ export type CallErrorLogFilters = {
   page?: number;
   page_size?: number;
   source?: 'all' | 'initiate' | 'permission_request' | 'accept' | 'mic' | 'webhook' | 'out_of_hours' | 'webrtc';
+  /** Filter by CRM vs inbox WhatsApp number. */
+  call_source?: 'crm' | 'inbox';
   search?: string;
   error_code?: string;
   date_from?: string;
@@ -5827,6 +5859,7 @@ export const getWhatsAppCallErrorLogsAPI = async (
   if (filters?.page) params.append('page', String(filters.page));
   if (filters?.page_size) params.append('page_size', String(filters.page_size));
   if (filters?.source && filters.source !== 'all') params.append('source', filters.source);
+  if (filters?.call_source) params.append('call_source', filters.call_source);
   if (filters?.search) params.append('search', filters.search);
   if (filters?.error_code) params.append('error_code', filters.error_code);
   if (filters?.date_from) params.append('date_from', filters.date_from);

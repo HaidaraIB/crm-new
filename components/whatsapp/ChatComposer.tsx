@@ -6,6 +6,7 @@ import { useChatVoiceRecorder } from '../../hooks/useChatVoiceRecorder';
 import { useAppContext } from '../../context/AppContext';
 import { translations } from '../../constants';
 import { AttachmentSourceModal } from '../modals/AttachmentSourceModal';
+import { ChatComposerAlerts } from '../chat/ChatComposerAlerts';
 import { QuickReplyInsert } from '../chat/QuickRepliesPanel';
 import { ChatTemplatePicker } from '../chat/ChatTemplatePicker';
 import { Button } from '../Button';

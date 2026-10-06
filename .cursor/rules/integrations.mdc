@@ -11,6 +11,7 @@ One registry entry and one page file per integration. Do not add another branch 
 - Registry: `pages/integrations/registry.ts` (page, copy keys, category, policy keys, tabs). The hub, sidebar labels, and help-video keys read it.
 - Page chrome: `IntegrationPageLayout` (title, status, policy banner, tabs). The connect action lives in the tab body, not the page header.
 - A connected account is a `ConnectionCard`. Connect, Test, Health, Edit, refresh, and Disconnect are visible buttons on the row. Disconnect always confirms. Do not hide those actions behind a more menu.
+- WhatsApp CRM and Inbox tabs use the same `WhatsAppPurposeSection` / `WhatsAppConnectionPanel`. Only hint copy, number label, and OAuth platform (`whatsapp` vs `whatsapp_inbox`) differ.
 - Nested rows (a Meta page, a WhatsApp number) use `ConnectionSubItem`.
 - Status text goes through `StatusBadge` / `normalizeConnectionStatus`.
 - Policy-off state is `PolicyBanner` plus disabled mutating actions, including on the inactive tab's policy key.

@@ -1426,6 +1426,8 @@ export const translations = {
     social_phone_required: "A phone number is required to convert this conversation.",
     social_phone_invalid: "Enter a valid phone number.",
     whatsappInboxTab: "Inbox number",
+    whatsappCrmIntegrationHint:
+      "Connect the WhatsApp Business number used for Chats and Calls. It must be different from your Inbox WhatsApp number.",
     whatsappInboxIntegrationHint:
       "Connect a WhatsApp number used only in the Omni-Channel Inbox. It must be different from your CRM WhatsApp number.",
     whatsappInboxConnectPrompt: "Connect a dedicated WhatsApp number for inbox conversations.",
@@ -4576,6 +4578,8 @@ export const translations = {
     social_phone_required: "رقم الهاتف مطلوب لتحويل هذه المحادثة.",
     social_phone_invalid: "أدخل رقم هاتف صالحاً.",
     whatsappInboxTab: "رقم صندوق الوارد",
+    whatsappCrmIntegrationHint:
+      "اربط رقم واتساب للأعمال المستخدم للمحادثات والمكالمات. يجب أن يختلف عن رقم واتساب صندوق الوارد.",
     whatsappInboxIntegrationHint:
       "اربط رقم واتساب يُستخدم فقط في صندوق الوارد الموحّد. يجب أن يختلف عن رقم واتساب CRM.",
     whatsappInboxConnectPrompt: "اربط رقم واتساب مخصّصاً لمحادثات صندوق الوارد.",

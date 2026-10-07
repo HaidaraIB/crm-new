@@ -5,7 +5,6 @@
  */
 
 import { localizeWhatsAppMessageBodyForLang } from './whatsappMessageBodyDisplay';
-import { isolatePhoneBidi } from '../components/PhoneText';
 
 export type NotificationLang = 'ar' | 'en';
 
@@ -351,16 +350,6 @@ export function getNotificationDisplay(
     bodyTpl = tpl.body_with_campaign;
   }
   const body = formatTemplate(bodyTpl, data);
-
-    const phone = str(data.phone).trim();
-    const isolatedPhone = phone ? isolatePhoneBidi(phone) : '';
-    const clientName = str(data.client_name || data.lead_name).trim();
-    const title = clientName || isolatedPhone || tpl.title;
-    const localizedBody = phone
-      ? formatTemplate(tpl.body, { ...data, phone: isolatedPhone })
-      : tpl.title;
-    return { title, body: localizedBody, typeLabel: tpl.title };
-  }
 
   return {
     title: tpl.title,

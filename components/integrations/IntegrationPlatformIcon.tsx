@@ -13,7 +13,6 @@ export type IntegrationPlatform =
     | 'sms'
     | 'ai'
     | 'mujeb'
-    | 'pbx'
     | 'lead_api';
 
 type BrandLogo = {
@@ -32,7 +31,6 @@ const PLATFORM_LOGOS: Partial<Record<IntegrationPlatform, BrandLogo>> = {
     sms: { src: '/sms_logo_icon.png', mono: true },
     ai: { src: '/chatgpt_logo_icon.png', mono: true },
     mujeb: { src: '/mujeb_logo_icon.png', scale: 'scale-150' },
-    pbx: { src: '/zycoo_logo_icon.webp' },
 };
 
 const PLATFORM_ICONS: Partial<Record<IntegrationPlatform, React.FC<React.SVGProps<SVGSVGElement>>>> = {
@@ -67,7 +65,6 @@ const PAGE_TO_PLATFORM: Partial<Record<Page, IntegrationPlatform>> = {
     AI: 'ai',
     'Lead API': 'lead_api',
     Mujeb: 'mujeb',
-    PBX: 'pbx',
 };
 
 export const integrationPlatformFromPage = (page: Page): IntegrationPlatform | null =>

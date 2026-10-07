@@ -8,12 +8,11 @@ import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useLeadSocialMessages, useChannels, useTags } from '../hooks/useQueries';
 import { useQuery } from '@tanstack/react-query';
-import { getConnectedAccountAPI, pbxDialAPI, getPbxDialStatusAPI } from '../services/api';
-import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
+import { getConnectedAccountAPI } from '../services/api';
+import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
 import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
-import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
 import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
@@ -155,7 +154,6 @@ export const ViewLeadPage = () => {
     const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered, goBackFromLead } = useAppContext();
     const isMedicalCompany = isMedicalSpecialization(currentUser?.company?.specialization);
     
-    const canPbxDial = usePbxDialEnabled();
     const whatsappCalling = useWhatsAppCallingOptional();
     const openWhatsApp = useWhatsAppLeadAction();
     const deleteLeadMutation = useDeleteLead();
@@ -422,25 +420,6 @@ export const ViewLeadPage = () => {
         setIsConfirmDeleteModalOpen(true);
     };
 
-    const formatPbxCallSummary = (cc: Record<string, unknown>): string => {
-        const parts: string[] = [];
-        const direction = (cc.pbx_direction ?? cc.pbxDirection) as string | undefined;
-        if (direction === 'inbound') parts.push(t('inbound'));
-        else if (direction === 'outbound') parts.push(t('outbound'));
-        else if (direction === 'internal') parts.push(t('internal'));
-
-        const disposition = (cc.pbx_disposition ?? cc.pbxDisposition) as string | undefined;
-        if (disposition === 'answered') parts.push(t('answered'));
-        else if (disposition === 'no_answer') parts.push(t('missed'));
-        else if (disposition === 'busy') parts.push(t('busy'));
-        else if (disposition === 'failed') parts.push(t('callFailed'));
-
-        const duration = (cc.pbx_duration_sec ?? cc.pbxDurationSec) as number | undefined;
-        if (duration) parts.push(`${duration}s`);
-
-        const legacyNotes = (cc.notes as string) || '';
-        return parts.length ? parts.join(' Â· ') : legacyNotes;
-    };
 
     const formatWhatsAppCallSummary = (cc: Record<string, unknown>): string => {
         const parts: string[] = [t('whatsappCallMade')];
@@ -460,45 +439,7 @@ export const ViewLeadPage = () => {
         return parts.join(' Â· ');
     };
 
-    const pollPbxDialStatus = async (commandId: number) => {
-        for (let attempt = 0; attempt < 15; attempt += 1) {
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            try {
-                const status = await getPbxDialStatusAPI(commandId);
-                if (status.status === 'completed') {
-                    setSuccessMessage(t('pbxDialCompleted'));
-                    setIsSuccessModalOpen(true);
-                    return;
-                }
-                if (status.status === 'failed') {
-                    setAlertMessage(
-                        localizePbxResultMessage(status.result_message, t) || t('pbxDialFailed')
-                    );
-                    setAlertVariant('error');
-                    setIsAlertModalOpen(true);
-                    return;
-                }
-            } catch {
-                // keep polling until timeout
-            }
-        }
-    };
 
-    const handlePbxDial = async (phone: string) => {
-        if (!displayLead?.id) return;
-        try {
-            const result = await pbxDialAPI({ client: displayLead.id, phone_number: phone });
-            setSuccessMessage(t('pbxDialQueued'));
-            setIsSuccessModalOpen(true);
-            if (result?.id) {
-                void pollPbxDialStatus(result.id);
-            }
-        } catch (e: any) {
-            setAlertMessage(getLocalizedApiErrorMessage(e, t, 'pbxDialFailed'));
-            setAlertVariant('error');
-            setIsAlertModalOpen(true);
-        }
-    };
 
     const integrationAccountId = displayLead?.integration_account ?? (displayLead as any)?.integrationAccount ?? null;
     const isMetaLead = (displayLead?.source || (displayLead as any)?.source) === 'meta_lead_form';
@@ -629,44 +570,33 @@ export const ViewLeadPage = () => {
 
             const callDateTimeFormatted = formatDetailDateTime(callDate);
             const followUpDateFormatted = formatDetailDateTime(cc.follow_up_date);
-            const isPbxCall = cc.source === 'pbx';
             const isWhatsAppCall = cc.source === 'whatsapp';
             const recordingUrl = isWhatsAppCall
                 ? ((cc.whatsapp_recording_url ?? cc.whatsappRecordingUrl) as string | undefined)
-                : isPbxCall
-                  ? ((cc.pbx_recording_url ?? cc.pbxRecordingUrl) as string | undefined)
-                  : undefined;
+                : undefined;
             const recordingStatus = isWhatsAppCall
                 ? ((cc.whatsapp_recording_status ?? cc.whatsappRecordingStatus) as string | undefined)
-                : isPbxCall
-                  ? ((cc.pbx_recording_status ?? cc.pbxRecordingStatus) as string | undefined)
-                  : undefined;
+                : undefined;
 
             return {
                 id: `call-${cc.id}`,
                 type: 'call',
                 user: user?.name || cc.created_by_username || t('unknown'),
                 avatar: user?.avatar || '',
-                action: isPbxCall
-                    ? formatPbxCallSummary(cc)
-                    : isWhatsAppCall
-                      ? formatWhatsAppCallSummary(cc)
-                      : t('callMade'),
-                details: isPbxCall
-                    ? ''
-                    : isWhatsAppCall
-                      ? ((cc.notes as string) || '').includes('\n')
-                          ? ((cc.notes as string).split('\n').slice(1).join('\n') || '')
-                          : ''
-                      : (cc.notes || ''),
+                action: isWhatsAppCall
+                    ? formatWhatsAppCallSummary(cc)
+                    : t('callMade'),
+                details: isWhatsAppCall
+                    ? ((cc.notes as string) || '').includes('\n')
+                        ? ((cc.notes as string).split('\n').slice(1).join('\n') || '')
+                        : ''
+                    : (cc.notes || ''),
                 date: formatTimelineDate(callDate, lang),
                 timestamp: timestamp,
-                stage: isPbxCall
-                    ? t('pbxCallSource')
-                    : isWhatsAppCall
-                      ? t('whatsappCallSource')
-                      : callMethodName,
-                color: isPbxCall ? '#4f46e5' : isWhatsAppCall ? '#16a34a' : callMethod?.color,
+                stage: isWhatsAppCall
+                    ? t('whatsappCallSource')
+                    : callMethodName,
+                color: isWhatsAppCall ? '#16a34a' : callMethod?.color,
                 callDatetime: callDateTimeFormatted,
                 followUpDate: followUpDateFormatted,
                 recordingUrl: recordingUrl || undefined,
@@ -1138,10 +1068,8 @@ export const ViewLeadPage = () => {
                                     variant="details"
                                     phoneNumbers={displayLead.phoneNumbers}
                                     fallbackPhone={displayLead.phone}
-                                    pbxEnabled={canPbxDial}
                                     onSms={(phone) => setSendSMSModal({ phone })}
                                     onWhatsApp={(phone) => openWhatsApp(displayLead, phone)}
-                                    onPbxDial={handlePbxDial}
                                     t={(key: string) => t(key as Parameters<typeof t>[0])}
                                 />
                                 {whatsappCalling ? (

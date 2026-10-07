@@ -19,7 +19,7 @@ import {
 
 /**
  * Global "customer arrived" alert for whoever the arrival was routed to.
- * Mirrors PbxScreenPopListener's mounting pattern (one global listener in TheApp),
+ * Mirrors other global alert listeners in TheApp,
  * but is driven by /lead-arrivals/pending/ instead of the notification inbox.
  *
  * Presented as a centered, ringing call-style dialog (same shape as an incoming

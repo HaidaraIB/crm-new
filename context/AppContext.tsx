@@ -1448,7 +1448,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'AI':
       case 'Lead API':
       case 'Mujeb':
-      case 'PBX':
       case 'Billing':
       case 'Change Plan':
       case 'Payment':

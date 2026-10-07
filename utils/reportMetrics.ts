@@ -229,7 +229,6 @@ export function isConvertedLead(lead: any, statuses: StatusConfig[] = []): boole
 }
 
 export function classifyCall(call: any): 'answered' | 'missed' | 'unknown' {
-  const disposition = String(call?.pbx_disposition ?? call?.pbxDisposition ?? '').toLowerCase();
   if (disposition === 'answered') return 'answered';
   if (disposition === 'no_answer' || disposition === 'busy' || disposition === 'missed') return 'missed';
 

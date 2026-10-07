@@ -10,11 +10,6 @@ const API_ERROR_CODE_TO_KEY: Partial<Record<string, TranslationKey>> = {
   employee_weekly_day_off: 'errorEmployeeWeeklyDayOff',
   duplicate_lead_phone: 'duplicate_lead_phone',
   cannot_delete_clients: 'cannot_delete_clients',
-  no_extension: 'errorPbxNoExtension',
-  pbx_not_enabled: 'errorPbxNotEnabled',
-  pbx_no_phone: 'errorPbxNoPhoneNumber',
-  pbx_lead_not_in_company: 'errorPbxLeadNotInCompany',
-  pbx_user_not_in_company: 'errorPbxUserNotInCompany',
   whatsapp_voice_note_requires_ogg: 'whatsapp_voice_note_requires_ogg',
 };
 
@@ -23,16 +18,6 @@ const API_ERROR_MESSAGE_TO_KEY: Partial<Record<string, TranslationKey>> = {
   'A lead with this phone number already exists in your company': 'duplicate_lead_phone',
   'You do not have permission to delete customers.': 'cannot_delete_clients',
   'You do not have permission to delete customers': 'cannot_delete_clients',
-  'No PBX extension mapped for your user.': 'errorPbxNoExtension',
-  'No PBX extension mapped for your user': 'errorPbxNoExtension',
-  'PBX integration is not enabled.': 'errorPbxNotEnabled',
-  'PBX integration is not enabled': 'errorPbxNotEnabled',
-  'No phone number available.': 'errorPbxNoPhoneNumber',
-  'No phone number available': 'errorPbxNoPhoneNumber',
-  'Lead not in your company.': 'errorPbxLeadNotInCompany',
-  'Lead not in your company': 'errorPbxLeadNotInCompany',
-  'User must belong to your company.': 'errorPbxUserNotInCompany',
-  'User must belong to your company': 'errorPbxUserNotInCompany',
   'Voice notes require OGG/Opus. Install ffmpeg on the server or record in a browser that supports audio/ogg.':
     'whatsapp_voice_note_requires_ogg',
   'Voice notes require OGG/Opus. Install ffmpeg on the server or record in a browser that supports audio/ogg':
@@ -119,39 +104,4 @@ export function getLocalizedApiErrorMessage(
   }
 
   return t(fallbackKey);
-}
-
-/** Localize connector/AMI result text stored on completed dial commands. */
-export function localizePbxResultMessage(
-  message: string | null | undefined,
-  t: (key: TranslationKey) => string
-): string | undefined {
-  if (!message) return undefined;
-
-  const normalized = normalizeApiMessage(message);
-  const localized = translateKnownMessage(normalized, t);
-  if (localized) return localized;
-
-  const lower = normalized.toLowerCase();
-  if (lower.includes('ami login failed')) {
-    return t('errorPbxAmiLoginFailed');
-  }
-  if (lower.includes('connection refused') || lower.includes('timed out') || lower.includes('timeout')) {
-    return t('errorPbxConnectionRefused');
-  }
-  if (lower.includes('extension does not exist')) {
-    return t('errorPbxExtensionNotExist');
-  }
-  if (
-    lower.includes('not registered') ||
-    lower.includes('no registered') ||
-    lower.includes('unavailable') && lower.includes('endpoint')
-  ) {
-    return t('errorPbxExtensionNotRegistered');
-  }
-  if (lower.includes('ami originate failed')) {
-    return t('errorPbxOriginateFailed');
-  }
-
-  return undefined;
 }

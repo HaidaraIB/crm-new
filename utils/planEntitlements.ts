@@ -25,7 +25,6 @@ const FEATURE_KEY_ORDER = [
     'integration_openai',
     'integration_api',
     'integration_mujeb',
-    'integration_pbx',
 ] as const;
 
 /** Monthly usage keys — display order */
@@ -56,7 +55,6 @@ const LABELS: Record<string, { ar: string; en: string }> = {
     integration_openai: { ar: 'الذكاء الاصطناعي (OpenAI)', en: 'OpenAI (ChatGPT)' },
     integration_api: { ar: 'واجهة الليدز المخصصة', en: 'Custom Lead API' },
     integration_mujeb: { ar: 'مجيب', en: 'Mujeb' },
-    integration_pbx: { ar: 'بدّالة / ZYCOO', en: 'PBX / ZYCOO' },
     max_deals: { ar: 'الصفقات', en: 'Deals' },
     max_tasks: { ar: 'المهام', en: 'Tasks' },
     max_integration_accounts: { ar: 'التكاملات', en: 'Integrations' },

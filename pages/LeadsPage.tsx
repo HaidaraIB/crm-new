@@ -11,10 +11,9 @@ import { StatusChangeReasonModal } from '../components/modals/StatusChangeReason
 import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
 import { Lead, LeadApiFilters, Status, User } from '../types';
 import { useLeads, useLeadStatusCounts, useDeleteLead, useBulkDeleteLeads, usePatchLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
-import { pbxDialAPI, getPbxDialStatusAPI, getLeadsAPI } from '../services/api';
-import { usePbxDialEnabled } from '../hooks/usePbxDialEnabled';
+import { getLeadsAPI } from '../services/api';
 import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
-import { getLocalizedApiErrorMessage, localizePbxResultMessage } from '../utils/apiErrorMessage';
+import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
 import { exportToExcel } from '../utils/exportToExcel';
 import { normalizeLead } from '../utils/normalizeLead';
 import { resolvePrimaryPhone } from '../utils/resolvePrimaryPhone';
@@ -76,7 +75,6 @@ export const LeadsPage = () => {
         setAlertVariant,
         setIsAlertModalOpen,
     } = useAppContext();
-    const canPbxDial = usePbxDialEnabled();
     const openWhatsApp = useWhatsAppLeadAction();
     const isDataEntryUser = normalizeRole(currentUser?.role) === 'DataEntry';
     const isMedicalCompany = useMemo(
@@ -316,44 +314,7 @@ export const LeadsPage = () => {
     // Send SMS modal: { leadId, phone, lead? }
     const [sendSMSModal, setSendSMSModal] = useState<{ leadId: number; phone: string; lead?: any } | null>(null);
 
-    const pollPbxDialStatus = async (commandId: number) => {
-        for (let i = 0; i < 40; i += 1) {
-            await new Promise((r) => setTimeout(r, 1500));
-            try {
-                const status = await getPbxDialStatusAPI(commandId);
-                if (status.status === 'completed') {
-                    setSuccessMessage(t('pbxDialCompleted'));
-                    setIsSuccessModalOpen(true);
-                    return;
-                }
-                if (status.status === 'failed') {
-                    setAlertVariant('error');
-                    setAlertMessage(
-                        localizePbxResultMessage(status.result_message, t) || t('pbxDialFailed')
-                    );
-                    setIsAlertModalOpen(true);
-                    return;
-                }
-            } catch {
-                /* keep polling */
-            }
-        }
-    };
 
-    const handlePbxDial = async (leadId: number, phone: string) => {
-        try {
-            const result = await pbxDialAPI({ client: leadId, phone_number: phone });
-            setSuccessMessage(t('pbxDialQueued'));
-            setIsSuccessModalOpen(true);
-            if (result?.id) {
-                void pollPbxDialStatus(result.id);
-            }
-        } catch (e: any) {
-            setAlertVariant('error');
-            setAlertMessage(getLocalizedApiErrorMessage(e, t, 'pbxDialFailed'));
-            setIsAlertModalOpen(true);
-        }
-    };
 
     const [leadSearchDraft, setLeadSearchDraft] = useState(leadFilters.search);
 
@@ -960,10 +921,8 @@ export const LeadsPage = () => {
                                                             variant="table"
                                                             phoneNumbers={lead.phoneNumbers}
                                                             fallbackPhone={lead.phone}
-                                                            pbxEnabled={canPbxDial}
                                                             onSms={(phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
                                                             onWhatsApp={(phone) => openWhatsApp(lead, phone)}
-                                                            onPbxDial={(phone) => handlePbxDial(lead.id, phone)}
                                                             t={(key: string) => t(key as Parameters<typeof t>[0])}
                                                         />
                                                     </div>

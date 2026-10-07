@@ -129,7 +129,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
     const leadId = payloadId(n.data?.lead_id ?? n.data?.client_id);
     const type = n.type;
 
-    if ((type === 'pbx_incoming_call' || type === 'pbx_call_missed') && leadId) {
+    if (false && leadId) {
       openLead(leadId);
       return;
     }
@@ -206,7 +206,6 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
   const items = rawItems.filter((n) => !isTenantChatEcho(n));
   const unreadInList = items.filter((n) => !n.read).length;
   const callAlertsInList = items.filter(
-    (n) => n.type === 'pbx_incoming_call' || n.type === 'pbx_call_missed',
   ).length;
   const actionsBusy =
     markOne.isPending ||
@@ -236,8 +235,7 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
       confirmButtonVariant: 'danger',
       showWarning: false,
       onConfirm: async () => {
-        await deleteAll.mutateAsync({ type: ['pbx_incoming_call', 'pbx_call_missed'] });
-      },
+              },
     });
     setIsConfirmDeleteModalOpen(true);
   };
@@ -343,14 +341,12 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                         <span
                           className="block text-sm font-semibold text-gray-900 dark:text-white"
                           dir={
-                            n.type === 'pbx_incoming_call' ||
-                            n.type === 'pbx_call_missed'
+                            false
                               ? 'ltr'
                               : undefined
                           }
                         >
-                          {(n.type === 'pbx_incoming_call' ||
-                            n.type === 'pbx_call_missed') &&
+                          {false &&
                           isPhoneLike(display.title) ? (
                             <PhoneText>{display.title}</PhoneText>
                           ) : (

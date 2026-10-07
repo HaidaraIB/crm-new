@@ -15,7 +15,7 @@ export type Page =
   | 'Chats'
   | 'Calls'
   | 'Teams Report' | 'Employees Report' | 'Marketing Report'
-  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'Mujeb' | 'PBX'
+  | 'Meta' | 'TikTok' | 'WhatsApp' | 'Twilio' | 'AI' | 'Lead API' | 'Mujeb'
   | 'Call Reports'
   | 'Change Plan' | 'Payment' | 'Subscription' | 'PaymentSuccess'
   | 'Support Center'
@@ -325,7 +325,7 @@ export interface TimelineEntry {
   callDatetime?: string; // Optional: formatted call datetime for calls
   followUpDate?: string; // Optional: formatted follow-up date for calls
   locationPhotoUrl?: string; // Optional: client location photo for field visits
-  recordingUrl?: string; // Optional: PBX / WhatsApp call recording playback URL
+  recordingUrl?: string; // Optional: WhatsApp call recording playback URL
   recordingStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'skipped' | string;
   /** Direction for individual WhatsApp / social timeline rows (before thread collapse). */
   direction?: 'inbound' | 'outbound';

@@ -129,11 +129,9 @@ const TEMPLATES: Record<string, Record<NotificationLang, Template>> = {
     ar: { title: 'تذكير مكالمة', body: 'تبقى {minutes_remaining} دقيقة على موعد مكالمة المتابعة مع {lead_name}' },
     en: { title: 'Call Reminder', body: '{minutes_remaining} minutes remaining for follow-up call with {lead_name}' },
   },
-  pbx_incoming_call: {
     ar: { title: 'مكالمة واردة', body: 'مكالمة واردة من {phone}' },
     en: { title: 'Incoming Call', body: 'Incoming call from {phone}' },
   },
-  pbx_call_missed: {
     ar: { title: 'مكالمة فائتة', body: 'مكالمة فائتة من {phone}' },
     en: { title: 'Missed Call', body: 'Missed call from {phone}' },
   },
@@ -360,8 +358,6 @@ export function getNotificationDisplay(
   }
   const body = formatTemplate(bodyTpl, data);
 
-  // PBX: prefer caller phone as title when no matched lead name.
-  if (type === 'pbx_incoming_call' || type === 'pbx_call_missed') {
     const phone = str(data.phone).trim();
     const isolatedPhone = phone ? isolatePhoneBidi(phone) : '';
     const clientName = str(data.client_name || data.lead_name).trim();

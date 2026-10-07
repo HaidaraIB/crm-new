@@ -7,7 +7,7 @@
  *
  * The `invalidate` vocabulary is the backend's, already used by the mobile app's
  * SyncInvalidation bus (`whatsapp:conversations`, `tenant_chat:messages`,
- * `crm:leads`, `crm:deals`, `crm:arrivals`, `pbx:screen_pop`). Keeping one
+ * `crm:leads`, `crm:deals`, `crm:arrivals`). Keeping one
  * vocabulary across web, mobile and server is what stops a new push type needing
  * three separate mapping tables.
  */
@@ -26,7 +26,6 @@ const INVALIDATION_MAP: Record<string, QueryKey[]> = {
   'crm:leads': [['leads'], ['dashboardSummary']],
   'crm:deals': [['deals'], ['dashboardSummary']],
   'crm:arrivals': [['leadArrivals'], queryKeys.pendingLeadArrivals],
-  'pbx:screen_pop': [['notifications']],
   'support_chat:messages': [['support-chat-messages'], ['support-chat-conversation']],
 };
 

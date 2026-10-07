@@ -15,7 +15,6 @@ import {
 import {
   ClockIcon,
   MicrophoneIcon,
-  PbxDialIcon,
   SearchIcon,
   XIcon,
 } from '../components/icons';
@@ -864,7 +863,7 @@ export const CallsPage: React.FC = () => {
                           aria-hidden
                         >
                           {call.direction === 'outbound' ? (
-                            <PbxDialIcon className="size-[18px]" />
+                            <PhoneIcon className="size-[18px]" />
                           ) : (
                             <PhoneIcon className="size-[18px]" />
                           )}
@@ -967,7 +966,7 @@ export const CallsPage: React.FC = () => {
                     className={`mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl ${directionIconWrapClass(selected.direction)}`}
                   >
                     {selected.direction === 'outbound' ? (
-                      <PbxDialIcon className="size-5" />
+                      <PhoneIcon className="size-5" />
                     ) : (
                       <PhoneIcon className="size-5" />
                     )}

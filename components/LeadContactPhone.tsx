@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PhoneIcon, PbxDialIcon, SmsIcon, WhatsappIcon } from './icons';
+import { PhoneIcon, SmsIcon, WhatsappIcon } from './icons';
 import { MarqueeText } from './MarqueeText';
 import { PHONE_BIDI_CLASS } from './PhoneText';
 import type { PhoneNumber } from '../types';
@@ -17,13 +17,13 @@ const ACTION_CELL = 'inline-flex items-center justify-center';
 const ACTION_CELL_SIZE = 'h-7 w-7';
 const ACTION_CELL_SIZE_COMPACT = 'h-6 w-6';
 
-/** Fixed columns: phone (marquee) | type | primary | sms | wa | call | pbx */
+/** Fixed columns: phone (marquee) | type | primary | sms | wa | call */
 function phoneGridClass(variant: LeadContactPhoneVariant): string {
   const base = 'grid w-full min-w-0 items-center';
   if (variant === 'table') {
-    return `${base} grid-cols-[minmax(4.5rem,1fr)_2.25rem_2.5rem_repeat(4,1.25rem)] gap-x-px gap-y-0.5`;
+    return `${base} grid-cols-[minmax(4.5rem,1fr)_2.25rem_2.5rem_repeat(3,1.25rem)] gap-x-px gap-y-0.5`;
   }
-  return `${base} grid-cols-[minmax(6rem,1fr)_3rem_3.25rem_repeat(4,1.5rem)] gap-x-1 gap-y-1`;
+  return `${base} grid-cols-[minmax(6rem,1fr)_3rem_3.25rem_repeat(3,1.5rem)] gap-x-1 gap-y-1`;
 }
 
 function sanitizeTel(phone: string): string {
@@ -33,19 +33,15 @@ function sanitizeTel(phone: string): string {
 function PhoneActions({
   phone,
   phoneType,
-  pbxEnabled,
   onSms,
   onWhatsApp,
-  onPbxDial,
   compact,
   t,
 }: {
   phone: string;
   phoneType?: string;
-  pbxEnabled?: boolean;
   onSms?: () => void;
   onWhatsApp?: () => void;
-  onPbxDial?: () => void;
   compact?: boolean;
   t: (key: string) => string;
 }) {
@@ -99,21 +95,6 @@ function PhoneActions({
           <span className="sr-only">{callTitle}</span>
         </a>
       </span>
-      <span className={cellClass}>
-        {pbxEnabled && onPbxDial ? (
-          <button
-            type="button"
-            onClick={onPbxDial}
-            className={`${btnClass} text-violet-600 dark:text-violet-400`}
-            title={t('dialViaPbx')}
-          >
-            <PbxDialIcon className={iconClass} />
-            <span className="sr-only">{t('dialViaPbx')}</span>
-          </button>
-        ) : (
-          <span className={placeholderClass} aria-hidden />
-        )}
-      </span>
     </div>
   );
 }
@@ -123,10 +104,8 @@ export type LeadContactPhoneProps = {
   phoneType?: PhoneNumber['phone_type'] | string;
   isPrimary?: boolean;
   variant: LeadContactPhoneVariant;
-  pbxEnabled?: boolean;
   onSms?: () => void;
   onWhatsApp?: () => void;
-  onPbxDial?: () => void;
   t: (key: string) => string;
   className?: string;
 };
@@ -146,10 +125,8 @@ export function LeadContactPhone({
   phoneType,
   isPrimary,
   variant,
-  pbxEnabled,
   onSms,
   onWhatsApp,
-  onPbxDial,
   t,
   className = '',
 }: LeadContactPhoneProps) {
@@ -193,10 +170,8 @@ export function LeadContactPhone({
         <PhoneActions
           phone={phone}
           phoneType={phoneType}
-          pbxEnabled={pbxEnabled}
           onSms={onSms}
           onWhatsApp={onWhatsApp}
-          onPbxDial={onPbxDial}
           compact={compact}
           t={t}
         />
@@ -209,10 +184,8 @@ export type LeadContactPhoneListProps = {
   phoneNumbers?: PhoneNumber[];
   fallbackPhone?: string;
   variant: LeadContactPhoneVariant;
-  pbxEnabled?: boolean;
   onSms: (phone: string) => void;
   onWhatsApp: (phone: string) => void;
-  onPbxDial?: (phone: string) => void;
   t: (key: string) => string;
   className?: string;
   emptyLabel?: string;
@@ -222,10 +195,8 @@ export function LeadContactPhoneList({
   phoneNumbers,
   fallbackPhone,
   variant,
-  pbxEnabled,
   onSms,
   onWhatsApp,
-  onPbxDial,
   t,
   className = '',
   emptyLabel = '-',
@@ -250,10 +221,8 @@ export function LeadContactPhoneList({
             phoneType={pn.phone_type}
             isPrimary={pn.is_primary}
             variant={variant}
-            pbxEnabled={pbxEnabled}
             onSms={() => onSms(pn.phone_number)}
             onWhatsApp={() => onWhatsApp(pn.phone_number)}
-            onPbxDial={onPbxDial ? () => onPbxDial(pn.phone_number) : undefined}
             t={t}
           />
         </div>

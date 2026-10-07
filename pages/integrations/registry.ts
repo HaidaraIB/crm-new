@@ -116,16 +116,6 @@ export const INTEGRATIONS: IntegrationEntry[] = [
     platform: 'mujeb',
     overviewKey: 'mujeb',
   },
-  {
-    page: 'PBX',
-    titleKey: 'pbxIntegration',
-    descriptionKey: 'integrationHubPbxDesc',
-    category: 'communication',
-    policyKeys: ['pbx'],
-    helpVideoPageKey: 'pbx',
-    platform: 'pbx',
-    overviewKey: 'pbx',
-  },
 ];
 
 export function integrationByPage(page: Page): IntegrationEntry | undefined {

@@ -12,8 +12,7 @@ import { useWebPush } from './hooks/useWebPush';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
 import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, AlertModal, ToastHost, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog, WebPushPrompt } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsHubPage, MetaIntegrationPage, TikTokIntegrationPage, WhatsAppIntegrationPage, SmsIntegrationPage, AiIntegrationPage, LeadApiIntegrationPage, MujebIntegrationPage, PbxIntegrationPage, MessagingCenterPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
-import { PbxScreenPopListener } from './components/PbxScreenPopListener';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsHubPage, MetaIntegrationPage, TikTokIntegrationPage, WhatsAppIntegrationPage, SmsIntegrationPage, AiIntegrationPage, LeadApiIntegrationPage, MujebIntegrationPage, MessagingCenterPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
@@ -120,8 +119,6 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <LeadApiIntegrationPage />;
         case 'Mujeb':
             return <MujebIntegrationPage />;
-        case 'PBX':
-            return <PbxIntegrationPage />;
         case 'Billing':
             return <BillingPage />;
         case 'Change Plan':
@@ -433,7 +430,6 @@ const TheApp = () => {
                 'lead api': 'Lead API',
                 'lead-api': 'Lead API',
                 'mujeb': 'Mujeb',
-                'pbx': 'PBX',
                 'call reports': 'Call Reports',
                 'call-reports': 'Call Reports',
                 'billing': 'Billing',
@@ -739,7 +735,6 @@ const TheApp = () => {
             'lead api': 'Lead API',
             'lead-api': 'Lead API',
             'mujeb': 'Mujeb',
-            'pbx': 'PBX',
             'call reports': 'Call Reports',
             'call-reports': 'Call Reports',
             'billing': 'Billing',
@@ -1212,7 +1207,6 @@ const TheApp = () => {
             ) : null}
             {isLoggedIn && currentUser ? <WebPushPrompt /> : null}
             {sessionSync}
-            <PbxScreenPopListener />
             <ArrivalAlertHost />
             <WorkSessionTrackerHost />
         </div>

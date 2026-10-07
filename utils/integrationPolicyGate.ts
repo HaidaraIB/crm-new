@@ -10,7 +10,6 @@ export type IntegrationPlatform =
   | 'openai'
   | 'api'
   | 'mujeb'
-  | 'pbx'
   | 'meta_inbox';
 
 /** Pages that should show the admin policy warning instead of opening into a 403. */
@@ -27,7 +26,6 @@ export const integrationPlatformByPage: Partial<Record<Page, IntegrationPlatform
   AI: 'openai',
   'Lead API': 'api',
   Mujeb: 'mujeb',
-  PBX: 'pbx',
 };
 
 export type IntegrationPolicyEntry = { enabled: boolean; message: string; scope: string };

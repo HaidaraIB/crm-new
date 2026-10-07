@@ -39,7 +39,6 @@ export * from './integrations/MujebIntegrationPage';
 export * from './integrations/LeadApiIntegrationPage';
 export * from './integrations/SmsIntegrationPage';
 export * from './integrations/AiIntegrationPage';
-export * from './integrations/PbxIntegrationPage';
 export * from './messaging-center/MessagingCenterPage';
 export * from './ChatsPage';
 export * from './CallsPage';

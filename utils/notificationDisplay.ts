@@ -129,12 +129,6 @@ const TEMPLATES: Record<string, Record<NotificationLang, Template>> = {
     ar: { title: 'تذكير مكالمة', body: 'تبقى {minutes_remaining} دقيقة على موعد مكالمة المتابعة مع {lead_name}' },
     en: { title: 'Call Reminder', body: '{minutes_remaining} minutes remaining for follow-up call with {lead_name}' },
   },
-    ar: { title: 'مكالمة واردة', body: 'مكالمة واردة من {phone}' },
-    en: { title: 'Incoming Call', body: 'Incoming call from {phone}' },
-  },
-    ar: { title: 'مكالمة فائتة', body: 'مكالمة فائتة من {phone}' },
-    en: { title: 'Missed Call', body: 'Missed call from {phone}' },
-  },
   visit_reminder: {
     ar: { title: 'تذكير زيارة', body: 'تبقى {minutes_remaining} دقيقة على موعد الزيارة القادمة مع {lead_name}' },
     en: { title: 'Visit Reminder', body: '{minutes_remaining} minutes remaining for upcoming visit with {lead_name}' },

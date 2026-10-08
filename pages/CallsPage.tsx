@@ -6,6 +6,7 @@ import {
   Card,
   FilterButton,
   Loader,
+  Modal,
   PageWrapper,
   PhoneText,
   PhoneIcon,
@@ -15,6 +16,7 @@ import {
 import {
   ClockIcon,
   MicrophoneIcon,
+  PlayIcon,
   SearchIcon,
   XIcon,
 } from '../components/icons';
@@ -885,14 +887,6 @@ export const CallsPage: React.FC = () => {
                             >
                               {callSourceLabel(call)}
                             </span>
-                            {hasRec ? (
-                              <span
-                                className="inline-flex items-center gap-0.5 rounded-full bg-gray-100 px-1.5 py-0.5 text-[10px] font-medium text-gray-600 dark:bg-gray-800 dark:text-gray-300"
-                                title={t('recording')}
-                              >
-                                <MicrophoneIcon className="size-3" />
-                              </span>
-                            ) : null}
                           </div>
                           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-gray-500 dark:text-gray-400">
                             <PhoneText className="text-xs text-gray-500 dark:text-gray-400">
@@ -925,31 +919,68 @@ export const CallsPage: React.FC = () => {
                           </span>
                         </div>
 
-                        {call.client ? (
-                          <button
-                            type="button"
-                            className="shrink-0 text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openLead(call);
-                            }}
-                          >
-                            {t('viewLead')}
-                          </button>
-                        ) : call.social_conversation_id ? (
-                          <button
-                            type="button"
-                            className="shrink-0 text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openInboxConversation(call);
-                            }}
-                          >
-                            {t('openInboxConversation')}
-                          </button>
-                        ) : (
-                          <span className="w-16 shrink-0 sm:w-20" aria-hidden />
-                        )}
+                        <div className="flex shrink-0 items-center gap-2">
+                          {hasRec ? (
+                            <button
+                              type="button"
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-primary/10 px-2.5 py-1.5 text-xs font-semibold text-primary-800 ring-1 ring-primary/20 transition-colors hover:bg-primary/15 dark:bg-primary/20 dark:text-primary-100 dark:ring-primary/30 dark:hover:bg-primary/30"
+                              title={t('playRecording')}
+                              aria-label={t('playRecording')}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelected(call);
+                              }}
+                            >
+                              <PlayIcon className="size-3.5 shrink-0" />
+                              <span className="hidden sm:inline">{t('playRecording')}</span>
+                            </button>
+                          ) : (
+                            <span
+                              className="inline-flex max-w-[7.5rem] items-center gap-1 truncate rounded-lg bg-gray-100 px-2 py-1.5 text-[11px] font-medium text-gray-500 dark:bg-gray-800 dark:text-gray-400 sm:max-w-none"
+                              title={
+                                call.recording_status === 'pending' ||
+                                call.recording_status === 'processing'
+                                  ? t('recordingProcessing')
+                                  : call.recording_status === 'failed'
+                                    ? t('recordingUnavailable')
+                                    : t('noRecording')
+                              }
+                            >
+                              <MicrophoneIcon className="size-3 shrink-0 opacity-70" />
+                              <span className="truncate">
+                                {call.recording_status === 'pending' ||
+                                call.recording_status === 'processing'
+                                  ? t('recordingProcessing')
+                                  : call.recording_status === 'failed'
+                                    ? t('recordingUnavailable')
+                                    : t('noRecording')}
+                              </span>
+                            </span>
+                          )}
+                          {call.client ? (
+                            <button
+                              type="button"
+                              className="shrink-0 text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openLead(call);
+                              }}
+                            >
+                              {t('viewLead')}
+                            </button>
+                          ) : call.social_conversation_id ? (
+                            <button
+                              type="button"
+                              className="shrink-0 text-xs font-semibold text-primary-700 hover:underline dark:text-primary-300"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openInboxConversation(call);
+                              }}
+                            >
+                              {t('openInboxConversation')}
+                            </button>
+                          ) : null}
+                        </div>
                       </div>
                     </li>
                   );
@@ -958,55 +989,54 @@ export const CallsPage: React.FC = () => {
             )}
           </Card>
 
-          {selected ? (
-            <Card className="border border-gray-200/80 shadow-sm dark:border-gray-700 dark:shadow-none">
-              <div className="mb-4 flex items-start justify-between gap-3">
-                <div className="flex min-w-0 items-start gap-3">
-                  <span
-                    className={`mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl ${directionIconWrapClass(selected.direction)}`}
-                  >
-                    {selected.direction === 'outbound' ? (
+          <Modal
+            isOpen={Boolean(selected)}
+            onClose={() => setSelected(null)}
+            title={selected ? displayName(selected) : ''}
+            maxWidth="lg"
+          >
+            {selected ? (
+              <div className="space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-start gap-3">
+                    <span
+                      className={`mt-0.5 flex size-11 shrink-0 items-center justify-center rounded-xl ${directionIconWrapClass(selected.direction)}`}
+                      aria-hidden
+                    >
                       <PhoneIcon className="size-5" />
-                    ) : (
-                      <PhoneIcon className="size-5" />
-                    )}
-                  </span>
-                  <div className="min-w-0">
-                    <p className="truncate text-base font-semibold text-gray-900 dark:text-gray-50">
-                      {displayName(selected)}
-                    </p>
-                    <PhoneText className="mt-0.5 text-sm text-gray-600 dark:text-gray-300">
-                      {selected.peer_phone}
-                    </PhoneText>
-                    <div className="mt-2 flex flex-wrap items-center gap-2">
-                      <span
-                        className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadgeClass(selected.status)}`}
-                      >
-                        {statusLabel(selected.status, t)}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {selected.direction === 'inbound' ? t('incoming') : t('outgoing')}
-                      </span>
-                      <span className="font-mono text-xs tabular-nums text-gray-700 dark:text-gray-200">
-                        {formatDuration(selected.duration_sec)}
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400">
-                        {formatFullWhen(callTimestamp(selected), language)}
-                      </span>
-                      {selected.agent_username ? (
-                        <span className="text-xs text-gray-500 dark:text-gray-400">
-                          · {selected.agent_username}
+                    </span>
+                    <div className="min-w-0">
+                      <PhoneText className="text-sm text-gray-600 dark:text-gray-300">
+                        {selected.peer_phone}
+                      </PhoneText>
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <span
+                          className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusBadgeClass(selected.status)}`}
+                        >
+                          {statusLabel(selected.status, t)}
                         </span>
-                      ) : null}
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {selected.direction === 'inbound' ? t('incoming') : t('outgoing')}
+                        </span>
+                        <span className="font-mono text-xs tabular-nums text-gray-700 dark:text-gray-200">
+                          {formatDuration(selected.duration_sec)}
+                        </span>
+                        <span className="text-xs text-gray-500 dark:text-gray-400">
+                          {formatFullWhen(callTimestamp(selected), language)}
+                        </span>
+                        {selected.agent_username ? (
+                          <span className="text-xs text-gray-500 dark:text-gray-400">
+                            · {selected.agent_username}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   </div>
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
                   {selected.client ? (
                     <Button
                       type="button"
                       variant="secondary"
-                      className="h-9 rounded-lg"
+                      className="h-9 shrink-0 rounded-lg"
                       onClick={() => openLead(selected)}
                     >
                       {t('viewLead')}
@@ -1015,44 +1045,35 @@ export const CallsPage: React.FC = () => {
                     <Button
                       type="button"
                       variant="secondary"
-                      className="h-9 rounded-lg"
+                      className="h-9 shrink-0 rounded-lg"
                       onClick={() => openInboxConversation(selected)}
                     >
                       {t('openInboxConversation')}
                     </Button>
                   ) : null}
-                  <button
-                    type="button"
-                    className="inline-flex size-9 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-100"
-                    onClick={() => setSelected(null)}
-                    title={t('close')}
-                    aria-label={t('close')}
-                  >
-                    <XIcon className="size-4" />
-                  </button>
                 </div>
-              </div>
 
-              {selected.notes ? (
-                <p className="mb-4 whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
-                  {selected.notes}
-                </p>
-              ) : null}
-
-              <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/50">
-                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                  {t('recording')}
-                </p>
-                {selected.recording_status === 'ready' && selected.recording_url ? (
-                  <CallRecordingPlayer url={selected.recording_url} t={t} />
-                ) : (
-                  <p className="text-sm text-gray-500 dark:text-gray-400">
-                    {t('noRecording')}
+                <div className="rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-gray-700 dark:bg-gray-900/50">
+                  <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                    {t('recording')}
                   </p>
-                )}
+                  {selected.recording_status === 'ready' && selected.recording_url ? (
+                    <CallRecordingPlayer url={selected.recording_url} t={t} />
+                  ) : (
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {t('noRecording')}
+                    </p>
+                  )}
+                </div>
+
+                {selected.notes ? (
+                  <p className="whitespace-pre-wrap rounded-lg border border-gray-100 bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:border-gray-700 dark:bg-gray-900/60 dark:text-gray-200">
+                    {selected.notes}
+                  </p>
+                ) : null}
               </div>
-            </Card>
-          ) : null}
+            ) : null}
+          </Modal>
         </div>
       </div>
         </>

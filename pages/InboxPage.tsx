@@ -680,7 +680,7 @@ export const InboxPage: React.FC = () => {
                   <div className="flex min-w-0 items-center gap-1.5">
                     <InboxChannelBadge
                       channel={row.channel}
-                      className="h-3.5 w-3.5 shrink-0 text-gray-500 dark:text-gray-300"
+                      className="h-3.5 w-3.5 shrink-0"
                     />
                     <span className="min-w-0 flex-1 truncate text-sm font-semibold text-gray-900 dark:text-gray-50">
                       {row.contact.display_name}

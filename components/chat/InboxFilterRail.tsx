@@ -54,17 +54,18 @@ type Props = {
 
 function ChannelIcon({
   channel,
-  className = 'h-4 w-4 shrink-0 opacity-70',
+  className = 'h-4 w-4 shrink-0',
 }: {
   channel: string;
   className?: string;
 }) {
+  // Brand marks carry their own colors — do not mute with opacity/currentColor.
   if (channel === 'instagram') return <InstagramIcon className={className} />;
   if (channel === 'messenger') return <MessengerIcon className={className} />;
   if (channel === 'whatsapp') {
     return <IntegrationPlatformIcon platform="whatsapp" size="sm" variant="inline" className={className} />;
   }
-  return <InboxIcon className={className} />;
+  return <InboxIcon className={`${className} opacity-70`} />;
 }
 
 function statusCount(key: string, counts: Record<string, number>): number {

@@ -96,14 +96,64 @@ export const WhatsappIcon = (props: React.SVGProps<SVGSVGElement>) => (
 export const InboxIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg>
 );
-export const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><rect width="20" height="20" x="2" y="2" rx="5" ry="5"/><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z"/><line x1="17.5" x2="17.51" y1="6.5" y2="6.5"/></svg>
-);
-export const MessengerIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" {...props}>
-        <path fill="currentColor" d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.19.16.15.26.35.27.57l.05 1.78a.8.8 0 0 0 1.12.71l1.99-.88c.17-.07.35-.09.53-.04 .91.25 1.88.38 2.9.38 5.64 0 10-4.13 10-9.71S17.64 2 12 2zm6 7.46-2.94 4.66a1.5 1.5 0 0 1-2.17.4l-2.34-1.75a.6.6 0 0 0-.72 0l-3.16 2.4c-.42.32-.97-.18-.69-.63l2.94-4.66a1.5 1.5 0 0 1 2.17-.4l2.34 1.75c.21.16.51.16.72 0l3.16-2.4c.42-.32.97.18.69.63z"/>
-    </svg>
-);
+/** Official Instagram app mark with brand gradient (ignores currentColor). */
+export const InstagramIcon = ({ className, style, width = 24, height = 24, ...rest }: React.SVGProps<SVGSVGElement>) => {
+    const gid = React.useId().replace(/:/g, '');
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={width}
+            height={height}
+            viewBox="0 0 24 24"
+            className={className}
+            style={style}
+            aria-hidden
+            {...rest}
+        >
+            <defs>
+                <radialGradient id={`ig-${gid}`} cx="30%" cy="107%" r="150%">
+                    <stop offset="0%" stopColor="#fdf497" />
+                    <stop offset="5%" stopColor="#fdf497" />
+                    <stop offset="45%" stopColor="#fd5949" />
+                    <stop offset="60%" stopColor="#d6249f" />
+                    <stop offset="90%" stopColor="#285AEB" />
+                </radialGradient>
+            </defs>
+            <rect width="24" height="24" rx="6" fill={`url(#ig-${gid})`} />
+            <circle cx="12" cy="12" r="4.2" fill="none" stroke="#fff" strokeWidth="1.8" />
+            <circle cx="17.2" cy="6.8" r="1.15" fill="#fff" />
+            <rect x="3.6" y="3.6" width="16.8" height="16.8" rx="4.4" fill="none" stroke="#fff" strokeWidth="1.8" />
+        </svg>
+    );
+};
+/** Official Messenger glyph with brand gradient (ignores currentColor). */
+export const MessengerIcon = ({ className, style, width = 24, height = 24, ...rest }: React.SVGProps<SVGSVGElement>) => {
+    const gid = React.useId().replace(/:/g, '');
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={width}
+            height={height}
+            viewBox="0 0 24 24"
+            className={className}
+            style={style}
+            aria-hidden
+            {...rest}
+        >
+            <defs>
+                <linearGradient id={`msg-${gid}`} x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#00B2FF" />
+                    <stop offset="50%" stopColor="#006AFF" />
+                    <stop offset="100%" stopColor="#A033FF" />
+                </linearGradient>
+            </defs>
+            <path
+                fill={`url(#msg-${gid})`}
+                d="M12 2C6.36 2 2 6.13 2 11.7c0 2.91 1.19 5.44 3.14 7.19.16.15.26.35.27.57l.05 1.78a.8.8 0 0 0 1.12.71l1.99-.88c.17-.07.35-.09.53-.04.91.25 1.88.38 2.9.38 5.64 0 10-4.13 10-9.71S17.64 2 12 2zm6 7.46-2.94 4.66a1.5 1.5 0 0 1-2.17.4l-2.34-1.75a.6.6 0 0 0-.72 0l-3.16 2.4c-.42.32-.97-.18-.69-.63l2.94-4.66a1.5 1.5 0 0 1 2.17-.4l2.34 1.75c.21.16.51.16.72 0l3.16-2.4c.42-.32.97.18.69.63z"
+            />
+        </svg>
+    );
+};
 export const MenuIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><line x1="4" x2="20" y1="12" y2="12"/><line x1="4" x2="20" y1="6" y2="6"/><line x1="4" x2="20" y1="18" y2="18"/></svg>
 );

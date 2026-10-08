@@ -38,9 +38,8 @@ const PLATFORM_ICONS: Partial<Record<IntegrationPlatform, React.FC<React.SVGProp
     lead_api: CodeBracketsIcon,
 };
 
-/** Icon foreground — readable on dark UI backgrounds (SVG platforms only). */
+/** Icon foreground — SVG platforms only. Brand-gradient marks omit a text color. */
 const ICON_FG: Partial<Record<IntegrationPlatform, string>> = {
-    meta_inbox: 'text-[#C13584] dark:text-[#F09AD3]',
     lead_api: 'text-primary-700 dark:text-primary-200',
 };
 

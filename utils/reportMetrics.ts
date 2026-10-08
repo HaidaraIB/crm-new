@@ -229,9 +229,6 @@ export function isConvertedLead(lead: any, statuses: StatusConfig[] = []): boole
 }
 
 export function classifyCall(call: any): 'answered' | 'missed' | 'unknown' {
-  if (disposition === 'answered') return 'answered';
-  if (disposition === 'no_answer' || disposition === 'busy' || disposition === 'missed') return 'missed';
-
   const method = String(call?.call_method_name ?? call?.callMethodName ?? '').toLowerCase();
   if (method.includes('no answer') || method.includes('not answered')) return 'missed';
   if (method.includes('answered') || method.includes('following')) return 'answered';

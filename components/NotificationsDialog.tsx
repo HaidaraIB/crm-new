@@ -14,7 +14,6 @@ import {
 } from '../services/api';
 import { formatDateTimeToLocal } from '../utils/dateUtils';
 import { getNotificationDisplay } from '../utils/notificationDisplay';
-import { PhoneText, isPhoneLike } from './PhoneText';
 import { WebPushOptIn } from './WebPushOptIn';
 import { queryKeys, useSyncDigest } from '../hooks/useQueries';
 import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
@@ -129,10 +128,6 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
     const leadId = payloadId(n.data?.lead_id ?? n.data?.client_id);
     const type = n.type;
 
-    if (false && leadId) {
-      openLead(leadId);
-      return;
-    }
     if (
       (type === 'whatsapp_message_received' ||
         type === 'whatsapp_template_sent' ||
@@ -205,8 +200,6 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
   const rawItems: AppNotification[] = listQuery.data?.results ?? [];
   const items = rawItems.filter((n) => !isTenantChatEcho(n));
   const unreadInList = items.filter((n) => !n.read).length;
-  const callAlertsInList = items.filter(
-  ).length;
   const actionsBusy =
     markOne.isPending ||
     deleteOne.isPending ||
@@ -223,19 +216,6 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
       onConfirm: async () => {
         await deleteAll.mutateAsync(undefined);
       },
-    });
-    setIsConfirmDeleteModalOpen(true);
-  };
-
-  const confirmDeleteCallAlerts = () => {
-    setConfirmDeleteConfig({
-      title: t('notificationsDeleteCallNotifications'),
-      message: t('notificationsDeleteCallNotificationsConfirm'),
-      confirmButtonText: t('notificationsDeleteCallNotifications'),
-      confirmButtonVariant: 'danger',
-      showWarning: false,
-      onConfirm: async () => {
-              },
     });
     setIsConfirmDeleteModalOpen(true);
   };
@@ -272,17 +252,6 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                 onClick={() => markAll.mutate()}
               >
                 {t('notificationsMarkAllRead')}
-              </Button>
-            ) : null}
-            {callAlertsInList > 0 ? (
-              <Button
-                type="button"
-                variant="secondary"
-                className="whitespace-nowrap px-3 py-1.5 text-xs"
-                disabled={actionsBusy}
-                onClick={confirmDeleteCallAlerts}
-              >
-                {t('notificationsDeleteCallNotifications')}
               </Button>
             ) : null}
             {items.length > 0 ? (
@@ -338,20 +307,8 @@ export const NotificationsDialog = ({ onClose }: NotificationsDialogProps) => {
                   <>
                     <div className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1">
-                        <span
-                          className="block text-sm font-semibold text-gray-900 dark:text-white"
-                          dir={
-                            false
-                              ? 'ltr'
-                              : undefined
-                          }
-                        >
-                          {false &&
-                          isPhoneLike(display.title) ? (
-                            <PhoneText>{display.title}</PhoneText>
-                          ) : (
-                            display.title
-                          )}
+                        <span className="block text-sm font-semibold text-gray-900 dark:text-white">
+                          {display.title}
                         </span>
                         <span className="mt-0.5 block text-[10px] font-medium uppercase tracking-wide text-gray-500 dark:text-gray-300">
                           {display.typeLabel}

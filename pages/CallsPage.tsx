@@ -592,7 +592,7 @@ export const CallsPage: React.FC = () => {
 
       <div className="mb-4 border-b border-gray-200 dark:border-gray-700">
         <nav
-          className="-mb-px flex gap-4 overflow-x-auto rtl:space-x-reverse"
+          className="-mb-px flex gap-4 overflow-x-auto overflow-y-hidden rtl:space-x-reverse"
           aria-label="Tabs"
         >
           <button

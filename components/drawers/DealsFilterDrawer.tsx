@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { NumberInput } from '../NumberInput';
-import { useProjects, useUnits } from '../../hooks/useQueries';
+import { useDealPipelines, useProjects, useUnits, useUsers } from '../../hooks/useQueries';
 import {
   FilterDrawerShell,
   FilterSection,
@@ -19,6 +19,14 @@ export const DEFAULT_DEAL_FILTERS: DealFilters = {
   valueMin: '',
   valueMax: '',
   search: '',
+  stageId: 'All',
+  outcome: 'All',
+  employee: 'All',
+  pipeline: 'All',
+  expectedCloseFrom: '',
+  expectedCloseTo: '',
+  createdFrom: '',
+  createdTo: '',
 };
 
 const DEAL_STATUSES = ['reservation', 'contracted', 'closed'] as const;
@@ -41,6 +49,10 @@ export const DealsFilterDrawer = () => {
 
   const { data: unitsResponse } = useUnits();
   const units = unitsResponse?.results || [];
+  const { data: pipelines = [] } = useDealPipelines();
+  const { data: usersResponse } = useUsers();
+  const users = Array.isArray(usersResponse) ? usersResponse : usersResponse?.results || [];
+  const stages = pipelines.flatMap((pipeline) => pipeline.stages || []);
 
   const syncDraft = useCallback(() => {
     setLocalFilters(dealFilters);
@@ -93,6 +105,46 @@ export const DealsFilterDrawer = () => {
           </div>
 
           <div>
+            <FilterLabel htmlFor="deals-filter-outcome">{t('dealOutcome')}</FilterLabel>
+            <FilterSelect
+              id="deals-filter-outcome"
+              value={localFilters.outcome}
+              onChange={(e) => handleFilterChange('outcome', e.target.value)}
+            >
+              <option value="All">{t('dealAllOutcomes')}</option>
+              <option value="open">{t('dealOpenStage')}</option>
+              <option value="won">{t('dealWonStage')}</option>
+              <option value="lost">{t('dealLostStage')}</option>
+            </FilterSelect>
+          </div>
+          <div>
+            <FilterLabel htmlFor="deals-filter-stage">{t('stage')}</FilterLabel>
+            <FilterSelect
+              id="deals-filter-stage"
+              value={localFilters.stageId}
+              onChange={(e) => handleFilterChange('stageId', e.target.value)}
+            >
+              <option value="All">{t('all')}</option>
+              {stages.map((stage) => (
+                <option key={stage.id} value={String(stage.id)}>{stage.name}</option>
+              ))}
+            </FilterSelect>
+          </div>
+          <div>
+            <FilterLabel htmlFor="deals-filter-owner">{t('dealOwner')}</FilterLabel>
+            <FilterSelect
+              id="deals-filter-owner"
+              value={localFilters.employee}
+              onChange={(e) => handleFilterChange('employee', e.target.value)}
+            >
+              <option value="All">{t('all')}</option>
+              {users.map((user: { id: number; username?: string; name?: string }) => (
+                <option key={user.id} value={String(user.id)}>{user.name || user.username}</option>
+              ))}
+            </FilterSelect>
+          </div>
+
+          <div>
             <FilterLabel htmlFor="deals-filter-payment">{t('paymentMethod')}</FilterLabel>
             <FilterSelect
               id="deals-filter-payment"
@@ -119,7 +171,7 @@ export const DealsFilterDrawer = () => {
                 >
                   <option value="All">{t('all')}</option>
                   {projects.map((project: any) => (
-                    <option key={project.id} value={project.name}>
+                    <option key={project.id} value={String(project.id)}>
                       {project.name}
                     </option>
                   ))}
@@ -137,7 +189,7 @@ export const DealsFilterDrawer = () => {
                   {units.map((unit: any) => {
                     const code = unit.code || String(unit.id);
                     return (
-                      <option key={unit.id} value={code}>
+                      <option key={unit.id} value={String(unit.id)}>
                         {code}
                       </option>
                     );
@@ -171,6 +223,26 @@ export const DealsFilterDrawer = () => {
                 min={0}
                 step={1}
               />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <FilterLabel htmlFor="deals-filter-close-from">{t('dealExpectedClose')}</FilterLabel>
+              <FilterInput id="deals-filter-close-from" type="date" value={localFilters.expectedCloseFrom} onChange={(e) => handleFilterChange('expectedCloseFrom', e.target.value)} />
+            </div>
+            <div>
+              <FilterLabel htmlFor="deals-filter-close-to">{t('to') || t('dealExpectedClose')}</FilterLabel>
+              <FilterInput id="deals-filter-close-to" type="date" value={localFilters.expectedCloseTo} onChange={(e) => handleFilterChange('expectedCloseTo', e.target.value)} />
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <FilterLabel htmlFor="deals-filter-created-from">{t('dealCreatedAtRange')}</FilterLabel>
+              <FilterInput id="deals-filter-created-from" type="date" value={localFilters.createdFrom} onChange={(e) => handleFilterChange('createdFrom', e.target.value)} />
+            </div>
+            <div>
+              <FilterLabel htmlFor="deals-filter-created-to">{t('to') || t('dealCreatedAtRange')}</FilterLabel>
+              <FilterInput id="deals-filter-created-to" type="date" value={localFilters.createdTo} onChange={(e) => handleFilterChange('createdTo', e.target.value)} />
             </div>
           </div>
         </div>

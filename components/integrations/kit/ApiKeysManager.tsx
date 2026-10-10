@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '../../Button';
+import { FieldActionRow } from '../../FieldActionRow';
 import { Input } from '../../Input';
 import { Modal } from '../../Modal';
 import { FileTextIcon, PlusIcon, TrashIcon } from '../../icons';
@@ -86,9 +87,16 @@ export const ApiKeysManager: React.FC<{
       {!canManage ? <p className="text-xs text-amber-600 dark:text-amber-400">{t('leadApiAdminOnly')}</p> : null}
       {canManage ? (
         <div className="rounded-xl border border-dashed border-gray-300 dark:border-gray-600 bg-gray-50/80 dark:bg-gray-800/40 p-4">
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-            <div className="flex-1 min-w-0">
-              <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('leadApiKeyName')}</label>
+          <div>
+            <label className="mb-1 block text-xs text-gray-500 dark:text-gray-400">{t('leadApiKeyName')}</label>
+            <FieldActionRow
+              action={
+                <Button disabled={disabled || busy} loading={busy} onClick={create}>
+                  <PlusIcon className="h-4 w-4" />
+                  {t('leadApiGenerateKey')}
+                </Button>
+              }
+            >
               <Input
                 value={name}
                 disabled={disabled || busy}
@@ -99,17 +107,8 @@ export const ApiKeysManager: React.FC<{
                 placeholder={t('leadApiKeyNamePlaceholder')}
                 className={error ? 'border-red-500 dark:border-red-500' : ''}
               />
-              {error ? <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
-            </div>
-            <Button
-              className="shrink-0 w-full sm:w-auto"
-              disabled={disabled || busy}
-              loading={busy}
-              onClick={create}
-            >
-              <PlusIcon className="h-4 w-4" />
-              {t('leadApiGenerateKey')}
-            </Button>
+            </FieldActionRow>
+            {error ? <p className="mt-1 text-sm text-red-600 dark:text-red-400">{error}</p> : null}
           </div>
         </div>
       ) : null}

@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText, IconButton } from '../components/index';
 import { Product, ProductCategory, Supplier } from '../types';
 import { AddProductModal } from '../components/modals/AddProductModal';
 import { EditProductModal } from '../components/modals/EditProductModal';
@@ -67,14 +67,10 @@ const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Pr
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(product)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(product)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(product.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(product.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -112,14 +108,10 @@ const CategoriesTable = ({ categories, onUpdate, onDelete, isAdmin }: { categori
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(category)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(category)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(category.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(category.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -167,14 +159,10 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers:
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(supplier)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(supplier)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(supplier.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(supplier.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -416,8 +404,8 @@ export const ProductsInventoryPage = () => {
 
     return (
         <PageWrapper title={t('products')} actions={pageActions}>
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
-                <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
+            <div className="mb-4 overflow-x-auto overflow-y-hidden border-b border-gray-200 dark:border-gray-700">
+                <nav className="-mb-px flex min-w-max space-x-4 rtl:space-x-reverse" aria-label="Tabs">
                     <button onClick={() => setActiveTab('products')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'products' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('products')}</button>
                     <button onClick={() => setActiveTab('categories')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'categories' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('productCategories')}</button>
                     <button onClick={() => setActiveTab('suppliers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'suppliers' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('suppliers')}</button>

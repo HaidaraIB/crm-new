@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { Developer } from '../../types';
 import { useUpdateProject, useDevelopers } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -56,19 +57,35 @@ export const EditProjectModal = () => {
         company: currentUser?.company?.id,
     });
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('project.upsert', values, translate);
+
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+        const next = applyCatalog(catalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        if (!formState.name.trim()) {
-            newErrors.name = t('projectNameRequired') || 'Project name is required';
-        }
-
-        if (!formState.developer) {
-            newErrors.developer = t('developerRequired') || 'Developer is required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -159,7 +176,10 @@ export const EditProjectModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating project:', error);
-            setErrors({ _general: error?.message || t('errorUpdatingProject') || 'Failed to update project. Please try again.' });
+            const serverErrors = serverFieldErrors(error, 'project.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('errorUpdatingProject') || 'Failed to update project. Please try again.' });
         }
     };
 
@@ -178,8 +198,7 @@ export const EditProjectModal = () => {
                         placeholder={t('enterProjectName')} 
                         value={formState.name} 
                         onChange={handleChange}
-                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                     {errors.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}

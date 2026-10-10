@@ -7,6 +7,7 @@ import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { useAddOwner } from '../../hooks/useQueries';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -35,15 +36,36 @@ export const AddOwnerModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+            phone: formState.phone,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('owner.upsert', values, translate);
+        delete next.email;
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+        const next = applyCatalog(catalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -97,7 +119,10 @@ export const AddOwnerModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating owner:', error);
-            setErrors({ _general: error?.message || t('errorCreatingOwner') || 'Failed to create owner. Please try again.' });
+            const serverErrors = serverFieldErrors(error, 'owner.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('errorCreatingOwner') || 'Failed to create owner. Please try again.' });
         }
     };
 
@@ -116,8 +141,7 @@ export const AddOwnerModal = () => {
                         placeholder={t('enterOwnerFullName')} 
                         value={formState.name} 
                         onChange={handleChange}
-                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                     {errors.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
@@ -128,8 +152,10 @@ export const AddOwnerModal = () => {
                         id="phone" 
                         placeholder={t('enterContactPhoneNumber')} 
                         value={formState.phone} 
-                        onChange={handlePhoneChange} 
-                    />
+                        onChange={handlePhoneChange} onBlur={() => blurField('phone')} />
+                    {errors.phone && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                    )}
                 </div>
                  <div>
                     <Label htmlFor="city">{t('city')}</Label>

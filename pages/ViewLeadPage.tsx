@@ -2,11 +2,13 @@
 
 import React, { useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, ArrowLeftIcon, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TagMultiSelect, LeadContactPhoneList, PlainTextWithLinks } from '../components/index';
+import { PageWrapper, Button, Card, Timeline, EditIcon, PlusIcon, Loader, PageBackButton, PhoneIcon, FacebookIcon, WhatsappIcon, TrashIcon, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TagMultiSelect, LeadContactPhoneList, PlainTextWithLinks } from '../components/index';
+import { LeadDealsSection } from '../components/deals/LeadDealsSection';
 import SendSMSModal from '../components/modals/SendSMSModal';
 import { formatDateTimeToLocal, formatTimelineDate, formatTimelineDetailDateTime } from '../utils/dateUtils';
 import { formatLeadBudget } from '../utils/budgetRange';
 import { useUsers, useClientTasks, useStatuses, useLead, usePatchLead, useDeleteLead, useClientEvents, useStages, useClientCalls, useClientVisits, useClientFieldVisits, useCallMethods, useVisitTypes, useLeadSMSMessages, useLeadWhatsAppMessages, useLeadSocialMessages, useChannels, useTags } from '../hooks/useQueries';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI } from '../services/api';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
@@ -154,6 +156,7 @@ export const ViewLeadPage = () => {
     const { t, selectedLead, setIsAddActionModalOpen, setIsAddCallModalOpen, setIsAddVisitModalOpen, setIsAddFieldVisitModalOpen, setEditingLead, setCurrentPage, setSelectedLeadForDeal, setSelectedLead, currentUser, theme, language, setSuccessMessage, setIsSuccessModalOpen, setAlertMessage, setAlertVariant, setIsAlertModalOpen, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen, hasSupervisorPermission, openCallsFiltered, goBackFromLead } = useAppContext();
     const isMedicalCompany = isMedicalSpecialization(currentUser?.company?.specialization);
     
+    useInvalidateOnSliceChange('leads', [['leads'], ['lead'], ['clientEvents']]);
     const whatsappCalling = useWhatsAppCallingOptional();
     const openWhatsApp = useWhatsAppLeadAction();
     const deleteLeadMutation = useDeleteLead();
@@ -888,15 +891,8 @@ export const ViewLeadPage = () => {
         <PageWrapper
             fullWidthTitle
             title={
-                <div className="relative z-30 flex w-full min-w-0 items-center gap-2 overflow-x-auto p-1.5 -m-1.5">
-                    <button
-                        type="button"
-                        onClick={goBackFromLead}
-                        className="shrink-0 rounded-md p-1 transition-colors hover:bg-gray-100 dark:hover:bg-gray-800"
-                        title={t('back') || 'Back'}
-                    >
-                        <ArrowLeftIcon className="h-5 w-5 text-gray-600 dark:text-gray-400" />
-                    </button>
+                <div className="relative z-30 flex w-full min-w-0 items-center gap-2 overflow-x-auto overflow-y-hidden p-1.5 -m-1.5">
+                    <PageBackButton onClick={goBackFromLead} />
                     <h1 className="min-w-0 shrink overflow-hidden text-base font-semibold text-gray-900 dark:text-gray-100 sm:text-lg md:text-xl">
                         <MarqueeText
                             text={displayLead.name}
@@ -1466,6 +1462,11 @@ export const ViewLeadPage = () => {
                 </Card>
             </div>
 
+            {displayLead?.id ? (
+                <div className="mt-6">
+                    <LeadDealsSection leadId={displayLead.id} />
+                </div>
+            ) : null}
             <div className="mt-6">
                 <Timeline history={timelineHistory} chatLead={displayLead} />
             </div>

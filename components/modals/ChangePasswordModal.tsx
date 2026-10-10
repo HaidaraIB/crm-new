@@ -6,11 +6,7 @@ import { Input } from '../Input';
 import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import { changePasswordAPI } from '../../services/api';
-import {
-    validatePasswordField,
-    validateConfirmPasswordField,
-    requiredTrim,
-} from '../../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 // FIX: Made children optional to fix missing children prop error.
@@ -85,45 +81,36 @@ export const ChangePasswordModal = () => {
         }
     };
 
-    const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
 
-        const currentErr = requiredTrim(
-            formData.currentPassword,
-            t,
-            'currentPasswordRequired',
-            'Current password is required'
-        );
-        if (currentErr) newErrors.currentPassword = currentErr;
+    const passwordCatalogValues = (): Record<string, unknown> => ({
+        current_password: formData.currentPassword,
+        new_password: formData.newPassword,
+        confirm_password: formData.confirmPassword,
+    });
 
-        const newPassErr = validatePasswordField(formData.newPassword, t);
-        if (newPassErr) {
-            newErrors.newPassword =
-                newPassErr === (t('passwordRequired') || 'Password is required')
-                    ? t('newPasswordRequired') || 'New password is required'
-                    : newPassErr;
-        }
-
-        const confirmErr = validateConfirmPasswordField(
-            formData.newPassword,
-            formData.confirmPassword,
-            t
-        );
-        if (confirmErr) newErrors.confirmPassword = confirmErr;
-
+    const applyPasswordCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('auth.change_password', values, translate);
         if (
             formData.currentPassword &&
             formData.newPassword &&
             formData.currentPassword === formData.newPassword
         ) {
-            newErrors.newPassword =
+            next.newPassword =
                 t('newPasswordMustBeDifferent') || 'New password must be different from current password';
         }
+        return next;
+    };
 
-        setErrors(newErrors);
-        if (Object.keys(newErrors).length > 0) {
+    const validateForm = (): boolean => {
+        const next = applyPasswordCatalog(passwordCatalogValues());
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
             requestAnimationFrame(() =>
-                scrollToFirstFieldError(newErrors, {
+                scrollToFirstFieldError(next, {
                     currentPassword: 'currentPassword',
                     newPassword: 'newPassword',
                     confirmPassword: 'confirmPassword',
@@ -132,6 +119,16 @@ export const ChangePasswordModal = () => {
             return false;
         }
         return true;
+    };
+
+    const blurField = (field: string) => {
+        const next = applyPasswordCatalog(passwordCatalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const handleSubmit = async () => {
@@ -161,16 +158,10 @@ export const ChangePasswordModal = () => {
             setSuccessMessage(t('passwordChangedSuccessfully') || 'Password changed successfully!');
             setIsSuccessModalOpen(true);
         } catch (error: any) {
-            const errorMessage = error.message || t('errorChangingPassword') || 'Error changing password';
-            
-            // Check if error is about current password
-            if (errorMessage.toLowerCase().includes('current') || errorMessage.toLowerCase().includes('incorrect')) {
-                setErrors({ currentPassword: errorMessage });
-            } else if (errorMessage.toLowerCase().includes('match')) {
-                setErrors({ confirmPassword: errorMessage });
-            } else {
-                setErrors({ general: errorMessage });
-            }
+            const serverErrors = serverFieldErrors(error, 'auth.change_password', translate);
+            if (serverErrors._general) serverErrors.general = serverErrors._general;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ general: error?.message || t('errorChangingPassword') || 'Error changing password' });
         } finally {
             setIsLoading(false);
         }
@@ -205,6 +196,7 @@ export const ChangePasswordModal = () => {
                             placeholder={t('enterCurrentPassword')}
                             value={formData.currentPassword}
                             onChange={(e) => handleChange('currentPassword', e.target.value)}
+                            onBlur={() => blurField('currentPassword')}
                             autoComplete="current-password"
                             data-lpignore="true"
                             data-form-type="other"
@@ -235,6 +227,7 @@ export const ChangePasswordModal = () => {
                             placeholder={t('enterNewPassword')}
                             value={formData.newPassword}
                             onChange={(e) => handleChange('newPassword', e.target.value)}
+                            onBlur={() => blurField('newPassword')}
                             autoComplete="new-password"
                             data-lpignore="true"
                             data-form-type="other"
@@ -265,6 +258,7 @@ export const ChangePasswordModal = () => {
                             placeholder={t('enterConfirmNewPassword')}
                             value={formData.confirmPassword}
                             onChange={(e) => handleChange('confirmPassword', e.target.value)}
+                            onBlur={() => blurField('confirmPassword')}
                             autoComplete="new-password"
                             data-lpignore="true"
                             data-form-type="other"

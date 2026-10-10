@@ -2,7 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterButton, RefreshButton, EditIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, TrashIcon, FilterButton, RefreshButton, EditIcon, TableHorizontalScroll, hasActiveFilters, IconButton } from '../components/index';
 import { DEFAULT_CAMPAIGN_FILTERS } from '../components/drawers/CampaignsFilterDrawer';
 import { Campaign } from '../types';
 import { useCampaigns, useDeleteCampaign } from '../hooks/useQueries';
@@ -72,12 +72,8 @@ const CampaignsTable = ({ campaigns, onEdit, onDelete }: { campaigns: Campaign[]
                                 </td>
                                 <td className="px-4 py-4 whitespace-nowrap text-center">
                                     <div className="flex items-center justify-center gap-1.5">
-                                        <Button variant="ghost" className="p-1.5 h-auto !text-blue-600 dark:!text-blue-400 hover:!bg-blue-50 dark:hover:!bg-blue-900/20 rounded-md transition-colors" onClick={() => onEdit(campaign)} title={t('edit') || 'Edit'}>
-                                            <EditIcon className="w-4 h-4" />
-                                        </Button>
-                                        <Button variant="ghost" className="p-1.5 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 rounded-md transition-colors" onClick={() => onDelete(campaign.id)} title={t('delete') || 'Delete'}>
-                                            <TrashIcon className="w-4 h-4" />
-                                        </Button>
+                                        <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit') || 'Edit'} onClick={() => onEdit(campaign)} />
+                                        <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => onDelete(campaign.id)} />
                                     </div>
                                 </td>
                             </tr>

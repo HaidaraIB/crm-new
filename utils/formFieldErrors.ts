@@ -1,6 +1,7 @@
 /** Shared form field-error helpers (registration-aligned UX). */
 
-import type { TranslateFn } from './formValidation';
+/** Accepts typed i18n `t` (keyof translations) and plain `(key: string) => string`. */
+export type TranslateFn = (key: any) => string | undefined;
 
 export const normalizeErrorMessage = (value: any): string => {
     if (!value) return '';

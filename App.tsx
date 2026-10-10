@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { AppProvider, useAppContext, resolveFallbackPage } from './context/AppContext';
-import { getCompanyRoute, getCompanyViewLeadRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
+import { getCompanyRoute, getCompanyViewLeadRoute, getCompanyDealRoute, navigateToCompanyRoute, extractCompanyFromPath, extractPageFromPath } from './utils/routing';
 import { useTeamChatAwayNotifications } from './hooks/useTeamChatAwayNotifications';
 import { useWhatsAppAwayNotifications } from './hooks/useWhatsAppAwayNotifications';
 import { useSyncDigest } from './hooks/useQueries';
@@ -11,8 +11,8 @@ import { RealtimeSessionSync } from './components/RealtimeSessionSync';
 import { useWebPush } from './hooks/useWebPush';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
-import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, ViewDealModal, AlertModal, ToastHost, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog, WebPushPrompt } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, EmployeesReportPage, IntegrationsHubPage, MetaIntegrationPage, TikTokIntegrationPage, WhatsAppIntegrationPage, SmsIntegrationPage, AiIntegrationPage, LeadApiIntegrationPage, MujebIntegrationPage, MessagingCenterPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
+import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, AlertModal, ToastHost, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog, WebPushPrompt } from './components/index';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, ViewDealPage, EmployeesReportPage, IntegrationsHubPage, MetaIntegrationPage, TikTokIntegrationPage, WhatsAppIntegrationPage, SmsIntegrationPage, AiIntegrationPage, LeadApiIntegrationPage, MujebIntegrationPage, MessagingCenterPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
@@ -77,6 +77,8 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <CreateDealPage />;
         case 'EditDeal':
             return <EditDealPage />;
+        case 'ViewDeal':
+            return <ViewDealPage />;
         case 'Users':
         case 'Employees':
             return <UsersPage />;
@@ -402,6 +404,7 @@ const TheApp = () => {
                 'deals': 'Deals',
                 'create-deal': 'CreateDeal',
                 'edit-deal': 'EditDeal',
+                'view-deal': 'ViewDeal',
                 'employees': 'Employees',
                 'users': 'Users',
                 'marketing': 'Marketing',
@@ -469,6 +472,12 @@ const TheApp = () => {
                     }
                     setCurrentPage('All Leads');
                 }
+                return;
+            }
+
+            if (normalizedPath.startsWith('view-deal/') || normalizedPath.startsWith('edit-deal/')) {
+                const nextPage = normalizedPath.startsWith('view-deal/') ? 'ViewDeal' : 'EditDeal';
+                if (/\d+/.test(normalizedPath) && currentPage !== nextPage) setCurrentPage(nextPage);
                 return;
             }
 
@@ -648,8 +657,14 @@ const TheApp = () => {
         if (!companyFromPath && currentUser?.company && pathnameToCheck !== '/' && subdomainSlug) {
             // Preserve view-lead/:id pattern (getCompanyRoute would mangle it to view-lead123)
             const viewLeadMatch = pageFromPath.match(/^view-(?:lead|patient)\/(\d+)$/i);
+            const viewDealMatch = pageFromPath.match(/^view-deal\/(\d+)$/i);
+            const editDealMatch = pageFromPath.match(/^edit-deal\/(\d+)$/i);
             const correctRoute = viewLeadMatch
                 ? getCompanyViewLeadRoute(currentUser.company.name, currentUser.company.domain, parseInt(viewLeadMatch[1], 10), currentUser.company.specialization)
+                : viewDealMatch
+                    ? getCompanyDealRoute(currentUser.company.name, currentUser.company.domain, `view-deal/${viewDealMatch[1]}`)
+                    : editDealMatch
+                        ? getCompanyDealRoute(currentUser.company.name, currentUser.company.domain, `edit-deal/${editDealMatch[1]}`)
                 : getCompanyRoute(currentUser.company.name, currentUser.company.domain, pageFromPath || currentPage, currentUser.company.specialization);
             window.history.replaceState({}, '', withSearch(correctRoute));
             return;
@@ -707,6 +722,7 @@ const TheApp = () => {
             'deals': 'Deals',
             'create-deal': 'CreateDeal',
             'edit-deal': 'EditDeal',
+            'view-deal': 'ViewDeal',
             'employees': 'Employees',
             'users': 'Users',
             'marketing': 'Marketing',
@@ -784,6 +800,12 @@ const TheApp = () => {
                 }
                 setCurrentPage('All Leads');
             }
+            return;
+        }
+
+        if (normalizedPath.startsWith('view-deal/') || normalizedPath.startsWith('edit-deal/')) {
+            const nextPage = normalizedPath.startsWith('view-deal/') ? 'ViewDeal' : 'EditDeal';
+            if (/\d+/.test(normalizedPath) && currentPage !== nextPage) setCurrentPage(nextPage);
             return;
         }
         
@@ -1184,7 +1206,6 @@ const TheApp = () => {
             <EditProductCategoryModal />
             <AddSupplierModal />
             <EditSupplierModal />
-            <ViewDealModal />
             <ToastHost />
             <AlertModal />
             <AddChannelModal />

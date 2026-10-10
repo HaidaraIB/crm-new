@@ -6,6 +6,7 @@ import { updateCompanyAssignmentSettingsAPI } from '../../services/api';
 import { useCurrentUser, queryKeys } from '../../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -39,17 +40,38 @@ export const WorkHoursSettings = () => {
         }
     }, [company]);
 
-    const validateForm = (): boolean => {
-        const newErrors: Record<string, string> = {};
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
 
-        if (
-            !Number.isFinite(idleTimeoutMinutes) ||
-            idleTimeoutMinutes < 1 ||
-            idleTimeoutMinutes > 120
-        ) {
-            newErrors.idleTimeoutMinutes =
-                t('invalidWorkHoursIdleTimeout') || 'Please enter a valid number of minutes (1 to 120)';
-        }
+    const mirrorWorkHoursErrors = (raw: Record<string, string>) => {
+        const next = { ...raw };
+        if (next._general && !next.general) next.general = next._general;
+        if (next.idle_timeout_minutes && !next.idleTimeoutMinutes) next.idleTimeoutMinutes = next.idle_timeout_minutes;
+        if (next.idleTimeoutMinutes && !next.idle_timeout_minutes) next.idle_timeout_minutes = next.idleTimeoutMinutes;
+        return next;
+    };
+
+    const collectWorkHoursErrors = (minutes = idleTimeoutMinutes) =>
+        mirrorWorkHoursErrors(
+            catalogFieldErrors('work_hours.update', { idle_timeout_minutes: minutes, idleTimeoutMinutes: minutes }, translate),
+        );
+
+    const showIdleError = (minutes = idleTimeoutMinutes) => {
+        const next = collectWorkHoursErrors(minutes);
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next.idleTimeoutMinutes) updated.idleTimeoutMinutes = next.idleTimeoutMinutes;
+            else delete updated.idleTimeoutMinutes;
+            if (next.idle_timeout_minutes) updated.idle_timeout_minutes = next.idle_timeout_minutes;
+            else delete updated.idle_timeout_minutes;
+            return updated;
+        });
+    };
+
+    const validateForm = (): boolean => {
+        const newErrors = collectWorkHoursErrors();
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
@@ -89,12 +111,14 @@ export const WorkHoursSettings = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating work hours settings:', error);
-            setErrors({
-                general:
+            const server = mirrorWorkHoursErrors(serverFieldErrors(error, 'work_hours.update', translate));
+            if (!server.general && !server.idleTimeoutMinutes) {
+                server.general =
                     error?.message ||
                     t('errorSavingSettings') ||
-                    'Failed to save settings. Please try again.',
-            });
+                    'Failed to save settings. Please try again.';
+            }
+            setErrors(server);
         } finally {
             setIsSaving(false);
         }
@@ -141,6 +165,7 @@ export const WorkHoursSettings = () => {
                                 {t('workHoursIdleTimeoutMinutes')}
                             </Label>
                             <div className="flex items-center gap-2 mt-1">
+                                <div onBlur={() => showIdleError()}>
                                 <NumberInput
                                     id="work-hours-idle-timeout"
                                     min={1}
@@ -148,21 +173,17 @@ export const WorkHoursSettings = () => {
                                     value={idleTimeoutMinutes.toString()}
                                     onChange={(e) => {
                                         const value = parseInt(e.target.value, 10);
+                                        const minutes = !isNaN(value) ? value : e.target.value === '' ? 1 : idleTimeoutMinutes;
                                         if (!isNaN(value)) {
                                             setIdleTimeoutMinutes(value);
                                         } else if (e.target.value === '') {
                                             setIdleTimeoutMinutes(1);
                                         }
-                                        if (errors.idleTimeoutMinutes) {
-                                            setErrors((prev) => {
-                                                const next = { ...prev };
-                                                delete next.idleTimeoutMinutes;
-                                                return next;
-                                            });
-                                        }
+                                        if (errors.idleTimeoutMinutes) showIdleError(minutes);
                                     }}
                                     className={`w-32 ${errors.idleTimeoutMinutes ? 'border-red-500' : ''}`}
                                 />
+                                </div>
                                 <span className="text-sm text-gray-500 dark:text-gray-400">
                                     {t('minutes') || 'minutes'}
                                 </span>

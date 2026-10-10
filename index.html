@@ -383,6 +383,28 @@
             height: 0;
         }
 
+        /* overflow-x: auto promotes the other axis to auto, so a one-pixel overrun
+           (tab underline, scrollbar gutter) paints a vertical bar beside the horizontal one.
+           Responsive variants stay inside their breakpoints so a wrapping toolbar is not clipped. */
+        .overflow-x-auto:not(.overflow-y-auto):not(.overflow-y-scroll) {
+            overflow-y: hidden;
+        }
+        @media (min-width: 640px) {
+            .sm\:overflow-x-auto:not(.overflow-y-auto):not(.overflow-y-scroll) { overflow-y: hidden; }
+        }
+        @media (min-width: 768px) {
+            .md\:overflow-x-auto:not(.overflow-y-auto):not(.overflow-y-scroll) { overflow-y: hidden; }
+        }
+        @media (min-width: 1024px) {
+            .lg\:overflow-x-auto:not(.overflow-y-auto):not(.overflow-y-scroll) { overflow-y: hidden; }
+        }
+        @media (min-width: 1280px) {
+            .xl\:overflow-x-auto:not(.overflow-y-auto):not(.overflow-y-scroll) { overflow-y: hidden; }
+        }
+        @media (min-width: 1536px) {
+            .\32xl\:overflow-x-auto:not(.overflow-y-auto):not(.overflow-y-scroll) { overflow-y: hidden; }
+        }
+
         /* Leaflet: clamp height so map tiles cannot inflate page scroll height */
         .lead-location-map {
             isolation: isolate;
@@ -453,6 +475,11 @@
             .animate-slide-down {
                 animation: none;
             }
+        }
+
+        /* Button labels stay on one line. Opt out with whitespace-normal. */
+        button {
+            white-space: nowrap;
         }
     </style>
   <script type="importmap">

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Alert } from '../../components/Alert';
-import { Card, Button, NumberInput } from '../../components/index';
+import { Card, Button, NumberInput, FieldError } from '../../components/index';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { useAppContext } from '../../context/AppContext';
 import { updateCompanyAssignmentSettingsAPI } from '../../services/api';
@@ -10,6 +10,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { IANA_TIMEZONE_GROUPS, allListedIanaZones, type TimezoneGroup } from '../../utils/ianaTimezones';
 import type { AutoAssignAlgorithm } from '../../types';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+import { catalogFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -63,18 +64,10 @@ export const LeadAssignmentSettings = () => {
     }, [businessTimezone, t]);
 
     const validateForm = (): boolean => {
-        const newErrors: Record<string, string> = {};
-
-        if (reAssignEnabled && (!Number.isFinite(reAssignHours) || reAssignHours < 1)) {
-            newErrors.reAssignHours = t('invalidReminderDelayTime') || 'Please enter a valid number of hours (1 or more)';
-        }
-
-        if (
-            noFollowUpEnabled &&
-            (!Number.isFinite(noFollowUpHours) || noFollowUpHours < 1 || noFollowUpHours > 168)
-        ) {
-            newErrors.noFollowUpHours = t('invalidNoFollowUpHours') || 'Please enter a valid number of hours (1 to 168)';
-        }
+        const values: Record<string, unknown> = {};
+        if (reAssignEnabled) values.reAssignHours = reAssignHours;
+        if (noFollowUpEnabled) values.noFollowUpHours = noFollowUpHours;
+        const newErrors = catalogFieldErrors('company_assignment_settings.update', values, t);
 
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
@@ -255,9 +248,7 @@ export const LeadAssignmentSettings = () => {
                                         {t('hours') || 'ساعة'}
                                     </span>
                                 </div>
-                                {errors.reAssignHours && (
-                                    <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.reAssignHours}</p>
-                                )}
+                                <FieldError>{errors.reAssignHours}</FieldError>
                                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     {t('reminderDelayTimeDesc')}
                                 </p>
@@ -317,9 +308,7 @@ export const LeadAssignmentSettings = () => {
                                             {t('hours')}
                                         </span>
                                     </div>
-                                    {errors.noFollowUpHours && (
-                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.noFollowUpHours}</p>
-                                    )}
+                                    <FieldError>{errors.noFollowUpHours}</FieldError>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         {t('noFollowUpHoursDesc')}
                                     </p>

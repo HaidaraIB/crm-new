@@ -8,9 +8,9 @@ import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { Supplier } from '../../types';
 import { useUpdateSupplier } from '../../hooks/useQueries';
-import { validateEmailField, validatePhoneField } from '../../utils/formValidation';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -50,25 +50,41 @@ export const EditSupplierModal = () => {
     
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+            email: formState.email,
+            phone: formState.phone,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('supplier.upsert', values, translate);
+
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        const emailError = validateEmailField(formState.email, t, { required: false });
-        if (emailError) newErrors.email = emailError;
-
-        const phoneError = validatePhoneField(formState.phone, t, { required: false });
-        if (phoneError) newErrors.phone = phoneError;
-
-        setErrors(newErrors);
-        if (Object.keys(newErrors).length > 0) {
-            scrollToFirstFieldError(newErrors, EDIT_SUPPLIER_DOM_ID_MAP);
+        const next = applyCatalog(catalogValues());
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
+            scrollToFirstFieldError(next, EDIT_SUPPLIER_DOM_ID_MAP);
             return false;
         }
         return true;
+    };
+
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -137,23 +153,10 @@ export const EditSupplierModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating supplier:', error);
-            
-            // Parse API validation errors
-            const apiErrors = error?.response?.data || {};
-            const newErrors: { [key: string]: string } = {};
-            
-            Object.keys(apiErrors).forEach(key => {
-                const errorMessages = Array.isArray(apiErrors[key]) 
-                    ? apiErrors[key] 
-                    : [apiErrors[key]];
-                newErrors[key] = errorMessages[0];
-            });
-            
-            if (Object.keys(newErrors).length === 0) {
-                newErrors._general = error?.message || t('failedToUpdateSupplier') || 'Failed to update supplier. Please try again.';
-            }
-            
-            setErrors(newErrors);
+            const serverErrors = serverFieldErrors(error, 'supplier.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('failedToUpdateSupplier') || 'Failed to update supplier. Please try again.' });
         }
     };
 
@@ -172,8 +175,7 @@ export const EditSupplierModal = () => {
                         placeholder={t('enterSupplierName') || 'Enter supplier name'} 
                         value={formState.name} 
                         onChange={handleChange}
-                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                     {errors.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
@@ -188,6 +190,7 @@ export const EditSupplierModal = () => {
                             setFormState(prev => ({ ...prev, phone: value }));
                             clearError('phone');
                         }}
+                        onBlur={() => blurField('phone')}
                         defaultCountry="IQ"
                         error={!!errors.phone}
                     />
@@ -203,8 +206,7 @@ export const EditSupplierModal = () => {
                         placeholder={t('enterEmail') || 'Enter email'} 
                         value={formState.email} 
                         onChange={handleChange}
-                        className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.email ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('email')} />
                     {errors.email && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
                     )}

@@ -19,7 +19,7 @@ export const CopyField: React.FC<{
           readOnly
           value={value}
           dir="ltr"
-          className="flex-1 min-w-0 rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm font-mono"
+          className="h-10 flex-1 min-w-0 rounded-md border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-900 dark:text-white px-3 text-sm font-mono"
         />
         <Button
           variant="secondary"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll } from '../../components/index';
+import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll, IconButton } from '../../components/index';
 import { Tag } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useTags, useDeleteTag } from '../../hooks/useQueries';
@@ -102,22 +102,8 @@ export const TagsSettings = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                                            <button
-                                                type="button"
-                                                className="p-2 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-600 dark:text-gray-400"
-                                                onClick={() => handleEditTag(tag)}
-                                                title={t('edit') || 'Edit'}
-                                            >
-                                                <EditIcon className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="p-2 h-auto hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-red-600 dark:text-red-400"
-                                                onClick={() => handleDeleteTag(tag.id)}
-                                                title={t('delete') || 'Delete'}
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
+                                            <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit') || 'Edit'} onClick={() => handleEditTag(tag)} />
+                                            <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => handleDeleteTag(tag.id)} />
                                         </div>
                                     </td>
                                 </tr>

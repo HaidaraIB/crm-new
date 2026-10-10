@@ -18,6 +18,7 @@ export * from './ActivitiesPage';
 export * from './PropertiesPage';
 export * from './OwnersPage';
 export * from './DealsPage';
+export * from './ViewDealPage';
 export * from './CreateDealPage';
 export * from './EditDealPage';
 export * from './CreateLeadPage';

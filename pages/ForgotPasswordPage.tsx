@@ -4,7 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
 import { Button, Input, MoonIcon, SunIcon } from '../components/index';
 import { forgotPasswordAPI } from '../services/api';
-import { validateEmailField, validateOtpCodeField } from '../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 
 export const ForgotPasswordPage = () => {
     const { setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -15,13 +15,27 @@ export const ForgotPasswordPage = () => {
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [success, setSuccess] = useState(false);
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const showEmailError = (nextEmail = email) => {
+        const next = catalogFieldErrors('auth.forgot_password', { email: nextEmail }, translate);
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next.email) updated.email = next.email;
+            else delete updated.email;
+            return updated;
+        });
+    };
+
     const handleForgotPassword = async () => {
-        setErrors({});
         setSuccess(false);
 
-        const emailErr = validateEmailField(email, t);
-        if (emailErr) {
-            setErrors({ email: emailErr });
+        const next = catalogFieldErrors('auth.forgot_password', { email }, translate);
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
             return;
         }
 
@@ -31,20 +45,31 @@ export const ForgotPasswordPage = () => {
             await forgotPasswordAPI(email, language);
             setSuccess(true);
         } catch (error: any) {
+            const server = serverFieldErrors(error, 'auth.forgot_password', translate);
             const errorMessage = error.message || 'Failed to send password reset email';
-            setErrors({ general: errorMessage });
+            setErrors({
+                ...server,
+                general: server._general || server.general || errorMessage,
+            });
         } finally {
             setIsLoading(false);
         }
     };
 
+    const showCodeError = (nextCode = code) => {
+        const next = catalogFieldErrors('auth.email_code', { code: nextCode }, translate);
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next.code) updated.code = next.code;
+            else delete updated.code;
+            return updated;
+        });
+    };
+
     const handleContinueWithCode = () => {
-        const codeErr = validateOtpCodeField(code, t, { exactLength: 6 });
-        if (codeErr) {
-            setErrors({ code: codeErr === (t('invalidVerificationCode') || 'Invalid verification code')
-                ? (t('codeMustBe6Digits') || 'Code must be 6 digits')
-                : (code.trim() ? codeErr : (t('pleaseEnterCode') || 'Please enter the reset code'))
-            });
+        const next = catalogFieldErrors('auth.email_code', { code }, translate);
+        if (Object.keys(next).length > 0) {
+            setErrors(next);
             return;
         }
         setIsCodeLoading(true);
@@ -102,16 +127,13 @@ export const ForgotPasswordPage = () => {
                                             value={code}
                                             className={errors.code ? 'border-red-500' : ''}
                                             onChange={(e) => {
-                                                setCode(e.target.value);
-                                                setErrors((prev) => {
-                                                    const next = { ...prev };
-                                                    delete next.code;
-                                                    delete next.general;
-                                                    return next;
-                                                });
+                                                const value = e.target.value;
+                                                setCode(value);
+                                                if (errors.code) showCodeError(value);
                                             }}
+                                            onBlur={() => showCodeError()}
                                             onKeyPress={(e) => {
-                                                if (e.key === 'Enter' && code.trim().length === 6) {
+                                                if (e.key === 'Enter' && code.trim()) {
                                                     handleContinueWithCode();
                                                 }
                                             }}
@@ -129,7 +151,7 @@ export const ForgotPasswordPage = () => {
                                             onClick={handleContinueWithCode}
                                             className="w-full"
                                             loading={isCodeLoading}
-                                            disabled={!code.trim() || code.trim().length !== 6 || isCodeLoading}
+                                            disabled={!code.trim() || isCodeLoading}
                                         >
                                             {t('continueWithCode') || 'Continue with Code'}
                                         </Button>
@@ -152,14 +174,11 @@ export const ForgotPasswordPage = () => {
                                         value={email}
                                         className={errors.email ? 'border-red-500' : ''}
                                         onChange={(e) => {
-                                            setEmail(e.target.value);
-                                            setErrors((prev) => {
-                                                const next = { ...prev };
-                                                delete next.email;
-                                                delete next.general;
-                                                return next;
-                                            });
+                                            const value = e.target.value;
+                                            setEmail(value);
+                                            if (errors.email) showEmailError(value);
                                         }}
+                                        onBlur={() => showEmailError()}
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') {
                                                 handleForgotPassword();

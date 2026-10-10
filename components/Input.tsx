@@ -20,6 +20,7 @@ export const Input = forwardRef<
     defaultValue?: string;
     /** Renders inside the field direction wrapper at inline-end (password reveal, etc.). */
     endAdornment?: React.ReactNode;
+    invalid?: boolean;
   } & InputHTMLAttributes<HTMLInputElement>
 >(
   (
@@ -34,6 +35,7 @@ export const Input = forwardRef<
       defaultValue,
       dir,
       endAdornment,
+      invalid,
       ...rest
     },
     ref,
@@ -56,7 +58,8 @@ export const Input = forwardRef<
           onChange={onChange}
           defaultValue={defaultValue}
           dir={resolvedDir}
-          className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-300 ${leadingPad} ${trailingPad} ${className}`}
+          aria-invalid={invalid || rest['aria-invalid'] ? true : undefined}
+          className={`h-10 w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border ${invalid ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-700'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-500 dark:placeholder:text-gray-300 ${leadingPad} ${trailingPad} ${className}`}
           {...rest}
         />
         {icon ? (

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef, createContext, useContext, ReactNode } from 'react';
 import type { Toast } from '../components/ToastHost';
 import type { AlertVariant } from '../components/Alert';
-import { Theme, Language, Page, Lead, User, Deal, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ArrivalFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
+import { Theme, Language, Page, Lead, User, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ArrivalFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
 import { translations } from '../constants';
 import {
   isMedicalSpecialization,
@@ -17,7 +17,7 @@ import { generateColorShades } from '../utils/colors';
 import { getCurrentUserAPI, checkPaymentStatusAPI, updateLanguageAPI, sendPresenceHeartbeatAPI, resetConditionalRequestCaches } from '../services/api';
 import { sendRealtime } from '../hooks/useRealtimeChannel';
 import { getRoleLandingPage, normalizeRole, roleReportsPresence, userTracksWorkHours } from '../utils/roles';
-import { getCompanyRoute, getCompanyViewLeadRoute, navigateToPage, NavigateToPageOptions } from '../utils/routing';
+import { getCompanyRoute, getCompanyViewLeadRoute, goToPreviousPage, navigateToPage, NavigateToPageOptions } from '../utils/routing';
 import { syncInputDirections } from '../utils/inputAutoDir';
 import { setLeadsReturnPage, getLeadsReturnPage } from '../utils/leadsReturnPage';
 import {
@@ -293,10 +293,6 @@ export interface AppContextType {
   // Deals states
   isDealsFilterDrawerOpen: boolean;
   setIsDealsFilterDrawerOpen: (isOpen: boolean) => void;
-  isViewDealModalOpen: boolean;
-  setIsViewDealModalOpen: (isOpen: boolean) => void;
-  viewingDeal: Deal | null;
-  setViewingDeal: React.Dispatch<React.SetStateAction<Deal | null>>;
 
   // Users states
   isAddUserModalOpen: boolean;
@@ -390,8 +386,6 @@ export interface AppContextType {
   setTodosPagePreset: React.Dispatch<React.SetStateAction<import('../utils/missionBarNavigation').MissionBarTodosPreset | null>>;
   dealFilters: DealFilters;
   setDealFilters: React.Dispatch<React.SetStateAction<DealFilters>>;
-  editingDeal: Deal | null;
-  setEditingDeal: React.Dispatch<React.SetStateAction<Deal | null>>;
   campaignFilters: CampaignFilters;
   setCampaignFilters: React.Dispatch<React.SetStateAction<CampaignFilters>>;
   activityFilters: ActivityFilters;
@@ -621,6 +615,14 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     valueMin: '',
     valueMax: '',
     search: '',
+    stageId: 'All',
+    outcome: 'All',
+    employee: 'All',
+    pipeline: 'All',
+    expectedCloseFrom: '',
+    expectedCloseTo: '',
+    createdFrom: '',
+    createdTo: '',
   });
   const [campaignFilters, setCampaignFilters] = useState<CampaignFilters>({
     isActive: 'All',
@@ -771,9 +773,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   
   // Deals state
   const [isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen] = useState(false);
-  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
-  const [isViewDealModalOpen, setIsViewDealModalOpen] = useState(false);
-  const [viewingDeal, setViewingDeal] = useState<Deal | null>(null);
   
   // Users state
   const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
@@ -1399,6 +1398,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       case 'Deals':
       case 'CreateDeal':
       case 'EditDeal':
+      case 'ViewDeal':
         return p('can_manage_deals');
       case 'Users':
       case 'Employees':
@@ -1697,16 +1697,18 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     if (target?.page === 'Calls') {
       stashPendingCallsTab(target.callsTab);
     }
-    const route = currentUser?.company
-      ? getCompanyRoute(
-          currentUser.company.name,
-          currentUser.company.domain,
-          page,
-          currentUser.company.specialization,
-        )
-      : `/${page.toLowerCase().replace(/\s+/g, '-')}`;
-    window.history.pushState({}, '', route);
-    setCurrentPage(page);
+    goToPreviousPage(() => {
+      const route = currentUser?.company
+        ? getCompanyRoute(
+            currentUser.company.name,
+            currentUser.company.domain,
+            page,
+            currentUser.company.specialization,
+          )
+        : `/${page.toLowerCase().replace(/\s+/g, '-')}`;
+      window.history.pushState({}, '', route);
+      setCurrentPage(page);
+    });
   }, [currentUser?.company]);
 
   const openCallsFiltered = useCallback(
@@ -1804,9 +1806,6 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isEditSupplierModalOpen, setIsEditSupplierModalOpen,
     editingSupplier, setEditingSupplier,
     isDealsFilterDrawerOpen, setIsDealsFilterDrawerOpen,
-    editingDeal, setEditingDeal,
-    isViewDealModalOpen, setIsViewDealModalOpen,
-    viewingDeal, setViewingDeal,
     isAddUserModalOpen, setIsAddUserModalOpen,
     isViewUserModalOpen, setIsViewUserModalOpen,
     isEditUserModalOpen, setIsEditUserModalOpen,

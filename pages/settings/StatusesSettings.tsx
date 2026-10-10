@@ -1,6 +1,6 @@
 import React from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll } from '../../components/index';
+import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll, IconButton } from '../../components/index';
 import { Status } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useStatuses, useDeleteStatus, useUpdateStatus } from '../../hooks/useQueries';
@@ -203,23 +203,8 @@ export const StatusesSettings = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                                            <button
-                                                type="button"
-                                                className="p-2 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-600 dark:text-gray-400"
-                                                onClick={() => handleEditStatus(status)}
-                                                title={t('edit') || 'Edit'}
-                                            >
-                                                <EditIcon className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="p-2 h-auto hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-red-600 dark:text-red-400"
-                                                disabled={isDefault} 
-                                                onClick={() => handleDeleteStatus(status.id)}
-                                                title={isDefault ? t('cannotDeleteDefault') || 'Cannot delete default' : t('delete') || 'Delete'}
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
+                                            <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit') || 'Edit'} onClick={() => handleEditStatus(status)} />
+                                            <IconButton icon={<TrashIcon className="h-4 w-4" />} label={isDefault ? t('cannotDeleteDefault') || 'Cannot delete default' : t('delete') || 'Delete'} tone="danger" onClick={() => handleDeleteStatus(status.id)} disabled={isDefault} />
                                         </div>
                                     </td>
                                 </tr>

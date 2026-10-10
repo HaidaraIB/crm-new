@@ -1,19 +1,35 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
+import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, PageBackButton, PageLoadingState, FieldError, IconButton, Select } from '../components/index';
 import { Channel, Lead, PhoneNumber, Status, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useTags, usePatchLead } from '../hooks/useQueries';
 import { TagMultiSelect } from '../components/leads/TagMultiSelect';
+import { goToPreviousPage } from '../utils/routing';
 import { getAssignmentBlockReason, ASSIGNMENT_BLOCK_LABEL_KEY } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions } from '../utils/roles';
 import { LeadInterestInventoryFields } from '../components/LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { parseLeadCoordinate } from '../utils/leadLocation';
 import { mapApiLeadToDisplayLead, normalizeLead } from '../utils/normalizeLead';
-import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
+import { mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
+import { scrollToFirstFieldError } from '../utils/formFieldErrors';
+import { Alert } from '../components/Alert';
 import { LeadUrgentToggle } from '../components/LeadUrgentToggle';
+
+/** Error key -> DOM id, for scrolling to the first invalid field on submit. */
+const LEAD_FIELD_DOM_IDS: Record<string, string> = {
+    name: 'name',
+    phone: 'phone',
+    communicationWay: 'communicationWay',
+    status: 'status',
+    priority: 'priority',
+    type: 'type',
+    leadCompanyName: 'leadCompanyName',
+    notes: 'notes',
+};
 import { buildLeadUpdateDiff, buildLeadUpdatePayload } from '../utils/leadUpdatePayload';
 import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
 import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
@@ -23,19 +39,23 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
 
-// FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className, language }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; language?: 'ar' | 'en' }) => {
-    const { language: contextLanguage } = useAppContext();
-    const lang = language || contextLanguage;
-    return (
-        <select id={id} value={value} onChange={onChange} dir={lang === 'ar' ? 'rtl' : 'ltr'} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${className || ''}`}>
-            {children}
-        </select>
-    );
-};
-
 export const EditLeadPage = () => {
     const { t, setCurrentPage, editingLead, setEditingLead, setSelectedLead, currentUser } = useAppContext();
+    const goLeads = () => {
+        window.history.pushState({}, '', '/leads');
+        setCurrentPage('Leads');
+    };
+    const goBack = () => {
+        if (!editingLead) {
+            goToPreviousPage(goLeads);
+            return;
+        }
+        setSelectedLead(editingLead);
+        goToPreviousPage(() => {
+            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
+            setCurrentPage('ViewLead');
+        });
+    };
 
     const isMedicalCompany = useMemo(
         () => String(currentUser?.company?.specialization || '').toLowerCase() === 'medical',
@@ -106,32 +126,78 @@ export const EditLeadPage = () => {
         return () => clearTimeout(timer);
     }, []);
 
-    const validateForm = (): boolean => {
-        const newErrors = validateLeadForm(
-            {
-                name: formState.name,
-                phone: formState.phone,
-                phoneNumbers,
-                communicationWay: formState.communicationWay,
-                status: formState.status,
-                priority: formState.priority,
-                type: formState.type,
-            },
-            t
-        );
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
     };
 
-    const clearError = (field: string) => {
-        if (errors[field]) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors[field];
-                return newErrors;
-            });
+    const leadCatalogValues = (
+        state = formState,
+        phones: PhoneNumber[] = phoneNumbers,
+    ) => {
+        const filled = phones.filter((pn) => (pn.phone_number || '').trim() !== '');
+        const phone = filled[0]?.phone_number || state.phone;
+        return {
+            name: state.name,
+            phone,
+            phone_number: phone,
+            ...(filled.length ? { phoneNumbers: filled, phone_numbers: filled } : {}),
+            communicationWay: state.communicationWay,
+            communication_way: state.communicationWay,
+            status: state.status,
+            priority: state.priority,
+            type: state.type,
+            leadCompanyName: state.leadCompanyName,
+            lead_company_name: state.leadCompanyName,
+            notes: state.notes,
+        };
+    };
+
+    const mirrorLeadErrors = (raw: Record<string, string>) => {
+        const next = { ...raw };
+        if (next._general && !next.general) next.general = next._general;
+        if (next.companyId && !next.company) next.company = next.companyId;
+        if (next.company && !next.companyId) next.companyId = next.company;
+        if (next.phoneNumbers && !next.phone) next.phone = next.phoneNumbers;
+        if (next.phone_number && !next.phone) next.phone = next.phone_number;
+        for (const [key, message] of Object.entries(raw)) {
+            if ((key.startsWith('phone_numbers') || key.startsWith('phoneNumbers')) && !next.phone) {
+                next.phone = message;
+            }
         }
+        return next;
+    };
+
+    const showLeadField = (
+        field: string,
+        state = formState,
+        phones: PhoneNumber[] = phoneNumbers,
+    ) => {
+        const next = mirrorLeadErrors(catalogFieldErrors('lead.upsert', leadCatalogValues(state, phones), translate));
+        const keys = new Set<string>([field]);
+        if (field === 'phone' || field === 'phoneNumbers') {
+            keys.add('phone');
+            keys.add('phoneNumbers');
+            keys.add('phone_number');
+        }
+        setErrors((prev) => {
+            const updated = { ...prev };
+            for (const key of keys) {
+                if (next[key]) updated[key] = next[key];
+                else delete updated[key];
+            }
+            return updated;
+        });
+    };
+
+    const validateForm = (): boolean => {
+        const next = mirrorLeadErrors(catalogFieldErrors('lead.upsert', leadCatalogValues(), translate));
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
+            requestAnimationFrame(() => scrollToFirstFieldError(next, LEAD_FIELD_DOM_IDS));
+            return false;
+        }
+        return true;
     };
 
     // Initialize form state when editingLead changes
@@ -277,10 +343,9 @@ export const EditLeadPage = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;
-        setFormState(prev => {
-            return { ...prev, [id]: value };
-        });
-        clearError(id);
+        const nextState = { ...formState, [id]: value };
+        setFormState(nextState);
+        if (errors[id]) showLeadField(id, nextState, phoneNumbers);
     };
 
     const handleAddPhoneNumber = () => {
@@ -316,8 +381,9 @@ export const EditLeadPage = () => {
             }
             return newPhones;
         });
-        if (field === 'phone_number') {
-            clearError('phone');
+        if (field === 'phone_number' && errors.phone) {
+            const nextPhones = phoneNumbers.map((pn, i) => (i === index ? { ...pn, phone_number: String(value) } : pn));
+            showLeadField('phone', formState, nextPhones);
         }
     };
 
@@ -380,7 +446,11 @@ export const EditLeadPage = () => {
                 setCurrentPage('ViewLead');
             } catch (error: any) {
                 console.error('Error updating lead:', error);
-                setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorUpdatingLead'));
+                const server = mirrorLeadErrors(serverFieldErrors(error, 'lead.upsert', translate));
+                const fallback = mapLeadApiErrorToFieldErrors(error, t, 'errorUpdatingLead');
+                const next = Object.keys(server).length > 0 ? { ...fallback, ...server } : fallback;
+                setErrors(next);
+                requestAnimationFrame(() => scrollToFirstFieldError(next, LEAD_FIELD_DOM_IDS));
             }
         };
 
@@ -417,24 +487,26 @@ export const EditLeadPage = () => {
             await submitPatch(patchData);
         } catch (error: any) {
             console.error('Error updating lead:', error);
-            setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorUpdatingLead'));
+            const server = mirrorLeadErrors(serverFieldErrors(error, 'lead.upsert', translate));
+            const fallback = mapLeadApiErrorToFieldErrors(error, t, 'errorUpdatingLead');
+            const next = Object.keys(server).length > 0 ? { ...fallback, ...server } : fallback;
+            setErrors(next);
+            requestAnimationFrame(() => scrollToFirstFieldError(next, LEAD_FIELD_DOM_IDS));
         }
     };
 
     if (!editingLead) {
         return (
-            <PageWrapper title={t('editLead') || 'Edit Lead'}>
+            <PageWrapper title={
+                <div className="flex min-w-0 items-center gap-3">
+                    <PageBackButton onClick={goBack} />
+                    <span className="truncate">{t('editLead')}</span>
+                </div>
+            }>
                 <div className="text-center py-8">
-                    <p className="text-gray-500 dark:text-gray-400">{t('noLeadSelected') || 'No lead selected for editing'}</p>
-                    <Button
-                        variant="secondary"
-                        onClick={() => {
-                            window.history.pushState({}, '', '/leads');
-                            setCurrentPage('Leads');
-                        }}
-                        className="mt-4"
-                    >
-                        {t('back') || 'Back'}
+                    <p className="text-gray-500 dark:text-gray-400">{t('noLeadSelected')}</p>
+                    <Button variant="secondary" onClick={goBack} className="mt-4">
+                        {t('back')}
                     </Button>
                 </div>
             </PageWrapper>
@@ -443,7 +515,12 @@ export const EditLeadPage = () => {
 
     if (pageLoading) {
         return (
-            <PageWrapper title={t('editLead') || 'Edit Lead'}>
+            <PageWrapper title={
+                <div className="flex min-w-0 items-center gap-3">
+                    <PageBackButton onClick={goBack} />
+                    <span className="truncate">{t('editLead')}</span>
+                </div>
+            }>
                 <PageLoadingState label={t('loading') || 'Loading'} />
             </PageWrapper>
         );
@@ -452,19 +529,9 @@ export const EditLeadPage = () => {
     return (
         <PageWrapper 
             title={
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => {
-                            setSelectedLead(editingLead);
-                            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
-                            setCurrentPage('ViewLead');
-                        }}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                        title={t('back') || 'Back'}
-                    >
-                        <ArrowLeftIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    </button>
-                    <span>{t('editLead') || 'Edit Lead'}</span>
+                <div className="flex min-w-0 items-center gap-3">
+                    <PageBackButton onClick={goBack} />
+                    <span className="truncate">{t('editLead')}</span>
                 </div>
             }
         >
@@ -483,24 +550,8 @@ export const EditLeadPage = () => {
                             companyTimeZone={companyTz}
                         />
                     </div>
-                    {(errors.general || Object.keys(errors).filter(key => key !== 'general').length > 0) && (
-                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                            {errors.general && (
-                                <p className="text-sm text-red-600 dark:text-red-400 mb-2 font-medium">{errors.general}</p>
-                            )}
-                            {Object.keys(errors).filter(key => key !== 'general').length > 0 && (
-                                <div className="text-sm text-red-600 dark:text-red-400">
-                                    {!errors.general && (
-                                        <p className="font-medium mb-2">{t('pleaseFixErrors') || 'Please fix the following errors:'}</p>
-                                    )}
-                                    <ul className="list-disc list-inside space-y-1">
-                                        {Object.keys(errors).filter(key => key !== 'general').map(key => (
-                                            <li key={key} className="font-medium">{errors[key]}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </div>
+                    {errors.general && (
+                        <Alert variant="error" className="mb-4">{errors.general}</Alert>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div className="md:col-span-2 lg:col-span-1">
@@ -510,20 +561,22 @@ export const EditLeadPage = () => {
                                 placeholder={t('enterClientName')} 
                                 value={formState.name} 
                                 onChange={handleChange}
+                                onBlur={() => showLeadField('name')}
                                 className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
                             />
-                            {errors.name && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                            )}
+                            <FieldError>{errors.name}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
-                            <Input 
-                                id="leadCompanyName" 
-                                placeholder={t('enterLeadCompanyName')} 
-                                value={formState.leadCompanyName} 
+                            <Input
+                                id="leadCompanyName"
+                                placeholder={t('enterLeadCompanyName')}
+                                value={formState.leadCompanyName}
                                 onChange={handleChange}
+                                onBlur={() => showLeadField('leadCompanyName')}
+                                className={errors.leadCompanyName ? 'border-red-500 dark:border-red-500' : ''}
                             />
+                            <FieldError>{errors.leadCompanyName}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="profession">{t('profession')}</Label>
@@ -588,9 +641,11 @@ export const EditLeadPage = () => {
                                 rows={3}
                                 value={formState.notes}
                                 onChange={handleChange}
+                                onBlur={() => showLeadField('notes')}
                                 placeholder={t('enterNotes') || 'Enter notes...'}
-                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${errors.notes ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                             />
+                            <FieldError>{errors.notes}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="budget">{t('budget')}</Label>
@@ -609,20 +664,21 @@ export const EditLeadPage = () => {
                             </div>
                             {phoneNumbers.length === 0 ? (
                                 <div>
+                                    <div onBlur={() => showLeadField('phone')}>
                                     <PhoneInput 
                                         id="phone" 
                                         placeholder={t('enterPhoneNumber')} 
                                         value={formState.phone} 
                                         onChange={(value) => {
-                                            setFormState(prev => ({ ...prev, phone: value }));
-                                            clearError('phone');
+                                            const nextState = { ...formState, phone: value };
+                                            setFormState(nextState);
+                                            if (errors.phone) showLeadField('phone', nextState, phoneNumbers);
                                         }}
                                         defaultCountry="IQ"
                                         error={!!errors.phone}
                                     />
-                                    {errors.phone && (
-                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
-                                    )}
+                                    </div>
+                                    <FieldError>{errors.phone}</FieldError>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         {t('orAddMultiplePhones') || 'Or add multiple phone numbers below'}
                                     </p>
@@ -632,6 +688,7 @@ export const EditLeadPage = () => {
                                     {phoneNumbers.map((pn, index) => (
                                         <div key={index} className="grid grid-cols-12 gap-3 items-center">
                                             <div className="col-span-12 md:col-span-5">
+                                                <div onBlur={() => showLeadField('phone')}>
                                                 <PhoneInput
                                                     placeholder={t('enterPhoneNumber')}
                                                     value={pn.phone_number}
@@ -639,6 +696,7 @@ export const EditLeadPage = () => {
                                                     defaultCountry="IQ"
                                                     error={!!errors.phone}
                                                 />
+                                                </div>
                                             </div>
                                             <div className="col-span-6 md:col-span-2">
                                                 <Select
@@ -662,22 +720,13 @@ export const EditLeadPage = () => {
                                                 />
                                             </div>
                                             <div className="col-span-2 md:col-span-2 flex justify-end">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemovePhoneNumber(index)}
-                                                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                                                    title={t('delete') || 'Delete'}
-                                                >
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </button>
+                                                <IconButton size="md" tone="danger" icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} onClick={() => handleRemovePhoneNumber(index)} />
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                            {errors.phone && phoneNumbers.length > 0 && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
-                            )}
+                            {phoneNumbers.length > 0 && <FieldError>{errors.phone}</FieldError>}
                         </div>
                         <div>
                             <Label htmlFor="assignedTo">{t('assignedTo')}</Label>
@@ -707,9 +756,7 @@ export const EditLeadPage = () => {
                                 <option value="hot">{t('hot')}</option>
                                 <option value="cold">{t('cold')}</option>
                             </Select>
-                            {errors.type && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.type}</p>
-                            )}
+                            <FieldError>{errors.type}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="communicationWay">{t('communicationWay')} <span className="text-red-500">*</span></Label>
@@ -730,9 +777,7 @@ export const EditLeadPage = () => {
                                     <option value="" disabled>{t('noChannelsAvailable') || 'No channels available'}</option>
                                 )}
                             </Select>
-                            {errors.communicationWay && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.communicationWay}</p>
-                            )}
+                            <FieldError>{errors.communicationWay}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="priority">{t('priority')} <span className="text-red-500">*</span></Label>
@@ -747,9 +792,7 @@ export const EditLeadPage = () => {
                                 <option value="medium">{t('medium')}</option>
                                 <option value="low">{t('low')}</option>
                             </Select>
-                            {errors.priority && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.priority}</p>
-                            )}
+                            <FieldError>{errors.priority}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="status">{t('status')} <span className="text-red-500">*</span></Label>
@@ -772,9 +815,7 @@ export const EditLeadPage = () => {
                                     <option value="" disabled>{t('noStatusesAvailable') || 'No statuses available'}</option>
                                 )}
                             </Select>
-                            {errors.status && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.status}</p>
-                            )}
+                            <FieldError>{errors.status}</FieldError>
                         </div>
                         {tags.length > 0 && (
                             <div>
@@ -789,11 +830,7 @@ export const EditLeadPage = () => {
                         )}
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
-                        <Button type="button" variant="secondary" onClick={() => {
-                            setSelectedLead(editingLead);
-                            window.history.pushState({}, '', `/view-lead/${editingLead.id}`);
-                            setCurrentPage('ViewLead');
-                        }} disabled={isSaving}>
+                        <Button type="button" variant="secondary" onClick={goBack} disabled={isSaving}>
                             {t('cancel')}
                         </Button>
                         <Button type="submit" disabled={isSaving} loading={isSaving}>

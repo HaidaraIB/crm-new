@@ -48,7 +48,7 @@ export const Tabs: React.FC<{
 
   return (
     <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-      <nav className="-mb-px flex gap-6 overflow-x-auto" role="tablist" aria-label={ariaLabel}>
+      <nav className="-mb-px flex gap-6 overflow-x-auto overflow-y-hidden" role="tablist" aria-label={ariaLabel}>
         {tabs.map((tab, index) => {
           const selected = tab.id === activeId;
           return (

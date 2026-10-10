@@ -46,7 +46,7 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
       className={`pointer-events-none fixed inset-x-3 bottom-4 z-[80] flex justify-center md:start-[calc(16rem+0.75rem)] ${className}`}
     >
       <div
-        className="pointer-events-auto flex w-max max-w-full items-center gap-2 overflow-x-auto rounded-full border border-gray-200 bg-white/95 p-1.5 ps-2 shadow-2xl shadow-black/20 ring-1 ring-black/5 backdrop-blur-md dark:border-white/10 dark:bg-gray-900/95 dark:shadow-black/60 dark:ring-white/10 sm:gap-2.5 sm:ps-2.5"
+        className="pointer-events-auto flex w-max max-w-full items-center gap-2 overflow-x-auto overflow-y-hidden rounded-full border border-gray-200 bg-white/95 p-1.5 ps-2 shadow-2xl shadow-black/20 ring-1 ring-black/5 backdrop-blur-md dark:border-white/10 dark:bg-gray-900/95 dark:shadow-black/60 dark:ring-white/10 sm:gap-2.5 sm:ps-2.5"
         role="toolbar"
         aria-label={selectedLabel}
       >

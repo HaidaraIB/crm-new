@@ -354,7 +354,7 @@ export const ChangePlanPage = () => {
                                     setTrialCodeMessage(null);
                                 }}
                                 placeholder={t('trialCodePlaceholder')}
-                                className="flex-1 min-w-[160px] rounded-lg border border-gray-300 dark:border-gray-600 px-3 py-2 text-sm font-mono bg-white dark:bg-gray-800"
+                                className="h-10 flex-1 min-w-[160px] rounded-md border border-gray-300 dark:border-gray-600 px-3 text-sm font-mono bg-white dark:bg-gray-800"
                             />
                             <Button
                                 type="button"
@@ -366,7 +366,7 @@ export const ChangePlanPage = () => {
                             </Button>
                         </div>
                         {trialCodeMessage && (
-                            <p className="text-sm text-red-600 dark:text-red-300">{trialCodeMessage}</p>
+                            <p className="text-sm text-red-600 dark:text-red-400">{trialCodeMessage}</p>
                         )}
                     </div>
 

@@ -10,7 +10,7 @@ import {
     preLoginPhoneChangeAPI,
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
-import { validateOtpCodeField } from '../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 
 const PRE_LOGIN_PHONE_RESEND_COOLDOWN_KEY = 'preLoginVerifyPhoneResendCooldown';
@@ -200,12 +200,34 @@ export const VerifyPhonePage = () => {
         }
     };
 
-    const clearFieldError = (field: string) => {
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const showCodeError = (nextCode = code) => {
+        const next = catalogFieldErrors('auth.phone_otp', { code: nextCode }, translate);
         setErrors((prev) => {
-            if (!prev[field]) return prev;
-            const next = { ...prev };
-            delete next[field];
-            return next;
+            const updated = { ...prev };
+            delete updated.phone;
+            if (next.code) updated.code = next.code;
+            else delete updated.code;
+            return updated;
+        });
+    };
+
+    const showNewPhoneError = (nextPhone = newPhone) => {
+        const next = catalogFieldErrors('auth.phone_otp', { phone: nextPhone, code: '000000' }, translate);
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next.phone) {
+                updated.phone = next.phone;
+                updated.newPhone = next.phone;
+            } else {
+                delete updated.phone;
+                delete updated.newPhone;
+            }
+            return updated;
         });
     };
 
@@ -215,9 +237,9 @@ export const VerifyPhonePage = () => {
             return;
         }
         const trimmed = code.trim().replace(/\s/g, '');
-        const codeErr = validateOtpCodeField(trimmed, t);
-        if (codeErr) {
-            setErrors({ code: codeErr });
+        const codeErrors = catalogFieldErrors('auth.phone_otp', { code: trimmed }, translate);
+        if (codeErrors.code) {
+            setErrors({ code: codeErrors.code });
             return;
         }
         setErrors({});
@@ -238,7 +260,14 @@ export const VerifyPhonePage = () => {
             schedulePostVerifyRedirect();
         } catch (error: unknown) {
             const err = error as { message?: string };
-            setStatus({ type: 'error', message: err.message || 'Verification failed' });
+            const server = serverFieldErrors(error, 'auth.phone_otp', translate);
+            if (server.code || server.phone) {
+                setErrors({
+                    ...(server.code ? { code: server.code } : {}),
+                    ...(server.phone ? { phone: server.phone, newPhone: server.phone } : {}),
+                });
+            }
+            setStatus({ type: 'error', message: server._general || err.message || 'Verification failed' });
         } finally {
             setVerifyLoading(false);
         }
@@ -249,9 +278,9 @@ export const VerifyPhonePage = () => {
             setStatus({ type: 'error', message: t('preLoginCredentialsMissingHint') });
             return;
         }
-        const digits = newPhone.replace(/\D/g, '');
-        if (digits.length < 8) {
-            setErrors({ newPhone: t('invalidPhone') || 'Invalid phone number format' });
+        const phoneErrors = catalogFieldErrors('auth.phone_otp', { phone: newPhone.trim(), code: '000000' }, translate);
+        if (phoneErrors.phone) {
+            setErrors({ phone: phoneErrors.phone, newPhone: phoneErrors.phone });
             return;
         }
         setErrors({});
@@ -348,9 +377,11 @@ export const VerifyPhonePage = () => {
                                         autoComplete="one-time-code"
                                         value={code}
                                         onChange={(e) => {
-                                            setCode(e.target.value.replace(/\D/g, '').slice(0, 8));
-                                            clearFieldError('code');
+                                            const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                            setCode(value);
+                                            if (errors.code) showCodeError(value);
                                         }}
+                                        onBlur={() => showCodeError()}
                                         placeholder="123456"
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') handleVerify();
@@ -383,7 +414,12 @@ export const VerifyPhonePage = () => {
                                     <div className="space-y-2">
                                         <Input
                                             value={newPhone}
-                                            onChange={(e) => setNewPhone(e.target.value)}
+                                            onChange={(e) => {
+                                                const value = e.target.value;
+                                                setNewPhone(value);
+                                                if (errors.newPhone || errors.phone) showNewPhoneError(value);
+                                            }}
+                                            onBlur={() => showNewPhoneError()}
                                             placeholder={t('preLoginNewPhonePlaceholder')}
                                             inputMode="tel"
                                             autoComplete="tel"

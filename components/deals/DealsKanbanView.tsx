@@ -1,423 +1,121 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useQueries, useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState } from 'react';
+import { KanbanBoard } from '../kanban';
+import { DealKanbanCard } from './DealKanbanCard';
+import { DealWonLostModal } from './DealWonLostModal';
+import { getDealsAPI, moveDealAPI } from '../../services/api';
+import { mapApiDeal } from '../../utils/deals/dealMapper';
+import { formatDealMoney } from '../../utils/deals/dealFormatters';
 import { useAppContext } from '../../context/AppContext';
-import { Button, SectionLoadingState } from '../index';
-import {
-    KanbanBoard,
-    reconcileKanbanColumns,
-    type KanbanColumnDef,
-    type KanbanMoveEvent,
-} from '../kanban';
-import { DealKanbanCard, type DealKanbanCardModel } from './DealKanbanCard';
-import { getDealsAPI, patchDealAPI } from '../../services/api';
-import { queryKeys } from '../../hooks/useQueries';
-import type { Deal, DealFilters } from '../../types';
-import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
+import type { Deal, DealPipeline, DealPipelineStage } from '../../types';
+import type { DealQueryParams } from '../../services/api';
 
-const COLUMN_PAGE_SIZE = 30;
-
-export const DEAL_STAGE_ORDER: Deal['stage'][] = [
-    'in_progress',
-    'on_hold',
-    'won',
-    'lost',
-    'cancelled',
-];
-
-export const DEAL_STAGE_COLORS: Record<string, string> = {
-    in_progress: '#3b82f6',
-    on_hold: '#eab308',
-    won: '#22c55e',
-    lost: '#ef4444',
-    cancelled: '#a855f7',
-};
+const PAGE_SIZE = 40;
 
 type DealsKanbanViewProps = {
-    search?: string;
-    dealFilters: DealFilters;
-    isRealEstate: boolean;
-    canDrag?: boolean;
-    onOpenDeal: (deal: DealKanbanCardModel) => void;
-    getStageLabel: (stage: string) => string;
-    enabled?: boolean;
+  pipeline?: DealPipeline;
+  filters: DealQueryParams;
+  refreshKey?: number;
+  onOpen: (deal: Deal) => void;
+  onEdit: (deal: Deal) => void;
+  onDelete: (deal: Deal) => void;
 };
 
-const normalizeDeal = (raw: any): DealKanbanCardModel => {
-    let clientName = '';
-    if (raw.client_name) clientName = raw.client_name;
-    else if (raw.clientName) clientName = raw.clientName;
-    else if (typeof raw.client === 'object' && raw.client?.name) clientName = raw.client.name;
+export const DealsKanbanView = ({ pipeline, filters, refreshKey = 0, onOpen, onEdit, onDelete }: DealsKanbanViewProps) => {
+  const { t } = useAppContext();
+  const stages = pipeline?.stages || [];
+  const [itemsByColumn, setItemsByColumn] = useState<Record<string, Deal[]>>({});
+  const [pending, setPending] = useState<{ deal: Deal; stage: DealPipelineStage } | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-    let projectName = '';
-    if (raw.project_name) projectName = raw.project_name;
-    else if (typeof raw.project === 'object' && raw.project?.name) projectName = raw.project.name;
-    else if (typeof raw.project === 'string') projectName = raw.project;
-
-    let unitCode = '';
-    if (raw.unit_code) unitCode = raw.unit_code;
-    else if (typeof raw.unit === 'object' && raw.unit?.code) unitCode = raw.unit.code;
-    else if (typeof raw.unit === 'string') unitCode = raw.unit;
-
-    return {
-        ...raw,
-        id: raw.id,
-        clientName,
-        project: projectName,
-        unit: unitCode,
-        project_name: projectName || raw.project_name,
-        unit_code: unitCode || raw.unit_code,
-        paymentMethod: raw.payment_method || raw.paymentMethod || '',
-        status: raw.status || '',
-        stage: raw.stage,
-        value: typeof raw.value === 'number' ? raw.value : Number(raw.value) || 0,
-        startDate: raw.start_date || raw.startDate || null,
-        closedDate: raw.closed_date || raw.closedDate || null,
-        startedBy: raw.started_by || raw.startedBy || null,
-        closedBy: raw.closed_by || raw.closedBy || null,
-        client: typeof raw.client === 'number' ? raw.client : raw.client?.id,
-        employee: typeof raw.employee === 'number' ? raw.employee : raw.employee?.id,
-    };
-};
-
-const matchesClientFilters = (
-    deal: DealKanbanCardModel,
-    filters: DealFilters,
-    isRealEstate: boolean,
-): boolean => {
-    if (filters.status && filters.status !== 'All') {
-        if ((deal.status || '') !== filters.status) return false;
-    }
-    if (filters.paymentMethod && filters.paymentMethod !== 'All') {
-        if ((deal.paymentMethod || '') !== filters.paymentMethod) return false;
-    }
-    if (isRealEstate && filters.unit && filters.unit !== 'All') {
-        if ((deal.unit || '') !== filters.unit) return false;
-    }
-    if (isRealEstate && filters.project && filters.project !== 'All') {
-        if ((deal.project || '') !== filters.project) return false;
-    }
-    if (filters.valueMin) {
-        const minValue = parseFloat(filters.valueMin);
-        if (!Number.isNaN(minValue) && (deal.value || 0) < minValue) return false;
-    }
-    if (filters.valueMax) {
-        const maxValue = parseFloat(filters.valueMax);
-        if (!Number.isNaN(maxValue) && (deal.value || 0) > maxValue) return false;
-    }
-    return true;
-};
-
-export const DealsKanbanView = ({
-    search,
-    dealFilters,
-    isRealEstate,
-    canDrag = true,
-    onOpenDeal,
-    getStageLabel,
-    enabled = true,
-}: DealsKanbanViewProps) => {
-    const { t, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
-    const queryClient = useQueryClient();
-
-    const searchKey = search?.trim() || '';
-    const filtersKey = useMemo(
-        () =>
-            JSON.stringify({
-                search: searchKey,
-                status: dealFilters.status,
-                paymentMethod: dealFilters.paymentMethod,
-                unit: dealFilters.unit,
-                project: dealFilters.project,
-                valueMin: dealFilters.valueMin,
-                valueMax: dealFilters.valueMax,
-            }),
-        [searchKey, dealFilters],
-    );
-
-    const [itemsByColumn, setItemsByColumn] = useState<Record<string, DealKanbanCardModel[]>>({});
-    const [columnPages, setColumnPages] = useState<Record<string, number>>({});
-    const [hasMoreByColumn, setHasMoreByColumn] = useState<Record<string, boolean>>({});
-    const [countsByColumn, setCountsByColumn] = useState<Record<string, number>>({});
-    const [loadingMore, setLoadingMore] = useState<Record<string, boolean>>({});
-    const [movingId, setMovingId] = useState<string | null>(null);
-
-    const seedToken = filtersKey;
-    const seededTokenRef = useRef('');
-    /** Ids seen on page 1 at the last seed/reconcile — lets us detect deletions. */
-    const firstPageIdsRef = useRef<Set<string>>(new Set());
-
-    useEffect(() => {
-        seededTokenRef.current = '';
-        firstPageIdsRef.current = new Set();
-        setItemsByColumn({});
-        setColumnPages({});
-        setHasMoreByColumn({});
-        setCountsByColumn({});
-        setLoadingMore({});
-    }, [seedToken]);
-
-    const columnQueries = useQueries({
-        queries: DEAL_STAGE_ORDER.map((stage) => ({
-            queryKey: [...queryKeys.deals(1, COLUMN_PAGE_SIZE, searchKey, stage), 'kanban'] as const,
-            queryFn: () =>
-                getDealsAPI(1, COLUMN_PAGE_SIZE, {
-                    ...(searchKey ? { search: searchKey } : {}),
-                    stage,
-                }),
-            enabled: enabled,
-            staleTime: 60 * 1000,
-        })),
+  useEffect(() => {
+    let cancelled = false;
+    if (!stages.length) return;
+    Promise.all(stages.map(async (stage) => {
+      const data = await getDealsAPI(1, PAGE_SIZE, { ...filters, pipeline: pipeline?.id, stageId: stage.id, outcome: undefined });
+      const rows = Array.isArray(data?.results) ? data.results : [];
+      return [String(stage.id), rows.map((row: Record<string, unknown>) => mapApiDeal(row))] as const;
+    })).then((entries) => {
+      if (!cancelled) setItemsByColumn(Object.fromEntries(entries));
+    }).catch(() => {
+      if (!cancelled) setItemsByColumn({});
     });
+    return () => { cancelled = true; };
+  }, [pipeline?.id, stages.map((stage) => stage.id).join(','), JSON.stringify(filters), refreshKey]);
 
-    const dataStamp = columnQueries.map((q) => q.dataUpdatedAt).join('|');
+  const columns = useMemo(() => stages.map((stage) => ({
+    id: stage.id,
+    title: stage.name,
+    color: stage.color,
+    count: itemsByColumn[String(stage.id)]?.length || 0,
+  })), [stages, itemsByColumn]);
 
-    useEffect(() => {
-        if (!enabled) return;
-        if (!columnQueries.every((q) => q.isSuccess || q.isError)) return;
+  const moveLocally = (deal: Deal, stage: DealPipelineStage) => {
+    setItemsByColumn((prev) => {
+      const next: Record<string, Deal[]> = {};
+      Object.entries(prev).forEach(([key, list]) => {
+        next[key] = list.filter((item) => item.id !== deal.id);
+      });
+      const updated = {
+        ...deal,
+        pipelineStage: stage.id,
+        pipelineStageName: stage.name,
+        pipelineStageColor: stage.color,
+        stageType: stage.stageType,
+      };
+      next[String(stage.id)] = [updated, ...(next[String(stage.id)] || [])];
+      return next;
+    });
+  };
 
-        const freshItems: Record<string, DealKanbanCardModel[]> = {};
-        const freshHasMore: Record<string, boolean> = {};
-        const freshCounts: Record<string, number> = {};
-
-        DEAL_STAGE_ORDER.forEach((stage, index) => {
-            const query = columnQueries[index];
-            if (!query?.isSuccess || !query.data) {
-                freshItems[stage] = [];
-                freshHasMore[stage] = false;
-                freshCounts[stage] = 0;
-                return;
-            }
-            const mapped = (query.data.results || [])
-                .map(normalizeDeal)
-                .filter((d) => matchesClientFilters(d, dealFilters, isRealEstate));
-            freshItems[stage] = mapped;
-            freshHasMore[stage] = Boolean(query.data.next);
-            freshCounts[stage] = query.data.count ?? mapped.length;
-        });
-
-        const collectFirstPageIds = () => {
-            const ids = new Set<string>();
-            Object.values(freshItems).forEach((list) =>
-                list.forEach((deal) => ids.add(String(deal.id))),
-            );
-            return ids;
-        };
-
-        if (seededTokenRef.current !== seedToken) {
-            setItemsByColumn(freshItems);
-            setHasMoreByColumn(freshHasMore);
-            setCountsByColumn(freshCounts);
-            setColumnPages({});
-            firstPageIdsRef.current = collectFirstPageIds();
-            seededTokenRef.current = seedToken;
-            return;
-        }
-
-        // Refetch after a delete/edit elsewhere: fold server truth back into the board
-        // without discarding load-more pages. Skipped mid-drag so the optimistic card
-        // isn't snapped back by a refetch that raced the PATCH.
-        if (movingId) return;
-
-        const prevFirstPageIds = firstPageIdsRef.current;
-        setItemsByColumn(
-            (prev) =>
-                reconcileKanbanColumns({
-                    current: prev,
-                    fresh: freshItems,
-                    prevFirstPageIds,
-                    getItemId: (deal) => deal.id,
-                }).next,
-        );
-        setHasMoreByColumn((prev) => {
-            const next = { ...prev };
-            Object.entries(freshHasMore).forEach(([stage, hasMore]) => {
-                // Columns showing extra pages keep the flag from their last load-more.
-                if ((columnPages[stage] ?? 1) <= 1) next[stage] = hasMore;
-            });
-            return next;
-        });
-        setCountsByColumn(freshCounts);
-        firstPageIdsRef.current = collectFirstPageIds();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [dataStamp, enabled, seedToken, movingId]);
-
-    const columns: KanbanColumnDef[] = useMemo(
-        () =>
-            DEAL_STAGE_ORDER.map((stage) => ({
-                id: stage,
-                title: getStageLabel(stage),
-                color: DEAL_STAGE_COLORS[stage],
-                count: countsByColumn[stage] ?? itemsByColumn[stage]?.length ?? 0,
-            })),
-        [getStageLabel, countsByColumn, itemsByColumn],
-    );
-
-    const isInitialLoading =
-        enabled &&
-        seededTokenRef.current !== seedToken &&
-        columnQueries.some((q) => q.isLoading || q.isFetching);
-
-    const handleLoadMore = useCallback(
-        async (column: KanbanColumnDef) => {
-            const stage = String(column.id);
-            if (loadingMore[stage]) return;
-
-            const currentPage = columnPages[stage] ?? 1;
-            const nextPage = currentPage + 1;
-            setLoadingMore((prev) => ({ ...prev, [stage]: true }));
-            try {
-                const data = await queryClient.fetchQuery({
-                    queryKey: [
-                        ...queryKeys.deals(nextPage, COLUMN_PAGE_SIZE, searchKey, stage),
-                        'kanban',
-                    ] as const,
-                    queryFn: () =>
-                        getDealsAPI(nextPage, COLUMN_PAGE_SIZE, {
-                            ...(searchKey ? { search: searchKey } : {}),
-                            stage,
-                        }),
-                });
-                const results = (data?.results || [])
-                    .map(normalizeDeal)
-                    .filter((d) => matchesClientFilters(d, dealFilters, isRealEstate));
-                setItemsByColumn((prev) => {
-                    const existing = prev[stage] || [];
-                    const existingIds = new Set(existing.map((d) => d.id));
-                    return {
-                        ...prev,
-                        [stage]: [...existing, ...results.filter((d) => !existingIds.has(d.id))],
-                    };
-                });
-                setHasMoreByColumn((prev) => ({ ...prev, [stage]: Boolean(data?.next) }));
-                setColumnPages((prev) => ({ ...prev, [stage]: nextPage }));
-                if (typeof data?.count === 'number') {
-                    setCountsByColumn((prev) => ({ ...prev, [stage]: data.count }));
-                }
-            } catch (error: any) {
-                setAlertMessage(getLocalizedApiErrorMessage(error, t, 'errorLoadingDeals'));
-                setAlertVariant('error');
-                setIsAlertModalOpen(true);
-            } finally {
-                setLoadingMore((prev) => ({ ...prev, [stage]: false }));
-            }
-        },
-        [
-            loadingMore,
-            columnPages,
-            searchKey,
-            dealFilters,
-            isRealEstate,
-            queryClient,
-            setAlertMessage,
-            setAlertVariant,
-            setIsAlertModalOpen,
-            t,
-        ],
-    );
-
-    const handleMove = useCallback(
-        async ({ itemId, fromColumnId, toColumnId }: KanbanMoveEvent) => {
-            if (String(fromColumnId) === String(toColumnId)) return;
-
-            const fromKey = String(fromColumnId);
-            const toKey = String(toColumnId);
-            if (!DEAL_STAGE_ORDER.includes(toKey as Deal['stage'])) return;
-
-            const dealId = Number(itemId);
-            let moved: DealKanbanCardModel | undefined;
-
-            setItemsByColumn((prev) => {
-                const fromList = prev[fromKey] || [];
-                const toList = prev[toKey] || [];
-                moved = fromList.find((d) => d.id === dealId);
-                if (!moved) return prev;
-                const updated: DealKanbanCardModel = {
-                    ...moved,
-                    stage: toKey as Deal['stage'],
-                };
-                return {
-                    ...prev,
-                    [fromKey]: fromList.filter((d) => d.id !== dealId),
-                    [toKey]: [updated, ...toList.filter((d) => d.id !== dealId)],
-                };
-            });
-            setCountsByColumn((prev) => ({
-                ...prev,
-                [fromKey]: Math.max(0, (prev[fromKey] ?? 1) - 1),
-                [toKey]: (prev[toKey] ?? 0) + 1,
-            }));
-
-            setMovingId(itemId);
-            try {
-                await patchDealAPI(dealId, { stage: toKey });
-                queryClient.invalidateQueries({ queryKey: ['deals'] });
-            } catch (error: any) {
-                setItemsByColumn((prev) => {
-                    if (!moved) return prev;
-                    const fromList = prev[fromKey] || [];
-                    const toList = prev[toKey] || [];
-                    return {
-                        ...prev,
-                        [toKey]: toList.filter((d) => d.id !== dealId),
-                        [fromKey]: [moved!, ...fromList.filter((d) => d.id !== dealId)],
-                    };
-                });
-                setCountsByColumn((prev) => ({
-                    ...prev,
-                    [fromKey]: (prev[fromKey] ?? 0) + 1,
-                    [toKey]: Math.max(0, (prev[toKey] ?? 1) - 1),
-                }));
-                setAlertMessage(getLocalizedApiErrorMessage(error, t, 'kanbanMoveDealFailed'));
-                setAlertVariant('error');
-                setIsAlertModalOpen(true);
-            } finally {
-                setMovingId(null);
-            }
-        },
-        [queryClient, setAlertMessage, setAlertVariant, setIsAlertModalOpen, t],
-    );
-
-    if (!enabled) return null;
-
-    if (isInitialLoading) {
-        return <SectionLoadingState label={t('loading')} />;
+  const applyMove = async (deal: Deal, stage: DealPipelineStage, extra?: { lostReason?: number; lostNote?: string }) => {
+    setSubmitting(true);
+    try {
+      await moveDealAPI(deal.id, { pipelineStage: stage.id, lostReason: extra?.lostReason, lostNote: extra?.lostNote });
+      moveLocally(deal, stage);
+      setPending(null);
+    } finally {
+      setSubmitting(false);
     }
+  };
 
-    return (
-        <KanbanBoard<DealKanbanCardModel>
-            columns={columns}
-            itemsByColumn={itemsByColumn}
-            getItemId={(deal) => deal.id}
-            getColumnId={(deal) => deal.stage}
-            disabled={!canDrag}
-            isItemDisabled={(deal) => movingId === String(deal.id)}
-            emptyColumnLabel={t('kanbanEmptyDealColumn')}
-            dragInstructionsLabel={t('kanbanDragDealInstructions')}
-            movingAnnounceLabel={t('kanbanMoving')}
-            onMove={handleMove}
-            renderCard={(deal) => (
-                <DealKanbanCard
-                    deal={deal}
-                    isRealEstate={isRealEstate}
-                    onOpen={onOpenDeal}
-                />
-            )}
-            renderColumnFooter={(column) => {
-                const colKey = String(column.id);
-                if (!hasMoreByColumn[colKey]) return null;
-                return (
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        className="w-full mt-1"
-                        disabled={Boolean(loadingMore[colKey])}
-                        loading={Boolean(loadingMore[colKey])}
-                        onClick={() => handleLoadMore(column)}
-                    >
-                        {t('kanbanLoadMore')}
-                    </Button>
-                );
-            }}
-        />
-    );
+  return (
+    <>
+      <KanbanBoard
+        columns={columns}
+        itemsByColumn={itemsByColumn}
+        getItemId={(deal) => deal.id}
+        getColumnId={(deal) => deal.pipelineStage || stages[0]?.id || ''}
+        emptyColumnLabel={t('noDealsFound')}
+        onMove={({ itemId, toColumnId }) => {
+          const deal = Object.values(itemsByColumn).flat().find((item) => String(item.id) === itemId);
+          const stage = stages.find((item) => String(item.id) === String(toColumnId));
+          if (!deal || !stage) return;
+          if (stage.stageType === 'won' || stage.stageType === 'lost') {
+            setPending({ deal, stage });
+            return;
+          }
+          return applyMove(deal, stage);
+        }}
+        renderCard={(deal) => (
+          <DealKanbanCard deal={deal} onOpen={onOpen} onEdit={onEdit} onDelete={onDelete} />
+        )}
+        renderColumnFooter={(column) => {
+          const list = itemsByColumn[String(column.id)] || [];
+          const total = list.reduce((sum, deal) => sum + Number(deal.value || 0), 0);
+          const weighted = list.reduce((sum, deal) => sum + Number(deal.weightedValue || 0), 0);
+          return (
+            <p className="px-3 pb-2 text-xs text-gray-600 dark:text-gray-300 tabular-nums">
+              {formatDealMoney(total)} · {t('dealWeighted')} {formatDealMoney(weighted)}
+            </p>
+          );
+        }}
+      />
+      <DealWonLostModal
+        stage={pending?.stage || null}
+        submitting={submitting}
+        onClose={() => setPending(null)}
+        onConfirm={(payload) => pending && applyMove(pending.deal, pending.stage, payload)}
+      />
+    </>
+  );
 };

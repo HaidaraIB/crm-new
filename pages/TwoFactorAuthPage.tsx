@@ -9,7 +9,7 @@ import {
     getCurrentUserAPI,
     type RequestTwoFactorAuthResponse,
 } from '../services/api';
-import { validateOtpCodeField } from '../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
 import { storePaymentAccessToken } from '../utils/paymentAuth';
@@ -116,12 +116,18 @@ export const TwoFactorAuthPage = () => {
         }
     }, [countdown]);
 
-    const clearFieldError = (field: string) => {
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const showCodeError = (nextCode = code) => {
+        const next = catalogFieldErrors('auth.two_factor', { code: nextCode }, translate);
         setErrors((prev) => {
-            if (!prev[field]) return prev;
-            const next = { ...prev };
-            delete next[field];
-            return next;
+            const updated = { ...prev };
+            if (next.code) updated.code = next.code;
+            else delete updated.code;
+            return updated;
         });
     };
 
@@ -197,9 +203,9 @@ export const TwoFactorAuthPage = () => {
         setErrors({});
         setSuccess('');
         
-        const codeError = validateOtpCodeField(code, t, { exactLength: 6 });
-        if (codeError) {
-            setErrors({ code: codeError });
+        const next = catalogFieldErrors('auth.two_factor', { code }, translate);
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
             return;
         }
 
@@ -331,7 +337,11 @@ export const TwoFactorAuthPage = () => {
             } else if (errorMessage.includes('Invalid') || errorMessage.includes('invalid')) {
                 setErrors({ code: t('twoFactorCodeInvalid') || 'Invalid two-factor authentication code' });
             } else {
-                setErrors({ general: errorMessage || t('twoFactorAuthFailed') || 'Failed to verify two-factor authentication code' });
+                const server = serverFieldErrors(error, 'auth.two_factor', translate);
+                setErrors({
+                    ...server,
+                    general: server._general || server.general || errorMessage || t('twoFactorAuthFailed') || 'Failed to verify two-factor authentication code',
+                });
             }
             setIsLoading(false);
         }
@@ -340,7 +350,7 @@ export const TwoFactorAuthPage = () => {
     const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value.replace(/\D/g, '').slice(0, 6);
         setCode(value);
-        clearFieldError('code');
+        if (errors.code) showCodeError(value);
     };
 
     const handleDigitChange = (index: number, value: string) => {
@@ -349,7 +359,7 @@ export const TwoFactorAuthPage = () => {
         newCode[index] = digit;
         const updatedCode = newCode.join('').slice(0, 6);
         setCode(updatedCode);
-        clearFieldError('code');
+        if (errors.code) showCodeError(updatedCode);
 
         // Auto-focus next input
         if (digit && index < 5) {
@@ -376,7 +386,7 @@ export const TwoFactorAuthPage = () => {
         const pastedData = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
         if (pastedData) {
             setCode(pastedData);
-            clearFieldError('code');
+            if (errors.code) showCodeError(pastedData);
             // Focus the next empty input or the last one
             const nextIndex = Math.min(pastedData.length, 5);
             const nextInput = document.getElementById(`code-input-${nextIndex}`);
@@ -455,6 +465,10 @@ export const TwoFactorAuthPage = () => {
                                 className="flex gap-2 justify-center"
                                 dir="ltr"
                                 onPaste={handlePaste}
+                                onBlur={(event) => {
+                                    if (event.currentTarget.contains(event.relatedTarget as Node | null)) return;
+                                    showCodeError();
+                                }}
                             >
                                 {[0, 1, 2, 3, 4, 5].map((index) => (
                                     <input

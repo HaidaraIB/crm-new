@@ -13,11 +13,9 @@ import {
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import {
   buildFieldErrorSummary,
-  clearFieldError,
-  mapApiFieldsToUiErrors,
   scrollToFirstFieldError,
 } from '../utils/formFieldErrors';
-import { validateEmailField, validateNameField, validatePhoneField } from '../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
 import type { translations } from '../constants';
 
@@ -419,16 +417,49 @@ export const BookDemoPage = () => {
     return formatBookingDateTime(selectedSlot.starts_at, tz, language);
   }, [selectedSlot, tz, language]);
 
-  const validateDetailsForm = (): Record<string, string> => {
-    const next: Record<string, string> = {};
-    const nameErr = validateNameField(name, t, { requiredKey: 'nameRequired' });
-    if (nameErr) next.name = nameErr;
-    const emailErr = validateEmailField(email, t);
-    if (emailErr) next.email = emailErr;
-    const phoneErr = validatePhoneField(phone, t);
-    if (phoneErr) next.phone = phoneErr;
+  const translate = (key: string) => {
+    const value = t(key as never);
+    return value && value !== key ? value : undefined;
+  };
+
+  const demoValues = (patch: { name?: string; email?: string; phone?: string; companyName?: string } = {}) => ({
+    name: patch.name ?? name,
+    email: patch.email ?? email,
+    phone: patch.phone ?? phone,
+    company_name: patch.companyName ?? companyName,
+    companyName: patch.companyName ?? companyName,
+    starts_at: selectedSlot?.starts_at || '',
+    scheduledAt: selectedSlot?.starts_at || '',
+  });
+
+  const mirrorDemoErrors = (raw: Record<string, string>) => {
+    const next = { ...raw };
+    if (next._general && !next.general) next.general = next._general;
+    if (next.company_name && !next.companyName) next.companyName = next.company_name;
+    if (next.companyName && !next.company_name) next.company_name = next.companyName;
+    if (next.starts_at && !next.scheduledAt) next.scheduledAt = next.starts_at;
+    if (next.scheduledAt && !next.starts_at) next.starts_at = next.scheduledAt;
     return next;
   };
+
+  const showDemoField = (
+    field: 'name' | 'email' | 'phone' | 'companyName',
+    patch: { name?: string; email?: string; phone?: string; companyName?: string } = {},
+  ) => {
+    const next = mirrorDemoErrors(catalogFieldErrors('demo_booking.create', demoValues(patch), translate));
+    const keys = field === 'companyName' ? ['companyName', 'company_name'] : [field];
+    setFieldErrors((prev) => {
+      const updated = { ...prev };
+      for (const key of keys) {
+        if (next[key]) updated[key] = next[key];
+        else delete updated[key];
+      }
+      return updated;
+    });
+  };
+
+  const validateDetailsForm = (): Record<string, string> =>
+    mirrorDemoErrors(catalogFieldErrors('demo_booking.create', demoValues(), translate));
 
   const handleSubmit = async () => {
     if (!selectedSlot) return;
@@ -462,7 +493,7 @@ export const BookDemoPage = () => {
       setSavedBooking(booking);
     } catch (err: unknown) {
       const apiErr = err as Error & { code?: string; fields?: Record<string, unknown> };
-      const mapped = mapApiFieldsToUiErrors(apiErr.fields, t);
+      const mapped = mirrorDemoErrors(serverFieldErrors(err, 'demo_booking.create', translate));
       if (Object.keys(mapped).length > 0) {
         setFieldErrors(mapped);
         setError(
@@ -746,10 +777,12 @@ export const BookDemoPage = () => {
                         placeholder={t('bookDemoName')}
                         value={name}
                         onChange={(e) => {
-                          setName(e.target.value);
-                          clearFieldError(setFieldErrors, 'name');
+                          const value = e.target.value;
+                          setName(value);
                           setError(null);
+                          if (fieldErrors.name) showDemoField('name', { name: value });
                         }}
+                        onBlur={() => showDemoField('name')}
                         aria-invalid={fieldErrors.name ? true : undefined}
                         className={fieldErrors.name ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}
                       />
@@ -763,32 +796,43 @@ export const BookDemoPage = () => {
                         placeholder={t('bookDemoEmail')}
                         value={email}
                         onChange={(e) => {
-                          setEmail(e.target.value);
-                          clearFieldError(setFieldErrors, 'email');
+                          const value = e.target.value;
+                          setEmail(value);
                           setError(null);
+                          if (fieldErrors.email) showDemoField('email', { email: value });
                         }}
+                        onBlur={() => showDemoField('email')}
                         aria-invalid={fieldErrors.email ? true : undefined}
                         className={fieldErrors.email ? 'border-red-500 dark:border-red-500 focus:ring-red-500' : ''}
                       />
                     </BookDemoField>
                     <BookDemoField label={t('bookDemoPhone')} htmlFor="book-demo-phone" error={fieldErrors.phone}>
+                      <div onBlur={() => showDemoField('phone')}>
                       <PhoneInput
                         id="book-demo-phone"
                         value={phone}
                         error={!!fieldErrors.phone}
                         onChange={(value) => {
                           setPhone(value);
-                          clearFieldError(setFieldErrors, 'phone');
                           setError(null);
+                          if (fieldErrors.phone) showDemoField('phone', { phone: value });
                         }}
                         placeholder={t('bookDemoPhone')}
                       />
+                      </div>
                     </BookDemoField>
-                    <BookDemoField label={t('bookDemoCompany')}>
+                    <BookDemoField label={t('bookDemoCompany')} error={fieldErrors.companyName || fieldErrors.company_name}>
                       <Input
                         placeholder={t('bookDemoCompany')}
                         value={companyName}
-                        onChange={(e) => setCompanyName(e.target.value)}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setCompanyName(value);
+                          if (fieldErrors.companyName || fieldErrors.company_name) {
+                            showDemoField('companyName', { companyName: value });
+                          }
+                        }}
+                        onBlur={() => showDemoField('companyName')}
                       />
                     </BookDemoField>
                     <BookDemoField label={t('bookDemoNotes')}>
@@ -805,13 +849,7 @@ export const BookDemoPage = () => {
                   <Button
                     className="w-full mt-6 py-3 text-base"
                     loading={submitting}
-                    disabled={
-                      submitting ||
-                      !selectedSlot ||
-                      !name.trim() ||
-                      !email.trim() ||
-                      !phone.trim()
-                    }
+                    disabled={submitting || !selectedSlot}
                     onClick={() => void handleSubmit()}
                   >
                     {t('bookDemoSubmit')}

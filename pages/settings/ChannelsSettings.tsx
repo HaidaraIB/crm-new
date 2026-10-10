@@ -1,7 +1,7 @@
 
 import React from 'react';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
-import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll } from '../../components/index';
+import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll, IconButton } from '../../components/index';
 import { Channel } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useChannels, useDeleteChannel, useUpdateChannel } from '../../hooks/useQueries';
@@ -188,22 +188,8 @@ export const ChannelsSettings = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className={`flex items-center justify-center gap-1 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                                            <button
-                                                type="button"
-                                                className="p-2 h-auto hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors text-gray-600 dark:text-gray-400"
-                                                onClick={() => handleEditChannel(channel)}
-                                                title={t('edit') || 'Edit'}
-                                            >
-                                                <EditIcon className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                type="button"
-                                                className="p-2 h-auto hover:bg-red-50 dark:hover:bg-red-900/20 rounded-md transition-colors text-red-600 dark:text-red-400"
-                                                onClick={() => handleDeleteChannel(channel.id)}
-                                                title={t('delete') || 'Delete'}
-                                            >
-                                                <TrashIcon className="w-4 h-4" />
-                                            </button>
+                                            <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit') || 'Edit'} onClick={() => handleEditChannel(channel)} />
+                                            <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => handleDeleteChannel(channel.id)} />
                                         </div>
                                     </td>
                                 </tr>

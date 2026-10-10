@@ -49,7 +49,7 @@ function CodeBlock({
         <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</p>
       ) : null}
       <div className="relative rounded-lg border border-gray-200 dark:border-gray-600 bg-gray-900 dark:bg-gray-950 overflow-hidden">
-        <pre className="overflow-x-auto p-4 text-xs sm:text-sm text-gray-100 font-mono leading-relaxed" dir="ltr">
+        <pre className="overflow-x-auto overflow-y-hidden p-4 text-xs sm:text-sm text-gray-100 font-mono leading-relaxed" dir="ltr">
           <code>{code}</code>
         </pre>
         <Button
@@ -72,7 +72,7 @@ function FieldsTable({
   rows: { field: string; required: string; description: string }[];
 }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-600 mb-4">
+    <div className="mb-4 overflow-x-auto overflow-y-hidden rounded-lg border border-gray-200 dark:border-gray-600">
       <table className="min-w-full text-sm text-start">
         <thead className="bg-gray-50 dark:bg-gray-800/80">
           <tr>

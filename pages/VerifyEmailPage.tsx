@@ -10,7 +10,7 @@ import {
     preLoginEmailChangeAPI,
 } from '../services/api';
 import { navigateToCompanyRoute } from '../utils/routing';
-import { validateEmailField, validateOtpCodeField } from '../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 
 const PRE_LOGIN_EMAIL_RESEND_COOLDOWN_KEY = 'preLoginVerifyEmailResendCooldown';
@@ -217,20 +217,46 @@ export const VerifyEmailPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps -- URL-driven, run once on mount
     }, []);
 
-    const clearFieldError = (field: string) => {
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const showManualCodeError = (nextCode = manualCode) => {
+        const next = catalogFieldErrors('auth.email_code', { code: nextCode }, translate);
         setErrors((prev) => {
-            if (!prev[field]) return prev;
-            const next = { ...prev };
-            delete next[field];
-            return next;
+            const updated = { ...prev };
+            if (next.code) {
+                updated.code = next.code;
+                updated.manualCode = next.code;
+            } else {
+                delete updated.code;
+                delete updated.manualCode;
+            }
+            return updated;
+        });
+    };
+
+    const showNewEmailError = (nextEmail = newEmail) => {
+        const next = catalogFieldErrors('auth.forgot_password', { email: nextEmail }, translate);
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next.email) {
+                updated.email = next.email;
+                updated.newEmail = next.email;
+            } else {
+                delete updated.email;
+                delete updated.newEmail;
+            }
+            return updated;
         });
     };
 
     const handleManualVerify = async () => {
         if (!manualEmail) return;
-        const codeErr = validateOtpCodeField(manualCode, t);
-        if (codeErr) {
-            setErrors({ manualCode: codeErr });
+        const next = catalogFieldErrors('auth.email_code', { code: manualCode }, translate);
+        if (next.code) {
+            setErrors({ code: next.code, manualCode: next.code });
             return;
         }
         setErrors({});
@@ -250,7 +276,9 @@ export const VerifyEmailPage = () => {
             schedulePostVerifyRedirect();
         } catch (error: unknown) {
             const err = error as { message?: string; detail?: string; error?: string };
-            const errorMessage = err.message || err.detail || err.error || 'Verification failed';
+            const server = serverFieldErrors(error, 'auth.email_code', translate);
+            if (server.code) setErrors({ code: server.code, manualCode: server.code });
+            const errorMessage = server._general || err.message || err.detail || err.error || 'Verification failed';
             setStatus({
                 type: 'error',
                 message: errorMessage,
@@ -303,9 +331,9 @@ export const VerifyEmailPage = () => {
             return;
         }
         const trimmed = newEmail.trim().toLowerCase();
-        const emailErr = validateEmailField(newEmail, t);
-        if (emailErr) {
-            setErrors({ newEmail: emailErr });
+        const emailErrors = catalogFieldErrors('auth.forgot_password', { email: newEmail }, translate);
+        if (emailErrors.email) {
+            setErrors({ email: emailErrors.email, newEmail: emailErrors.email });
             return;
         }
         setErrors({});
@@ -390,7 +418,12 @@ export const VerifyEmailPage = () => {
                                     className="w-full"
                                     onClick={() => {
                                         setShowChangeEmail((v) => !v);
-                                        clearFieldError('newEmail');
+                                        setErrors((prev) => {
+                                            const next = { ...prev };
+                                            delete next.newEmail;
+                                            delete next.email;
+                                            return next;
+                                        });
                                     }}
                                 >
                                     {t('preLoginChangeEmailTitle')}
@@ -400,9 +433,11 @@ export const VerifyEmailPage = () => {
                                         <Input
                                             value={newEmail}
                                             onChange={(e) => {
-                                                setNewEmail(e.target.value);
-                                                clearFieldError('newEmail');
+                                                const value = e.target.value;
+                                                setNewEmail(value);
+                                                if (errors.newEmail || errors.email) showNewEmailError(value);
                                             }}
+                                            onBlur={() => showNewEmailError()}
                                             placeholder={t('preLoginNewEmailPlaceholder')}
                                             type="email"
                                             autoComplete="email"
@@ -431,10 +466,12 @@ export const VerifyEmailPage = () => {
                                 <Input
                                     value={manualCode}
                                     onChange={(e) => {
-                                        setManualCode(e.target.value);
+                                        const value = e.target.value;
+                                        setManualCode(value);
                                         setStatus(null);
-                                        clearFieldError('manualCode');
+                                        if (errors.manualCode || errors.code) showManualCodeError(value);
                                     }}
+                                    onBlur={() => showManualCodeError()}
                                     placeholder={t('verificationCodePlaceholder') || '6-digit code'}
                                     onKeyPress={(e) => {
                                         if (e.key === 'Enter') {

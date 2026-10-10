@@ -812,7 +812,7 @@ export const DashboardPage = () => {
                            <DashboardWidgetMenu items={weekLeadsChartMenuItems} ariaLabel={dashboardMenuAriaLabel} />
                          </div>
                      </div>
-                     <div className="overflow-x-auto -mx-1 px-1">
+                     <div className="overflow-x-auto overflow-y-hidden -mx-1 px-1">
                          <div className="min-w-[300px]">
                              <ResponsiveContainer width="100%" height={320}>
                                 <AreaChart data={filteredWeekLeadsData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>

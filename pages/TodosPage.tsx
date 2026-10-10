@@ -1,10 +1,10 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, PlusIcon, EditIcon, TrashIcon, EyeIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode, PageLoadingState, RefreshButton } from '../components/index';
+import { PageWrapper, Card, Button, ClockIcon, UsersIcon, PhoneIcon, ListIcon, CheckIcon, PlusIcon, EditIcon, TrashIcon, EyeIcon, EditTodoModal, TableHorizontalScroll, ViewModeToggle, useEntityViewMode, PageLoadingState, RefreshButton, Pagination, IconButton } from '../components/index';
 import { TodosKanbanView } from '../components/todos/TodosKanbanView';
 import type { TodoKanbanItem } from '../components/todos/TodoKanbanCard';
-import { TaskStage, Stage, Deal } from '../types';
+import { TaskStage, Stage } from '../types';
 
 type CallMethodItem = { id: number; name: string; color?: string };
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
@@ -17,6 +17,7 @@ import {
 } from '../utils/missionBarNavigation';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
 import { userCanListDealsApi } from '../utils/roles';
+import { getCompanyDealRoute } from '../utils/routing';
 import {
     useTasks,
     useCompleteTask,
@@ -31,8 +32,9 @@ import {
     useCompleteClientCallFollowUp,
     useCallMethods,
 } from '../hooks/useQueries';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
-import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 import { usePersistedTab } from '../hooks/usePersistedTab';
 
 const TODO_TABS = ['active', 'completed'] as const;
@@ -71,18 +73,6 @@ const getStageIcon = (stage: TaskStage) => {
     return ClockIcon; // Default for hold and others
 };
 
-const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const items: Array<number | 'ellipsis'> = [1];
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    if (start > 2) items.push('ellipsis');
-    for (let page = start; page <= end; page += 1) items.push(page);
-    if (end < total - 1) items.push('ellipsis');
-    items.push(total);
-    return items;
-};
-
 export const TodosPage = () => {
     const {
         t,
@@ -93,14 +83,14 @@ export const TodosPage = () => {
         todosPagePreset,
         setTodosPagePreset,
         openLeadDetails,
-        setViewingDeal,
-        setIsViewDealModalOpen,
         currentUser,
+        setCurrentPage,
         setAlertMessage,
         setAlertVariant,
         setIsAlertModalOpen,
     } = useAppContext();
-    
+    useInvalidateOnSliceChange('todos', [['tasks'], ['clientTasks']]);
+
     // Load selected date from localStorage or default to today
     // Use 'all' string to represent null (All option)
     const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
@@ -466,14 +456,8 @@ export const TodosPage = () => {
                 showError(t('dealRequiredForTask') || 'Deal information is required');
                 return;
             }
-            const deal = allDeals.find((d: any) => d.id === dealId);
-            if (deal) {
-                setViewingDeal(deal as Deal);
-                setIsViewDealModalOpen(true);
-            } else {
-                setViewingDeal({ id: dealId } as Deal);
-                setIsViewDealModalOpen(true);
-            }
+            window.history.pushState({}, '', getCompanyDealRoute(currentUser?.company?.name, currentUser?.company?.domain, `view-deal/${dealId}`));
+            setCurrentPage('ViewDeal');
             return;
         }
 
@@ -718,7 +702,6 @@ export const TodosPage = () => {
     ]);
 
     const totalTodoPages = Math.max(1, Math.ceil(filteredTodos.length / todosPageSize));
-    const paginationItems = getPaginationItems(todosPageNumber, totalTodoPages);
     const paginatedTodos = useMemo(() => {
         const start = (todosPageNumber - 1) * todosPageSize;
         return filteredTodos.slice(start, start + todosPageSize);
@@ -1179,23 +1162,9 @@ export const TodosPage = () => {
                                                                 </td>
                                                                 <td className="px-4 py-4 whitespace-nowrap text-center">
                                                                     <div className="flex items-center justify-center gap-1.5">
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    className="p-1.5 h-auto !text-blue-600 dark:!text-blue-400 hover:!bg-blue-50 dark:hover:!bg-blue-900/20 rounded-md transition-colors"
-                                                                                    onClick={() => handleOpenRelated(todo.id)}
-                                                                                    title={t('open') || 'Open'}
-                                                                                >
-                                                                                    <EyeIcon className="w-4 h-4" />
-                                                                                </Button>
+                                                                                <IconButton icon={<EyeIcon className="h-4 w-4" />} label={t('open') || 'Open'} onClick={() => handleOpenRelated(todo.id)} />
                                                                                 {taskType === 'deal_task' && (
-                                                                                    <Button
-                                                                                        variant="ghost"
-                                                                                        className="p-1.5 h-auto !text-amber-600 dark:!text-amber-400 hover:!bg-amber-50 dark:hover:!bg-amber-900/20 rounded-md transition-colors"
-                                                                                        onClick={() => handleEditTodo(todo.id)}
-                                                                                        title={t('edit') || 'Edit'}
-                                                                                    >
-                                                                                        <EditIcon className="w-4 h-4" />
-                                                                                    </Button>
+                                                                                    <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit') || 'Edit'} onClick={() => handleEditTodo(todo.id)} />
                                                                                 )}
                                             {activeTab === 'active' && (
                                                                             <>
@@ -1210,15 +1179,7 @@ export const TodosPage = () => {
                                                                                     <CheckIcon className="w-4 h-4" />
                                                                                 </Button>
                                                                                 )}
-                                                                                <Button 
-                                                                                    variant="ghost" 
-                                                                                    className="p-1.5 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 rounded-md transition-colors" 
-                                                                                    onClick={() => handleDeleteTodo(todo.id)}
-                                                                                    title={t('delete') || 'Delete'}
-                                                                                    disabled={deleteTaskMutation.isPending || deleteClientTaskMutation.isPending || deleteClientCallMutation.isPending}
-                                                                                >
-                                                                                    <TrashIcon className="w-4 h-4" />
-                                                                                </Button>
+                                                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => handleDeleteTodo(todo.id)} disabled={deleteTaskMutation.isPending || deleteClientTaskMutation.isPending || deleteClientCallMutation.isPending} />
                                                                             </>
                                             )}
                                             {activeTab === 'completed' && (
@@ -1226,15 +1187,7 @@ export const TodosPage = () => {
                                                                 <div className="px-2 py-1 bg-green-100 dark:bg-green-900/30 rounded-full" title={t('completed') || 'Completed'}>
                                                                     <CheckIcon className="w-4 h-4 text-green-600 dark:text-green-400" />
                                                 </div>
-                                                                                <Button 
-                                                                                    variant="ghost" 
-                                                                                    className="p-1.5 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 rounded-md transition-colors" 
-                                                                                    onClick={() => handleDeleteTodo(todo.id)}
-                                                                                    title={t('delete') || 'Delete'}
-                                                                                    disabled={deleteTaskMutation.isPending || deleteClientTaskMutation.isPending || deleteClientCallMutation.isPending}
-                                                                                >
-                                                                                    <TrashIcon className="w-4 h-4" />
-                                                                                </Button>
+                                                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => handleDeleteTodo(todo.id)} disabled={deleteTaskMutation.isPending || deleteClientTaskMutation.isPending || deleteClientCallMutation.isPending} />
                                                                             </>
                                             )}
                                     </div>
@@ -1248,65 +1201,14 @@ export const TodosPage = () => {
                                     </div>
                                 </div>
                             </TableHorizontalScroll>
-                            <div className="mt-4 px-3 pb-3 flex flex-col sm:flex-row items-center justify-between gap-3">
-                                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                                    {t('page')} {todosPageNumber} {t('of')} {totalTodoPages}
-                                </p>
-                                <div className="flex items-center gap-2" dir="ltr">
-                                    <select
-                                        value={todosPageSize}
-                                        onChange={(e) => setTodosPageSize(Number(e.target.value))}
-                                        className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                                    >
-                                        {PAGE_SIZE_OPTIONS.map((size) => (
-                                            <option key={size} value={size}>
-                                                {`${size} ${t('perPage')}`}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setTodosPageNumber(1)}
-                                        disabled={todosPageNumber === 1}
-                                    >
-                                        &laquo;
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setTodosPageNumber((prev) => Math.max(1, prev - 1))}
-                                        disabled={todosPageNumber === 1}
-                                    >
-                                        {t('previous')}
-                                    </Button>
-                                    {paginationItems.map((item, idx) =>
-                                        item === 'ellipsis' ? (
-                                            <span key={`todos-ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
-                                        ) : (
-                                            <Button
-                                                key={item}
-                                                variant={item === todosPageNumber ? 'primary' : 'secondary'}
-                                                onClick={() => setTodosPageNumber(item)}
-                                            >
-                                                {item}
-                                            </Button>
-                                        )
-                                    )}
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setTodosPageNumber((prev) => Math.min(totalTodoPages, prev + 1))}
-                                        disabled={todosPageNumber === totalTodoPages}
-                                    >
-                                        {t('next')}
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setTodosPageNumber(totalTodoPages)}
-                                        disabled={todosPageNumber === totalTodoPages}
-                                    >
-                                        &raquo;
-                                    </Button>
-                                </div>
-                            </div>
+                            <Pagination
+                                page={todosPageNumber}
+                                totalPages={totalTodoPages}
+                                onPageChange={setTodosPageNumber}
+                                pageSize={todosPageSize}
+                                onPageSizeChange={setTodosPageSize}
+                                className="px-3 pb-3"
+                            />
                         </Card>
                         ) : (
                             <Card className="text-center py-10 px-4">

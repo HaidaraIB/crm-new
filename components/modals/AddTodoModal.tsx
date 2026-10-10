@@ -7,6 +7,7 @@ import {Input, AutoDirTextarea } from '../Input';
 import { Button } from '../Button';
 import { useCreateTask, useDeals, useStages } from '../../hooks/useQueries';
 import { userCanListDealsApi } from '../../utils/roles';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -58,23 +59,37 @@ export const AddTodoModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const todoCatalogValues = (): Record<string, unknown> => ({
+        deal: formState.dealId,
+        notes: formState.notes,
+        reminder_date: formState.reminderDate,
+    });
+
+    const applyTodoCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('task.upsert', values, translate);
+        if (next.deal) next.dealId = next.deal;
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+        const next = applyTodoCatalog(todoCatalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        if (!formState.dealId || formState.dealId === '') {
-            newErrors.dealId = t('dealRequired') || 'Deal is required';
-        }
-
-        if (!formState.stageId || formState.stageId === '') {
-            newErrors.stageId = t('stageRequired') || 'Stage is required';
-        }
-
-        if (!formState.reminderDate || formState.reminderDate.trim() === '') {
-            newErrors.reminderDate = t('reminderDateRequired') || 'Reminder date is required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyTodoCatalog(todoCatalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -166,74 +181,11 @@ export const AddTodoModal = () => {
         } catch (error: any) {
             console.error('Error creating todo:', error);
             
-            // Handle API validation errors
-            let errorMessage = t('failedToCreateTodo') || 'Failed to create todo. Please try again.';
-            const newErrors: { [key: string]: string } = {};
-            
-            if (error?.message) {
-                try {
-                    const errorData = JSON.parse(error.message);
-                    
-                    Object.keys(errorData).forEach(key => {
-                        if (Array.isArray(errorData[key])) {
-                            newErrors[key] = errorData[key][0];
-                        } else if (typeof errorData[key] === 'string') {
-                            newErrors[key] = errorData[key];
-                        }
-                    });
-                    
-                    // Map API field names to form field names
-                    if (newErrors.deal) {
-                        newErrors.dealId = newErrors.deal;
-                        delete newErrors.deal;
-                    }
-                    if (newErrors.stage) {
-                        newErrors.stageId = newErrors.stage;
-                        delete newErrors.stage;
-                    }
-                    
-                    setErrors(newErrors);
-                    
-                    // Show first error in alert
-                    const firstError = Object.values(newErrors)[0];
-                    if (firstError) {
-                        errorMessage = firstError;
-                    }
-                } catch (e) {
-                    // If parsing fails, use the error message as is
-                    errorMessage = error.message;
-                }
-            } else if (error?.fields || error?.response?.data) {
-                const errorData = error.fields || error.response?.data || {};
-                
-                Object.keys(errorData).forEach(key => {
-                    if (Array.isArray(errorData[key])) {
-                        newErrors[key] = errorData[key][0];
-                    } else if (typeof errorData[key] === 'string') {
-                        newErrors[key] = errorData[key];
-                    }
-                });
-                
-                // Map API field names to form field names
-                if (newErrors.deal) {
-                    newErrors.dealId = newErrors.deal;
-                    delete newErrors.deal;
-                }
-                if (newErrors.stage) {
-                    newErrors.stageId = newErrors.stage;
-                    delete newErrors.stage;
-                }
-                
-                setErrors(newErrors);
-                
-                // Show first error in alert
-                const firstError = Object.values(newErrors)[0];
-                if (firstError) {
-                    errorMessage = firstError;
-                }
-            }
-            
-            setErrors(prev => ({ ...prev, _general: errorMessage }));
+            const serverErrors = serverFieldErrors(error, 'task.upsert', translate);
+            if (serverErrors.deal) serverErrors.dealId = serverErrors.deal;
+            if (serverErrors.stage) serverErrors.stageId = serverErrors.stage;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('failedToCreateTodo') || 'Failed to create todo. Please try again.' });
         }
     };
 
@@ -296,6 +248,7 @@ export const AddTodoModal = () => {
                         type="datetime-local" 
                         value={formState.reminderDate} 
                         onChange={handleChange}
+                        onBlur={() => blurField('reminderDate')}
                         className={errors.reminderDate ? 'border-red-500 dark:border-red-500' : ''}
                     />
                     {errors.reminderDate && (
@@ -309,9 +262,13 @@ export const AddTodoModal = () => {
                         rows={4} 
                         value={formState.notes}
                         onChange={handleChange}
+                        onBlur={() => blurField('notes')}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary" 
                         placeholder={t('enterNotes')}
                     />
+                    {errors.notes && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.notes}</p>
+                    )}
                 </div>
                 <div className="flex justify-end gap-2">
                     <Button type="button" variant="secondary" onClick={handleClose} disabled={loading}>{t('cancel')}</Button>

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { IconButton } from '../IconButton';
+import { TrashIcon } from '../icons';
 import {
   MessagePlaceholderChips,
   insertTextAtCaret,
@@ -8,7 +10,7 @@ import {
 import type { MessageTemplateType, TemplateButtonPayload } from '../../services/api';
 import { createMessageTemplateAPI, updateMessageTemplateAPI, resolveLocalizedApiError, getApiErrorDetails } from '../../services/api';
 import { SelectMediaModal } from './SelectMediaModal';
-import { validateWhatsAppTemplateBody } from '../../utils/whatsappTemplateValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 import { clearFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 import { translations } from '../../constants';
@@ -18,8 +20,6 @@ type TFn = (key: keyof typeof translations.en) => string;
 const NAME_MAX = 200;
 const BODY_MAX = 1000;
 const FOOTER_MAX = 60;
-/** Template name: English only (letters, numbers, spaces, hyphens, underscores) - required by WhatsApp/Meta */
-const TEMPLATE_NAME_ENGLISH_REGEX = /^[a-zA-Z0-9_\s\-]+$/;
 const BUTTON_TEXT_MAX = 25;
 const PHONE_MAX = 20;
 const URL_MAX = 1000;
@@ -342,14 +342,16 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
 
   const handleSubmit = async () => {
     const newErrors: Record<string, string> = {};
-    if (!name.trim()) {
-      newErrors.name = t('templateName') + ' ' + (t('required') || 'required');
-    } else if (isWhatsApp && !TEMPLATE_NAME_ENGLISH_REGEX.test(name.trim())) {
-      newErrors.name = t('templateNameEnglishOnly');
-    }
-    if (!content.trim()) {
-      newErrors.content = (t('messageContent') || 'Message content') + ' ' + (t('required') || 'required');
-    }
+    const catalogErrors = catalogFieldErrors(
+      'whatsapp_template.upsert',
+      { name, content },
+      (key) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+      },
+    );
+    if (catalogErrors.name) newErrors.name = catalogErrors.name;
+    if (catalogErrors.content) newErrors.content = catalogErrors.content;
     if (isWhatsApp && isMediaHeader && !hasHeaderMedia) {
       newErrors.headerMedia = t('templateHeaderMediaRequired');
     }
@@ -439,9 +441,16 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
   };
 
   const runWhatsAppBodyValidation = (): boolean => {
-    const result = validateWhatsAppTemplateBody(content);
-    if (!result.ok && result.key) {
-      setErrors({ content: t(result.key) });
+    const result = catalogFieldErrors(
+      'whatsapp_template.upsert',
+      { name: name || 'template', content },
+      (key) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+      },
+    );
+    if (result.content) {
+      setErrors({ content: result.content });
       return false;
     }
     return true;
@@ -788,7 +797,7 @@ export const EditTemplateModal = ({ isOpen, onClose, template, t, language, onSu
                     </div>
                   )}
                   <div className="flex items-end shrink-0 pt-6">
-                    <button type="button" onClick={() => removeButton(btn.id)} className="p-1.5 rounded text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-600 hover:text-red-600" title={t('delete')}>🗑</button>
+                    <IconButton tone="danger" icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} onClick={() => removeButton(btn.id)} />
                   </div>
                 </div>
               ))}

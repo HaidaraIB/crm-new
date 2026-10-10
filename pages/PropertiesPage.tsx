@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, Dropdown, DropdownItem, Loader, EditIcon, TrashIcon, TableHorizontalScroll, hasActiveFilters, Pagination, IconButton } from '../components/index';
 import { DEFAULT_UNIT_FILTERS } from '../components/drawers/UnitsFilterDrawer';
 import { DEFAULT_PROJECT_FILTERS } from '../components/drawers/ProjectsFilterDrawer';
 import { DEFAULT_DEVELOPER_FILTERS } from '../components/drawers/DevelopersFilterDrawer';
@@ -11,7 +11,7 @@ import { useDevelopers, useProjects, useUnits, useDeleteDeveloper, useDeleteProj
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
 import { withLatinDigits } from '../utils/dateUtils';
-import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 import { usePersistedTab } from '../hooks/usePersistedTab';
 
 type Tab = 'units' | 'projects' | 'developers';
@@ -27,18 +27,6 @@ const formatInventoryRef = (
     if (value == null || value === '') return '-';
     if (typeof value === 'object') return value.name?.trim() || String(value.id);
     return String(value);
-};
-
-const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const items: Array<number | 'ellipsis'> = [1];
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    if (start > 2) items.push('ellipsis');
-    for (let page = start; page <= end; page += 1) items.push(page);
-    if (end < total - 1) items.push('ellipsis');
-    items.push(total);
-    return items;
 };
 
 const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { developers: Developer[]; onUpdate: (dev: Developer) => void; onDelete: (id: number) => void; isAdmin: boolean }) => {
@@ -63,14 +51,10 @@ const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { develope
                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
                                         <div className="flex items-center justify-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(dev)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(dev)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(dev.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(dev.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -118,14 +102,10 @@ const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Di
                                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
                                         <div className="flex items-center justify-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(proj)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(proj)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(proj.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(proj.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -198,14 +178,10 @@ const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: DisplayUnit
                                         <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-center">
                                             <div className="flex items-center justify-center gap-2">
                                                 {isAdmin && (
-                                                    <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(unit)}>
-                                                        <EditIcon className="w-4 h-4" />
-                                                    </Button>
+                                                    <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(unit)} />
                                                 )}
                                                 {isAdmin && (
-                                                    <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(unit.id)}>
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </Button>
+                                                    <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(unit.id)} />
                                                 )}
                                             </div>
                                         </td>
@@ -651,192 +627,51 @@ export const PropertiesPage = () => {
         const developersTotalPages = Math.max(1, Math.ceil((developersResponse?.count || 0) / developersPageSize));
         const projectsTotalPages = Math.max(1, Math.ceil((projectsResponse?.count || 0) / projectsPageSize));
         const unitsTotalPages = Math.max(1, Math.ceil((unitsResponse?.count || 0) / unitsPageSize));
-        const visibleDeveloperPages = getPaginationItems(developersPageNumber, developersTotalPages);
-        const visibleProjectPages = getPaginationItems(projectsPageNumber, projectsTotalPages);
-        const visibleUnitPages = getPaginationItems(unitsPageNumber, unitsTotalPages);
 
         switch (activeTab) {
             case 'units':
                 return (
                     <Card>
                         <UnitsTable units={filteredUnits} onUpdate={handleUpdateUnit} onDelete={handleDeleteUnit} isAdmin={isAdmin} />
-                        <div className="mt-4 flex items-center justify-end gap-2" dir="ltr">
-                            <select
-                                value={unitsPageSize}
-                                onChange={(e) => setUnitsPageSize(Number(e.target.value))}
-                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                            >
-                                {PAGE_SIZE_OPTIONS.map((size) => (
-                                    <option key={size} value={size}>{`${size} ${t('perPage')}`}</option>
-                                ))}
-                            </select>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUnitsPageNumber(1)}
-                                disabled={unitsPageNumber === 1}
-                            >
-                                &laquo;
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUnitsPageNumber((prev) => Math.max(1, prev - 1))}
-                                disabled={!unitsResponse?.previous}
-                            >
-                                {t('previous')}
-                            </Button>
-                            {visibleUnitPages.map((item, idx) =>
-                                item === 'ellipsis' ? (
-                                    <span key={`ellipsis-unit-${idx}`} className="px-2 text-gray-500">...</span>
-                                ) : (
-                                    <Button
-                                        key={item}
-                                        variant={item === unitsPageNumber ? 'primary' : 'secondary'}
-                                        onClick={() => setUnitsPageNumber(item)}
-                                    >
-                                        {item}
-                                    </Button>
-                                )
-                            )}
-                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
-                                {t('page')} {unitsPageNumber} {t('of')} {unitsTotalPages}
-                            </span>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUnitsPageNumber((prev) => prev + 1)}
-                                disabled={!unitsResponse?.next}
-                            >
-                                {t('next')}
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUnitsPageNumber(unitsTotalPages)}
-                                disabled={unitsPageNumber === unitsTotalPages}
-                            >
-                                &raquo;
-                            </Button>
-                        </div>
+                        <Pagination
+                            page={unitsPageNumber}
+                            totalPages={unitsTotalPages}
+                            onPageChange={setUnitsPageNumber}
+                            pageSize={unitsPageSize}
+                            onPageSizeChange={setUnitsPageSize}
+                            hasPrevious={Boolean(unitsResponse?.previous)}
+                            hasNext={Boolean(unitsResponse?.next)}
+                        />
                     </Card>
                 );
             case 'projects':
                 return (
                     <Card>
                         <ProjectsTable projects={filteredProjects} onUpdate={handleUpdateProject} onDelete={handleDeleteProject} isAdmin={isAdmin} />
-                        <div className="mt-4 flex items-center justify-end gap-2" dir="ltr">
-                            <select
-                                value={projectsPageSize}
-                                onChange={(e) => setProjectsPageSize(Number(e.target.value))}
-                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                            >
-                                {PAGE_SIZE_OPTIONS.map((size) => (
-                                    <option key={size} value={size}>{`${size} ${t('perPage')}`}</option>
-                                ))}
-                            </select>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setProjectsPageNumber(1)}
-                                disabled={projectsPageNumber === 1}
-                            >
-                                &laquo;
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setProjectsPageNumber((prev) => Math.max(1, prev - 1))}
-                                disabled={!projectsResponse?.previous}
-                            >
-                                {t('previous')}
-                            </Button>
-                            {visibleProjectPages.map((item, idx) =>
-                                item === 'ellipsis' ? (
-                                    <span key={`ellipsis-project-${idx}`} className="px-2 text-gray-500">...</span>
-                                ) : (
-                                    <Button
-                                        key={item}
-                                        variant={item === projectsPageNumber ? 'primary' : 'secondary'}
-                                        onClick={() => setProjectsPageNumber(item)}
-                                    >
-                                        {item}
-                                    </Button>
-                                )
-                            )}
-                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
-                                {t('page')} {projectsPageNumber} {t('of')} {projectsTotalPages}
-                            </span>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setProjectsPageNumber((prev) => prev + 1)}
-                                disabled={!projectsResponse?.next}
-                            >
-                                {t('next')}
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setProjectsPageNumber(projectsTotalPages)}
-                                disabled={projectsPageNumber === projectsTotalPages}
-                            >
-                                &raquo;
-                            </Button>
-                        </div>
+                        <Pagination
+                            page={projectsPageNumber}
+                            totalPages={projectsTotalPages}
+                            onPageChange={setProjectsPageNumber}
+                            pageSize={projectsPageSize}
+                            onPageSizeChange={setProjectsPageSize}
+                            hasPrevious={Boolean(projectsResponse?.previous)}
+                            hasNext={Boolean(projectsResponse?.next)}
+                        />
                     </Card>
                 );
             case 'developers':
                 return (
                     <Card>
                         <DevelopersTable developers={filteredDevelopers} onUpdate={handleUpdateDeveloper} onDelete={handleDeleteDeveloper} isAdmin={isAdmin} />
-                        <div className="mt-4 flex items-center justify-end gap-2" dir="ltr">
-                            <select
-                                value={developersPageSize}
-                                onChange={(e) => setDevelopersPageSize(Number(e.target.value))}
-                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                            >
-                                {PAGE_SIZE_OPTIONS.map((size) => (
-                                    <option key={size} value={size}>{`${size} ${t('perPage')}`}</option>
-                                ))}
-                            </select>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setDevelopersPageNumber(1)}
-                                disabled={developersPageNumber === 1}
-                            >
-                                &laquo;
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setDevelopersPageNumber((prev) => Math.max(1, prev - 1))}
-                                disabled={!developersResponse?.previous}
-                            >
-                                {t('previous')}
-                            </Button>
-                            {visibleDeveloperPages.map((item, idx) =>
-                                item === 'ellipsis' ? (
-                                    <span key={`ellipsis-developer-${idx}`} className="px-2 text-gray-500">...</span>
-                                ) : (
-                                    <Button
-                                        key={item}
-                                        variant={item === developersPageNumber ? 'primary' : 'secondary'}
-                                        onClick={() => setDevelopersPageNumber(item)}
-                                    >
-                                        {item}
-                                    </Button>
-                                )
-                            )}
-                            <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 min-w-[95px] text-center">
-                                {t('page')} {developersPageNumber} {t('of')} {developersTotalPages}
-                            </span>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setDevelopersPageNumber((prev) => prev + 1)}
-                                disabled={!developersResponse?.next}
-                            >
-                                {t('next')}
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setDevelopersPageNumber(developersTotalPages)}
-                                disabled={developersPageNumber === developersTotalPages}
-                            >
-                                &raquo;
-                            </Button>
-                        </div>
+                        <Pagination
+                            page={developersPageNumber}
+                            totalPages={developersTotalPages}
+                            onPageChange={setDevelopersPageNumber}
+                            pageSize={developersPageSize}
+                            onPageSizeChange={setDevelopersPageSize}
+                            hasPrevious={Boolean(developersResponse?.previous)}
+                            hasNext={Boolean(developersResponse?.next)}
+                        />
                     </Card>
                 );
             default:
@@ -858,8 +693,8 @@ export const PropertiesPage = () => {
 
     return (
         <PageWrapper title={t('properties')} actions={pageActions}>
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
-                <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
+            <div className="mb-4 overflow-x-auto overflow-y-hidden border-b border-gray-200 dark:border-gray-700">
+                <nav className="-mb-px flex min-w-max space-x-4 rtl:space-x-reverse" aria-label="Tabs">
                     <button onClick={() => setActiveTab('units')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'units' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('units')}</button>
                     <button onClick={() => setActiveTab('projects')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'projects' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('projects')}</button>
                     <button onClick={() => setActiveTab('developers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'developers' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('developers')}</button>

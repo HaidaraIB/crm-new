@@ -1,624 +1,214 @@
-
-
-import React, { useMemo, useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, TrashIcon, EditIcon, EyeIcon, PageLoadingState, TableHorizontalScroll, hasActiveFilters, ViewModeToggle, useEntityViewMode } from '../components/index';
+import { Button, FilterButton, Pagination, PageLoadingState, PageWrapper, PlusIcon, RefreshButton, TrashIcon, ViewModeToggle, hasActiveFilters, useEntityViewMode } from '../components';
+import { BulkActionBar } from '../components/bulk/BulkActionBar';
 import { DEFAULT_DEAL_FILTERS } from '../components/drawers/DealsFilterDrawer';
+import { DealSummaryBar } from '../components/deals/DealSummaryBar';
 import { DealsKanbanView } from '../components/deals/DealsKanbanView';
-import { Deal } from '../types';
-import { useDeals, useDeleteDeal, useProjects, useUnits } from '../hooks/useQueries';
+import { DealsTable } from '../components/deals/DealsTable';
+import { useBulkDealAction, useDealPipelines, useDealSummary, useDeals, useDeleteDeal, useUsers } from '../hooks/useQueries';
+import { getDealsAPI } from '../services/api';
+import { mapApiDeal } from '../utils/deals/dealMapper';
+import { dealFiltersToQuery } from '../utils/deals/dealQuery';
 import { exportToExcel } from '../utils/exportToExcel';
-import { withLatinDigits } from '../utils/dateUtils';
-import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
-
-const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const items: Array<number | 'ellipsis'> = [1];
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    if (start > 2) items.push('ellipsis');
-    for (let page = start; page <= end; page += 1) items.push(page);
-    if (end < total - 1) items.push('ellipsis');
-    items.push(total);
-    return items;
-};
-
-const DealsTable = ({ deals, onDelete, onEdit, onView, isRealEstate, projects, units }: { deals: Deal[], onDelete: (id: number) => void, onEdit: (id: number) => void, onView: (id: number) => void, isRealEstate: boolean, projects: any[], units: any[] }) => {
-    const { t } = useAppContext();
-    
-    return (
-        <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0 rounded-lg">
-            <div className="min-w-full block">
-                <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
-                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1000px]">
-                        <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
-                            <tr>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('dealId')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('clientName')}</th>
-                                {isRealEstate && <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('project')}</th>}
-                                {isRealEstate && <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden md:table-cell text-center">{t('unit')}</th>}
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden sm:table-cell text-center">{t('stage')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('status')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('paymentMethod')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('value')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('startDate')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap hidden lg:table-cell text-center">{t('closedDate')}</th>
-                                <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('actions')}</th>
-                            </tr>
-                        </thead>
-                        <tbody className="bg-white dark:bg-dark-card divide-y divide-gray-200 dark:divide-gray-700">
-                            {deals.length === 0 ? (
-                                <tr>
-                                    <td colSpan={isRealEstate ? 11 : 9} className="px-4 py-12 text-center">
-                                        <p className="text-gray-500 dark:text-gray-400">{t('noDealsFound')}</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                deals.map(deal => {
-                                    const formatDate = (dateStr: string | undefined): string => {
-                                        if (!dateStr) return '-';
-                                        try {
-                                            const date = new Date(dateStr);
-                                            if (!isNaN(date.getTime())) {
-                                                return date.toLocaleDateString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' }));
-                                            }
-                                        } catch (e) {
-                                            // Ignore parsing errors
-                                        }
-                                        return dateStr;
-                                    };
-
-                                    const formatStage = (stage: string | undefined): string => {
-                                        if (!stage) return '-';
-                                        const stageMap: { [key: string]: string } = {
-                                            'in_progress': t('inProgress') || 'In Progress',
-                                            'on_hold': t('onHold') || 'On Hold',
-                                            'won': t('won') || 'Won',
-                                            'lost': t('lost') || 'Lost',
-                                            'cancelled': t('cancelled') || 'Cancelled',
-                                        };
-                                        return stageMap[stage] || stage;
-                                    };
-
-                                    const formatStatus = (status: string | undefined): string => {
-                                        if (!status) return '-';
-                                        const statusLower = status.toLowerCase();
-                                        const statusMap: { [key: string]: string } = {
-                                            'reservation': t('reservation') || 'Reservation',
-                                            'contracted': t('contracted') || 'Contracted',
-                                            'closed': t('closed') || 'Closed',
-                                        };
-                                        return statusMap[statusLower] || status;
-                                    };
-
-                                    const formatPaymentMethod = (method: string | undefined): string => {
-                                        if (!method) return '-';
-                                        const methodLower = method.toLowerCase();
-                                        const methodMap: { [key: string]: string } = {
-                                            'cash': t('cash') || 'Cash',
-                                            'installment': t('installment') || 'Installment',
-                                        };
-                                        return methodMap[methodLower] || method;
-                                    };
-
-                                    const getStageColor = (stage: string | undefined): string => {
-                                        if (!stage) return 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-                                        const colorMap: { [key: string]: string } = {
-                                            'in_progress': 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
-                                            'on_hold': 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200',
-                                            'won': 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200',
-                                            'lost': 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
-                                            'cancelled': 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-                                        };
-                                        return colorMap[stage] || 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200';
-                                    };
-
-                                    // Get project and unit names from API serializer fields (project_name, unit_code)
-                                    // If not available, fall back to searching in projects/units arrays
-                                    const projectName = isRealEstate && deal.project 
-                                        ? ((deal as any).project_name || projects.find(p => p.name === deal.project || p.id.toString() === deal.project || p.id === deal.project)?.name || (typeof deal.project === 'string' ? deal.project : null))
-                                        : null;
-                                    const unitCode = isRealEstate && deal.unit 
-                                        ? ((deal as any).unit_code || units.find(u => u.code === deal.unit || u.id.toString() === deal.unit || u.id === deal.unit)?.code || (typeof deal.unit === 'string' ? deal.unit : null))
-                                        : null;
-
-                                    // Format value like budget: comma-separated with trailing zeros removed
-                                    const formattedValue = (() => {
-                                        const num = Number(deal.value);
-                                        const formatted = num.toLocaleString('en-US', withLatinDigits({ 
-                                            minimumFractionDigits: 0, 
-                                            maximumFractionDigits: 2 
-                                        }));
-                                        return formatted.replace(/\.0+$/, '');
-                                    })();
-
-                                    return (
-                                        <tr key={deal.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors duration-150">
-                                            <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap text-center">
-                                                <span className="text-sm">#{deal.id}</span>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                <span className="text-sm font-medium text-gray-900 dark:text-white">{deal.clientName}</span>
-                                            </td>
-                                            {isRealEstate && (
-                                                <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-700 dark:text-gray-300">{projectName || '-'}</span>
-                                                </td>
-                                            )}
-                                            {isRealEstate && (
-                                                <td className="px-4 py-4 hidden md:table-cell whitespace-nowrap text-center">
-                                                    <span className="text-sm text-gray-700 dark:text-gray-300">{unitCode || '-'}</span>
-                                                </td>
-                                            )}
-                                            <td className="px-4 py-4 hidden sm:table-cell whitespace-nowrap text-center">
-                                                <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${getStageColor(deal.stage)}`}>
-                                                    {formatStage(deal.stage)}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                <span className={`inline-flex items-center px-2.5 py-1 text-xs font-medium rounded-full ${
-                                                    deal.status?.toLowerCase() === 'reservation' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200' :
-                                                    deal.status?.toLowerCase() === 'contracted' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' :
-                                                    deal.status?.toLowerCase() === 'closed' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' :
-                                                    'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200'
-                                                }`}>
-                                                    {formatStatus(deal.status)}
-                                                </span>
-                                            </td>
-                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
-                                                <span className="text-sm text-gray-700 dark:text-gray-300">{formatPaymentMethod(deal.paymentMethod)}</span>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                <span className="text-sm font-semibold text-gray-900 dark:text-white">{formattedValue}</span>
-                                            </td>
-                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
-                                                <span className="text-sm text-gray-600 dark:text-gray-400">{formatDate(deal.startDate)}</span>
-                                            </td>
-                                            <td className="px-4 py-4 hidden lg:table-cell whitespace-nowrap text-center">
-                                                <span className="text-sm text-gray-600 dark:text-gray-400">{formatDate(deal.closedDate)}</span>
-                                            </td>
-                                            <td className="px-4 py-4 whitespace-nowrap text-center">
-                                                <div className="flex items-center justify-center gap-1.5">
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        className="p-1.5 h-auto !text-green-600 dark:!text-green-400 hover:!bg-green-50 dark:hover:!bg-green-900/20 rounded-md transition-colors" 
-                                                        onClick={() => onView(deal.id)} 
-                                                        title={t('view') || 'View'}
-                                                    >
-                                                        <EyeIcon className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        className="p-1.5 h-auto !text-blue-600 dark:!text-blue-400 hover:!bg-blue-50 dark:hover:!bg-blue-900/20 rounded-md transition-colors" 
-                                                        onClick={() => onEdit(deal.id)} 
-                                                        title={t('edit') || 'Edit'}
-                                                    >
-                                                        <EditIcon className="w-4 h-4" />
-                                                    </Button>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        className="p-1.5 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20 rounded-md transition-colors" 
-                                                        onClick={() => onDelete(deal.id)} 
-                                                        title={t('delete') || 'Delete'}
-                                                    >
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    );
-                                })
-                            )}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </TableHorizontalScroll>
-    );
-}
+import { getCompanyDealRoute } from '../utils/routing';
+import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import type { Deal } from '../types';
 
 export const DealsPage = () => {
-    const { 
-        t, 
-        setCurrentPage, 
-        setIsDealsFilterDrawerOpen, 
-        dealFilters,
-        setDealFilters,
-        currentUser, 
-        setConfirmDeleteConfig, 
-        setIsConfirmDeleteModalOpen,
-        setEditingDeal,
-        setIsViewDealModalOpen,
-        setViewingDeal
-    } = useAppContext();
-    const [dealsPageNumber, setDealsPageNumber] = useState(1);
-    const [dealsPageSize, setDealsPageSize] = usePersistedPageSize('deals');
-    const [viewMode, setViewMode] = useEntityViewMode('deals');
-    const isBoardView = viewMode === 'board';
+  const {
+    t,
+    currentUser,
+    dealFilters,
+    setDealFilters,
+    setIsDealsFilterDrawerOpen,
+    setCurrentPage,
+    setConfirmDeleteConfig,
+    setIsConfirmDeleteModalOpen,
+  } = useAppContext();
+  const [viewMode, setViewMode] = useEntityViewMode('deals');
+  const isBoard = viewMode === 'board';
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = usePersistedPageSize('deals');
+  const [selected, setSelected] = useState<number[]>([]);
+  const [bulkOwnerValue, setBulkOwnerValue] = useState('');
+  const [bulkStageValue, setBulkStageValue] = useState('');
+  const [boardRevision, setBoardRevision] = useState(0);
+  const [pipelineId, setPipelineId] = useState<number | null>(null);
+  const { data: pipelines = [] } = useDealPipelines();
+  const pipeline = pipelines.find((item) => item.id === pipelineId) || pipelines.find((item) => item.isDefault) || pipelines[0];
+  const query = useMemo(() => dealFiltersToQuery(dealFilters, pipeline?.id), [dealFilters, pipeline?.id]);
+  const { data, isLoading, isError, refetch, isFetching } = useDeals(page, { enabled: !isBoard }, pageSize, undefined, undefined, query);
+  const { data: summary } = useDealSummary(query);
+  const { data: usersResponse } = useUsers();
+  const deleteDeal = useDeleteDeal();
+  const bulk = useBulkDealAction();
+  const users = Array.isArray(usersResponse) ? usersResponse : usersResponse?.results || [];
+  const deals: Deal[] = data?.results || [];
+  const total = data?.count || 0;
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
+  const isRealEstate = currentUser?.company?.specialization === 'real_estate';
 
-    // Fetch deals using React Query (search is server-side)
-    const { data: dealsResponse, isLoading: dealsLoading, isFetching: dealsFetching, error: dealsError, refetch: refetchDeals } = useDeals(
-        dealsPageNumber,
-        { enabled: !isBoardView },
-        dealsPageSize,
-        dealFilters.search || undefined,
+  useEffect(() => { setPage(1); }, [JSON.stringify(query), pageSize]);
+  useEffect(() => {
+    if (selected.length === 0) {
+      setBulkOwnerValue('');
+      setBulkStageValue('');
+    }
+  }, [selected.length]);
+
+  const go = (segment: string, pageName: 'CreateDeal' | 'EditDeal' | 'ViewDeal') => {
+    window.history.pushState({}, '', getCompanyDealRoute(currentUser?.company?.name, currentUser?.company?.domain, segment));
+    setCurrentPage(pageName);
+  };
+
+  const confirmDelete = (ids: number[], name?: string) => {
+    setConfirmDeleteConfig({
+      title: t('deleteDeal'),
+      message: t('confirmDeleteDeal'),
+      itemName: name || String(ids.length),
+      onConfirm: async () => {
+        if (ids.length === 1) await deleteDeal.mutateAsync(ids[0]);
+        else await bulk.mutateAsync({ ids, action: 'delete' });
+        setSelected([]);
+        setBoardRevision((value) => value + 1);
+      },
+    });
+    setIsConfirmDeleteModalOpen(true);
+  };
+
+  const exportFiltered = async () => {
+    const payload = await getDealsAPI(undefined, undefined, query);
+    const rawRows = Array.isArray(payload) ? payload : payload?.results || [];
+    const rows = rawRows.map((row: Record<string, unknown>) => mapApiDeal(row));
+    exportToExcel(
+      rows.map((deal: Deal) => ({
+        id: deal.id,
+        title: deal.title,
+        clientName: deal.clientName,
+        stage: deal.pipelineStageName || deal.stage,
+        value: deal.value,
+        owner: deal.employeeUsername || '',
+      })),
+      [
+        { key: 'id', label: t('dealId') },
+        { key: 'title', label: t('dealTitle') },
+        { key: 'clientName', label: t('clientName') },
+        { key: 'stage', label: t('stage') },
+        { key: 'value', label: t('value') },
+        { key: 'owner', label: t('dealOwner') },
+      ],
+      `deals-export-${new Date().toISOString().slice(0, 10)}`,
+      t('deals'),
     );
-    const dealsRaw = dealsResponse?.results || [];
-    const hasNextPage = Boolean(dealsResponse?.next);
-    const hasPreviousPage = Boolean(dealsResponse?.previous);
-    const totalDealsCount = dealsResponse?.count || 0;
-    const pageSize = dealsPageSize;
-    const totalPages = Math.max(1, Math.ceil(totalDealsCount / pageSize));
-    const paginationItems = getPaginationItems(dealsPageNumber, totalPages);
+  };
 
-    // Fetch projects and units for real estate
-    const { data: projectsResponse } = useProjects();
-    const projectsRaw = projectsResponse?.results || [];
+  if (!isBoard && isLoading) {
+    return <PageWrapper title={t('deals')}><PageLoadingState label={t('loading')} /></PageWrapper>;
+  }
+  if (!isBoard && isError) {
+    return <PageWrapper title={t('deals')}><p className="p-6 text-red-600">{t('errorLoadingDeals')}</p></PageWrapper>;
+  }
 
-    const { data: unitsResponse } = useUnits();
-    const unitsRaw = unitsResponse?.results || [];
-    
-    // Transform deals: convert client, project, unit from object/ID to string
-    const allDeals = useMemo((): Deal[] => {
-        return dealsRaw.map((deal: any): Deal => {
-            // Handle clientName - API might return client_name, clientName, or client object
-            let clientName = '';
-            if (deal.client_name) {
-                clientName = deal.client_name;
-            } else if (deal.clientName) {
-                clientName = deal.clientName;
-            } else if (typeof deal.client === 'object' && deal.client?.name) {
-                clientName = deal.client.name;
-            } else if (typeof deal.client === 'number') {
-                // Would need to fetch client, but for now use fallback
-                clientName = deal.client_name || deal.clientName || '';
-            }
-            
-            // Handle project - API might return project_name, project, or project object
-            let projectName = '';
-            if (deal.project_name) {
-                projectName = deal.project_name;
-            } else if (typeof deal.project === 'object' && deal.project?.name) {
-                projectName = deal.project.name;
-            } else if (typeof deal.project === 'number') {
-                const proj = projectsRaw.find((p: any) => p.id === deal.project);
-                projectName = proj?.name || '';
-            } else if (typeof deal.project === 'string') {
-                projectName = deal.project;
-            }
-            
-            // Handle unit - API might return unit_code, unit, or unit object
-            let unitCode = '';
-            if (deal.unit_code) {
-                unitCode = deal.unit_code;
-            } else if (typeof deal.unit === 'object' && deal.unit?.code) {
-                unitCode = deal.unit.code;
-            } else if (typeof deal.unit === 'number') {
-                const unit = unitsRaw.find((u: any) => u.id === deal.unit);
-                unitCode = unit?.code || '';
-            } else if (typeof deal.unit === 'string') {
-                unitCode = deal.unit;
-            }
-            
-            // Handle paymentMethod - API might return payment_method or paymentMethod
-            const paymentMethod = deal.payment_method || deal.paymentMethod || '';
-            
-            // Handle startedBy and closedBy - API might return started_by/closed_by or startedBy/closedBy
-            const startedBy = deal.started_by || deal.startedBy || null;
-            const closedBy = deal.closed_by || deal.closedBy || null;
-            
-            // Handle startDate and closedDate - API might return start_date/closed_date or startDate/closedDate
-            const startDate = deal.start_date || deal.startDate || null;
-            const closedDate = deal.closed_date || deal.closedDate || null;
-            
-            return {
-                ...deal,
-                clientName: clientName,
-                project: projectName,
-                unit: unitCode,
-                paymentMethod: paymentMethod,
-                startedBy: startedBy,
-                closedBy: closedBy,
-                startDate: startDate,
-                closedDate: closedDate,
-            };
-        });
-    }, [dealsRaw, projectsRaw, unitsRaw]);
-    
-    // Transform projects and units for display
-    const projects = projectsRaw;
-    const units = unitsRaw;
-
-    // Delete deal mutation
-    const deleteDealMutation = useDeleteDeal();
-
-    const isRealEstate = currentUser?.company?.specialization === 'real_estate';
-
-    const filteredDeals = useMemo(() => {
-        let filtered = allDeals;
-
-        // Status filter
-        if (dealFilters.status && dealFilters.status !== 'All') {
-            filtered = filtered.filter(deal => {
-                const status = deal.status || '';
-                return status === dealFilters.status;
-            });
-        }
-
-        // Payment method filter
-        if (dealFilters.paymentMethod && dealFilters.paymentMethod !== 'All') {
-            filtered = filtered.filter(deal => {
-                const paymentMethod = deal.paymentMethod || '';
-                return paymentMethod === dealFilters.paymentMethod;
-            });
-        }
-
-        // Unit filter (for real estate)
-        if (isRealEstate && dealFilters.unit && dealFilters.unit !== 'All') {
-            filtered = filtered.filter(deal => {
-                const unit = deal.unit || '';
-                return unit === dealFilters.unit;
-            });
-        }
-
-        // Project filter (for real estate) - filter by deal's project
-        if (isRealEstate && dealFilters.project && dealFilters.project !== 'All') {
-            filtered = filtered.filter(deal => {
-                const project = deal.project || '';
-                return project === dealFilters.project;
-            });
-        }
-
-        // Value range filter
-        if (dealFilters.valueMin) {
-            const minValue = parseFloat(dealFilters.valueMin);
-            if (!isNaN(minValue)) {
-                filtered = filtered.filter(deal => (deal.value || 0) >= minValue);
-            }
-        }
-        if (dealFilters.valueMax) {
-            const maxValue = parseFloat(dealFilters.valueMax);
-            if (!isNaN(maxValue)) {
-                filtered = filtered.filter(deal => (deal.value || 0) <= maxValue);
-            }
-        }
-
-        // Search is applied server-side via useDeals
-
-        return filtered;
-    }, [allDeals, dealFilters, isRealEstate]);
-
-    useEffect(() => {
-        setDealsPageNumber(1);
-    }, [
-        dealFilters.status,
-        dealFilters.paymentMethod,
-        dealFilters.unit,
-        dealFilters.project,
-        dealFilters.valueMin,
-        dealFilters.valueMax,
-        dealFilters.search,
-    ]);
-
-    useEffect(() => {
-        setDealsPageNumber(1);
-    }, [dealsPageSize]);
-
-    const handleDelete = (id: number) => {
-        const deal = allDeals.find(d => d.id === id);
-        if (deal) {
-            setConfirmDeleteConfig({
-                title: t('deleteDeal') || 'Delete Deal',
-                message: t('confirmDeleteDeal') || 'Are you sure you want to delete the deal for',
-                itemName: deal.clientName,
-                onConfirm: async () => {
-                    try {
-                        await deleteDealMutation.mutateAsync(id);
-                    } catch (error: any) {
-                        console.error('Error deleting deal:', error);
-                        throw error;
-                    }
-                },
-            });
-            setIsConfirmDeleteModalOpen(true);
-        }
-    };
-
-    const handleEdit = (id: number) => {
-        const deal = allDeals.find(d => d.id === id);
-        if (deal) {
-            setEditingDeal(deal);
-            window.history.pushState({}, '', '/edit-deal');
-            setCurrentPage('EditDeal');
-        }
-    };
-
-    const handleView = (id: number) => {
-        const deal = allDeals.find(d => d.id === id);
-        if (deal) {
-            setViewingDeal(deal);
-            setIsViewDealModalOpen(true);
-        }
-    };
-
-    const handleOpenDealFromBoard = (deal: Deal) => {
-        setViewingDeal(deal);
-        setIsViewDealModalOpen(true);
-    };
-
-    const getStageLabel = (stage: string): string => {
-        const stageMap: Record<string, string> = {
-            in_progress: t('inProgress') || 'In Progress',
-            on_hold: t('onHold') || 'On Hold',
-            won: t('won') || 'Won',
-            lost: t('lost') || 'Lost',
-            cancelled: t('cancelled') || 'Cancelled',
-        };
-        return stageMap[stage] || stage;
-    };
-
-    const handleExportDeals = () => {
-        const rows = filteredDeals.map((deal: any) => ({
-            id: deal.id,
-            clientName: deal.clientName ?? '',
-            project: deal.project ?? '',
-            unit: deal.unit ?? '',
-            stage: deal.stage ?? '',
-            status: deal.status ?? '',
-            paymentMethod: deal.paymentMethod ?? '',
-            value: deal.value ?? '',
-            startDate: deal.startDate ? new Date(deal.startDate).toLocaleDateString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : '',
-            closedDate: deal.closedDate ? new Date(deal.closedDate).toLocaleDateString('en-US', withLatinDigits({ year: 'numeric', month: 'short', day: 'numeric' })) : '',
-        }));
-        const columns = [
-            { key: 'id', label: t('dealId') || 'ID' },
-            { key: 'clientName', label: t('clientName') || 'Client' },
-            { key: 'project', label: t('project') || 'Project' },
-            { key: 'unit', label: t('unit') || 'Unit' },
-            { key: 'stage', label: t('stage') || 'Stage' },
-            { key: 'status', label: t('status') || 'Status' },
-            { key: 'paymentMethod', label: t('paymentMethod') || 'Payment Method' },
-            { key: 'value', label: t('value') || 'Value' },
-            { key: 'startDate', label: t('startDate') || 'Start Date' },
-            { key: 'closedDate', label: t('closedDate') || 'Closed Date' },
-        ];
-        exportToExcel(rows, columns, `deals-export-${new Date().toISOString().slice(0, 10)}`, t('deals') || 'Deals');
-    };
-
-    if (!isBoardView && dealsLoading) {
-        return (
-            <PageWrapper title={t('deals')}>
-                <PageLoadingState label={t('loading')} />
-            </PageWrapper>
-        );
-    }
-
-    if (!isBoardView && dealsError) {
-        return (
-            <PageWrapper title={t('deals')}>
-                <div className="flex items-center justify-center" style={{ height: 'calc(100vh - 200px)' }}>
-                    <div className="text-center">
-                        <p className="text-red-600 dark:text-red-400 mb-4">
-                            {t('errorLoadingDeals') || 'Error loading deals. Please try again.'}
-                        </p>
-                        <Button onClick={() => window.location.reload()}>
-                            {t('reload') || 'Reload'}
-                        </Button>
-                    </div>
-                </div>
-            </PageWrapper>
-        );
-    }
-
-    return (
-        <PageWrapper
-            title={t('deals')}
-            actions={
-                <>
-                    <FilterButton
-                        onClick={() => setIsDealsFilterDrawerOpen(true)}
-                        className="w-full sm:w-auto"
-                        hasActiveFilters={hasActiveFilters(dealFilters, DEFAULT_DEAL_FILTERS)}
-                    />
-                    <RefreshButton
-                        onClick={() => { void refetchDeals(); }}
-                        loading={dealsFetching && !dealsLoading}
-                        className="w-full sm:w-auto"
-                    />
-                    <Button variant="secondary" onClick={handleExportDeals} className="w-full sm:w-auto" type="button" disabled={filteredDeals.length === 0 && !isBoardView}>
-                        <span className="hidden sm:inline">{t('exportDeals') || 'Export to Excel'}</span>
-                    </Button>
-                    <Button 
-                        onClick={() => {
-                            window.history.pushState({}, '', '/create-deal');
-                            setCurrentPage('CreateDeal');
-                        }} 
-                        className="w-full sm:w-auto" 
-                        type="button"
-                    >
-                        <PlusIcon className="w-4 h-4"/> <span className="hidden sm:inline">{t('createDeal')}</span>
-                    </Button>
-                </>
-            }
+  return (
+    <PageWrapper
+      title={t('deals')}
+      actions={
+        <>
+          <FilterButton onClick={() => setIsDealsFilterDrawerOpen(true)} hasActiveFilters={hasActiveFilters(dealFilters, DEFAULT_DEAL_FILTERS)} />
+          <RefreshButton onClick={() => { void refetch(); }} loading={isFetching && !isLoading} />
+          <Button variant="secondary" onClick={() => { void exportFiltered(); }}>{t('exportDeals')}</Button>
+          <Button onClick={() => go('create-deal', 'CreateDeal')}><PlusIcon className="w-4 h-4" /> {t('createDeal')}</Button>
+        </>
+      }
+    >
+      <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <select
+          className="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100"
+          value={pipeline?.id || ''}
+          onChange={(e) => {
+            setPipelineId(Number(e.target.value));
+            setDealFilters({ ...dealFilters, pipeline: e.target.value });
+          }}
         >
-            <div className="mb-4 flex justify-end">
-                <ViewModeToggle value={viewMode} onChange={setViewMode} />
-            </div>
-            {isBoardView ? (
-                <DealsKanbanView
-                    search={dealFilters.search || undefined}
-                    dealFilters={dealFilters}
-                    isRealEstate={isRealEstate}
-                    canDrag
-                    onOpenDeal={handleOpenDealFromBoard}
-                    getStageLabel={getStageLabel}
-                    enabled={isBoardView}
-                />
-            ) : (
-            <Card>
-                <DealsTable deals={filteredDeals} onDelete={handleDelete} onEdit={handleEdit} onView={handleView} isRealEstate={isRealEstate} projects={projects} units={units} />
-                <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        {t('page')} {dealsPageNumber} {t('of')} {totalPages}
-                    </p>
-                    <div className="flex items-center gap-2" dir="ltr">
-                        <select
-                            value={dealsPageSize}
-                            onChange={(e) => setDealsPageSize(Number(e.target.value))}
-                            className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                        >
-                            {PAGE_SIZE_OPTIONS.map((size) => (
-                                <option key={size} value={size}>
-                                    {`${size} ${t('perPage')}`}
-                                </option>
-                            ))}
-                        </select>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setDealsPageNumber(1)}
-                            disabled={dealsPageNumber === 1 || dealsLoading}
-                        >
-                            &laquo;
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setDealsPageNumber((prev) => Math.max(1, prev - 1))}
-                            disabled={!hasPreviousPage || dealsLoading}
-                        >
-                            {t('previous')}
-                        </Button>
-                        {paginationItems.map((item, idx) =>
-                            item === 'ellipsis' ? (
-                                <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
-                            ) : (
-                                <Button
-                                    key={item}
-                                    variant={item === dealsPageNumber ? 'primary' : 'secondary'}
-                                    onClick={() => setDealsPageNumber(item)}
-                                    disabled={dealsLoading}
-                                >
-                                    {item}
-                                </Button>
-                            )
-                        )}
-                        <Button
-                            variant="secondary"
-                            onClick={() => setDealsPageNumber((prev) => prev + 1)}
-                            disabled={!hasNextPage || dealsLoading}
-                        >
-                            {t('next')}
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setDealsPageNumber(totalPages)}
-                            disabled={dealsPageNumber === totalPages || dealsLoading}
-                        >
-                            &raquo;
-                        </Button>
-                    </div>
-                </div>
-            </Card>
-            )}
-        </PageWrapper>
-    );
+          {pipelines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+        </select>
+        <ViewModeToggle value={viewMode} onChange={setViewMode} />
+      </div>
+      <div className="mb-4"><DealSummaryBar summary={summary} /></div>
+      {isBoard ? (
+        <DealsKanbanView
+          pipeline={pipeline}
+          filters={query}
+          refreshKey={boardRevision}
+          onOpen={(deal) => go(`view-deal/${deal.id}`, 'ViewDeal')}
+          onEdit={(deal) => go(`edit-deal/${deal.id}`, 'EditDeal')}
+          onDelete={(deal) => confirmDelete([deal.id], deal.clientName)}
+        />
+      ) : (
+        <>
+          <DealsTable
+            deals={deals}
+            isRealEstate={isRealEstate}
+            selectedIds={selected}
+            onToggle={(id) => setSelected((prev) => prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id])}
+            onTogglePage={(ids, checked) => setSelected((prev) => checked ? Array.from(new Set([...prev, ...ids])) : prev.filter((id) => !ids.includes(id)))}
+            onDelete={(id) => confirmDelete([id], deals.find((deal) => deal.id === id)?.clientName)}
+            onEdit={(id) => go(`edit-deal/${id}`, 'EditDeal')}
+            onView={(id) => go(`view-deal/${id}`, 'ViewDeal')}
+          />
+          <Pagination
+            page={page}
+            totalPages={pageCount}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={setPageSize}
+            disabled={isFetching}
+          />
+        </>
+      )}
+      <BulkActionBar selectedCount={selected.length} selectedLabel={t('selectedCount').replace('{count}', String(selected.length))} clearLabel={t('clearSelection')} onClear={() => setSelected([])}>
+        <select
+          className="!h-8 shrink-0 rounded-full border border-gray-300 bg-white px-3 text-sm text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:bg-white/10 dark:text-white"
+          value={bulkOwnerValue}
+          disabled={bulk.isPending}
+          onChange={(e) => {
+            const value = e.target.value;
+            setBulkOwnerValue(value);
+            const employee = Number(value);
+            if (!employee) return;
+            void bulk.mutateAsync({ ids: selected, action: 'assign', employee }).then(() => setSelected([]));
+          }}
+        >
+          <option value="">{t('dealOwner')}</option>
+          {users.map((user: { id: number; username?: string; name?: string }) => <option key={user.id} value={user.id}>{user.name || user.username}</option>)}
+        </select>
+        <select
+          className="!h-8 shrink-0 rounded-full border border-gray-300 bg-white px-3 text-sm text-gray-900 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/20 dark:bg-white/10 dark:text-white"
+          value={bulkStageValue}
+          disabled={bulk.isPending}
+          onChange={(e) => {
+            const value = e.target.value;
+            setBulkStageValue(value);
+            const stage = pipeline?.stages.find((item) => String(item.id) === value);
+            if (!stage || stage.stageType === 'lost') return;
+            void bulk.mutateAsync({ ids: selected, action: 'move', pipelineStage: stage.id }).then(() => setSelected([]));
+          }}
+        >
+          <option value="">{t('dealBulkMove')}</option>
+          {(pipeline?.stages || []).filter((stage) => stage.stageType !== 'lost').map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
+        </select>
+        <Button
+          variant="danger"
+          onClick={() => confirmDelete(selected)}
+          disabled={bulk.isPending}
+          className="!h-8 shrink-0 whitespace-nowrap !rounded-full px-3"
+          title={t('delete')}
+        >
+          <TrashIcon className="h-4 w-4 shrink-0" />
+          {t('delete')}
+        </Button>
+      </BulkActionBar>
+    </PageWrapper>
+  );
 };

@@ -16,15 +16,8 @@ import { normalizeRole } from '../utils/roles';
 import { isFibSessionPayload, routeToFibPaymentPage } from '../utils/paymentSession';
 import { hydratePaymentAccessToken } from '../utils/paymentAuth';
 import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
-import { validateNameField, validatePhoneField } from '../utils/formValidation';
-import { clearFieldError, mapApiFieldsToUiErrors } from '../utils/formFieldErrors';
-
-const PROFILE_API_FIELD_MAP: Record<string, string> = {
-    first_name: 'firstName',
-    last_name: 'lastName',
-    phone: 'phone',
-    profile_photo: 'profilePhoto',
-};
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
+import { clearFieldError } from '../utils/formFieldErrors';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -224,32 +217,59 @@ export const ProfilePage = () => {
         }
     };
 
-    const validateProfileForm = (): Record<string, string> => {
-        const validationErrors: Record<string, string> = {};
-        const firstNameErr = validateNameField(firstName, t, {
-            requiredKey: 'firstNameRequired',
-            fallback: 'First name is required',
-        });
-        if (firstNameErr) validationErrors.firstName = firstNameErr;
-
-        const lastNameErr = validateNameField(lastName, t, {
-            requiredKey: 'lastNameRequired',
-            fallback: 'Last name is required',
-        });
-        if (lastNameErr) validationErrors.lastName = lastNameErr;
-
-        const phoneErr = validatePhoneField(phone, t, { required: false });
-        if (phoneErr) validationErrors.phone = phoneErr;
-
-        return validationErrors;
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
     };
+
+    const profileValues = (patch: { firstName?: string; lastName?: string; email?: string; phone?: string } = {}) => ({
+        first_name: patch.firstName ?? firstName,
+        firstName: patch.firstName ?? firstName,
+        last_name: patch.lastName ?? lastName,
+        lastName: patch.lastName ?? lastName,
+        email: patch.email ?? email,
+        phone: patch.phone ?? phone,
+    });
+
+    const mirrorProfileErrors = (raw: Record<string, string>) => {
+        const next = { ...raw };
+        if (next._general && !next.general) next.general = next._general;
+        if (next.first_name && !next.firstName) next.firstName = next.first_name;
+        if (next.firstName && !next.first_name) next.first_name = next.firstName;
+        if (next.last_name && !next.lastName) next.lastName = next.last_name;
+        if (next.lastName && !next.last_name) next.last_name = next.lastName;
+        return next;
+    };
+
+    const showProfileField = (
+        field: 'firstName' | 'lastName' | 'email' | 'phone',
+        patch: { firstName?: string; lastName?: string; email?: string; phone?: string } = {},
+    ) => {
+        const next = mirrorProfileErrors(catalogFieldErrors('profile.update', profileValues(patch), translate));
+        const keys = field === 'firstName'
+            ? ['firstName', 'first_name']
+            : field === 'lastName'
+              ? ['lastName', 'last_name']
+              : [field];
+        setErrors((prev) => {
+            const updated = { ...prev };
+            for (const key of keys) {
+                if (next[key]) updated[key] = next[key];
+                else delete updated[key];
+            }
+            return updated;
+        });
+    };
+
+    const validateProfileForm = (): Record<string, string> =>
+        mirrorProfileErrors(catalogFieldErrors('profile.update', profileValues(), translate));
 
     const handleSave = async () => {
         if (!currentUser?.id) return;
 
         const validationErrors = validateProfileForm();
+        setErrors(validationErrors);
         if (Object.keys(validationErrors).length > 0) {
-            setErrors(validationErrors);
             return;
         }
 
@@ -293,13 +313,9 @@ export const ProfilePage = () => {
         } catch (error: any) {
             console.error('Error updating profile:', error);
             // Handle field-specific errors
-            if (error?.fields) {
-                const fieldErrors = mapApiFieldsToUiErrors(error.fields, t, PROFILE_API_FIELD_MAP);
-                setErrors(
-                    Object.keys(fieldErrors).length > 0
-                        ? fieldErrors
-                        : { general: error?.message || t('errorUpdatingProfile') || 'Failed to update profile. Please try again.' }
-                );
+            const server = mirrorProfileErrors(serverFieldErrors(error, 'profile.update', translate));
+            if (Object.keys(server).length > 0) {
+                setErrors(server);
             } else {
                 setErrors({ general: error?.message || t('errorUpdatingProfile') || 'Failed to update profile. Please try again.' });
             }
@@ -480,9 +496,11 @@ export const ProfilePage = () => {
                                     id="profile-first-name" 
                                     value={firstName}
                                     onChange={(e) => {
-                                        setFirstName(e.target.value);
-                                        clearFieldError(setErrors, 'firstName');
+                                        const value = e.target.value;
+                                        setFirstName(value);
+                                        if (errors.firstName || errors.first_name) showProfileField('firstName', { firstName: value });
                                     }}
+                                    onBlur={() => showProfileField('firstName')}
                                     className={errors.firstName ? 'border-red-500 dark:border-red-500' : ''}
                                 />
                                 {errors.firstName && (
@@ -495,9 +513,11 @@ export const ProfilePage = () => {
                                     id="profile-last-name" 
                                     value={lastName}
                                     onChange={(e) => {
-                                        setLastName(e.target.value);
-                                        clearFieldError(setErrors, 'lastName');
+                                        const value = e.target.value;
+                                        setLastName(value);
+                                        if (errors.lastName || errors.last_name) showProfileField('lastName', { lastName: value });
                                     }}
+                                    onBlur={() => showProfileField('lastName')}
                                     className={errors.lastName ? 'border-red-500 dark:border-red-500' : ''}
                                 />
                                 {errors.lastName && (
@@ -511,10 +531,18 @@ export const ProfilePage = () => {
                                 id="profile-email" 
                                 type="email" 
                                 value={email}
-                                onChange={(e) => setEmail(e.target.value)}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setEmail(value);
+                                    if (errors.email) showProfileField('email', { email: value });
+                                }}
+                                onBlur={() => showProfileField('email')}
                                 disabled={currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified}
                                 className={(currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified) ? "bg-gray-100 dark:bg-gray-800 cursor-not-allowed" : ""}
                             />
+                            {errors.email && (
+                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
+                            )}
                             {(currentUser?.emailVerified || currentUser?.email_verified || currentUser?.is_email_verified) ? (
                                 <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
@@ -544,9 +572,11 @@ export const ProfilePage = () => {
                                 type="tel" 
                                 value={phone}
                                 onChange={(e) => {
-                                    setPhone(e.target.value);
-                                    clearFieldError(setErrors, 'phone');
+                                    const value = e.target.value;
+                                    setPhone(value);
+                                    if (errors.phone) showProfileField('phone', { phone: value });
                                 }}
+                                onBlur={() => showProfileField('phone')}
                                 disabled={true}
                                 className={`bg-gray-100 dark:bg-gray-800 cursor-not-allowed ${errors.phone ? 'border-red-500 dark:border-red-500' : ''}`}
                             />

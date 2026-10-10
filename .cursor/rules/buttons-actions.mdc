@@ -1,0 +1,40 @@
+---
+description: Buttons, row actions, delete affordances and control heights — one look across the app
+globs: "**/pages/**/*.tsx,**/components/**/*.tsx"
+alwaysApply: false
+---
+
+# Buttons and actions
+
+## Control height is 40px
+`Input`, `Select`, `NumberInput`, `PhoneInput`, `Button` (`md`), `FilterButton`, `RefreshButton` are all `h-10`. A field and a button on the same row therefore line up without tweaks:
+- Unlabeled field + button → `FieldActionRow` (or `flex items-center gap-2`).
+- Labeled fields in a grid → `items-end` (bottoms align because heights match).
+- Never shrink/grow one control with `!h-*` / `py-*` overrides to "make it fit". `Button` `sm` (32px) is for tables, toolbars inside cards and compact lists.
+- Use `Select` from `components/Select.tsx` instead of a raw `<select>` with ad-hoc classes.
+
+## Deleting an item in a repeated set → `IconButton`
+List rows, table rows, form sub-rows (phone numbers, deal line items, pipeline stages, lost reasons):
+
+```tsx
+<IconButton tone="danger" icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} onClick={...} />
+```
+- `size="sm"` (32px) in tables/lists, `size="md"` (40px) when the row also contains form fields.
+- View / edit / reorder actions in the same row use `IconButton` with the default `neutral` tone.
+- `label` is required (it becomes `aria-label` + `title`).
+
+## Deleting the record itself or a container → `Button variant="danger"`
+Delete lead, delete pipeline, bulk delete, revoke key, disconnect: `<Button variant="danger"><TrashIcon className="h-4 w-4" />{label}</Button>`. Never a gray `secondary` button for a destructive action.
+
+## Confirming
+- Deleting **persisted** data always confirms via `ConfirmDeleteModal` (or `setConfirmDeleteConfig` + `setIsConfirmDeleteModalOpen` from `AppContext`). The confirm button is `danger`, Cancel is `secondary`.
+- Removing an **unsaved** form sub-row (phone row, line item before save) does not confirm.
+- No hand-rolled overlay dialogs with raw red buttons.
+
+## Chips / tags
+Remove-from-chip uses a real `<button>` with `XIcon` and an `aria-label`, never a clickable `<span>`.
+
+## Don'ts
+- No emoji as icons (🗑).
+- No raw `<button className="bg-red-600 …">` / `bg-primary …` — use `Button` / `IconButton`.
+- No `Button variant="ghost" className="p-1 h-auto !text-red-600"` — `className` is appended, not merged, so those overrides fight the size classes. Use `IconButton`.

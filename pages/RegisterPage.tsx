@@ -21,15 +21,7 @@ import { isRedundantPlanDescription } from '../utils/planEntitlements';
 import { withLatinDigits } from '../utils/dateUtils';
 import { setPendingSubscriptionId } from '../utils/paymentSession';
 import { isNetworkError } from '../utils/isNetworkError';
-import {
-    validateEmailField,
-    validateUsernameField,
-    validatePhoneField,
-    validatePasswordField,
-    validateConfirmPasswordField,
-    validateDomainSlugField,
-    requiredTrim,
-} from '../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 import {
     normalizeErrorMessage,
     unwrapApiFieldErrors,
@@ -261,9 +253,13 @@ export const RegisterPage = () => {
         }
     };
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
     const handlePhoneChange = (value: string) => {
         setPhone(value);
-        clearFieldError('phone');
     };
     const handleVerifyEmail = async () => {
         if (!verificationEmail) {
@@ -274,10 +270,11 @@ export const RegisterPage = () => {
             return;
         }
 
-        if (!verificationCode.trim()) {
+        const codeErrors = catalogFieldErrors('auth.email_code', { code: verificationCode }, translate);
+        if (codeErrors.code) {
             setVerificationStatus({
                 type: 'error',
-                message: t('verificationCodeRequired') || 'Please enter the verification code sent to your email.',
+                message: codeErrors.code,
             });
             return;
         }
@@ -675,20 +672,112 @@ export const RegisterPage = () => {
         formPanelRef.current?.scrollTo({ top: 0, behavior: 'instant' });
     }, [currentStep]);
 
-    const validateStep1 = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+    const registerValues = (patch: Record<string, string> = {}) => ({
+        company: {
+            name: patch.companyName ?? companyName,
+            domain: patch.companyDomain ?? companyDomain,
+            specialization: patch.specialization ?? specialization,
+        },
+        owner: {
+            first_name: patch.firstName ?? firstName,
+            last_name: patch.lastName ?? lastName,
+            email: patch.email ?? email,
+            username: patch.username ?? username,
+            password: patch.password ?? password,
+            phone: patch.phone ?? phone,
+        },
+    });
 
-        const companyNameErr = requiredTrim(
-            companyName,
-            t,
-            'companyNameRequired',
-            'Company name is required'
+    const STEP1_KEYS = new Set([
+        'companyName', 'company.name', 'companyDomain', 'company.domain', 'specialization', 'company.specialization',
+    ]);
+    const STEP2_KEYS = new Set([
+        'firstName', 'owner.first_name', 'lastName', 'owner.last_name', 'email', 'owner.email',
+        'username', 'owner.username', 'phone', 'owner.phone', 'password', 'owner.password', 'confirmPassword',
+    ]);
+
+    const mirrorRegisterErrors = (
+        raw: Record<string, string>,
+        passwordValue: string,
+        confirmValue: string,
+        includeConfirm: boolean,
+    ) => {
+        const next = { ...raw };
+        if (next._general && !next.general) next.general = next._general;
+        const passwordFromAlias = next.confirmPassword;
+        const pairs: Array<[string, string]> = [
+            ['company.name', 'companyName'],
+            ['company.domain', 'companyDomain'],
+            ['company.specialization', 'specialization'],
+            ['owner.first_name', 'firstName'],
+            ['owner.last_name', 'lastName'],
+            ['owner.email', 'email'],
+            ['owner.username', 'username'],
+            ['owner.phone', 'phone'],
+            ['owner.password', 'password'],
+        ];
+        for (const [apiKey, uiKey] of pairs) {
+            if (next[apiKey] && !next[uiKey]) next[uiKey] = next[apiKey];
+            if (next[uiKey] && !next[apiKey]) next[apiKey] = next[uiKey];
+        }
+        if (passwordFromAlias && !next.password) {
+            next.password = passwordFromAlias;
+            next['owner.password'] = passwordFromAlias;
+        }
+        delete next.confirmPassword;
+        if (includeConfirm) {
+            if (!confirmValue.trim()) {
+                const required = translate('validation.required');
+                if (required) next.confirmPassword = required;
+            } else if (passwordValue !== confirmValue) {
+                next.confirmPassword = translate('validation.matches_field') || t('passwordsDoNotMatch');
+            }
+        }
+        return next;
+    };
+
+    const collectRegisterErrors = (patch: Record<string, string> = {}, includeConfirm = false) =>
+        mirrorRegisterErrors(
+            catalogFieldErrors('auth.register', registerValues(patch), translate),
+            patch.password ?? password,
+            patch.confirmPassword ?? confirmPassword,
+            includeConfirm,
         );
-        if (companyNameErr) newErrors.companyName = companyNameErr;
 
-        const domainErr = validateDomainSlugField(companyDomain, t);
-        if (domainErr) newErrors.companyDomain = domainErr;
+    const pickRegisterErrors = (source: Record<string, string>, keys: Set<string>) => {
+        const next: Record<string, string> = {};
+        for (const [key, message] of Object.entries(source)) {
+            if (keys.has(key)) next[key] = message;
+        }
+        return next;
+    };
 
+    const showRegisterField = (field: string, patch: Record<string, string> = {}) => {
+        const includeConfirm = field === 'confirmPassword' || field === 'password';
+        const all = collectRegisterErrors(patch, includeConfirm || currentStep === 2);
+        const keys = field === 'companyName'
+            ? ['companyName', 'company.name']
+            : field === 'companyDomain'
+              ? ['companyDomain', 'company.domain']
+              : field === 'firstName'
+                ? ['firstName', 'owner.first_name']
+                : field === 'lastName'
+                  ? ['lastName', 'owner.last_name']
+                  : field === 'password'
+                    ? ['password', 'owner.password', 'confirmPassword']
+                    : [field];
+        setErrors((prev) => {
+            const updated = { ...prev };
+            for (const key of keys) {
+                if (all[key]) updated[key] = all[key];
+                else delete updated[key];
+            }
+            return updated;
+        });
+    };
+
+    const validateStep1 = (): boolean => {
+        const newErrors = pickRegisterErrors(collectRegisterErrors(), STEP1_KEYS);
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
             requestAnimationFrame(() => scrollToFirstFieldError(newErrors));
@@ -698,29 +787,7 @@ export const RegisterPage = () => {
     };
 
     const validateStep2 = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-
-        const firstNameErr = requiredTrim(firstName, t, 'firstNameRequired', 'First name is required');
-        if (firstNameErr) newErrors.firstName = firstNameErr;
-
-        const lastNameErr = requiredTrim(lastName, t, 'lastNameRequired', 'Last name is required');
-        if (lastNameErr) newErrors.lastName = lastNameErr;
-
-        const emailErr = validateEmailField(email, t);
-        if (emailErr) newErrors.email = emailErr;
-
-        const usernameErr = validateUsernameField(username, t);
-        if (usernameErr) newErrors.username = usernameErr;
-
-        const phoneErr = validatePhoneField(phone, t);
-        if (phoneErr) newErrors.phone = phoneErr;
-
-        const passwordErr = validatePasswordField(password, t);
-        if (passwordErr) newErrors.password = passwordErr;
-
-        const confirmErr = validateConfirmPasswordField(password, confirmPassword, t);
-        if (confirmErr) newErrors.confirmPassword = confirmErr;
-
+        const newErrors = pickRegisterErrors(collectRegisterErrors({}, true), STEP2_KEYS);
         setErrors(newErrors);
         if (Object.keys(newErrors).length > 0) {
             requestAnimationFrame(() => scrollToFirstFieldError(newErrors));
@@ -842,16 +909,20 @@ export const RegisterPage = () => {
         const phoneCode = phoneOtpCode.trim();
         const emailCode = emailOtpCode.trim();
         const nextErrors: Record<string, string> = {};
-        if (phoneOtpRequired && !/^\d{4,8}$/.test(phoneCode)) {
-            nextErrors.phoneOtp =
-                phoneOtpChannel === 'twilio_sms'
-                    ? t('verificationCodeHintSms')
-                    : phoneOtpChannel === 'otpiq'
-                      ? t('verificationCodeHintOtpiq')
-                      : t('verificationCodeHintWhatsApp');
+        if (phoneOtpRequired) {
+            const phoneCheck = catalogFieldErrors('auth.phone_otp', { phone, code: phoneCode }, translate);
+            if (phoneCheck.code) {
+                nextErrors.code = phoneCheck.code;
+                nextErrors.phoneOtp = phoneCheck.code;
+            }
+            if (phoneCheck.phone) nextErrors.phone = phoneCheck.phone;
         }
-        if (emailVerificationRequired && !/^\d{4,8}$/.test(emailCode)) {
-            nextErrors.emailOtp = t('verificationCodeHintEmail') || 'Enter the code from your email.';
+        if (emailVerificationRequired) {
+            const emailCheck = catalogFieldErrors('auth.email_code', { code: emailCode }, translate);
+            if (emailCheck.code) {
+                nextErrors.code = nextErrors.code || emailCheck.code;
+                nextErrors.emailOtp = emailCheck.code;
+            }
         }
         if (Object.keys(nextErrors).length > 0) {
             setErrors((prev) => ({ ...prev, ...nextErrors }));
@@ -1064,12 +1135,17 @@ export const RegisterPage = () => {
                 setErrors({ general: t('networkErrorRetry') });
                 return;
             }
-            const backendFieldErrors = mapBackendErrorsToFields(error.fields || {});
+            const server = mirrorRegisterErrors(serverFieldErrors(error, 'auth.register', translate), password, confirmPassword, true);
+            const backendFieldErrors = {
+                ...mapBackendErrorsToFields(error.fields || {}),
+                ...server,
+            };
             if (Object.keys(backendFieldErrors).length > 0) {
                 const withSummary = {
                     ...backendFieldErrors,
                     general:
                         backendFieldErrors.general ||
+                        server._general ||
                         buildFieldErrorSummary(backendFieldErrors),
                 };
                 setErrors(withSummary);
@@ -1209,13 +1285,17 @@ export const RegisterPage = () => {
                                             placeholder={t('enterCompanyName') || 'Enter company name'}
                                             value={companyName}
                                             onChange={(e) => {
-                                                setCompanyName(e.target.value);
-                                                clearFieldError('companyName');
+                                                const value = e.target.value;
+                                                setCompanyName(value);
+                                                if (errors.companyName) showRegisterField('companyName', { companyName: value });
                                             }}
                                             onBlur={() => {
+                                                let domain = companyDomain;
                                                 if (companyName.trim() && !companyDomain.trim()) {
-                                                    setCompanyDomain(slugifyDomain(companyName));
+                                                    domain = slugifyDomain(companyName);
+                                                    setCompanyDomain(domain);
                                                 }
+                                                showRegisterField('companyName', { companyDomain: domain });
                                             }}
                                             className={errors.companyName ? 'border-red-500' : ''}
                                         />
@@ -1233,9 +1313,11 @@ export const RegisterPage = () => {
                                             placeholder={t('enterCompanyDomain') || 'e.g., mycompany'}
                                             value={companyDomain}
                                             onChange={(e) => {
-                                                setCompanyDomain(slugifyDomain(e.target.value));
-                                                clearFieldError('companyDomain');
+                                                const value = slugifyDomain(e.target.value);
+                                                setCompanyDomain(value);
+                                                if (errors.companyDomain) showRegisterField('companyDomain', { companyDomain: value });
                                             }}
+                                            onBlur={() => showRegisterField('companyDomain')}
                                             className={errors.companyDomain ? 'border-red-500' : ''}
                                         />
                                         {errors.companyDomain && (
@@ -1285,9 +1367,11 @@ export const RegisterPage = () => {
                                                 placeholder={t('enterFirstName') || 'Enter first name'}
                                                 value={firstName}
                                                 onChange={(e) => {
-                                                    setFirstName(e.target.value);
-                                                    clearFieldError('firstName');
+                                                    const value = e.target.value;
+                                                    setFirstName(value);
+                                                    if (errors.firstName) showRegisterField('firstName', { firstName: value });
                                                 }}
+                                                onBlur={() => showRegisterField('firstName')}
                                                 className={errors.firstName ? 'border-red-500' : ''}
                                             />
                                             {errors.firstName && (
@@ -1304,9 +1388,11 @@ export const RegisterPage = () => {
                                                 placeholder={t('enterLastName') || 'Enter last name'}
                                                 value={lastName}
                                                 onChange={(e) => {
-                                                    setLastName(e.target.value);
-                                                    clearFieldError('lastName');
+                                                    const value = e.target.value;
+                                                    setLastName(value);
+                                                    if (errors.lastName) showRegisterField('lastName', { lastName: value });
                                                 }}
+                                                onBlur={() => showRegisterField('lastName')}
                                                 className={errors.lastName ? 'border-red-500' : ''}
                                             />
                                             {errors.lastName && (
@@ -1326,9 +1412,11 @@ export const RegisterPage = () => {
                                             placeholder={t('enterEmail') || 'Enter email address'}
                                             value={email}
                                             onChange={(e) => {
-                                                setEmail(e.target.value);
-                                                clearFieldError('email');
+                                                const value = e.target.value;
+                                                setEmail(value);
+                                                if (errors.email) showRegisterField('email', { email: value });
                                             }}
+                                            onBlur={() => showRegisterField('email')}
                                             className={errors.email ? 'border-red-500' : ''}
                                         />
                                         {errors.email && (
@@ -1347,9 +1435,11 @@ export const RegisterPage = () => {
                                             placeholder={t('enterUsername') || 'Enter username'}
                                             value={username}
                                             onChange={(e) => {
-                                                setUsername(e.target.value);
-                                                clearFieldError('username');
+                                                const value = e.target.value;
+                                                setUsername(value);
+                                                if (errors.username) showRegisterField('username', { username: value });
                                             }}
+                                            onBlur={() => showRegisterField('username')}
                                             className={errors.username ? 'border-red-500' : ''}
                                         />
                                         {errors.username && (
@@ -1361,14 +1451,19 @@ export const RegisterPage = () => {
                                         <label htmlFor="phone" className="block text-sm font-medium text-secondary mb-1">
                                             {t('phone') || 'Phone'} <span className="text-red-500 dark:text-red-400">*</span>
                                         </label>
+                                        <div onBlur={() => showRegisterField('phone')}>
                                         <PhoneInput
                                             id="phone"
                                             placeholder={t('enterPhone') || 'Enter phone number'}
                                             value={phone}
-                                            onChange={handlePhoneChange}
+                                            onChange={(value) => {
+                                                handlePhoneChange(value);
+                                                if (errors.phone) showRegisterField('phone', { phone: value });
+                                            }}
                                             error={!!errors.phone}
                                             defaultCountry="IQ"
                                         />
+                                        </div>
                                         {errors.phone && (
                                             <p className="mt-1 text-sm text-red-600 dark:text-red-300">{errors.phone}</p>
                                         )}
@@ -1388,9 +1483,11 @@ export const RegisterPage = () => {
                                                 placeholder={t('enterPassword')}
                                                 value={password}
                                                 onChange={(e) => {
-                                                    setPassword(e.target.value);
-                                                    clearFieldError('password');
+                                                    const value = e.target.value;
+                                                    setPassword(value);
+                                                    if (errors.password) showRegisterField('password', { password: value });
                                                 }}
+                                                onBlur={() => showRegisterField('password')}
                                                 className={errors.password ? 'border-red-500' : ''}
                                                 endAdornment={
                                                   <button
@@ -1428,9 +1525,11 @@ export const RegisterPage = () => {
                                                 placeholder={t('confirmPassword')}
                                                 value={confirmPassword}
                                                 onChange={(e) => {
-                                                    setConfirmPassword(e.target.value);
-                                                    clearFieldError('confirmPassword');
+                                                    const value = e.target.value;
+                                                    setConfirmPassword(value);
+                                                    if (errors.confirmPassword) showRegisterField('confirmPassword', { confirmPassword: value });
                                                 }}
+                                                onBlur={() => showRegisterField('confirmPassword')}
                                                 className={errors.confirmPassword ? 'border-red-500' : ''}
                                                 endAdornment={
                                                   <button
@@ -1491,14 +1590,35 @@ export const RegisterPage = () => {
                                             placeholder="123456"
                                             value={phoneOtpCode}
                                             onChange={(e) => {
-                                                setPhoneOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8));
-                                                if (errors.phoneOtp) {
+                                                const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                                setPhoneOtpCode(value);
+                                                if (errors.phoneOtp || errors.code) {
+                                                    const phoneCheck = catalogFieldErrors('auth.phone_otp', { phone, code: value }, translate);
                                                     setErrors((prev) => {
                                                         const next = { ...prev };
-                                                        delete next.phoneOtp;
+                                                        if (phoneCheck.code) {
+                                                            next.code = phoneCheck.code;
+                                                            next.phoneOtp = phoneCheck.code;
+                                                        } else {
+                                                            delete next.code;
+                                                            delete next.phoneOtp;
+                                                        }
                                                         return next;
                                                     });
                                                 }
+                                            }}
+                                            onBlur={() => {
+                                                const phoneCheck = catalogFieldErrors('auth.phone_otp', { phone, code: phoneOtpCode }, translate);
+                                                setErrors((prev) => {
+                                                    const next = { ...prev };
+                                                    if (phoneCheck.code) {
+                                                        next.code = phoneCheck.code;
+                                                        next.phoneOtp = phoneCheck.code;
+                                                    } else {
+                                                        delete next.phoneOtp;
+                                                    }
+                                                    return next;
+                                                });
                                             }}
                                             className={errors.phoneOtp ? 'border-red-500' : ''}
                                         />
@@ -1519,14 +1639,26 @@ export const RegisterPage = () => {
                                             placeholder="123456"
                                             value={emailOtpCode}
                                             onChange={(e) => {
-                                                setEmailOtpCode(e.target.value.replace(/\D/g, '').slice(0, 8));
+                                                const value = e.target.value.replace(/\D/g, '').slice(0, 8);
+                                                setEmailOtpCode(value);
                                                 if (errors.emailOtp) {
+                                                    const emailCheck = catalogFieldErrors('auth.email_code', { code: value }, translate);
                                                     setErrors((prev) => {
                                                         const next = { ...prev };
-                                                        delete next.emailOtp;
+                                                        if (emailCheck.code) next.emailOtp = emailCheck.code;
+                                                        else delete next.emailOtp;
                                                         return next;
                                                     });
                                                 }
+                                            }}
+                                            onBlur={() => {
+                                                const emailCheck = catalogFieldErrors('auth.email_code', { code: emailOtpCode }, translate);
+                                                setErrors((prev) => {
+                                                    const next = { ...prev };
+                                                    if (emailCheck.code) next.emailOtp = emailCheck.code;
+                                                    else delete next.emailOtp;
+                                                    return next;
+                                                });
                                             }}
                                             className={errors.emailOtp ? 'border-red-500' : ''}
                                         />

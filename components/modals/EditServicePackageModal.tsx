@@ -10,6 +10,7 @@ import { Button } from '../Button';
 import { Service, ServicePackage } from '../../types';
 import { useUpdateServicePackage, useServices } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -49,19 +50,37 @@ export const EditServicePackageModal = () => {
     
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+            price: formState.price,
+            description: formState.description,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('service_package.upsert', values, translate);
+
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+        const next = applyCatalog(catalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        if (!formState.price || Number(formState.price) <= 0) {
-            newErrors.price = t('priceRequired') || 'Price is required and must be greater than 0';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -164,23 +183,10 @@ export const EditServicePackageModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating service package:', error);
-            
-            // Parse API validation errors
-            const apiErrors = error?.response?.data || {};
-            const newErrors: { [key: string]: string } = {};
-            
-            Object.keys(apiErrors).forEach(key => {
-                const errorMessages = Array.isArray(apiErrors[key]) 
-                    ? apiErrors[key] 
-                    : [apiErrors[key]];
-                newErrors[key] = errorMessages[0];
-            });
-            
-            if (Object.keys(newErrors).length === 0) {
-                newErrors._general = error?.message || t('failedToUpdateServicePackage') || 'Failed to update service package. Please try again.';
-            }
-            
-            setErrors(newErrors);
+            const serverErrors = serverFieldErrors(error, 'service_package.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('failedToUpdateServicePackage') || 'Failed to update service package. Please try again.' });
         }
     };
 
@@ -199,8 +205,7 @@ export const EditServicePackageModal = () => {
                         placeholder={t('enterPackageName') || 'Enter package name'} 
                         value={formState.name} 
                         onChange={handleChange}
-                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                     {errors.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
@@ -213,8 +218,10 @@ export const EditServicePackageModal = () => {
                         value={formState.description}
                         onChange={handleChange}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500" 
-                        placeholder={t('enterPackageDescription') || 'Enter package description'}
-                    />
+                        placeholder={t('enterPackageDescription') || 'Enter package description'} onBlur={() => blurField('description')} />
+                    {errors.description && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description}</p>
+                    )}
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
@@ -226,8 +233,7 @@ export const EditServicePackageModal = () => {
                             onChange={handleChange} 
                             min={0} 
                             step={0.01}
-                            className={errors.price ? 'border-red-500 dark:border-red-500' : ''}
-                        />
+                            className={errors.price ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('price')} />
                         {errors.price && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price}</p>
                         )}

@@ -10,6 +10,8 @@ import { SupervisorModal, SupervisorFormData } from './SupervisorModal';
 import { EditIcon, TrashIcon } from '../../components/icons';
 import { ToggleSwitch } from '../../components/ToggleSwitch';
 import { TableHorizontalScroll } from '../../components/TableHorizontalScroll';
+import { IconButton } from '../../components';
+import { ConfirmDeleteModal } from '../../components/modals/ConfirmDeleteModal';
 
 export const SupervisorsSettings = () => {
   const queryClient = useQueryClient();
@@ -30,7 +32,6 @@ export const SupervisorsSettings = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupervisor, setEditingSupervisor] = useState<Supervisor | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Supervisor | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const loadSupervisors = async () => {
     if (normalizeRole(currentUser?.role) !== 'Owner') {
@@ -133,6 +134,7 @@ export const SupervisorsSettings = () => {
       handleCloseModal();
     } catch (err: any) {
       console.error('Error saving supervisor:', err);
+      throw err;
     } finally {
       setIsSaving(false);
     }
@@ -180,16 +182,13 @@ export const SupervisorsSettings = () => {
 
   const handleDelete = async () => {
     if (!deleteTarget) return;
-    setIsDeleting(true);
     try {
       await deleteSupervisorAPI(deleteTarget.id);
       await queryClient.invalidateQueries({ queryKey: ['users'] });
       await loadSupervisors();
-      setDeleteTarget(null);
     } catch (e) {
       console.error('Error deleting supervisor:', e);
-    } finally {
-      setIsDeleting(false);
+      throw e;
     }
   };
 
@@ -360,12 +359,8 @@ export const SupervisorsSettings = () => {
                           />
                         </div>
                       )}
-                      <button type="button" onClick={() => handleOpenModal(s)} className="p-2 rounded-md text-blue-600 hover:text-blue-800 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/30" title={t('edit')} aria-label={t('edit')}>
-                        <EditIcon className="h-4 w-4" />
-                      </button>
-                      <button type="button" onClick={() => setDeleteTarget(s)} className="p-2 rounded-md text-red-600 hover:text-red-800 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/30" title={t('delete')} aria-label={t('delete')}>
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => handleOpenModal(s)} />
+                      <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => setDeleteTarget(s)} />
                       {language !== 'ar' && (
                         <div
                           className="flex items-center justify-center p-2"
@@ -386,21 +381,14 @@ export const SupervisorsSettings = () => {
         </table>
       </TableHorizontalScroll>
       <SupervisorModal isOpen={isModalOpen} onClose={handleCloseModal} onSave={handleSave} editingSupervisor={editingSupervisor} isLoading={isSaving} />
-      {deleteTarget && (
-        <div className="fixed inset-0 z-50 flex justify-center items-center p-4" onClick={() => setDeleteTarget(null)}>
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-sm w-full shadow-2xl ring-1 ring-black/10 dark:ring-white/10" onClick={(e) => e.stopPropagation()}>
-            <p className="text-gray-700 dark:text-gray-300 mb-4">
-              {t('supervisorsDeleteConfirm')} {deleteTarget.user.first_name} {deleteTarget.user.last_name}
-            </p>
-            <div className="flex justify-end gap-2">
-              <button type="button" onClick={() => setDeleteTarget(null)} className="px-4 py-2 border rounded-md dark:border-gray-600">{t('cancel')}</button>
-              <button type="button" onClick={handleDelete} disabled={isDeleting} className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50">
-                {isDeleting ? t('deleting') : t('delete')}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDeleteModal
+        isOpen={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        title={t('delete')}
+        message={deleteTarget ? `${t('supervisorsDeleteConfirm')} ${deleteTarget.user.first_name} ${deleteTarget.user.last_name}` : ''}
+        showSuccessMessage={false}
+      />
     </div>
   );
 };

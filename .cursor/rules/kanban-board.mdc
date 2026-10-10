@@ -23,7 +23,7 @@ Import from `components/kanban` (also re-exported from `components/index`):
 2. Render `<ViewModeToggle value={viewMode} onChange={setViewMode} />` next to list toolbar controls
 3. When `viewMode === 'board'`:
    - **Leads:** columns = company `Status` rows (`settings/statuses`), move → `PATCH { status: id }`
-   - **Deals:** columns = `Deal.stage` enum, move → `PATCH { stage }`
+   - **Deals:** columns come from the selected pipeline's stages. Moving a card calls `POST /deals/{id}/move/`. Won and lost stages confirm first; a lost stage requires a lost reason.
    - **Todos:** columns = company `LeadStage` rows (`settings/stages`); deal tasks + client tasks only (calls have no stage); move → `PATCH { stage: id }` on `/tasks/` or `/client-tasks/`
 4. Pass domain cards via `renderCard`; keep DnD in `KanbanBoard` / `KanbanCardShell`
 5. Prefer PATCH for field moves; optimistic UI + rollback; invalidate related queries

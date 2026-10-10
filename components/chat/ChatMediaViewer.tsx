@@ -483,7 +483,7 @@ export const ChatMediaViewer: React.FC<Props> = ({ items, initialIndex, onClose,
       {items.length > 1 ? (
         <div
           ref={filmstripRef}
-          className="relative z-30 flex shrink-0 gap-2 overflow-x-auto border-t border-white/10 bg-black/50 px-3 py-3 custom-scrollbar sm:px-4"
+          className="custom-scrollbar relative z-30 flex shrink-0 gap-2 overflow-x-auto overflow-y-hidden border-t border-white/10 bg-black/50 px-3 py-3 sm:px-4"
           role="list"
           aria-label={t('chatMediaAlbum')}
         >

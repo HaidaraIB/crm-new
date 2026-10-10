@@ -3,6 +3,7 @@ import React, { useEffect, useMemo } from 'react';
 import { PageWrapper, LegalLinks } from '../components/index';
 import { ChannelsSettings } from './settings/ChannelsSettings';
 import { StagesSettings } from './settings/StagesSettings';
+import { DealPipelinesSettings } from './settings/DealPipelinesSettings';
 import { StatusesSettings } from './settings/StatusesSettings';
 import { TagsSettings } from './settings/TagsSettings';
 import { CallMethodsSettings } from './settings/CallMethodsSettings';
@@ -20,6 +21,7 @@ import { usePersistedTab } from '../hooks/usePersistedTab';
 type SettingsTab =
     | 'Channels'
     | 'Stages'
+    | 'DealPipelines'
     | 'Statuses'
     | 'Tags'
     | 'CallMethods'
@@ -33,6 +35,7 @@ type SettingsTab =
 const ALL_SETTINGS_TAB_IDS: SettingsTab[] = [
     'Channels',
     'Stages',
+    'DealPipelines',
     'Statuses',
     'Tags',
     'CallMethods',
@@ -55,6 +58,7 @@ export const SettingsPage = () => {
         () => [
             'Channels',
             'Stages',
+            'DealPipelines',
             'Statuses',
             'Tags',
             'CallMethods',
@@ -98,6 +102,8 @@ export const SettingsPage = () => {
                 return <ChannelsSettings />;
             case 'Stages':
                 return <StagesSettings />;
+            case 'DealPipelines':
+                return <DealPipelinesSettings />;
             case 'Statuses':
                 return <StatusesSettings />;
             case 'Tags':
@@ -123,8 +129,8 @@ export const SettingsPage = () => {
 
     return (
         <PageWrapper title={t('settings')}>
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-6">
-                <nav className="-mb-px flex space-x-4 rtl:space-x-reverse flex-wrap" aria-label="Tabs">
+            <div className="mb-6 overflow-x-auto overflow-y-hidden border-b border-gray-200 dark:border-gray-700">
+                <nav className="-mb-px flex min-w-max flex-nowrap space-x-4 rtl:space-x-reverse [&>button]:shrink-0" aria-label="Tabs">
                     <button
                         onClick={() => setActiveTab('Channels')}
                         className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Channels' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
@@ -136,6 +142,12 @@ export const SettingsPage = () => {
                         className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Stages' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                     >
                         {t('stages')}
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('DealPipelines')}
+                        className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'DealPipelines' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
+                    >
+                        {t('dealPipelines')}
                     </button>
                     <button
                         onClick={() => setActiveTab('Statuses')}

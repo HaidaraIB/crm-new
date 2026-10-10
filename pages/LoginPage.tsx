@@ -8,6 +8,7 @@ import { getRoleLandingPage, normalizeRole } from '../utils/roles';
 import { getCompanyRoute } from '../utils/routing';
 import { clearPaymentAccessToken, hydratePaymentAccessToken, storePaymentAccessToken } from '../utils/paymentAuth';
 import { clearRegistrationDraft } from '../utils/registrationDraft';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 
 export const LoginPage = () => {
     // Check if this is a logout redirect and clear any remaining data
@@ -227,19 +228,30 @@ export const LoginPage = () => {
         }
     };
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const collectLoginErrors = (nextUsername = username, nextPassword = password) =>
+        catalogFieldErrors('auth.login', { username: nextUsername, password: nextPassword }, translate);
+
+    const showLoginField = (field: 'username' | 'password', nextUsername = username, nextPassword = password) => {
+        const next = collectLoginErrors(nextUsername, nextPassword);
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
+    };
+
     const handleLogin = async () => {
-        setErrors({});
         setVerificationGate(null);
 
-        const newErrors: Record<string, string> = {};
-        if (!username.trim()) {
-            newErrors.username = t('usernameRequired') || 'Username is required';
-        }
-        if (!password.trim()) {
-            newErrors.password = t('passwordRequired') || 'Password is required';
-        }
-        if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
+        const next = collectLoginErrors();
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
             return;
         }
 
@@ -366,8 +378,12 @@ export const LoginPage = () => {
                 setErrors({});
             } else {
                 const translatedError = translateLoginError(errorMessage, error);
+                const server = serverFieldErrors(error, 'auth.login', translate);
                 console.error('❌ Translated error:', translatedError);
-                setErrors({ general: translatedError });
+                setErrors({
+                    ...server,
+                    general: server._general || server.general || translatedError,
+                });
             }
             setIsLoading(false);
         }
@@ -477,7 +493,8 @@ export const LoginPage = () => {
                                 {errors.general === 'SUBSCRIPTION_INACTIVE' && subscriptionId && (
                                     <div className="mt-4 pt-4 border-t border-red-200 dark:border-red-800 space-y-2">
                                         <p className="text-sm font-medium">{t('trialCodeRedeem')}</p>
-                                        <div className="flex flex-wrap gap-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="min-w-0 flex-1">
                                             <Input
                                                 value={trialCodeInput}
                                                 onChange={(e) => {
@@ -485,8 +502,9 @@ export const LoginPage = () => {
                                                     setTrialCodeError(null);
                                                 }}
                                                 placeholder={t('trialCodePlaceholder')}
-                                                className="flex-1 min-w-[140px] font-mono"
+                                                className="font-mono"
                                             />
+                                            </div>
                                             <Button
                                                 type="button"
                                                 variant="secondary"
@@ -511,15 +529,12 @@ export const LoginPage = () => {
                                 value={username}
                                 className={errors.username ? 'border-red-500' : ''}
                                 onChange={(e) => {
-                                    setUsername(e.target.value);
-                                    setErrors((prev) => {
-                                        const next = { ...prev };
-                                        delete next.username;
-                                        delete next.general;
-                                        return next;
-                                    });
+                                    const value = e.target.value;
+                                    setUsername(value);
                                     setVerificationGate(null);
+                                    if (errors.username) showLoginField('username', value, password);
                                 }}
+                                onBlur={() => showLoginField('username')}
                                 onKeyPress={(e) => {
                                     if (e.key === 'Enter') {
                                         handleLogin();
@@ -548,15 +563,12 @@ export const LoginPage = () => {
                                   </button>
                                 }
                                 onChange={(e) => {
-                                    setPassword(e.target.value);
-                                    setErrors((prev) => {
-                                        const next = { ...prev };
-                                        delete next.password;
-                                        delete next.general;
-                                        return next;
-                                    });
+                                    const value = e.target.value;
+                                    setPassword(value);
                                     setVerificationGate(null);
+                                    if (errors.password) showLoginField('password', username, value);
                                 }}
+                                onBlur={() => showLoginField('password')}
                                 onKeyPress={(e) => {
                                     if (e.key === 'Enter') {
                                         handleLogin();

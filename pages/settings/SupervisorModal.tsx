@@ -5,19 +5,13 @@ import { EyeIcon, EyeOffIcon } from '../../components/icons';
 import { Input } from '../../components/Input';
 import { Button } from '../../components/Button';
 import { PhoneInput } from '../../components/PhoneInput';
-import {
-  validateEmailField,
-  validateUsernameField,
-  validatePhoneField,
-  validatePasswordField,
-  requiredTrim,
-} from '../../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 
 interface SupervisorModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: SupervisorFormData) => void;
+  onSave: (data: SupervisorFormData) => void | Promise<void>;
   editingSupervisor?: Supervisor | null;
   isLoading?: boolean;
 }
@@ -200,31 +194,57 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
 
   if (!isOpen) return null;
 
+  const translate = (key: string) => {
+    const value = t(key as never);
+    return value && value !== key ? value : undefined;
+  };
+
+  const supervisorValues = (data: SupervisorFormData = formData) => ({
+    username: data.username,
+    email: data.email,
+    first_name: data.first_name,
+    firstName: data.first_name,
+    last_name: data.last_name,
+    lastName: data.last_name,
+    phone: data.phone,
+    ...(editingSupervisor ? {} : { password: data.password || '' }),
+  });
+
+  const mirrorSupervisorErrors = (raw: Record<string, string>) => {
+    const next = { ...raw };
+    if (next._general && !next.general) next.general = next._general;
+    if (next.firstName && !next.first_name) next.first_name = next.firstName;
+    if (next.first_name && !next.firstName) next.firstName = next.first_name;
+    if (next.lastName && !next.last_name) next.last_name = next.lastName;
+    if (next.last_name && !next.lastName) next.lastName = next.last_name;
+    if (editingSupervisor) {
+      delete next.password;
+    }
+    return next;
+  };
+
+  const collectSupervisorErrors = (data: SupervisorFormData = formData) =>
+    mirrorSupervisorErrors(catalogFieldErrors('supervisor.create', supervisorValues(data), translate));
+
+  const showSupervisorField = (field: string, data: SupervisorFormData = formData) => {
+    const next = collectSupervisorErrors(data);
+    const keys = field === 'first_name'
+      ? ['first_name', 'firstName']
+      : field === 'last_name'
+        ? ['last_name', 'lastName']
+        : [field];
+    setErrors((prev) => {
+      const updated = { ...prev };
+      for (const key of keys) {
+        if (next[key]) updated[key] = next[key];
+        else delete updated[key];
+      }
+      return updated;
+    });
+  };
+
   const validate = (): boolean => {
-    const newErrors: Record<string, string> = {};
-    const firstErr = requiredTrim(formData.first_name, t, 'firstNameRequired', 'First name is required');
-    if (firstErr) {
-      newErrors.first_name = firstErr;
-    } else if (formData.first_name.trim().length < 2) {
-      newErrors.first_name = t('nameMinLength') || 'Name must be at least 2 characters';
-    }
-
-    if (!editingSupervisor) {
-      const usernameErr = validateUsernameField(formData.username, t);
-      if (usernameErr) newErrors.username = usernameErr;
-
-      const emailErr = validateEmailField(formData.email, t);
-      if (emailErr) newErrors.email = emailErr;
-
-      const passwordErr = validatePasswordField(formData.password || '', t);
-      if (passwordErr) newErrors.password = passwordErr;
-    } else if (formData.email.trim()) {
-      const emailErr = validateEmailField(formData.email, t);
-      if (emailErr) newErrors.email = emailErr;
-    }
-
-    const phoneErr = validatePhoneField(formData.phone, t);
-    if (phoneErr) newErrors.phone = phoneErr;
+    const newErrors = collectSupervisorErrors();
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
@@ -234,37 +254,38 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!validate()) return;
     if (!editingSupervisor && !formData.password) return;
-    onSave(formData);
+    try {
+      await onSave(formData);
+    } catch (error) {
+      const server = mirrorSupervisorErrors(serverFieldErrors(error, 'supervisor.create', translate));
+      if (!server.general && Object.keys(server).length === 0) {
+        server.general = t('errorSavingSettings') || 'Failed to save. Please try again.';
+      }
+      setErrors(server);
+      if (Object.keys(server).length > 0) {
+        requestAnimationFrame(() => scrollToFirstFieldError(server, FIELD_DOM_IDS));
+      }
+    }
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type, checked } = e.target;
-    if (errors[name]) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next[name];
-        return next;
-      });
+    const nextValue = type === 'checkbox' ? checked : value;
+    const nextData = { ...formData, [name]: nextValue };
+    setFormData(nextData);
+    if (errors[name] || (name === 'first_name' && errors.firstName) || (name === 'last_name' && errors.lastName)) {
+      showSupervisorField(name, nextData);
     }
-    setFormData((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
   };
 
   const handlePhoneChange = (value: string) => {
-    if (errors.phone) {
-      setErrors((prev) => {
-        const next = { ...prev };
-        delete next.phone;
-        return next;
-      });
-    }
-    setFormData((prev) => ({ ...prev, phone: value }));
+    const nextData = { ...formData, phone: value };
+    setFormData(nextData);
+    if (errors.phone) showSupervisorField('phone', nextData);
   };
 
   const permLabelKey: Record<string, string> = {
@@ -304,6 +325,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
           </button>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4" dir={formDir}>
+          {errors.general && <p className="text-red-500 text-sm">{errors.general}</p>}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="supervisor-first-name">{t('firstName')} *</Label>
@@ -312,6 +334,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
                 name="first_name"
                 value={formData.first_name}
                 onChange={handleChange}
+                onBlur={() => showSupervisorField('first_name')}
               />
               {errors.first_name && <p className="text-red-500 text-xs mt-1">{errors.first_name}</p>}
             </div>
@@ -322,6 +345,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
                 name="last_name"
                 value={formData.last_name}
                 onChange={handleChange}
+                onBlur={() => showSupervisorField('last_name')}
               />
               {errors.last_name && <p className="text-red-500 text-xs mt-1">{errors.last_name}</p>}
             </div>
@@ -333,6 +357,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
               name="username"
               value={formData.username}
               onChange={handleChange}
+              onBlur={() => showSupervisorField('username')}
               disabled={!!editingSupervisor}
               className={editingSupervisor ? 'opacity-60' : ''}
             />
@@ -346,6 +371,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
               type="email"
               value={formData.email}
               onChange={handleChange}
+              onBlur={() => showSupervisorField('email')}
               disabled={!!editingSupervisor}
               className={editingSupervisor ? 'opacity-60' : ''}
             />
@@ -353,6 +379,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
           </div>
           <div>
             <Label htmlFor="supervisor-phone">{t('phone')} *</Label>
+            <div onBlur={() => showSupervisorField('phone')}>
             <PhoneInput
               id="supervisor-phone"
               value={formData.phone}
@@ -360,6 +387,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
               placeholder={t('enterPhone') || 'Enter phone number'}
               error={!!errors.phone}
             />
+            </div>
             {errors.phone && <p className="text-red-500 text-xs mt-1">{errors.phone}</p>}
           </div>
           {!editingSupervisor && (
@@ -371,6 +399,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
                   type={showPassword ? 'text' : 'password'}
                   value={formData.password || ''}
                   onChange={handleChange}
+                  onBlur={() => showSupervisorField('password')}
                   endAdornment={
                     <button
                       type="button"

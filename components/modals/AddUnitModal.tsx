@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { NumberInput } from '../NumberInput';
 import { Project } from '../../types';
 import { useAddUnit, useProjects } from '../../hooks/useQueries';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -54,31 +55,39 @@ export const AddUnitModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+            price: formState.price,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('unit.upsert', values, translate);
+
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-
-        if (!formState.name?.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        if (formState.code && !formState.code.trim()) {
-            newErrors.code = t('codeRequired') || 'Code is required';
-        }
-
-        if (!formState.project) {
-            newErrors.project = t('projectRequired') || 'Project is required';
-        }
-
-        if (!formState.price || Number(formState.price) <= 0) {
-            newErrors.price = t('priceRequired') || 'Price is required and must be greater than 0';
-        }
-
+        const next = applyCatalog(catalogValues());
         if (projects.length === 0) {
-            newErrors.project = t('noProjectsAvailable') || 'No projects available. Please add a project first.';
+            next.project = t('noProjectsAvailable') || 'No projects available. Please add a project first.';
         }
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -172,7 +181,10 @@ export const AddUnitModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error adding unit:', error);
-            setErrors({ _general: error?.message || t('errorCreatingUnit') || 'Failed to add unit. Please try again.' });
+            const serverErrors = serverFieldErrors(error, 'unit.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('errorCreatingUnit') || 'Failed to add unit. Please try again.' });
         }
     };
 
@@ -211,8 +223,7 @@ export const AddUnitModal = () => {
                             placeholder={t('enterUnitName')} 
                             value={formState.name} 
                             onChange={handleChange}
-                            className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                        />
+                            className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                         {errors.name && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                         )}
@@ -255,8 +266,7 @@ export const AddUnitModal = () => {
                             placeholder={t('egPrice')} 
                             min={0} 
                             step={1}
-                            className={errors.price ? 'border-red-500 dark:border-red-500' : ''}
-                        />
+                            className={errors.price ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('price')} />
                         {errors.price && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.price}</p>
                         )}

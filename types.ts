@@ -2,7 +2,7 @@
 export type Language = 'en' | 'ar';
 export type Theme = 'light' | 'dark';
 export type Page = 
-  | 'Dashboard' | 'Leads' | 'Activities' | 'Inventory' | 'Deals' 
+  | 'Dashboard' | 'Leads' | 'Activities' | 'Inventory' | 'Deals' | 'ViewDeal' 
   | 'Users' | 'Employees' | 'Marketing'   | 'Todos' | 'Team Chat' | 'Reports' | 'Integrations' 
   | 'Billing' | 'Settings' | 'Library' | 'ViewLead' | 'CreateDeal' | 'EditDeal' | 'CreateLead' | 'EditLead' | 'Profile'
   // Sub-pages
@@ -547,20 +547,105 @@ export interface LeadApiFilters {
   lastContactedTo?: string;
 }
 
+export type LegacyDealStage = 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled';
+export type DealStageType = 'open' | 'won' | 'lost';
+
+export interface DealLineItem {
+  id?: number;
+  itemType: 'product' | 'service' | 'service_package' | 'unit' | 'custom';
+  product?: number | null;
+  service?: number | null;
+  servicePackage?: number | null;
+  unit?: number | null;
+  name: string;
+  unitPrice: number;
+  quantity: number;
+  discountPercentage: number;
+  lineTotal: number;
+  position?: number;
+}
+
+export interface DealEvent {
+  id: number;
+  eventType: string;
+  oldValue: string;
+  newValue: string;
+  reason: string;
+  metadata: Record<string, unknown>;
+  createdBy?: number | null;
+  createdByName?: string | null;
+  createdAt: string;
+}
+
+export interface DealPipelineStage {
+  id: number;
+  pipeline: number;
+  name: string;
+  color: string;
+  order: number;
+  stageType: DealStageType;
+  probability: number;
+  systemKey?: string | null;
+  isActive: boolean;
+}
+
+export interface DealPipeline {
+  id: number;
+  name: string;
+  order: number;
+  isDefault: boolean;
+  isActive: boolean;
+  stages: DealPipelineStage[];
+}
+
+export interface DealLostReason {
+  id: number;
+  name: string;
+  order: number;
+  isActive: boolean;
+}
+
+export interface DealStageSummary {
+  id: number;
+  name: string;
+  color: string;
+  stageType: DealStageType;
+  probability: number;
+  order: number;
+  count: number;
+  value: string;
+  weightedValue: string;
+}
+
+export interface DealSummary {
+  pipelineId: number | null;
+  pipelineName: string;
+  stages: DealStageSummary[];
+  openCount: number;
+  openValue: string;
+  weightedForecast: string;
+  wonCount: number;
+  wonValue: string;
+  wonThisPeriod: { count: number; value: string };
+  winRate: number;
+  forecastByMonth: { month: string; value: string; weighted: string }[];
+}
+
 export interface Deal {
   id: number;
+  title: string;
   clientName: string;
   paymentMethod: string;
-  status: string; // For display (Reservation, Contracted, Closed)
-  stage: 'won' | 'lost' | 'on_hold' | 'in_progress' | 'cancelled'; // API stage field
+  status: string;
+  stage: LegacyDealStage | string;
   value: number;
-  /** Optional follow-up reminder datetime (ISO string) */
   reminderDate?: string | null;
   leadId?: number;
-  client?: number; // API client ID
-  employee?: number; // API employee ID
-  startedBy?: number; // user ID
-  closedBy?: number; // user ID
+  client?: number;
+  employee?: number;
+  employeeUsername?: string;
+  startedBy?: number;
+  closedBy?: number;
   startDate?: string;
   closedDate?: string;
   discountPercentage?: number;
@@ -568,24 +653,46 @@ export interface Deal {
   salesCommissionPercentage?: number;
   salesCommissionAmount?: number;
   description?: string;
-  /** Real estate: unit id, code, or nested object from API */
-  unit?: number | string | { id: number; code?: string; name?: string } | null;
-  /** Real estate: project id, name, or nested object from API */
-  project?: number | string | { id: number; name?: string } | null;
-  unit_code?: string; // Read-only field from API serializer
-  project_name?: string; // Read-only field from API serializer
+  unit?: number | null;
+  project?: number | null;
+  unitCode?: string;
+  projectName?: string;
+  pipeline?: number | null;
+  pipelineName?: string;
+  pipelineStage?: number | null;
+  pipelineStageName?: string;
+  pipelineStageColor?: string;
+  stageType?: DealStageType | null;
+  probability?: number | null;
+  stageProbability?: number | null;
+  weightedValue?: number;
+  expectedCloseDate?: string | null;
+  currency?: string;
+  lostReason?: number | null;
+  lostReasonName?: string;
+  lostNote?: string;
+  lineItemsCount?: number;
+  lineItems?: DealLineItem[];
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface DealFilters {
-  status: string; // 'All' or specific status
-  paymentMethod: string; // 'All' or specific payment method
-  unit: string; // 'All' or specific unit (for real estate)
-  project: string; // 'All' or specific project (for real estate)
-  valueMin: string; // Minimum value
-  valueMax: string; // Maximum value
-  search: string; // Search by client name or deal ID
+  status: string;
+  paymentMethod: string;
+  unit: string;
+  project: string;
+  valueMin: string;
+  valueMax: string;
+  search: string;
+  stageId: string;
+  outcome: string;
+  employee: string;
+  pipeline: string;
+  expectedCloseFrom: string;
+  expectedCloseTo: string;
+  createdFrom: string;
+  createdTo: string;
 }
 
 // TaskStage enum values matching API TaskStage enum

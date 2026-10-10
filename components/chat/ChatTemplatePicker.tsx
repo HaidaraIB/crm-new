@@ -79,7 +79,7 @@ export const ChatTemplatePicker: React.FC<Props> = ({
       </div>
 
       {showTemplates && quickTemplates.length > 0 && (
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 custom-scrollbar">
+        <div className="custom-scrollbar flex gap-1.5 overflow-x-auto overflow-y-hidden pb-0.5">
           {quickTemplates.map((tpl) => (
             <button
               key={tpl.id}

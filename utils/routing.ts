@@ -140,6 +140,30 @@ export const getCompanyViewLeadRoute = (companyName?: string, companyDomain?: st
   return `/${subdomainSlug}/${path}`;
 };
 
+export const getCompanyDealRoute = (
+  companyName?: string,
+  companyDomain?: string,
+  segment: string = 'deals',
+): string => {
+  const subdomainSlug = companyDomain ? toSubdomainSlug(companyDomain) : (companyName ? toSubdomainSlug(companyName) : '');
+  if (!subdomainSlug) return `/${segment}`;
+  return `/${subdomainSlug}/${segment}`;
+};
+
+export const extractViewDealIdFromPath = (pathname: string): number | null => {
+  const match = decodeURIComponent(pathname).match(/\/view-deal\/(\d+)/i);
+  if (!match) return null;
+  const id = parseInt(match[1], 10);
+  return Number.isFinite(id) && id > 0 ? id : null;
+};
+
+export const extractEditDealIdFromPath = (pathname: string): number | null => {
+  const match = decodeURIComponent(pathname).match(/\/edit-deal\/(\d+)/i);
+  if (!match) return null;
+  const id = parseInt(match[1], 10);
+  return Number.isFinite(id) && id > 0 ? id : null;
+};
+
 /** Lead/patient id from /view-lead/:id or /view-patient/:id (with or without company prefix). */
 export const extractViewLeadIdFromPath = (pathname: string): number | null => {
   const match = decodeURIComponent(pathname).match(/\/view-(?:lead|patient)\/(\d+)/i);
@@ -227,7 +251,7 @@ export const extractCompanyFromPath = (pathname: string): string | null => {
     'settings', 'profile',
     'billing', 'payment', 'payment/success', 'payment/return', 'subscription', 'support-center', 'support', 'user-guide', 'news', 'login', 'register', 'forgot-password',
     'reset-password', 'verify-email', 'verify-phone', '2fa', 'payment-success', 'change-plan',
-    'create-lead', 'edit-lead', 'view-lead', 'create-deal', 'edit-deal',
+    'create-lead', 'edit-lead', 'view-lead', 'create-deal', 'edit-deal', 'view-deal',
     'patients', 'all-patients', 'fresh-patients', 'hot-patients', 'cold-patients', 'my-patients', 'rotated-patients',
     'create-patient', 'edit-patient', 'view-patient',
     'terms-of-service', 'terms', 'privacy-policy', 'privacy', 'data-deletion-policy', 'data-deletion',
@@ -260,4 +284,32 @@ export const extractPageFromPath = (pathname: string): string => {
   // No company in path, return full path
   return pathParts.join('/') || 'dashboard';
 };
+
+let navDepth = 0;
+let historyTrackingInstalled = false;
+
+/** Count in-app pushState entries so Back stays inside the app. */
+export const installAppHistoryTracking = (): void => {
+  if (historyTrackingInstalled || typeof window === 'undefined') return;
+  historyTrackingInstalled = true;
+  const nativePush = window.history.pushState.bind(window.history);
+  window.history.pushState = ((data: unknown, unused: string, url?: string | URL | null) => {
+    navDepth += 1;
+    nativePush(data, unused, url);
+  }) as History['pushState'];
+  window.addEventListener('popstate', () => {
+    navDepth = Math.max(0, navDepth - 1);
+  });
+};
+
+/** Pop the previous in-app page. When this tab was opened directly, run fallback. */
+export const goToPreviousPage = (fallback: () => void): void => {
+  if (navDepth > 0) {
+    window.history.back();
+    return;
+  }
+  fallback();
+};
+
+installAppHistoryTracking();
 

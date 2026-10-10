@@ -5,6 +5,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { useCreateClientFieldVisit } from '../../hooks/useQueries';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -99,16 +100,38 @@ export const AddFieldVisitModal = () => {
         if (uploadInputRef.current) uploadInputRef.current.value = '';
     };
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const fieldVisitCatalogValues = (): Record<string, unknown> => ({
+        notes: summary,
+        scheduled_at: visitDatetime,
+    });
+
+    const applyFieldVisitCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('field_visit.create', values, translate);
+        delete next.visitType;
+        if (next.notes) next.summary = next.notes;
+        if (next.scheduledAt) next.visitDatetime = next.scheduledAt;
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-        if (!summary?.trim()) {
-            newErrors.summary = t('visitSummaryRequired') || 'Summary is required';
-        }
-        if (!visitDatetime?.trim()) {
-            newErrors.visitDatetime = t('visitDatetimeRequired') || 'Visit date and time is required';
-        }
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+        const next = applyFieldVisitCatalog(fieldVisitCatalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
+
+    const blurField = (field: string) => {
+        const next = applyFieldVisitCatalog(fieldVisitCatalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -187,7 +210,11 @@ export const AddFieldVisitModal = () => {
             if (err?.name === 'GeolocationPositionError' || !navigator.geolocation) {
                 setErrors({ _general: t('employeeLocationRequired') });
             } else {
-                setErrors({ _general: fieldVisitErrorMessage(error, t) });
+                const serverErrors = serverFieldErrors(error, 'field_visit.create', translate);
+                if (serverErrors.notes) serverErrors.summary = serverErrors.notes;
+                if (serverErrors.scheduledAt) serverErrors.visitDatetime = serverErrors.scheduledAt;
+                if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+                else setErrors({ _general: fieldVisitErrorMessage(error, t) });
             }
         } finally {
             setLocating(false);
@@ -216,6 +243,7 @@ export const AddFieldVisitModal = () => {
                             setSummary(e.target.value);
                             clearError('summary');
                         }}
+                        onBlur={() => blurField('summary')}
                         className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.summary ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
                     />
                     {errors.summary && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.summary}</p>}
@@ -231,6 +259,7 @@ export const AddFieldVisitModal = () => {
                                 setVisitDatetime(e.target.value);
                                 clearError('visitDatetime');
                             }}
+                            onBlur={() => blurField('visitDatetime')}
                             className={`flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.visitDatetime ? 'border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
                         />
                         <Button type="button" variant="secondary" onClick={setVisitDatetimeToNow}>

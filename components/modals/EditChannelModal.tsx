@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { Channel } from '../../types';
 import { useUpdateChannel } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -63,19 +64,35 @@ export const EditChannelModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('channel.upsert', values, translate);
+
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+        const next = applyCatalog(catalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        if (!formState.type) {
-            newErrors.type = t('typeRequired') || 'Type is required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -148,28 +165,10 @@ export const EditChannelModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating channel:', error);
-            const errorData = error?.response?.data || error?.data || {};
-            const newErrors: { [key: string]: string } = {};
-            
-            // Parse API validation errors
-            if (errorData.priority) {
-                newErrors.priority = Array.isArray(errorData.priority) ? errorData.priority[0] : errorData.priority;
-            }
-            if (errorData.company) {
-                newErrors._general = Array.isArray(errorData.company) ? errorData.company[0] : errorData.company;
-            }
-            if (errorData.name) {
-                newErrors.name = Array.isArray(errorData.name) ? errorData.name[0] : errorData.name;
-            }
-            if (errorData.type) {
-                newErrors.type = Array.isArray(errorData.type) ? errorData.type[0] : errorData.type;
-            }
-            
-            if (Object.keys(newErrors).length === 0) {
-                newErrors._general = error?.message || t('failedToUpdateChannel') || 'Failed to update channel. Please try again.';
-            }
-            
-            setErrors(newErrors);
+            const serverErrors = serverFieldErrors(error, 'channel.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('failedToUpdateChannel') || 'Failed to update channel. Please try again.' });
         }
     };
 
@@ -208,8 +207,7 @@ export const EditChannelModal = () => {
                         placeholder={t('enterChannelName') || 'Enter channel name'} 
                         value={formState.name} 
                         onChange={handleChange}
-                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                     {errors.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}

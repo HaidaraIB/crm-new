@@ -39,6 +39,30 @@ const LEASE_STALE_MS = LEASE_RENEW_MS * 3;
 const MIN_BACKOFF_MS = 1_000;
 const MAX_BACKOFF_MS = 30_000;
 
+/** Stable for the life of this tab. Rides on relayed subscribe/unsubscribe frames. */
+const TAB_ID =
+  typeof window === 'undefined'
+    ? 'ssr'
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+
+/**
+ * Incremented each time the leader's socket opens. Followers compare it to the
+ * epoch on the periodic status broadcast so a new connection (new leader, or
+ * the same tab reconnecting) replays subscriptions even when `connected`
+ * never flipped through false.
+ */
+let socketEpoch = 0;
+
+/**
+ * Leader-only union of who wants which thread.
+ *
+ * Reference counts used to live per tab, so a follower's unsubscribe dropped
+ * a conversation another tab still had open. The key is `tenant:<id>` or
+ * `support:<id>`; the wire sees a subscribe on the first tab and an
+ * unsubscribe when the last one leaves.
+ */
+const heldByTab = new Map<string, Set<string>>();
+
 /**
  * Off unless explicitly enabled, so the client can ship before the server does.
  *
@@ -120,16 +144,12 @@ function readLease(): { id: string; at: number } | null {
  */
 function useTabRole(enabled: boolean): TabRole {
   const [role, setRole] = useState<TabRole>('follower');
-  const tabIdRef = useRef<string>(
-    `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
-  );
-
   useEffect(() => {
     if (!enabled || typeof window === 'undefined') {
       setRole('follower');
       return;
     }
-    const myId = tabIdRef.current;
+    const myId = TAB_ID;
 
     const claimOrRenew = () => {
       const lease = readLease();
@@ -297,16 +317,71 @@ export function onRealtimeFrame(handler: (frame: RealtimeFrame) => void): () => 
  * BroadcastChannel rather than opening a second one — the "one socket per
  * browser" rule holds for writes as well as reads.
  */
+function subscriptionKey(payload: OutboundPayload): string | null {
+  const id = payload.conversation;
+  if (typeof id !== 'number' || !Number.isInteger(id)) return null;
+  return `${payload.kind === 'support' ? 'support' : 'tenant'}:${id}`;
+}
+
+/**
+ * Record one tab's interest. Returns whether the wire should see the frame:
+ * the first subscribe, or the unsubscribe that drops the last tab.
+ */
+function noteSubscription(tabId: string, payload: OutboundPayload): boolean {
+  const action = payload.action;
+  if (action !== 'subscribe' && action !== 'unsubscribe') return true;
+  const key = subscriptionKey(payload);
+  if (!key || !tabId) return true;
+  if (action === 'subscribe') {
+    let tabs = heldByTab.get(key);
+    const first = !tabs || tabs.size === 0;
+    if (!tabs) {
+      tabs = new Set();
+      heldByTab.set(key, tabs);
+    }
+    tabs.add(tabId);
+    return first;
+  }
+  const tabs = heldByTab.get(key);
+  if (!tabs) return true;
+  tabs.delete(tabId);
+  if (tabs.size === 0) {
+    heldByTab.delete(key);
+    return true;
+  }
+  return false;
+}
+
+function replayConversationSubscriptions(): void {
+  conversationSubscribers.forEach((_count, conversationId) => {
+    sendRealtime({ action: 'subscribe', conversation: conversationId });
+  });
+  supportConversationSubscribers.forEach((_count, conversationId) => {
+    sendRealtime({
+      action: 'subscribe',
+      kind: 'support',
+      conversation: conversationId,
+    });
+  });
+}
+
 export function sendRealtime(payload: OutboundPayload): boolean {
   // Never claim success when realtime is off or no tab holds a connection.
   // Callers use the return value to decide whether they may back off their own
   // polling, so a false positive here silently stops a feature updating.
   if (!REALTIME_ENABLED || !socketConnected) return false;
-  if (leaderSend) return leaderSend(payload);
+  if (leaderSend) {
+    // This tab holds the socket, so it is the only one that can see every
+    // tab's interest. A subscribe another tab already holds is not sent again.
+    if (payload.action === 'subscribe' || payload.action === 'unsubscribe') {
+      if (!noteSubscription(TAB_ID, payload)) return true;
+    }
+    return leaderSend(payload);
+  }
   if (typeof window === 'undefined') return false;
   try {
     const channel = new BroadcastChannel(CHANNEL_NAME);
-    channel.postMessage({ type: 'send', payload });
+    channel.postMessage({ type: 'send', tabId: TAB_ID, payload });
     channel.close();
     // Optimistic: a relayed send cannot be confirmed from here. The leader is
     // alive (it renews its lease every 2s) or another tab has taken over, and
@@ -335,12 +410,7 @@ const supportConversationSubscribers = new Map<number, number>();
 if (typeof window !== 'undefined') {
   onRealtimeStatus((connected) => {
     if (!connected) return;
-    conversationSubscribers.forEach((_count, conversationId) => {
-      sendRealtime({ action: 'subscribe', conversation: conversationId });
-    });
-    supportConversationSubscribers.forEach((_count, conversationId) => {
-      sendRealtime({ action: 'subscribe', kind: 'support', conversation: conversationId });
-    });
+    replayConversationSubscriptions();
   });
 }
 
@@ -422,6 +492,10 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
   }, [enabled]);
 
   const digestDebounceRef = useRef<number | undefined>(undefined);
+  const followerEpochRef = useRef(-1);
+  // Bumps on every leader status while connected, so the liveness timer below
+  // resets. A state set to the same boolean would not re-run the effect.
+  const [leaderPulse, setLeaderPulse] = useState(0);
   const refreshDigest = useCallback(() => {
     if (digestDebounceRef.current) window.clearTimeout(digestDebounceRef.current);
     digestDebounceRef.current = window.setTimeout(() => {
@@ -445,6 +519,8 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
       const message = event.data as {
         type?: string;
         connected?: boolean;
+        epoch?: number;
+        tabId?: string;
         frame?: RealtimeFrame;
         payload?: OutboundPayload;
       };
@@ -460,6 +536,12 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
       // A follower asking us to put something on the wire. Ignored unless we
       // actually hold the socket, so exactly one tab acts on it.
       if (message?.type === 'send' && message.payload && leaderSend) {
+        const from = typeof message.tabId === 'string' ? message.tabId : '';
+        const action = message.payload.action;
+        if ((action === 'subscribe' || action === 'unsubscribe') && from) {
+          if (noteSubscription(from, message.payload)) leaderSend(message.payload);
+          return;
+        }
         leaderSend(message.payload);
         return;
       }
@@ -467,22 +549,35 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
       // is up. Followers mirror its state to decide their own poll interval —
       // otherwise they would keep polling every 5s while events were already
       // arriving, and the saving would only apply to whichever tab won the lease.
+      // `epoch` changes when the socket itself is new; a repeat status for the
+      // same connection must not resubscribe.
       if (message?.type === 'status' && typeof message.connected === 'boolean') {
+        const epoch = typeof message.epoch === 'number' ? message.epoch : 0;
+        const wasConnected = socketConnected;
         setSocketConnected(message.connected);
         setConnected(message.connected);
+        if (message.connected) setLeaderPulse((n) => n + 1);
+        if (message.connected && epoch !== followerEpochRef.current && wasConnected) {
+          replayConversationSubscriptions();
+        }
+        followerEpochRef.current = epoch;
       }
     };
     return () => channel?.close();
   }, [active, refreshDigest]);
 
-  // A follower that never hears from a leader must not sit on the slow interval
-  // forever — if the leader tab is closed mid-session, this tab either becomes
-  // the leader itself or falls back to polling.
+  // A follower that stops hearing the leader's periodic status must not sit on
+  // the slow interval. The leader re-broadcasts every lease renewal; missing
+  // several of those means the socket is gone and this tab should poll again
+  // (or take the lease itself).
   useEffect(() => {
-    if (role === 'leader') return;
-    const timer = window.setTimeout(() => setConnected(false), LEASE_STALE_MS * 2);
+    if (role === 'leader' || !connected) return;
+    const timer = window.setTimeout(() => {
+      setSocketConnected(false);
+      setConnected(false);
+    }, LEASE_STALE_MS * 2);
     return () => window.clearTimeout(timer);
-  }, [role, connected]);
+  }, [role, connected, leaderPulse]);
 
   useEffect(() => {
     if (!active || role !== 'leader' || typeof window === 'undefined') {
@@ -528,9 +623,10 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
         if (disposed) return;
         attempt = 0;
         realtimeLog('connected');
-        setSocketConnected(true);
-        // Only now can we actually put bytes on the wire; before this, callers
-        // must fall through to their HTTP path.
+        // Assign before announcing connected: the status listeners replay
+        // subscriptions synchronously, and they have to land on this socket.
+        // Clearing the union first makes that replay a real subscribe — the
+        // previous connection's membership died with it.
         leaderSend = (payload: OutboundPayload) => {
           if (!socket || socket.readyState !== WebSocket.OPEN) return false;
           try {
@@ -540,8 +636,11 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
             return false;
           }
         };
+        heldByTab.clear();
+        socketEpoch += 1;
+        setSocketConnected(true);
         setConnected(true);
-        broadcast?.postMessage({ type: 'status', connected: true });
+        broadcast?.postMessage({ type: 'status', connected: true, epoch: socketEpoch });
         // Anything that happened while we were disconnected was missed, and the
         // socket has no replay. One refetch re-establishes the truth.
         refreshDigest();
@@ -581,7 +680,7 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
             : `closed (code ${event.code}), reconnecting with backoff`
         );
         setConnected(false);
-        broadcast?.postMessage({ type: 'status', connected: false });
+        broadcast?.postMessage({ type: 'status', connected: false, epoch: socketEpoch });
         if (event.code === 4401) {
           void refreshTokenAPI()
             .then(() => {
@@ -614,11 +713,27 @@ export function useRealtimeChannel(enabled: boolean): { digestInterval: number }
 
     connect();
 
+    // Same cadence as the lease renewal. A tab opened after the socket came up
+    // never saw the one-shot `open` status; this is how it learns, and how a
+    // follower tells a live leader from a crashed one.
+    const pulseTimer = window.setInterval(() => {
+      if (disposed) return;
+      const open = socket?.readyState === WebSocket.OPEN;
+      broadcast?.postMessage({
+        type: 'status',
+        connected: open,
+        epoch: socketEpoch,
+      });
+    }, LEASE_RENEW_MS);
+
     return () => {
       disposed = true;
       leaderSend = null;
+      heldByTab.clear();
       setSocketConnected(false);
+      window.clearInterval(pulseTimer);
       if (retryTimer) window.clearTimeout(retryTimer);
+      broadcast?.postMessage({ type: 'status', connected: false, epoch: socketEpoch });
       broadcast?.close();
       if (socket) {
         socket.onclose = null; // Do not schedule a retry for our own teardown.

@@ -9,6 +9,7 @@ import { usePersistedTab } from '../hooks/usePersistedTab';
 import { createSupportTicketAPI, getSupportTicketsAPI } from '../services/api';
 import { withLatinDigits } from '../utils/dateUtils';
 import { translations } from '../constants';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 
 const SUPPORT_TABS = ['chat', 'tickets'] as const;
 
@@ -69,16 +70,48 @@ export const SupportCenterPage = () => {
     queryFn: () => getSupportTicketsAPI(),
   });
 
+  const translate = (key: string) => {
+    const value = t(key as never);
+    return value && value !== key ? value : undefined;
+  };
+
+  const mirrorTicketErrors = (raw: Record<string, string>) => {
+    const next = { ...raw };
+    if (next._general && !next.general) next.general = next._general;
+    if (next.subject && !next.title) next.title = next.subject;
+    if (next.title && !next.subject) next.subject = next.title;
+    if (next.message && !next.description) next.description = next.message;
+    if (next.description && !next.message) next.message = next.description;
+    return next;
+  };
+
+  const ticketValues = (patch: Partial<typeof formData> = {}) => {
+    const data = { ...formData, ...patch };
+    return {
+      title: data.title,
+      subject: data.title,
+      description: data.description,
+      message: data.description,
+    };
+  };
+
+  const showTicketField = (field: 'title' | 'description', patch: Partial<typeof formData> = {}) => {
+    const next = mirrorTicketErrors(catalogFieldErrors('support_ticket.create', ticketValues(patch), translate));
+    const keys = field === 'title' ? ['title', 'subject'] : ['description', 'message'];
+    setErrors((prev) => {
+      const updated = { ...prev };
+      for (const key of keys) {
+        if (next[key]) updated[key] = next[key];
+        else delete updated[key];
+      }
+      return updated;
+    });
+  };
+
   const validateForm = () => {
-    const newErrors: Record<string, string> = {};
-    if (!formData.title.trim()) {
-      newErrors.title = t('supportTicketTitle') ? `${t('supportTicketTitle')} (required)` : 'Subject is required';
-    }
-    if (!formData.description.trim()) {
-      newErrors.description = t('supportTicketDescription') ? `${t('supportTicketDescription')} (required)` : 'Description is required';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    const next = mirrorTicketErrors(catalogFieldErrors('support_ticket.create', ticketValues(), translate));
+    setErrors(next);
+    return Object.keys(next).length === 0;
   };
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -101,8 +134,9 @@ export const SupportCenterPage = () => {
       setSuccessMessage(t('ticketSubmittedSuccess') || 'Your request has been submitted successfully.');
       refetchTickets();
     } catch (err: any) {
-      const msg = err?.message || 'Failed to submit. Please try again.';
-      setErrors({ submit: msg });
+      const server = mirrorTicketErrors(serverFieldErrors(err, 'support_ticket.create', translate));
+      const msg = server.general || server._general || err?.message || 'Failed to submit. Please try again.';
+      setErrors({ ...server, submit: msg });
     } finally {
       isSubmittingRef.current = false;
       setIsSubmitting(false);
@@ -155,7 +189,12 @@ export const SupportCenterPage = () => {
               <Input
                 id="support-title"
                 value={formData.title}
-                onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
+                onChange={(e) => {
+                  const title = e.target.value;
+                  setFormData((prev) => ({ ...prev, title }));
+                  if (errors.title || errors.subject) showTicketField('title', { title });
+                }}
+                onBlur={() => showTicketField('title')}
                 placeholder={t('supportTicketTitle') || 'Subject'}
                 className="w-full"
               />
@@ -168,7 +207,12 @@ export const SupportCenterPage = () => {
               <textarea
                 id="support-description"
                 value={formData.description}
-                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                onChange={(e) => {
+                  const description = e.target.value;
+                  setFormData((prev) => ({ ...prev, description }));
+                  if (errors.description || errors.message) showTicketField('description', { description });
+                }}
+                onBlur={() => showTicketField('description')}
                 placeholder={t('supportTicketDescription') || 'Describe your issue...'}
                 rows={4}
                 className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"

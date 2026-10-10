@@ -10,7 +10,7 @@ import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import { useUpdateUser } from '../../hooks/useQueries';
 import { normalizeRoleForApi, roleShowsLeadAvailability } from '../../utils/roles';
-import { validateEmailField, validatePhoneField, validatePasswordField, validateNameField } from '../../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 import { toHtmlTimeValue } from '../../utils/weekOff';
@@ -195,41 +195,62 @@ export const EditUserModal = () => {
         }
     }, [selectedUser, isEditUserModalOpen, isMedicalCompany]);
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const userCatalogValues = (): Record<string, unknown> => {
+        const parts = formState.name.trim().split(/\s+/).filter(Boolean);
+        return {
+            first_name: parts[0] || '',
+            last_name: parts.slice(1).join(' '),
+            email: formState.email,
+            username: selectedUser?.username || '',
+            phone: formState.phone,
+            password: formState.password,
+            role: formState.role,
+        };
+    };
+
+    const applyUserCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('user.upsert', values, translate);
+        if (next.firstName || next.lastName) next.name = next.firstName || next.lastName;
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: Record<string, string> = {};
-
-        const nameError = validateNameField(formState.name, t, { minLength: 2 });
-        if (nameError) newErrors.name = nameError;
-
-        const emailError = validateEmailField(formState.email, t);
-        if (emailError) newErrors.email = emailError;
-
-        const phoneError = validatePhoneField(formState.phone, t);
-        if (phoneError) newErrors.phone = phoneError;
-
-        // Password is optional on edit - only validate if provided
-        const passwordError = validatePasswordField(formState.password, t, { required: false });
-        if (passwordError) newErrors.password = passwordError;
+        const next = applyUserCatalog(userCatalogValues());
 
         if (roleShowsLeadAvailability(formState.role)) {
             const start = formState.workStartTime.trim();
             const end = formState.workEndTime.trim();
             if ((start && !end) || (!start && end)) {
-                newErrors.workEndTime =
+                next.workEndTime =
                     t('workingHoursHelp') ||
                     'Both working hours are required together, or clear both.';
             } else if (start && end && start === end) {
-                newErrors.workEndTime =
+                next.workEndTime =
                     t('workingHoursHelp') || 'End time must differ from start time.';
             }
         }
 
-        setErrors(newErrors);
-        if (Object.keys(newErrors).length > 0) {
-            scrollToFirstFieldError(newErrors, EDIT_USER_DOM_ID_MAP);
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
+            scrollToFirstFieldError(next, EDIT_USER_DOM_ID_MAP);
             return false;
         }
         return true;
+    };
+
+    const blurField = (field: string) => {
+        const next = applyUserCatalog(userCatalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -309,46 +330,11 @@ export const EditUserModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating user:', error);
-            
-            // Handle API errors - Django REST Framework returns errors in specific format
-            const errorMessage = error?.message || '';
-            const errorFields = error?.fields || {};
-            const lowerMessage = errorMessage.toLowerCase();
-            
-            // Check for field-specific errors first (from API response)
-            if (errorFields.email) {
-                const emailError = Array.isArray(errorFields.email) ? errorFields.email[0] : errorFields.email;
-                if (typeof emailError === 'string' && (emailError.toLowerCase().includes('already exists') || emailError.toLowerCase().includes('already exist'))) {
-                    setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
-                } else {
-                    setErrors({ email: emailError || t('invalidEmail') || 'Invalid email format' });
-                }
-            } else if (errorFields.phone) {
-                const phoneError = Array.isArray(errorFields.phone) ? errorFields.phone[0] : errorFields.phone;
-                if (typeof phoneError === 'string' && (phoneError.toLowerCase().includes('already exists') || phoneError.toLowerCase().includes('already exist'))) {
-                    setErrors({ phone: t('phoneAlreadyExists') || 'This phone number is already registered' });
-                } else {
-                    setErrors({ phone: phoneError || t('invalidPhone') || 'Invalid phone number' });
-                }
-            } else if (errorFields.password) {
-                const passwordError = Array.isArray(errorFields.password) ? errorFields.password[0] : errorFields.password;
-                setErrors({ password: passwordError || t('passwordRequired') || 'Password is required' });
-            } else if (errorFields.role) {
-                const roleError = Array.isArray(errorFields.role) ? errorFields.role[0] : errorFields.role;
-                setErrors({ role: roleError || t('invalidRole') || 'Invalid role' });
-            } else if (lowerMessage.includes('email') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-                setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
-            } else if (lowerMessage.includes('phone') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-                setErrors({ phone: t('phoneAlreadyExists') || 'This phone number is already registered' });
-            } else if (errorFields.username) {
-                const usernameError = Array.isArray(errorFields.username) ? errorFields.username[0] : errorFields.username;
-                setErrors({ username: usernameError || t('usernameRequired') || 'Username is required' });
-            } else {
-                // Generic error - show at top
-                setErrors({ 
-                    _general: errorMessage || t('errorUpdatingEmployee') || 'Failed to update employee. Please try again.' 
-                });
-            }
+            const serverErrors = serverFieldErrors(error, 'user.upsert', translate);
+            if (serverErrors.firstName || serverErrors.lastName) serverErrors.name = serverErrors.firstName || serverErrors.lastName;
+            if (serverErrors.username && !serverErrors._general) serverErrors._general = serverErrors.username;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('errorUpdatingEmployee') || 'Failed to update employee. Please try again.' });
         }
     };
 
@@ -368,6 +354,7 @@ export const EditUserModal = () => {
                         id="edit-user-name" 
                         value={formState.name} 
                         onChange={handleChange}
+                        onBlur={() => blurField('name')}
                         className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
                     />
                     {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
@@ -378,6 +365,7 @@ export const EditUserModal = () => {
                         id="edit-user-phone" 
                         value={formState.phone} 
                         onChange={handlePhoneChange}
+                        onBlur={() => blurField('phone')}
                         placeholder={t('enterPhone') || 'Enter phone number'}
                         error={!!errors.phone}
                     />
@@ -390,6 +378,7 @@ export const EditUserModal = () => {
                         type="email" 
                         value={formState.email} 
                         onChange={handleChange}
+                        onBlur={() => blurField('email')}
                         className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
                     />
                     {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
@@ -400,7 +389,8 @@ export const EditUserModal = () => {
                             id="edit-user-password" 
                             type={passwordVisible ? 'text' : 'password'}
                             value={formState.password} 
-                            onChange={handleChange} 
+                            onChange={handleChange}
+                            onBlur={() => blurField('password')} 
                             placeholder={t('leaveBlankPassword')}
                             autoComplete="new-password"
                             className={errors.password ? 'border-red-500 dark:border-red-500' : ''}

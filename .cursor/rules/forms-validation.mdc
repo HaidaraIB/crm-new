@@ -1,0 +1,26 @@
+---
+description: Shared catalog form validation
+globs: "**/*Modal*.tsx,**/pages/**/*.tsx,**/forms/**"
+alwaysApply: false
+---
+
+# Form validation
+
+The Django catalog is the source of truth. Clients compile it; they do not invent rules.
+
+## Required pattern
+
+- All forms — new and existing — use a catalog `formId` from `validation/schemas/` and call `catalogFieldErrors(formId, values, t)` from `forms/` on submit and on blur, plus `serverFieldErrors(error, formId, t)` for API field codes in the `catch` block. This is the pattern every real form in this app uses; there is no separate react-hook-form-based API.
+- Localize with `validation.*` keys (English and Arabic). Never match English error text.
+- Submit stays enabled while the form is invalid and is disabled only while the request is in flight.
+- Inline errors sit under the field with `role="alert"`. Toasts are for success and network failures, not validation.
+
+## Anti-patterns
+
+- Do not add a local `validateForm` that re-implements required, email, phone, or password rules.
+- Do not toast a validation error instead of showing it on the field.
+- Mark a rule `client_only` in the catalog when the API still accepts the value. Do not reject a payload the serializer already accepts.
+
+## After a schema change
+
+Run `python manage.py export_validation_catalog` from `CRM-api-1` so `forms/catalog/catalog.snapshot.json` stays in sync, then `npm test`.

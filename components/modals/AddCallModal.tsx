@@ -7,6 +7,7 @@ import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { CallMethod } from '../../pages/settings/CallMethodsSettings';
 import { useCreateClientCall, useCallMethods } from '../../hooks/useQueries';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -40,19 +41,33 @@ export const AddCallModal = () => {
     const [followUpDate, setFollowUpDate] = useState('');
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const callCatalogValues = (): Record<string, unknown> => ({ callMethod, notes });
+
+    const applyCallCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('lead_call.create', values, translate);
+        delete next.result;
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+        const next = applyCallCatalog(callCatalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        if (!callMethod || callMethod.trim() === '') {
-            newErrors.callMethod = t('callMethodRequired') || 'Call method is required';
-        }
-
-        if (!notes || notes.trim() === '') {
-            newErrors.notes = t('notesRequired') || 'Notes are required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCallCatalog(callCatalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -137,8 +152,9 @@ export const AddCallModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error adding call:', error);
-            const errorMessage = error?.message || 'Failed to add call. Please try again.';
-            setErrors({ _general: errorMessage });
+            const serverErrors = serverFieldErrors(error, 'lead_call.create', translate);
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || 'Failed to add call. Please try again.' });
         }
     };
 
@@ -183,6 +199,7 @@ export const AddCallModal = () => {
                             setNotes(e.target.value);
                             clearError('notes');
                         }}
+                        onBlur={() => blurField('notes')}
                         className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.notes ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
                         placeholder={t('writeCallDetails') || 'Write call details...'}
                     />

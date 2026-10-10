@@ -1700,7 +1700,7 @@ export const TeamChatPage = ({ variant = 'page', onClose }: TeamChatPageProps = 
                   <p className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
                     {t('teamChatPinnedHeader')}
                   </p>
-                  <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+                  <div className="custom-scrollbar flex gap-2 overflow-x-auto overflow-y-hidden pb-1">
                     {pinnedInThread.map((pin) => (
                       <div
                         key={pin.pin_id}

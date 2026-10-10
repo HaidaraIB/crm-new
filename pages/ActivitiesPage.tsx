@@ -1,25 +1,13 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, FilterButton, RefreshButton, Button, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Card, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, Pagination } from '../components/index';
 import { DEFAULT_ACTIVITY_FILTERS } from '../components/drawers/ActivitiesFilterDrawer';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
 import { useActivities, useStages, useCallMethods } from '../hooks/useQueries';
 import { formatDateToLocal } from '../utils/dateUtils';
-import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 import type { ActivityFeedFilters, ActivityFeedRow } from '../services/api';
-
-const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const items: Array<number | 'ellipsis'> = [1];
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    if (start > 2) items.push('ellipsis');
-    for (let page = start; page <= end; page += 1) items.push(page);
-    if (end < total - 1) items.push('ellipsis');
-    items.push(total);
-    return items;
-};
 
 const hexToRgb = (hex: string) => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -77,7 +65,6 @@ export const ActivitiesPage = () => {
     const hasNextPage = Boolean(activitiesResponse?.next);
     const hasPreviousPage = Boolean(activitiesResponse?.previous);
     const totalPages = Math.max(1, Math.ceil(totalActivitiesCount / activitiesPageSize));
-    const paginationItems = getPaginationItems(activitiesPageNumber, totalPages);
 
     const { data: stagesData } = useStages();
     const stages = Array.isArray(stagesData)
@@ -195,66 +182,16 @@ export const ActivitiesPage = () => {
                         </tbody>
                     </table>
                 </TableHorizontalScroll>
-                <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        {t('page')} {activitiesPageNumber} {t('of')} {totalPages}
-                    </p>
-                    <div className="flex items-center gap-2" dir="ltr">
-                        <select
-                            value={activitiesPageSize}
-                            onChange={(e) => setActivitiesPageSize(Number(e.target.value))}
-                            className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                        >
-                            {PAGE_SIZE_OPTIONS.map((size) => (
-                                <option key={size} value={size}>
-                                    {`${size} ${t('perPage')}`}
-                                </option>
-                            ))}
-                        </select>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setActivitiesPageNumber(1)}
-                            disabled={activitiesPageNumber === 1 || activitiesLoading}
-                        >
-                            &laquo;
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setActivitiesPageNumber((prev) => Math.max(1, prev - 1))}
-                            disabled={!hasPreviousPage || activitiesLoading}
-                        >
-                            {t('previous')}
-                        </Button>
-                        {paginationItems.map((item, idx) =>
-                            item === 'ellipsis' ? (
-                                <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
-                            ) : (
-                                <Button
-                                    key={item}
-                                    variant={item === activitiesPageNumber ? 'primary' : 'secondary'}
-                                    onClick={() => setActivitiesPageNumber(item)}
-                                    disabled={activitiesLoading}
-                                >
-                                    {item}
-                                </Button>
-                            )
-                        )}
-                        <Button
-                            variant="secondary"
-                            onClick={() => setActivitiesPageNumber((prev) => prev + 1)}
-                            disabled={!hasNextPage || activitiesLoading}
-                        >
-                            {t('next')}
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setActivitiesPageNumber(totalPages)}
-                            disabled={activitiesPageNumber === totalPages || activitiesLoading}
-                        >
-                            &raquo;
-                        </Button>
-                    </div>
-                </div>
+                <Pagination
+                    page={activitiesPageNumber}
+                    totalPages={totalPages}
+                    onPageChange={setActivitiesPageNumber}
+                    pageSize={activitiesPageSize}
+                    onPageSizeChange={setActivitiesPageSize}
+                    hasPrevious={hasPreviousPage}
+                    hasNext={hasNextPage}
+                    disabled={activitiesLoading}
+                />
             </Card>
         </PageWrapper>
     );

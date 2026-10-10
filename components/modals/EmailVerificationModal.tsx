@@ -6,6 +6,7 @@ import { Modal, Button, Input, Loader } from '../index';
 import { verifyEmailAPI, getCurrentUserAPI, resendVerificationCodeAPI, changeEmailAPI } from '../../services/api';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '../../hooks/useQueries';
+import { catalogFieldErrors } from '../../forms';
 
 type EmailVerificationModalProps = {
     isOpen: boolean;
@@ -333,19 +334,11 @@ export const EmailVerificationModal: React.FC<EmailVerificationModalProps> = ({
     };
 
     const handleChangeEmail = async () => {
-        if (!newEmail.trim()) {
-            setVerificationStatus({
-                type: 'error',
-                message: t('emailRequired') || 'Email is required.',
-            });
-            return;
-        }
-
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail.trim())) {
-            setVerificationStatus({
-                type: 'error',
-                message: t('invalidEmail') || 'Invalid email format.',
-            });
+        // Reuses `profile.update`'s email field (required + format) instead of a
+        // local regex — same rule the rest of the app validates email against.
+        const fieldErrors = catalogFieldErrors('profile.update', { email: newEmail.trim() }, t);
+        if (fieldErrors.email) {
+            setVerificationStatus({ type: 'error', message: fieldErrors.email });
             return;
         }
 

@@ -4,11 +4,7 @@ import { useAppContext } from '../context/AppContext';
 import { AuthHero } from '../components/AuthHero';
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon } from '../components/index';
 import { resetPasswordAPI } from '../services/api';
-import {
-    validateEmailField,
-    validatePasswordField,
-    validateConfirmPasswordField,
-} from '../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
 
 export const ResetPasswordPage = () => {
     const { setCurrentPage, t, language, setLanguage, theme, setTheme } = useAppContext();
@@ -38,40 +34,68 @@ export const ResetPasswordPage = () => {
         }
     }, []);
 
-    const clearField = (field: string) => {
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const resetValues = (nextEmail = email, nextPassword = newPassword, nextConfirm = confirmPassword) => ({
+        email: nextEmail,
+        new_password: nextPassword,
+        confirm_password: nextConfirm,
+        password: nextPassword,
+        confirmPassword: nextConfirm,
+    });
+
+    const mirrorResetErrors = (raw: Record<string, string>) => {
+        const next = { ...raw };
+        if (next._general && !next.general) next.general = next._general;
+        if (next.password && !next.newPassword) next.newPassword = next.password;
+        if (next.newPassword && !next.password) next.password = next.newPassword;
+        if (next.new_password && !next.newPassword) next.newPassword = next.new_password;
+        if (next.confirm_password && !next.confirmPassword) next.confirmPassword = next.confirm_password;
+        return next;
+    };
+
+    const collectResetErrors = (nextEmail = email, nextPassword = newPassword, nextConfirm = confirmPassword) => {
+        const urlParams = new URLSearchParams(window.location.search);
+        const token = urlParams.get('token');
+        const next = mirrorResetErrors(
+            catalogFieldErrors('auth.reset_password', resetValues(nextEmail, nextPassword, nextConfirm), translate),
+        );
+        if (!token && !code.trim()) {
+            next.code = t('pleaseEnterCodeOrToken') || 'Please enter the reset code or use the reset link';
+        }
+        return next;
+    };
+
+    const showResetField = (
+        field: 'email' | 'newPassword' | 'confirmPassword',
+        nextEmail = email,
+        nextPassword = newPassword,
+        nextConfirm = confirmPassword,
+    ) => {
+        const next = collectResetErrors(nextEmail, nextPassword, nextConfirm);
+        const keys = field === 'newPassword' ? ['newPassword', 'password', 'new_password'] : [field];
         setErrors((prev) => {
-            const next = { ...prev };
-            delete next[field];
-            delete next.general;
-            return next;
+            const updated = { ...prev };
+            for (const key of keys) {
+                if (next[key]) updated[key] = next[key];
+                else delete updated[key];
+            }
+            return updated;
         });
     };
 
     const handleResetPassword = async () => {
-        setErrors({});
         setSuccess(false);
 
         const urlParams = new URLSearchParams(window.location.search);
         const token = urlParams.get('token');
 
-        const newErrors: Record<string, string> = {};
-        const emailErr = validateEmailField(email, t);
-        if (emailErr) newErrors.email = emailErr;
-
-        if (!token && !code.trim()) {
-            newErrors.code = t('pleaseEnterCodeOrToken') || 'Please enter the reset code or use the reset link';
-        }
-
-        const passwordErr = validatePasswordField(newPassword, t);
-        if (passwordErr) {
-            newErrors.newPassword = passwordErr;
-        }
-
-        const confirmErr = validateConfirmPasswordField(newPassword, confirmPassword, t);
-        if (confirmErr) newErrors.confirmPassword = confirmErr;
-
-        if (Object.keys(newErrors).length > 0) {
-            setErrors(newErrors);
+        const next = collectResetErrors();
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
             return;
         }
 
@@ -91,8 +115,12 @@ export const ResetPasswordPage = () => {
                 window.location.href = '/login';
             }, 2000);
         } catch (error: any) {
+            const server = mirrorResetErrors(serverFieldErrors(error, 'auth.reset_password', translate));
             const errorMessage = error.message || error.detail || error.error || 'Failed to reset password';
-            setErrors({ general: errorMessage });
+            setErrors({
+                ...server,
+                general: server.general || server._general || errorMessage,
+            });
         } finally {
             setIsLoading(false);
         }
@@ -149,9 +177,11 @@ export const ResetPasswordPage = () => {
                                         value={email}
                                         className={errors.email ? 'border-red-500' : ''}
                                         onChange={(e) => {
-                                            setEmail(e.target.value);
-                                            clearField('email');
+                                            const value = e.target.value;
+                                            setEmail(value);
+                                            if (errors.email) showResetField('email', value, newPassword, confirmPassword);
                                         }}
+                                        onBlur={() => showResetField('email')}
                                         disabled={!!new URLSearchParams(window.location.search).get('email')}
                                     />
                                     {errors.email && (
@@ -176,9 +206,13 @@ export const ResetPasswordPage = () => {
                                           </button>
                                         }
                                         onChange={(e) => {
-                                            setNewPassword(e.target.value);
-                                            clearField('newPassword');
+                                            const value = e.target.value;
+                                            setNewPassword(value);
+                                            if (errors.newPassword || errors.password) {
+                                                showResetField('newPassword', email, value, confirmPassword);
+                                            }
                                         }}
+                                        onBlur={() => showResetField('newPassword')}
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') {
                                                 handleResetPassword();
@@ -207,9 +241,11 @@ export const ResetPasswordPage = () => {
                                           </button>
                                         }
                                         onChange={(e) => {
-                                            setConfirmPassword(e.target.value);
-                                            clearField('confirmPassword');
+                                            const value = e.target.value;
+                                            setConfirmPassword(value);
+                                            if (errors.confirmPassword) showResetField('confirmPassword', email, newPassword, value);
                                         }}
+                                        onBlur={() => showResetField('confirmPassword')}
                                         onKeyPress={(e) => {
                                             if (e.key === 'Enter') {
                                                 handleResetPassword();

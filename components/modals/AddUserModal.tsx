@@ -9,13 +9,7 @@ import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { EyeIcon, EyeOffIcon } from '../icons';
 import { useCreateUser } from '../../hooks/useQueries';
-import {
-    validateEmailField,
-    validatePhoneField,
-    validatePasswordField,
-    validateUsernameField,
-    validateNameField,
-} from '../../utils/formValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 import { roleShowsLeadAvailability } from '../../utils/roles';
 
@@ -74,48 +68,62 @@ export const AddUserModal = () => {
     const [passwordVisible, setPasswordVisible] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const userCatalogValues = (): Record<string, unknown> => {
+        const parts = formData.name.trim().split(/\s+/).filter(Boolean);
+        return {
+            first_name: parts[0] || '',
+            last_name: parts.slice(1).join(' '),
+            email: formData.email,
+            username: formData.username,
+            phone: formData.phone,
+            password: formData.password,
+            role: formData.role,
+        };
+    };
+
+    const applyUserCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('user.upsert', values, translate);
+        if (next.firstName || next.lastName) next.name = next.firstName || next.lastName;
+        return next;
+    };
+
     const validateForm = () => {
-        const newErrors: Record<string, string> = {};
-
-        const nameError = validateNameField(formData.name, t, { minLength: 2 });
-        if (nameError) newErrors.name = nameError;
-
-        const usernameError = validateUsernameField(formData.username, t);
-        if (usernameError) newErrors.username = usernameError;
-
-        const emailError = validateEmailField(formData.email, t);
-        if (emailError) newErrors.email = emailError;
-
-        const passwordError = validatePasswordField(formData.password, t);
-        if (passwordError) newErrors.password = passwordError;
-
-        const phoneError = validatePhoneField(formData.phone, t);
-        if (phoneError) newErrors.phone = phoneError;
-
-        // Role validation
-        if (!formData.role) {
-            newErrors.role = t('roleRequired') || 'Role is required';
-        }
+        const next = applyUserCatalog(userCatalogValues());
 
         if (roleShowsLeadAvailability(formData.role)) {
             const start = formData.workStartTime.trim();
             const end = formData.workEndTime.trim();
             if ((start && !end) || (!start && end)) {
-                newErrors.workEndTime =
+                next.workEndTime =
                     t('workingHoursHelp') ||
                     'Both working hours are required together, or clear both.';
             } else if (start && end && start === end) {
-                newErrors.workEndTime =
+                next.workEndTime =
                     t('workingHoursHelp') || 'End time must differ from start time.';
             }
         }
 
-        setErrors(newErrors);
-        if (Object.keys(newErrors).length > 0) {
-            scrollToFirstFieldError(newErrors, ADD_USER_DOM_ID_MAP);
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
+            scrollToFirstFieldError(next, ADD_USER_DOM_ID_MAP);
             return false;
         }
         return true;
+    };
+
+    const blurField = (field: string) => {
+        const next = applyUserCatalog(userCatalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const handleSubmit = async () => {
@@ -197,52 +205,10 @@ export const AddUserModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating user:', error);
-            
-            // Handle API errors - Django REST Framework returns errors in specific format
-            const errorMessage = error?.message || '';
-            const errorFields = error?.fields || {};
-            const lowerMessage = errorMessage.toLowerCase();
-            
-            // Check for field-specific errors first (from API response)
-            if (errorFields.email) {
-                const emailError = Array.isArray(errorFields.email) ? errorFields.email[0] : errorFields.email;
-                if (typeof emailError === 'string' && (emailError.toLowerCase().includes('already exists') || emailError.toLowerCase().includes('already exist'))) {
-                    setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
-                } else {
-                    setErrors({ email: emailError || t('invalidEmail') || 'Invalid email format' });
-                }
-            } else if (errorFields.username) {
-                const usernameError = Array.isArray(errorFields.username) ? errorFields.username[0] : errorFields.username;
-                if (typeof usernameError === 'string' && (usernameError.toLowerCase().includes('already exists') || usernameError.toLowerCase().includes('already exist'))) {
-                    setErrors({ username: t('usernameAlreadyExists') || 'This username is already taken' });
-                } else {
-                    setErrors({ username: usernameError || t('usernameRequired') || 'Username is required' });
-                }
-            } else if (errorFields.phone) {
-                const phoneError = Array.isArray(errorFields.phone) ? errorFields.phone[0] : errorFields.phone;
-                if (typeof phoneError === 'string' && (phoneError.toLowerCase().includes('already exists') || phoneError.toLowerCase().includes('already exist'))) {
-                    setErrors({ phone: t('phoneAlreadyExists') || 'This phone number is already registered' });
-                } else {
-                    setErrors({ phone: phoneError || t('invalidPhone') || 'Invalid phone number' });
-                }
-            } else if (errorFields.password) {
-                const passwordError = Array.isArray(errorFields.password) ? errorFields.password[0] : errorFields.password;
-                setErrors({ password: passwordError || t('passwordRequired') || 'Password is required' });
-            } else if (errorFields.role) {
-                const roleError = Array.isArray(errorFields.role) ? errorFields.role[0] : errorFields.role;
-                setErrors({ role: roleError || t('invalidRole') || 'Invalid role' });
-            } else if (lowerMessage.includes('email') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-                setErrors({ email: t('emailAlreadyExists') || 'This email is already registered' });
-            } else if (lowerMessage.includes('username') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-                setErrors({ username: t('usernameAlreadyExists') || 'This username is already taken' });
-            } else if (lowerMessage.includes('phone') && (lowerMessage.includes('already exists') || lowerMessage.includes('already exist'))) {
-                setErrors({ phone: t('phoneAlreadyExists') || 'This phone number is already registered' });
-            } else {
-                // Generic error - show at top
-                setErrors({ 
-                    _general: errorMessage || t('errorCreatingEmployee') || 'Failed to create employee. Please try again.' 
-                });
-            }
+            const serverErrors = serverFieldErrors(error, 'user.upsert', translate);
+            if (serverErrors.firstName || serverErrors.lastName) serverErrors.name = serverErrors.firstName || serverErrors.lastName;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('errorCreatingEmployee') || 'Failed to create employee. Please try again.' });
         }
     };
 
@@ -290,6 +256,7 @@ export const AddUserModal = () => {
                         id="add-user-name" 
                         value={formData.name}
                         onChange={(e) => handleChange('name', e.target.value)}
+                        onBlur={() => blurField('name')}
                     />
                     {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
                 </div>
@@ -299,6 +266,7 @@ export const AddUserModal = () => {
                         id="add-user-username" 
                         value={formData.username}
                         onChange={(e) => handleChange('username', e.target.value)}
+                        onBlur={() => blurField('username')}
                     />
                     {errors.username && <p className="text-red-500 text-xs mt-1">{errors.username}</p>}
                 </div>
@@ -309,6 +277,7 @@ export const AddUserModal = () => {
                         type="email"
                         value={formData.email}
                         onChange={(e) => handleChange('email', e.target.value)}
+                        onBlur={() => blurField('email')}
                     />
                     {errors.email && <p className="text-red-500 text-xs mt-1">{errors.email}</p>}
                 </div>
@@ -319,6 +288,7 @@ export const AddUserModal = () => {
                             type={passwordVisible ? 'text' : 'password'}
                             value={formData.password}
                             onChange={(e) => handleChange('password', e.target.value)}
+                            onBlur={() => blurField('password')}
                             endAdornment={
                               <button 
                                 type="button"
@@ -337,6 +307,7 @@ export const AddUserModal = () => {
                         id="add-user-phone" 
                         value={formData.phone}
                         onChange={(value) => handleChange('phone', value)}
+                        onBlur={() => blurField('phone')}
                         placeholder={t('enterPhone') || 'Enter phone number'}
                         error={!!errors.phone}
                     />

@@ -1,18 +1,22 @@
 
 export * from './icons';
 export * from './Button';
+export * from './IconButton';
 export * from './FilterButton';
 export * from './RefreshButton';
 export * from './Card';
 export * from './TableHorizontalScroll';
 export * from './Input';
 export * from './NumberInput';
+export * from './Select';
 export * from './PhoneInput';
 export * from './PhoneText';
 export * from './PlainTextWithLinks';
 export * from './Checkbox';
 export * from './Modal';
 export * from './PageWrapper';
+export * from './PageBackButton';
+export * from './FieldActionRow';
 export * from './PageLoadingState';
 export * from './SectionLoadingState';
 export * from './WeekLeadsChart';
@@ -22,10 +26,12 @@ export * from './WebPushOptIn';
 export * from './WebPushPrompt';
 export * from './Sidebar';
 export * from './Loader';
+export * from './Pagination';
 export * from './bulk/BulkActionBar';
 // Named export only: `AlertVariant` would otherwise collide with the modal's
 // narrower variant union re-exported from ./modals/AlertModal.
 export { Alert } from './Alert';
+export { FieldError } from './FieldError';
 export * from './ToastHost';
 
 // New components
@@ -96,7 +102,6 @@ export * from './modals/AddProductCategoryModal';
 export * from './modals/EditProductCategoryModal';
 export * from './modals/AddSupplierModal';
 export * from './modals/EditSupplierModal';
-export * from './modals/ViewDealModal';
 export * from './modals/AlertModal';
 export * from './modals/EmailVerificationModal';
 export * from './modals/AddChannelModal';

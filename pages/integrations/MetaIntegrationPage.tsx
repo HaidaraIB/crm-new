@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { Button, Input } from '../../components/index';
+import { Button, FieldActionRow, Input } from '../../components/index';
 import { SelectLeadFormModal } from '../../components/modals/SelectLeadFormModal';
 import { SocialInboxSection } from '../../components/integrations/SocialInboxSection';
 import {
@@ -234,18 +234,20 @@ export const MetaIntegrationPage = () => {
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{t('metaPixelId')}</label>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">{t('metaPixelIdHint')}</p>
-                <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <FieldActionRow
+                  action={
+                    <Button variant="secondary" onClick={() => void savePixel(account)} loading={pixelSaving}>
+                      {t('savePixelId')}
+                    </Button>
+                  }
+                >
                   <Input
                     id={`meta-pixel-${account.id}`}
                     value={pixelDraft}
                     onChange={(e) => setPixelDraft(e.target.value)}
                     placeholder={t('metaPixelIdPlaceholder')}
-                    className="sm:max-w-md"
                   />
-                  <Button variant="secondary" onClick={() => void savePixel(account)} loading={pixelSaving}>
-                    {t('savePixelId')}
-                  </Button>
-                </div>
+                </FieldActionRow>
               </div>
             ) : null
           }

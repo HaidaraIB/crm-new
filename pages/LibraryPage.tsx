@@ -7,8 +7,7 @@ import {
   TrashIcon,
   FileTextIcon,
   TableHorizontalScroll,
-  MicrophoneIcon,
-} from '../components/index';
+  MicrophoneIcon, IconButton } from '../components/index';
 import { ChatMediaThumb } from '../components/chat/ChatMediaThumb';
 import { ChatMediaViewer } from '../components/chat/ChatMediaViewer';
 import type { ChatMediaAlbumItem } from '../components/chat/chatMediaAlbum';
@@ -314,15 +313,7 @@ export const LibraryPage = () => {
                       {file.uploaded_by_name || '—'}
                     </td>
                     <td className="whitespace-nowrap px-6 py-4 text-center">
-                      <button
-                        type="button"
-                        className="mx-auto inline-flex rounded-md p-2 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-                        onClick={() => handleDelete(file)}
-                        title={t('delete') || 'Delete'}
-                        aria-label={t('delete') || 'Delete'}
-                      >
-                        <TrashIcon className="h-4 w-4" />
-                      </button>
+                      <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => handleDelete(file)} />
                     </td>
                   </tr>
                 ))}

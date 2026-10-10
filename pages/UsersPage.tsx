@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText, RefreshButton, Modal, NumberInput } from '../components/index';
+import { PageWrapper, Button, Card, Dropdown, DropdownItem, WhatsappIcon, Loader, PlusIcon, PhoneIcon, PhoneText, RefreshButton, Modal, NumberInput, Pagination } from '../components/index';
 import { Supervisor, User } from '../types';
 import { useUsers, useReactivateEmployee, useSetUserAvailability, useWorkSessionSummary } from '../hooks/useQueries';
 import { deleteSupervisorAPI, getSupervisorsAPI, updateSupervisorAPI, updateUserAPI } from '../services/api';
@@ -12,7 +12,7 @@ import { formatWorkedDuration } from '../utils/workHours';
 import { buildWaMeUrl } from '../utils/whatsappLaunch';
 import { UserAvailabilityBadge } from '../components/UserAvailabilityBadge';
 import { getAssignmentBlockReason } from '../utils/weekOff';
-import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 /** Preset lengths for the quick "pause new leads" toggle, matching the API's minute bounds. */
 const UNAVAILABLE_PRESETS: Array<{ minutes: number; labelKey: string }> = [
@@ -25,18 +25,6 @@ const UNAVAILABLE_PRESETS: Array<{ minutes: number; labelKey: string }> = [
 
 /** Mirrors MAX_UNAVAILABLE_MINUTES in accounts/employee_availability.py (24h). */
 const MAX_UNAVAILABLE_MINUTES = 24 * 60;
-
-const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const items: Array<number | 'ellipsis'> = [1];
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    if (start > 2) items.push('ellipsis');
-    for (let page = start; page <= end; page += 1) items.push(page);
-    if (end < total - 1) items.push('ellipsis');
-    items.push(total);
-    return items;
-};
 
 const getPresenceSourceLabel = (source: string | undefined, t: (key: any) => string): string => {
     switch ((source || '').toLowerCase()) {
@@ -688,7 +676,6 @@ export const UsersPage = () => {
     const totalUsersCount = usersResponse?.count || 0;
     const pageSize = usersPageSize;
     const totalPages = Math.max(1, Math.ceil(totalUsersCount / pageSize));
-    const paginationItems = getPaginationItems(usersPageNumber, totalPages);
 
     useEffect(() => {
         setUsersPageNumber(1);
@@ -842,69 +829,20 @@ export const UsersPage = () => {
                             </div>
                         ))}
                     </div>
-                    <div className="mt-6 flex flex-col sm:flex-row items-center justify-between gap-3">
-                        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                            {t('page')} {usersPageNumber} {t('of')} {totalPages}
-                        </p>
-                        <div className="flex items-center gap-2" dir="ltr">
-                            <select
-                                value={usersPageSize}
-                                onChange={(e) => {
-                                    setUsersPageSize(Number(e.target.value));
-                                    setUsersPageNumber(1);
-                                }}
-                                className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                            >
-                                {PAGE_SIZE_OPTIONS.map((size) => (
-                                    <option key={size} value={size}>
-                                        {`${size} ${t('perPage')}`}
-                                    </option>
-                                ))}
-                            </select>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUsersPageNumber(1)}
-                                disabled={usersPageNumber === 1 || usersLoading}
-                            >
-                                &laquo;
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUsersPageNumber((prev) => Math.max(1, prev - 1))}
-                                disabled={!hasPreviousPage || usersLoading}
-                            >
-                                {t('previous')}
-                            </Button>
-                            {paginationItems.map((item, idx) =>
-                                item === 'ellipsis' ? (
-                                    <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
-                                ) : (
-                                    <Button
-                                        key={item}
-                                        variant={item === usersPageNumber ? 'primary' : 'secondary'}
-                                        onClick={() => setUsersPageNumber(item)}
-                                        disabled={usersLoading}
-                                    >
-                                        {item}
-                                    </Button>
-                                )
-                            )}
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUsersPageNumber((prev) => prev + 1)}
-                                disabled={!hasNextPage || usersLoading}
-                            >
-                                {t('next')}
-                            </Button>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setUsersPageNumber(totalPages)}
-                                disabled={usersPageNumber === totalPages || usersLoading}
-                            >
-                                &raquo;
-                            </Button>
-                        </div>
-                    </div>
+                    <Pagination
+                        page={usersPageNumber}
+                        totalPages={totalPages}
+                        onPageChange={setUsersPageNumber}
+                        pageSize={usersPageSize}
+                        onPageSizeChange={(size) => {
+                            setUsersPageSize(size);
+                            setUsersPageNumber(1);
+                        }}
+                        hasPrevious={hasPreviousPage}
+                        hasNext={hasNextPage}
+                        disabled={usersLoading}
+                        className="mt-6"
+                    />
                 </>
             )}
             {isOwner && (

@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, PhoneText, IconButton } from '../components/index';
 import { DEFAULT_SUPPLIER_FILTERS } from '../components/drawers/SuppliersFilterDrawer';
 import { Supplier } from '../types';
 import { useSuppliers, useDeleteSupplier } from '../hooks/useQueries';
@@ -58,22 +58,10 @@ const SuppliersTable = ({ suppliers, onUpdate, onDelete, isAdmin }: { suppliers:
                                         <td className="px-4 py-4 whitespace-nowrap text-center">
                                             <div className="flex items-center justify-center gap-1 sm:gap-2">
                                                 {isAdmin && (
-                                                    <button 
-                                                        className="p-1 h-auto text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors" 
-                                                        onClick={() => onUpdate(supplier)}
-                                                        title={t('edit') || 'Edit'}
-                                                    >
-                                                        <EditIcon className="w-4 h-4" />
-                                                    </button>
+                                                    <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit') || 'Edit'} onClick={() => onUpdate(supplier)} />
                                                 )}
                                                 {isAdmin && (
-                                                    <button 
-                                                        className="p-1 h-auto text-xs sm:text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" 
-                                                        onClick={() => onDelete(supplier.id)}
-                                                        title={t('delete') || 'Delete'}
-                                                    >
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </button>
+                                                    <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => onDelete(supplier.id)} />
                                                 )}
                                             </div>
                                         </td>

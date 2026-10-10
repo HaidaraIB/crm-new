@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, TableHorizontalScroll, PhoneText, IconButton } from '../components/index';
 import { Service, ServicePackage, ServiceProvider } from '../types';
 import { AddServiceModal } from '../components/modals/AddServiceModal';
 import { EditServiceModal } from '../components/modals/EditServiceModal';
@@ -60,14 +60,10 @@ const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Se
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(service)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(service)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(service.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(service.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -115,14 +111,10 @@ const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: Se
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(pkg)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(pkg)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(pkg.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(pkg.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -169,14 +161,10 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
                                     <td className="px-3 sm:px-6 py-4">
                                         <div className="flex items-center gap-2">
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto" onClick={() => onUpdate(provider)}>
-                                                    <EditIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(provider)} />
                                             )}
                                             {isAdmin && (
-                                                <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(provider.id)}>
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </Button>
+                                                <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(provider.id)} />
                                             )}
                                         </div>
                                     </td>
@@ -407,8 +395,8 @@ export const ServicesInventoryPage = () => {
 
     return (
         <PageWrapper title={t('services')} actions={pageActions}>
-            <div className="border-b border-gray-200 dark:border-gray-700 mb-4 overflow-x-auto">
-                <nav className="-mb-px flex space-x-4 rtl:space-x-reverse min-w-max" aria-label="Tabs">
+            <div className="mb-4 overflow-x-auto overflow-y-hidden border-b border-gray-200 dark:border-gray-700">
+                <nav className="-mb-px flex min-w-max space-x-4 rtl:space-x-reverse" aria-label="Tabs">
                     <button onClick={() => setActiveTab('services')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'services' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('services')}</button>
                     <button onClick={() => setActiveTab('packages')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'packages' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('servicePackages')}</button>
                     <button onClick={() => setActiveTab('providers')} className={`whitespace-nowrap py-3 sm:py-4 px-1 text-xs sm:text-sm flex-shrink-0 transition-colors ${activeTab === 'providers' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}>{t('serviceProviders')}</button>

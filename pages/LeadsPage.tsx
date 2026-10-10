@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText, BulkActionBar } from '../components/index';
+import { PageWrapper, Button, Card, FilterButton, RefreshButton, PlusIcon, EyeIcon, WhatsappIcon, ImportLeadsModal, PageLoadingState, AssigneeFilter, LeadStatusDropdown, LeadStatusBadge, LeadTagChips, TableHorizontalScroll, LeadContactPhoneList, ViewModeToggle, useEntityViewMode, hasActiveFilters, PhoneText, BulkActionBar, Pagination, IconButton } from '../components/index';
 import { DEFAULT_LEAD_FILTERS } from '../components/drawers/FilterDrawer';
 import { TrashIcon, FacebookIcon, TikTokIcon, SearchIcon, UserPlusIcon } from '../components/icons';
 import { LeadsKanbanView } from '../components/leads/LeadsKanbanView';
@@ -11,6 +11,7 @@ import { StatusChangeReasonModal } from '../components/modals/StatusChangeReason
 import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
 import { Lead, LeadApiFilters, Status, User } from '../types';
 import { useLeads, useLeadStatusCounts, useDeleteLead, useBulkDeleteLeads, usePatchLead, useUsers, useStatuses, useAssignUnassignedClients } from '../hooks/useQueries';
+import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { getLeadsAPI } from '../services/api';
 import { useWhatsAppLeadAction } from '../hooks/useWhatsAppLeadAction';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
@@ -23,7 +24,7 @@ import { formatLeadBudget } from '../utils/budgetRange';
 import { ARABIC_DATE_LOCALE, formatTimelineDate, withLatinDigits } from '../utils/dateUtils';
 import { MarqueeText } from '../components/MarqueeText';
 import { resolveInputDir } from '../utils/inputAutoDir';
-import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
+import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 import { usePersistedTab } from '../hooks/usePersistedTab';
 
 const LEADS_SCROLL_STORAGE_KEY = 'crm:leadsScrollY';
@@ -36,18 +37,6 @@ const readStoredScrollY = (page: string): number => {
     } catch {
         return 0;
     }
-};
-
-const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const items: Array<number | 'ellipsis'> = [1];
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    if (start > 2) items.push('ellipsis');
-    for (let page = start; page <= end; page += 1) items.push(page);
-    if (end < total - 1) items.push('ellipsis');
-    items.push(total);
-    return items;
 };
 
 export const LeadsPage = () => {
@@ -75,6 +64,7 @@ export const LeadsPage = () => {
         setAlertVariant,
         setIsAlertModalOpen,
     } = useAppContext();
+    useInvalidateOnSliceChange('leads', [['leads'], ['lead'], ['leadStatusCounts']]);
     const openWhatsApp = useWhatsAppLeadAction();
     const isDataEntryUser = normalizeRole(currentUser?.role) === 'DataEntry';
     const isMedicalCompany = useMemo(
@@ -185,7 +175,6 @@ export const LeadsPage = () => {
     const hasPreviousPage = Boolean(leadsResponse?.previous);
     const pageSize = leadsPageSize;
     const totalPages = Math.max(1, Math.ceil(totalLeadsCount / pageSize));
-    const paginationItems = getPaginationItems(leadsPageNumber, totalPages);
 
     useEffect(() => {
         setLeadsPageNumber(1);
@@ -643,7 +632,7 @@ export const LeadsPage = () => {
         <PageWrapper 
             title={pageTitle}
             actions={
-                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:p-1 lg:-m-1">
+                <div className="flex shrink-0 flex-wrap items-center justify-end gap-2 lg:flex-nowrap lg:overflow-x-auto lg:overflow-y-hidden lg:p-1 lg:-m-1">
                         <FilterButton
                             onClick={() => setIsFilterDrawerOpen(true)}
                             hasActiveFilters={hasActiveFilters(leadFilters, DEFAULT_LEAD_FILTERS)}
@@ -700,7 +689,7 @@ export const LeadsPage = () => {
             }
         >
             {!isBoardView && (
-            <div className="flex border-b border-gray-200 dark:border-gray-700 overflow-x-auto scrollbar-thin">
+            <div className="flex overflow-x-auto overflow-y-hidden border-b border-gray-200 scrollbar-thin dark:border-gray-700">
                 {leadStatusFilters.map(status => {
                     const count = status && statusCounts ? (statusCounts[status] ?? 0) : 0;
                     
@@ -1123,21 +1112,9 @@ export const LeadsPage = () => {
                                                         <span className="text-gray-400 dark:text-gray-500">—</span>
                                                     ) : (
                                                     <div className="flex items-center justify-center gap-1 sm:gap-2">
-                                                        <button 
-                                                            className="p-1 h-auto text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors" 
-                                                            onClick={() => handleViewLead(lead)}
-                                                            title={t('view') || 'View'}
-                                                        >
-                                                            <EyeIcon className="w-4 h-4" />
-                                                        </button>
+                                                        <IconButton icon={<EyeIcon className="h-4 w-4" />} label={t('view') || 'View'} onClick={() => handleViewLead(lead)} />
                                                         {canDeleteLead(lead) && (
-                                                            <button 
-                                                                className="p-1 h-auto text-xs sm:text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" 
-                                                                onClick={() => handleDeleteLead(lead)}
-                                                                title={t('delete') || 'Delete'}
-                                                            >
-                                                                <TrashIcon className="w-4 h-4" />
-                                                            </button>
+                                                            <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => handleDeleteLead(lead)} />
                                                         )}
                                                     </div>
                                                     )}
@@ -1150,71 +1127,21 @@ export const LeadsPage = () => {
                         </div>
                     </div>
                 </TableHorizontalScroll>
-                <div className="mt-4 px-2 sm:px-0 flex flex-col sm:flex-row items-center justify-between gap-3">
-                    <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                        {totalLeadsCount > 0
+                <Pagination
+                    page={leadsPageNumber}
+                    totalPages={totalPages}
+                    onPageChange={setLeadsPageNumber}
+                    pageSize={leadsPageSize}
+                    onPageSizeChange={setLeadsPageSize}
+                    hasPrevious={hasPreviousPage}
+                    hasNext={hasNextPage}
+                    disabled={leadsLoading}
+                    label={
+                        totalLeadsCount > 0
                             ? `${t('showing')} ${normalizedLeads.length} ${t('of')} ${totalLeadsCount}`
-                            : t('noLeadsFound')}
-                    </p>
-                    <div className="flex items-center gap-2" dir="ltr">
-                        <select
-                            value={leadsPageSize}
-                            onChange={(e) => setLeadsPageSize(Number(e.target.value))}
-                            className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                        >
-                            {PAGE_SIZE_OPTIONS.map((size) => (
-                                <option key={size} value={size}>
-                                    {`${size} ${t('perPage')}`}
-                                </option>
-                            ))}
-                        </select>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setLeadsPageNumber(1)}
-                            disabled={leadsPageNumber === 1 || leadsLoading}
-                        >
-                            &laquo;
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setLeadsPageNumber((prev) => Math.max(1, prev - 1))}
-                            disabled={!hasPreviousPage || leadsLoading}
-                        >
-                            {t('previous')}
-                        </Button>
-                        {paginationItems.map((item, idx) =>
-                            item === 'ellipsis' ? (
-                                <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
-                            ) : (
-                                <Button
-                                    key={item}
-                                    variant={item === leadsPageNumber ? 'primary' : 'secondary'}
-                                    onClick={() => setLeadsPageNumber(item)}
-                                    disabled={leadsLoading}
-                                >
-                                    {item}
-                                </Button>
-                            )
-                        )}
-                        <span className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 min-w-[90px] text-center">
-                            {t('page')} {leadsPageNumber} {t('of')} {totalPages}
-                        </span>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setLeadsPageNumber((prev) => prev + 1)}
-                            disabled={!hasNextPage || leadsLoading}
-                        >
-                            {t('next')}
-                        </Button>
-                        <Button
-                            variant="secondary"
-                            onClick={() => setLeadsPageNumber(totalPages)}
-                            disabled={leadsPageNumber === totalPages || leadsLoading}
-                        >
-                            &raquo;
-                        </Button>
-                    </div>
-                </div>
+                            : t('noLeadsFound')
+                    }
+                />
                 {!isDataEntryUser && !isBoardView && (
                     <BulkActionBar
                         selectedCount={selectedLeadCount}

@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, IconButton } from '../components/index';
 import { DEFAULT_SERVICE_FILTERS } from '../components/drawers/ServicesFilterDrawer';
 import { Service } from '../types';
 import { useServices, useDeleteService } from '../hooks/useQueries';
@@ -72,22 +72,10 @@ const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Se
                                         <td className="px-4 py-4 whitespace-nowrap text-center">
                                             <div className="flex items-center justify-center gap-1 sm:gap-2">
                                                 {isAdmin && (
-                                                    <button 
-                                                        className="p-1 h-auto text-xs sm:text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors" 
-                                                        onClick={() => onUpdate(service)}
-                                                        title={t('edit') || 'Edit'}
-                                                    >
-                                                        <EditIcon className="w-4 h-4" />
-                                                    </button>
+                                                    <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit') || 'Edit'} onClick={() => onUpdate(service)} />
                                                 )}
                                                 {isAdmin && (
-                                                    <button 
-                                                        className="p-1 h-auto text-xs sm:text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors" 
-                                                        onClick={() => onDelete(service.id)}
-                                                        title={t('delete') || 'Delete'}
-                                                    >
-                                                        <TrashIcon className="w-4 h-4" />
-                                                    </button>
+                                                    <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete') || 'Delete'} tone="danger" onClick={() => onDelete(service.id)} />
                                                 )}
                                             </div>
                                         </td>

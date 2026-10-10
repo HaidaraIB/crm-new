@@ -12,7 +12,7 @@ type FilterButtonProps = Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'ch
 };
 
 /**
- * Shared filter-drawer trigger sized to match `Button` (`h-9` / `py-2`).
+ * Shared filter-drawer trigger sized to match `Button` (`h-10`).
  */
 export const FilterButton = ({
   children,
@@ -28,7 +28,7 @@ export const FilterButton = ({
   return (
     <button
       type={type}
-      className={`inline-flex h-9 items-center justify-center gap-1.5 px-3 text-sm font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-100 shadow-sm hover:border-primary-400 dark:hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+      className={`inline-flex h-10 items-center justify-center gap-1.5 px-3 text-sm font-semibold bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md text-gray-900 dark:text-gray-100 shadow-sm hover:border-primary-400 dark:hover:border-primary-500 focus:outline-none focus:ring-2 focus:ring-primary-500/30 transition disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
       {...props}
     >
       <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary-50 dark:bg-primary-900/40 text-primary-600 dark:text-primary-300">

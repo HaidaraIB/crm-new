@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Input, Button, PageLoadingState } from '../components/index';
+import { PageWrapper, Input, Button, PageLoadingState, FieldActionRow } from '../components/index';
 import { PhoneText } from '../components/PhoneText';
 import { useLeads, useAnnounceLeadArrival } from '../hooks/useQueries';
 import { getCompanyRoute } from '../utils/routing';
@@ -74,19 +74,22 @@ export const CallCenterPage = () => {
   return (
     <PageWrapper title={t('callCenter') || 'Call Center'}>
       <div className="max-w-3xl mx-auto space-y-6">
-        <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
-          <div className="flex-1">
+        <form onSubmit={handleSearch}>
+          <FieldActionRow
+            action={
+              <Button type="submit" disabled={!searchInput.trim()}>
+                {t('search')}
+              </Button>
+            }
+          >
             <Input
               id="call-center-search"
-              placeholder={t('searchLeadByNameOrPhone') || 'Search by name or phone'}
+              placeholder={t('searchLeadByNameOrPhone')}
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
               autoFocus
             />
-          </div>
-          <Button type="submit" disabled={!searchInput.trim()}>
-            {t('search') || 'Search'}
-          </Button>
+          </FieldActionRow>
         </form>
 
         {isLoading || isFetching ? (

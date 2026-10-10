@@ -85,7 +85,7 @@ export const PageWrapper = ({
           <div
             className={
               shrinkTitle
-                ? 'flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-2 overflow-x-auto p-1 -m-1'
+                ? 'flex min-w-0 flex-1 flex-nowrap items-center justify-end gap-2 overflow-x-auto overflow-y-hidden p-1 -m-1'
                 : 'flex w-full min-w-0 shrink-0 flex-wrap items-center gap-2 sm:justify-end xl:w-auto xl:pt-1'
             }
           >

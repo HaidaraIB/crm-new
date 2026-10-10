@@ -1,35 +1,39 @@
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, ArrowLeftIcon, PageLoadingState } from '../components/index';
+import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, PageBackButton, PageLoadingState, FieldError, IconButton, Select } from '../components/index';
 import { Channel, Lead, PhoneNumber, Status, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { TagMultiSelect } from '../components/leads/TagMultiSelect';
 import { useUsers, useStatuses, useChannels, useTags, useCreateLead } from '../hooks/useQueries';
-import { getCompanyRoute } from '../utils/routing';
+import { getCompanyRoute, goToPreviousPage } from '../utils/routing';
 import { getAssignmentBlockReason, ASSIGNMENT_BLOCK_LABEL_KEY } from '../utils/weekOff';
 import { buildLeadAssigneePickerOptions, isDataEntryOnlyRole, normalizeRole } from '../utils/roles';
 import { LeadInterestInventoryFields, buildInterestedInventoryApiBody } from '../components/LeadInterestInventoryFields';
 import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { buildLeadLocationApiBody } from '../utils/leadLocation';
-import { validateLeadForm, mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
+import { mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
+import { catalogFieldErrors, serverFieldErrors } from '../forms';
+import { scrollToFirstFieldError } from '../utils/formFieldErrors';
+import { Alert } from '../components/Alert';
+
+/** Error key -> DOM id, for scrolling to the first invalid field on submit. */
+const LEAD_FIELD_DOM_IDS: Record<string, string> = {
+    name: 'name',
+    phone: 'phone',
+    communicationWay: 'communicationWay',
+    status: 'status',
+    priority: 'priority',
+    type: 'type',
+    leadCompanyName: 'leadCompanyName',
+    notes: 'notes',
+};
 import { LeadUrgentToggle } from '../components/LeadUrgentToggle';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
 );
-
-// FIX: Made children optional to fix missing children prop error.
-const Select = ({ id, children, value, onChange, className, language }: { id: string; children?: React.ReactNode; value?: string; onChange?: (e: React.ChangeEvent<HTMLSelectElement>) => void; className?: string; language?: 'ar' | 'en' }) => {
-    const { language: contextLanguage } = useAppContext();
-    const lang = language || contextLanguage;
-    return (
-        <select id={id} value={value} onChange={onChange} dir={lang === 'ar' ? 'rtl' : 'ltr'} className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${className || ''}`}>
-            {children}
-        </select>
-    );
-};
 
 export const CreateLeadPage = () => {
     const { t, setCurrentPage, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
@@ -49,6 +53,18 @@ export const CreateLeadPage = () => {
     );
 
     const companyTz = currentUser?.company?.timezone ?? 'UTC';
+
+    const goLeads = () => {
+        if (postCreateNavigateToAllLeads && currentUser?.company) {
+            const route = getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads', currentUser.company.specialization);
+            window.history.pushState({}, '', route);
+            setCurrentPage('All Leads');
+            return;
+        }
+        window.history.pushState({}, '', '/leads');
+        setCurrentPage('Leads');
+    };
+    const goBack = () => goToPreviousPage(goLeads);
 
     const { data: statusesData } = useStatuses();
     const statuses: Status[] = Array.isArray(statusesData)
@@ -165,34 +181,94 @@ export const CreateLeadPage = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [defaultStatus, defaultChannel]); // Depend on defaults, but check form state before updating
 
-    const validateForm = (): boolean => {
-        const newErrors = validateLeadForm(
-            {
-                name: formState.name,
-                phone: formState.phone,
-                phoneNumbers,
-                communicationWay: formState.communicationWay,
-                status: formState.status,
-                priority: formState.priority,
-                type: formState.type,
-                companyId: currentUser?.company?.id,
-            },
-            t,
-            { requireCompany: true }
-        );
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
     };
 
-    const clearError = (field: string) => {
-        if (errors[field]) {
-            setErrors(prev => {
-                const newErrors = { ...prev };
-                delete newErrors[field];
-                return newErrors;
-            });
+    const leadCatalogValues = (
+        state = formState,
+        phones: PhoneNumber[] = phoneNumbers,
+    ) => {
+        const filled = phones.filter((pn) => (pn.phone_number || '').trim() !== '');
+        const phone = filled[0]?.phone_number || state.phone;
+        return {
+            name: state.name,
+            phone,
+            phone_number: phone,
+            ...(filled.length ? { phoneNumbers: filled, phone_numbers: filled } : {}),
+            communicationWay: state.communicationWay,
+            communication_way: state.communicationWay,
+            status: state.status,
+            priority: state.priority,
+            type: state.type,
+            companyId: currentUser?.company?.id,
+            company: currentUser?.company?.id,
+            leadCompanyName: state.leadCompanyName,
+            lead_company_name: state.leadCompanyName,
+            notes: state.notes,
+        };
+    };
+
+    const mirrorLeadErrors = (raw: Record<string, string>) => {
+        const next = { ...raw };
+        if (next._general && !next.general) next.general = next._general;
+        if (next.companyId && !next.company) next.company = next.companyId;
+        if (next.company && !next.companyId) next.companyId = next.company;
+        if (next.phoneNumbers && !next.phone) next.phone = next.phoneNumbers;
+        if (next.phone_number && !next.phone) next.phone = next.phone_number;
+        for (const [key, message] of Object.entries(raw)) {
+            if ((key.startsWith('phone_numbers') || key.startsWith('phoneNumbers')) && !next.phone) {
+                next.phone = message;
+            }
         }
+        return next;
+    };
+
+    const showLeadField = (
+        field: string,
+        state = formState,
+        phones: PhoneNumber[] = phoneNumbers,
+    ) => {
+        const next = mirrorLeadErrors(
+            catalogFieldErrors('lead.upsert', leadCatalogValues(state, phones), translate, { requireCompany: true }),
+        );
+        const keys = new Set<string>([field]);
+        if (field === 'phone' || field === 'phoneNumbers') {
+            keys.add('phone');
+            keys.add('phoneNumbers');
+            keys.add('phone_number');
+        }
+        if (field === 'company' || field === 'companyId') {
+            keys.add('company');
+            keys.add('companyId');
+        }
+        setErrors((prev) => {
+            const updated = { ...prev };
+            for (const key of keys) {
+                if (next[key]) updated[key] = next[key];
+                else delete updated[key];
+            }
+            for (const key of Object.keys(updated)) {
+                if (key.startsWith('phone_numbers') || key.startsWith('phoneNumbers.')) {
+                    if (next[key]) updated[key] = next[key];
+                    else delete updated[key];
+                }
+            }
+            return updated;
+        });
+    };
+
+    const validateForm = (): boolean => {
+        const next = mirrorLeadErrors(
+            catalogFieldErrors('lead.upsert', leadCatalogValues(), translate, { requireCompany: true }),
+        );
+        setErrors(next);
+        if (Object.keys(next).length > 0) {
+            requestAnimationFrame(() => scrollToFirstFieldError(next, LEAD_FIELD_DOM_IDS));
+            return false;
+        }
+        return true;
     };
 
     // Set default assignedTo to current user when users load (only if not already set and user hasn't interacted)
@@ -221,8 +297,9 @@ export const CreateLeadPage = () => {
         if (!hasUserInteracted.current) {
             hasUserInteracted.current = true;
         }
-        setFormState(prev => ({ ...prev, [id]: value }));
-        clearError(id);
+        const nextState = { ...formState, [id]: value };
+        setFormState(nextState);
+        if (errors[id]) showLeadField(id, nextState, phoneNumbers);
     };
 
     const handleAddPhoneNumber = () => {
@@ -260,7 +337,8 @@ export const CreateLeadPage = () => {
             return newPhones;
         });
         if (field === 'phone_number') {
-            clearError('phone');
+            const nextPhones = phoneNumbers.map((pn, i) => (i === index ? { ...pn, phone_number: String(value) } : pn));
+            if (errors.phone) showLeadField('phone', formState, nextPhones);
         }
     };
 
@@ -347,13 +425,22 @@ export const CreateLeadPage = () => {
             }
         } catch (error: any) {
             console.error('Error creating lead:', error);
-            setErrors(mapLeadApiErrorToFieldErrors(error, t, 'errorCreatingLead'));
+            const server = mirrorLeadErrors(serverFieldErrors(error, 'lead.upsert', translate));
+            const fallback = mapLeadApiErrorToFieldErrors(error, t, 'errorCreatingLead');
+            const next = Object.keys(server).length > 0 ? { ...fallback, ...server } : fallback;
+            setErrors(next);
+            requestAnimationFrame(() => scrollToFirstFieldError(next, LEAD_FIELD_DOM_IDS));
         }
     };
 
     if (loading) {
         return (
-            <PageWrapper title={t('createNewLead') || 'Create New Lead'}>
+            <PageWrapper title={
+                <div className="flex min-w-0 items-center gap-3">
+                    <PageBackButton onClick={goBack} />
+                    <span className="truncate">{t('createNewLead')}</span>
+                </div>
+            }>
                 <PageLoadingState label={t('loading') || 'Loading'} />
             </PageWrapper>
         );
@@ -362,18 +449,9 @@ export const CreateLeadPage = () => {
     return (
         <PageWrapper 
             title={
-                <div className="flex items-center gap-3">
-                    <button
-                        onClick={() => {
-                            window.history.pushState({}, '', '/leads');
-                            setCurrentPage('Leads');
-                        }}
-                        className="p-1 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-md transition-colors"
-                        title={t('back') || 'Back'}
-                    >
-                        <ArrowLeftIcon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
-                    </button>
-                    <span>{t('createNewLead') || 'Create New Lead'}</span>
+                <div className="flex min-w-0 items-center gap-3">
+                    <PageBackButton onClick={goBack} />
+                    <span className="truncate">{t('createNewLead')}</span>
                 </div>
             }
         >
@@ -392,24 +470,8 @@ export const CreateLeadPage = () => {
                             companyTimeZone={companyTz}
                         />
                     </div>
-                    {(errors.general || Object.keys(errors).filter(key => key !== 'general').length > 0) && (
-                        <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
-                            {errors.general && (
-                                <p className="text-sm text-red-600 dark:text-red-400 mb-2 font-medium">{errors.general}</p>
-                            )}
-                            {Object.keys(errors).filter(key => key !== 'general').length > 0 && (
-                                <div className="text-sm text-red-600 dark:text-red-400">
-                                    {!errors.general && (
-                                        <p className="font-medium mb-2">{t('pleaseFixErrors') || 'Please fix the following errors:'}</p>
-                                    )}
-                                    <ul className="list-disc list-inside space-y-1">
-                                        {Object.keys(errors).filter(key => key !== 'general').map(key => (
-                                            <li key={key} className="font-medium">{errors[key]}</li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            )}
-                        </div>
+                    {errors.general && (
+                        <Alert variant="error" className="mb-4">{errors.general}</Alert>
                     )}
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                         <div className="md:col-span-2 lg:col-span-1">
@@ -419,20 +481,22 @@ export const CreateLeadPage = () => {
                                 placeholder={t('enterClientName')} 
                                 value={formState.name} 
                                 onChange={handleChange}
+                                onBlur={() => showLeadField('name')}
                                 className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
                             />
-                            {errors.name && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
-                            )}
+                            <FieldError>{errors.name}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="leadCompanyName">{t('leadCompanyName')}</Label>
-                            <Input 
-                                id="leadCompanyName" 
-                                placeholder={t('enterLeadCompanyName')} 
-                                value={formState.leadCompanyName} 
+                            <Input
+                                id="leadCompanyName"
+                                placeholder={t('enterLeadCompanyName')}
+                                value={formState.leadCompanyName}
                                 onChange={handleChange}
+                                onBlur={() => showLeadField('leadCompanyName')}
+                                className={errors.leadCompanyName ? 'border-red-500 dark:border-red-500' : ''}
                             />
+                            <FieldError>{errors.leadCompanyName}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="profession">{t('profession')}</Label>
@@ -488,9 +552,11 @@ export const CreateLeadPage = () => {
                                 rows={3}
                                 value={formState.notes}
                                 onChange={handleChange}
+                                onBlur={() => showLeadField('notes')}
                                 placeholder={t('enterNotes') || 'Enter notes...'}
-                                className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100"
+                                className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 ${errors.notes ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                             />
+                            <FieldError>{errors.notes}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="budget">{t('budget')}</Label>
@@ -509,21 +575,22 @@ export const CreateLeadPage = () => {
                             </div>
                             {phoneNumbers.length === 0 ? (
                                 <div>
+                                    <div onBlur={() => showLeadField('phone')}>
                                     <PhoneInput 
                                         id="phone" 
                                         placeholder={t('enterPhoneNumber')} 
                                         value={formState.phone} 
                                         onChange={(value) => {
                                             hasUserInteracted.current = true;
-                                            setFormState(prev => ({ ...prev, phone: value }));
-                                            clearError('phone');
+                                            const nextState = { ...formState, phone: value };
+                                            setFormState(nextState);
+                                            if (errors.phone) showLeadField('phone', nextState, phoneNumbers);
                                         }}
                                         defaultCountry="IQ"
                                         error={!!errors.phone}
                                     />
-                                    {errors.phone && (
-                                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
-                                    )}
+                                    </div>
+                                    <FieldError>{errors.phone}</FieldError>
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                         {t('orAddMultiplePhones') || 'Or add multiple phone numbers below'}
                                     </p>
@@ -533,6 +600,7 @@ export const CreateLeadPage = () => {
                                     {phoneNumbers.map((pn, index) => (
                                         <div key={index} className="grid grid-cols-12 gap-3 items-center">
                                             <div className="col-span-12 md:col-span-5">
+                                                <div onBlur={() => showLeadField('phone')}>
                                                 <PhoneInput
                                                     placeholder={t('enterPhoneNumber')}
                                                     value={pn.phone_number}
@@ -540,6 +608,7 @@ export const CreateLeadPage = () => {
                                                     defaultCountry="IQ"
                                                     error={!!errors.phone}
                                                 />
+                                                </div>
                                             </div>
                                             <div className="col-span-6 md:col-span-2">
                                                 <Select
@@ -563,22 +632,13 @@ export const CreateLeadPage = () => {
                                                 />
                                             </div>
                                             <div className="col-span-2 md:col-span-2 flex justify-end">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleRemovePhoneNumber(index)}
-                                                    className="p-1 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
-                                                    title={t('delete') || 'Delete'}
-                                                >
-                                                    <TrashIcon className="w-4 h-4" />
-                                                </button>
+                                                <IconButton size="md" tone="danger" icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} onClick={() => handleRemovePhoneNumber(index)} />
                                             </div>
                                         </div>
                                     ))}
                                 </div>
                             )}
-                            {errors.phone && phoneNumbers.length > 0 && (
-                                <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
-                            )}
+                            {phoneNumbers.length > 0 && <FieldError>{errors.phone}</FieldError>}
                         </div>
                         {!isDataEntryUser && (
                         <div>
@@ -599,16 +659,17 @@ export const CreateLeadPage = () => {
                         )}
                         <div>
                             <Label htmlFor="type">{t('type')}</Label>
-                            <Select id="type" value={formState.type} onChange={handleChange}>
+                            <Select id="type" value={formState.type} onChange={handleChange} className={errors.type ? 'border-red-500 dark:border-red-500' : ''}>
                                 <option value="">{t('selectType') || 'Select Type'}</option>
                                 <option value="fresh">{t('fresh')}</option>
                                 <option value="hot">{t('hot')}</option>
                                 <option value="cold">{t('cold')}</option>
                             </Select>
+                            <FieldError>{errors.type}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="communicationWay">{t('communicationWay')}</Label>
-                            <Select id="communicationWay" value={formState.communicationWay} onChange={handleChange}>
+                            <Select id="communicationWay" value={formState.communicationWay} onChange={handleChange} className={errors.communicationWay ? 'border-red-500 dark:border-red-500' : ''}>
                                 <option value="">{t('selectChannel') || 'Select Channel'}</option>
                                 {channels.length > 0 ? (
                                     channels.map(channel => (
@@ -620,19 +681,21 @@ export const CreateLeadPage = () => {
                                     <option value="">{t('noChannelsAvailable') || 'No channels available'}</option>
                                 )}
                             </Select>
+                            <FieldError>{errors.communicationWay}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="priority">{t('priority')}</Label>
-                            <Select id="priority" value={formState.priority} onChange={handleChange}>
+                            <Select id="priority" value={formState.priority} onChange={handleChange} className={errors.priority ? 'border-red-500 dark:border-red-500' : ''}>
                                 <option value="">{t('selectPriority') || 'Select Priority'}</option>
                                 <option value="high">{t('high')}</option>
                                 <option value="medium">{t('medium')}</option>
                                 <option value="low">{t('low')}</option>
                             </Select>
+                            <FieldError>{errors.priority}</FieldError>
                         </div>
                         <div>
                             <Label htmlFor="status">{t('status')}</Label>
-                            <Select id="status" value={formState.status} onChange={handleChange}>
+                            <Select id="status" value={formState.status} onChange={handleChange} className={errors.status ? 'border-red-500 dark:border-red-500' : ''}>
                                 <option value="">{t('selectStatus') || 'Select Status'}</option>
                                 {statuses.length > 0 ? (
                                     statuses
@@ -646,6 +709,7 @@ export const CreateLeadPage = () => {
                                     <option value="">{t('noStatusesAvailable') || 'No statuses available'}</option>
                                 )}
                             </Select>
+                            <FieldError>{errors.status}</FieldError>
                         </div>
                         {tags.length > 0 && (
                             <div>
@@ -663,15 +727,7 @@ export const CreateLeadPage = () => {
                         )}
                     </div>
                     <div className="mt-6 flex justify-end gap-2">
-                        <Button type="button" variant="secondary" onClick={() => {
-                            if (postCreateNavigateToAllLeads && currentUser?.company) {
-                                window.history.pushState({}, '', getCompanyRoute(currentUser.company.name, currentUser.company.domain, 'All Leads', currentUser.company.specialization));
-                                setCurrentPage('All Leads');
-                            } else {
-                                window.history.pushState({}, '', '/leads');
-                                setCurrentPage('Leads');
-                            }
-                        }} disabled={isSubmitting}>
+                        <Button type="button" variant="secondary" onClick={goBack} disabled={isSubmitting}>
                             {t('cancel')}
                         </Button>
                         <Button type="submit" loading={isSubmitting} disabled={isSubmitting}>

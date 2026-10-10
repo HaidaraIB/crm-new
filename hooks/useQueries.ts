@@ -35,6 +35,9 @@ import {
   getDeactivateEmployeePreviewAPI, deactivateEmployeeAPI, reactivateEmployeeAPI,
   setUserAvailabilityAPI,
   createDealAPI, updateDealAPI, patchDealAPI, deleteDealAPI,
+  getDealAPI, getDealSummaryAPI, getDealTimelineAPI, addDealNoteAPI,
+  moveDealAPI, markDealWonAPI, markDealLostAPI, reopenDealAPI, bulkDealsAPI,
+  getDealPipelinesAPI, getDealLostReasonsAPI,
   createTaskAPI, updateTaskAPI, patchTaskAPI, deleteTaskAPI, completeTaskAPI,
   createClientTaskAPI, updateClientTaskAPI, deleteClientTaskAPI, completeClientTaskReminderAPI,
   createClientCallAPI, updateClientCallAPI, deleteClientCallAPI, completeClientCallFollowUpAPI,
@@ -70,7 +73,8 @@ import {
   dismissAIInsightAPI,
   runAIAnalysisAPI,
 } from '../services/api';
-import type { MissionBarSummary, DashboardSummary, ReportQueryParams, CallReportResponse, LeadSocialMessageResponse } from '../services/api';
+import type { MissionBarSummary, DashboardSummary, ReportQueryParams, CallReportResponse, LeadSocialMessageResponse, DealQueryParams } from '../services/api';
+import { mapApiDeal, mapApiDealEvent, mapApiDealSummary, mapApiLostReason, mapApiPipeline } from '../utils/deals/dealMapper';
 
 // ==================== Query Keys ====================
 export const queryKeys = {
@@ -89,8 +93,13 @@ export const queryKeys = {
   callReport: (params?: ReportQueryParams) => ['callReport', params] as const,
   workSessionToday: ['workSessionToday'] as const,
   workSessionSummary: (days?: number) => ['workSessionSummary', days ?? 7] as const,
-  deals: (page?: number, pageSize?: number, search?: string, stage?: string) =>
-    ['deals', page ?? 'all', pageSize ?? 'default', search ?? '', stage ?? ''] as const,
+  deals: (page?: number, pageSize?: number, search?: string, stage?: string, extra?: string) =>
+    ['deals', page ?? 'all', pageSize ?? 'default', search ?? '', stage ?? '', extra ?? ''] as const,
+  deal: (id?: number) => ['deal', id] as const,
+  dealSummary: (filters?: string) => ['dealSummary', filters ?? ''] as const,
+  dealTimeline: (id?: number) => ['dealTimeline', id] as const,
+  dealPipelines: ['dealPipelines'] as const,
+  dealLostReasons: ['dealLostReasons'] as const,
   tasks: (filters?: any) => ['tasks', filters] as const,
   activities: (page?: number, pageSize?: number, filters?: any) =>
     ['activities', page ?? 'all', pageSize ?? 'default', filters] as const,
@@ -264,28 +273,91 @@ export const useDashboardSummary = (
   });
 };
 
+const mapDealList = (data: any) => {
+  if (Array.isArray(data)) return data.map((row) => mapApiDeal(row));
+  if (data && Array.isArray(data.results)) {
+    return { ...data, results: data.results.map((row: Record<string, unknown>) => mapApiDeal(row)) };
+  }
+  return data;
+};
+
 export const useDeals = (
   pageOrOptions?: number | Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
   options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
   pageSize?: number,
   search?: string,
   stage?: string,
+  extra?: DealQueryParams,
 ) => {
   const page = typeof pageOrOptions === 'number' ? pageOrOptions : undefined;
   const resolvedOptions = (typeof pageOrOptions === 'number' ? options : pageOrOptions) || options;
   const searchKey = search?.trim() || '';
   const stageKey = stage?.trim() || '';
+  const extraKey = extra ? JSON.stringify(extra) : '';
   return useQuery({
-    queryKey: queryKeys.deals(page, pageSize, searchKey, stageKey),
-    queryFn: () =>
-      getDealsAPI(page, pageSize, {
+    queryKey: queryKeys.deals(page, pageSize, searchKey, stageKey, extraKey),
+    queryFn: async () =>
+      mapDealList(await getDealsAPI(page, pageSize, {
         ...(searchKey ? { search: searchKey } : {}),
         ...(stageKey ? { stage: stageKey } : {}),
-      }),
-    staleTime: 1 * 60 * 1000, // 1 minute
+        ...extra,
+      })),
+    staleTime: 1 * 60 * 1000,
     ...resolvedOptions,
   });
 };
+
+export const useDeal = (id?: number, options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) =>
+  useQuery({
+    queryKey: queryKeys.deal(id),
+    queryFn: async () => mapApiDeal(await getDealAPI(id as number)),
+    enabled: Boolean(id),
+    ...options,
+  });
+
+export const useDealSummary = (filters?: DealQueryParams, options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) =>
+  useQuery({
+    queryKey: queryKeys.dealSummary(JSON.stringify(filters ?? {})),
+    queryFn: async () => mapApiDealSummary(await getDealSummaryAPI(filters)),
+    staleTime: 30 * 1000,
+    ...options,
+  });
+
+export const useDealTimeline = (id?: number, options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) =>
+  useQuery({
+    queryKey: queryKeys.dealTimeline(id),
+    queryFn: async () => {
+      const data = await getDealTimelineAPI(id as number);
+      const rows = Array.isArray(data) ? data : data?.results || [];
+      return rows.map((row: Record<string, unknown>) => mapApiDealEvent(row));
+    },
+    enabled: Boolean(id),
+    ...options,
+  });
+
+export const useDealPipelines = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) =>
+  useQuery({
+    queryKey: queryKeys.dealPipelines,
+    queryFn: async () => {
+      const data = await getDealPipelinesAPI();
+      const rows = Array.isArray(data) ? data : data?.results || [];
+      return rows.map((row: Record<string, unknown>) => mapApiPipeline(row));
+    },
+    staleTime: 60 * 1000,
+    ...options,
+  });
+
+export const useDealLostReasons = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) =>
+  useQuery({
+    queryKey: queryKeys.dealLostReasons,
+    queryFn: async () => {
+      const data = await getDealLostReasonsAPI();
+      const rows = Array.isArray(data) ? data : data?.results || [];
+      return rows.map((row: Record<string, unknown>) => mapApiLostReason(row));
+    },
+    staleTime: 60 * 1000,
+    ...options,
+  });
 
 export const useTasks = (
   filters?: any,
@@ -1279,12 +1351,25 @@ export const useSetUserAvailability = (
   });
 };
 
+const invalidateDealSurfaces = (queryClient: ReturnType<typeof useQueryClient>, dealId?: number) => {
+  queryClient.invalidateQueries({ queryKey: ['deals'] });
+  queryClient.invalidateQueries({ queryKey: ['dealSummary'] });
+  queryClient.invalidateQueries({ queryKey: ['dashboardSummary'] });
+  if (dealId) {
+    queryClient.invalidateQueries({ queryKey: queryKeys.deal(dealId) });
+    queryClient.invalidateQueries({ queryKey: queryKeys.dealTimeline(dealId) });
+  } else {
+    queryClient.invalidateQueries({ queryKey: ['deal'] });
+    queryClient.invalidateQueries({ queryKey: ['dealTimeline'] });
+  }
+};
+
 export const useCreateDeal = (options?: UseMutationOptions<any, Error, any>) => {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: (data: any) => createDealAPI(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deals'] });
+    onSuccess: (created) => {
+      invalidateDealSurfaces(queryClient, created?.id);
     },
     ...options,
   });
@@ -1294,8 +1379,8 @@ export const useUpdateDeal = (options?: UseMutationOptions<any, Error, { id: num
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: any }) => updateDealAPI(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deals'] });
+    onSuccess: (_data, variables) => {
+      invalidateDealSurfaces(queryClient, variables.id);
     },
     ...options,
   });
@@ -1309,8 +1394,8 @@ export const usePatchDeal = (
   return useMutation({
     mutationFn: ({ id, data }: { id: number; data: Record<string, unknown> }) =>
       patchDealAPI(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deals'] });
+    onSuccess: (_data, variables) => {
+      invalidateDealSurfaces(queryClient, variables.id);
     },
     ...options,
   });
@@ -1321,9 +1406,38 @@ export const useDeleteDeal = (options?: UseMutationOptions<void, Error, number>)
   return useMutation({
     mutationFn: (id: number) => deleteDealAPI(id),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['deals'] });
+      invalidateDealSurfaces(queryClient);
     },
     ...options,
+  });
+};
+
+export const useMoveDeal = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { id: number; pipelineStage: number; lostReason?: number; lostNote?: string }) =>
+      moveDealAPI(payload.id, payload),
+    onSuccess: (data) => {
+      invalidateDealSurfaces(queryClient, data?.id);
+    },
+  });
+};
+
+export const useBulkDealAction = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: bulkDealsAPI,
+    onSuccess: () => invalidateDealSurfaces(queryClient),
+  });
+};
+
+export const useAddDealNote = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, body }: { id: number; body: string }) => addDealNoteAPI(id, body),
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.dealTimeline(variables.id) });
+    },
   });
 };
 

@@ -9,6 +9,7 @@ import { Button } from '../Button';
 import { Status } from '../../types';
 import { useUpdateStatus } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -58,31 +59,56 @@ export const EditStatusModal = () => {
     });
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+            description: formState.description,
+            color: formState.color,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('status.upsert', values, translate);
+
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        if (!formState.category) {
-            newErrors.category = t('categoryRequired') || 'Category is required';
-        }
-
+        const next = applyCatalog(catalogValues());
         if (!currentUser?.company?.id) {
-            newErrors._general = t('companyRequired') || 'Company is required';
+            next._general = t('companyRequired') || 'Company is required';
         }
-
-        const raw = formState.autoDeleteHoursRaw.trim();
+        const raw = String(formState.autoDeleteHoursRaw || '').trim();
         if (raw !== '') {
             const n = parseInt(raw, 10);
             if (!Number.isFinite(n) || n < 1) {
-                newErrors.autoDeleteHoursRaw = t('invalidNumber') || 'Enter a whole number of hours (1 or more), or leave empty';
+                next.autoDeleteHoursRaw = t('invalidNumber') || 'Enter a whole number of hours (1 or more), or leave empty';
             }
         }
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        if (field === 'autoDeleteHoursRaw') {
+            const raw = String(formState.autoDeleteHoursRaw || '').trim();
+            if (raw !== '') {
+                const n = parseInt(raw, 10);
+                if (!Number.isFinite(n) || n < 1) {
+                    next.autoDeleteHoursRaw = t('invalidNumber') || 'Enter a whole number of hours (1 or more), or leave empty';
+                }
+            }
+        }
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -162,33 +188,10 @@ export const EditStatusModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error updating status:', error);
-            const errorData = error?.response?.data || error?.data || {};
-            const newErrors: { [key: string]: string } = {};
-            
-            // Parse API validation errors
-            if (errorData.company) {
-                newErrors._general = Array.isArray(errorData.company) ? errorData.company[0] : errorData.company;
-            }
-            if (errorData.name) {
-                newErrors.name = Array.isArray(errorData.name) ? errorData.name[0] : errorData.name;
-            }
-            if (errorData.category) {
-                newErrors.category = Array.isArray(errorData.category) ? errorData.category[0] : errorData.category;
-            }
-            if (errorData.description) {
-                newErrors.description = Array.isArray(errorData.description) ? errorData.description[0] : errorData.description;
-            }
-            if (errorData.auto_delete_after_hours) {
-                newErrors.autoDeleteHoursRaw = Array.isArray(errorData.auto_delete_after_hours)
-                    ? errorData.auto_delete_after_hours[0]
-                    : errorData.auto_delete_after_hours;
-            }
-
-            if (Object.keys(newErrors).length === 0) {
-                newErrors._general = error?.message || t('failedToUpdateStatus') || 'Failed to update status. Please try again.';
-            }
-            
-            setErrors(newErrors);
+            const serverErrors = serverFieldErrors(error, 'status.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('failedToUpdateStatus') || 'Failed to update status. Please try again.' });
         }
     };
 
@@ -207,8 +210,7 @@ export const EditStatusModal = () => {
                         placeholder={t('enterStatusName') || 'Enter status name'} 
                         value={formState.name} 
                         onChange={handleChange}
-                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                     {errors.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
@@ -221,8 +223,10 @@ export const EditStatusModal = () => {
                         value={formState.description}
                         onChange={handleChange}
                         className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-                        placeholder={t('enterStatusDescription') || 'Enter status description'}
-                    />
+                        placeholder={t('enterStatusDescription') || 'Enter status description'} onBlur={() => blurField('description')} />
+                    {errors.description && (
+                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.description}</p>
+                    )}
                 </div>
                 <div>
                     <Label htmlFor="category">{t('category')} <span className="text-red-500">*</span></Label>
@@ -258,6 +262,7 @@ export const EditStatusModal = () => {
                                 });
                             }
                         }}
+                        onBlur={() => blurField('autoDeleteHoursRaw')}
                         className={errors.autoDeleteHoursRaw ? 'border-red-500 dark:border-red-500' : ''}
                     />
                     {errors.autoDeleteHoursRaw && (
@@ -273,8 +278,12 @@ export const EditStatusModal = () => {
                             id="color"
                             value={formState.color}
                             onChange={(e) => setFormState(prev => ({ ...prev, color: e.target.value }))}
+                            onBlur={() => blurField('color')}
                             className="h-10 w-20 p-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded cursor-pointer"
                         />
+                        {errors.color && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.color}</p>
+                        )}
                         <span className="text-sm font-mono text-gray-600 dark:text-gray-400 uppercase">{formState.color}</span>
                     </div>
                 </div>

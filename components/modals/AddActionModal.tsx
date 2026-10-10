@@ -7,6 +7,7 @@ import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { Stage } from '../../types';
 import { useCreateClientTask, useStages } from '../../hooks/useQueries';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -48,19 +49,33 @@ export const AddActionModal = () => {
     const [reminder, setReminder] = useState('');
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const actionCatalogValues = (): Record<string, unknown> => ({ stage, notes });
+
+    const applyActionCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('lead_action.create', values, translate);
+        if (next.stageId) next.stage = next.stageId;
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
+        const next = applyActionCatalog(actionCatalogValues());
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        if (!stage || stage.trim() === '') {
-            newErrors.stage = t('stageRequired') || 'Stage is required';
-        }
-
-        if (!notes || notes.trim() === '') {
-            newErrors.notes = t('notesRequired') || 'Notes are required';
-        }
-
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyActionCatalog(actionCatalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -131,8 +146,10 @@ export const AddActionModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error adding action:', error);
-            const errorMessage = error?.message || 'Failed to add action. Please try again.';
-            setErrors({ _general: errorMessage });
+            const serverErrors = serverFieldErrors(error, 'lead_action.create', translate);
+            if (serverErrors.stageId) serverErrors.stage = serverErrors.stageId;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || 'Failed to add action. Please try again.' });
         }
     };
 
@@ -177,6 +194,7 @@ export const AddActionModal = () => {
                             setNotes(e.target.value);
                             clearError('notes');
                         }}
+                        onBlur={() => blurField('notes')}
                         className={`w-full px-3 py-2 bg-gray-50 dark:bg-gray-700 border ${errors.notes ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'} rounded-md focus:outline-none focus:ring-2 focus:ring-primary text-gray-900 dark:text-gray-100`}
                         placeholder={t('writeActionDetails')}
                     />

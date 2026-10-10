@@ -1,8 +1,6 @@
 /** Shared lead form validation (mirrors CreateLeadPage/EditLeadPage validateForm rules). */
 
-import type { TranslateFn } from './formValidation';
-import { validatePhoneField } from './formValidation';
-import { mapApiFieldsToUiErrors } from './formFieldErrors';
+import { mapApiFieldsToUiErrors, type TranslateFn } from './formFieldErrors';
 
 export interface LeadFormPhoneNumberInput {
     phone_number?: string;
@@ -45,53 +43,6 @@ export const resolveLeadPhoneNumbers = (
         return [{ phone_number: values.phone }];
     }
     return [];
-};
-
-export const validateLeadForm = (
-    values: LeadFormValues,
-    t: TranslateFn,
-    options?: LeadFormValidationOptions
-): Record<string, string> => {
-    const errors: Record<string, string> = {};
-
-    if (!values.name || !values.name.trim()) {
-        errors.name = t('nameRequired') || 'Name is required';
-    }
-
-    const finalPhoneNumbers = resolveLeadPhoneNumbers(values);
-    if (finalPhoneNumbers.length === 0) {
-        errors.phone = t('phoneNumberRequired') || 'At least one phone number is required';
-    } else {
-        for (const pn of finalPhoneNumbers) {
-            const phoneErr = validatePhoneField(String(pn.phone_number || ''), t);
-            if (phoneErr) {
-                errors.phone = phoneErr;
-                break;
-            }
-        }
-    }
-
-    if (!values.communicationWay) {
-        errors.communicationWay = t('communicationWayRequired') || 'Communication channel is required';
-    }
-
-    if (!values.status) {
-        errors.status = t('statusRequired') || 'Status is required';
-    }
-
-    if (!values.priority) {
-        errors.priority = t('priorityRequired') || 'Priority is required';
-    }
-
-    if (!values.type) {
-        errors.type = t('typeRequired') || 'Type is required';
-    }
-
-    if (options?.requireCompany && !values.companyId) {
-        errors.company = t('companyRequired') || 'Company is required';
-    }
-
-    return errors;
 };
 
 /** Map API field keys → lead form UI error keys. */

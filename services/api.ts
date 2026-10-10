@@ -391,10 +391,23 @@ function looksLikeMetaWabaNotApiEligible(text: string): boolean {
   );
 }
 
+function getCodedFieldIssues(errorData: unknown): Record<string, { code: string; params?: Record<string, unknown>; message?: string }[]> | undefined {
+  if (errorData == null || typeof errorData !== 'object') return undefined;
+  const d = errorData as Record<string, unknown>;
+  const envelope = d.success === false && d.error && typeof d.error === 'object' ? (d.error as Record<string, unknown>) : d;
+  const fields = envelope.fields;
+  if (!fields || typeof fields !== 'object' || Array.isArray(fields)) return undefined;
+  return fields as Record<string, { code: string; params?: Record<string, unknown>; message?: string }[]>;
+}
+
 function attachErrorFields(
-  err: Error & { fields?: Record<string, unknown> },
+  err: Error & { fields?: Record<string, unknown>; fieldIssues?: Record<string, unknown> },
   errorData: unknown
 ): void {
+  const coded = getCodedFieldIssues(errorData);
+  if (coded && Object.keys(coded).length > 0) {
+    err.fieldIssues = coded;
+  }
   const details = getErrorDetailsFromBody(errorData);
   if (details != null && typeof details === 'object' && !Array.isArray(details)) {
     err.fields = details as Record<string, unknown>;
@@ -3033,16 +3046,61 @@ export const bulkDeleteLeadsAPI = async (payload: BulkDeleteLeadsPayload) => {
  * GET /api/deals/
  * Response: { count, next, previous, results: Deal[] }
  */
+export type DealQueryParams = {
+  search?: string;
+  stage?: string;
+  stageId?: number | string;
+  pipeline?: number | string;
+  outcome?: string;
+  employee?: number | string;
+  client?: number | string;
+  status?: string;
+  paymentMethod?: string;
+  project?: number | string;
+  unit?: number | string;
+  valueMin?: string;
+  valueMax?: string;
+  expectedCloseFrom?: string;
+  expectedCloseTo?: string;
+  createdFrom?: string;
+  createdTo?: string;
+};
+
+const appendDealQuery = (queryParams: URLSearchParams, filters?: DealQueryParams) => {
+  if (!filters) return;
+  const entries: [string, string | number | undefined][] = [
+    ['search', filters.search?.trim()],
+    ['stage', filters.stage && filters.stage !== 'All' ? filters.stage : undefined],
+    ['stage_id', filters.stageId && String(filters.stageId) !== 'All' ? filters.stageId : undefined],
+    ['pipeline', filters.pipeline && String(filters.pipeline) !== 'All' ? filters.pipeline : undefined],
+    ['outcome', filters.outcome && filters.outcome !== 'All' ? filters.outcome : undefined],
+    ['employee', filters.employee && String(filters.employee) !== 'All' ? filters.employee : undefined],
+    ['client', filters.client],
+    ['status', filters.status && filters.status !== 'All' ? filters.status : undefined],
+    ['payment_method', filters.paymentMethod && filters.paymentMethod !== 'All' ? filters.paymentMethod : undefined],
+    ['project', filters.project && String(filters.project) !== 'All' ? filters.project : undefined],
+    ['unit', filters.unit && String(filters.unit) !== 'All' ? filters.unit : undefined],
+    ['value_min', filters.valueMin],
+    ['value_max', filters.valueMax],
+    ['expected_close_from', filters.expectedCloseFrom],
+    ['expected_close_to', filters.expectedCloseTo],
+    ['created_from', filters.createdFrom],
+    ['created_to', filters.createdTo],
+  ];
+  entries.forEach(([key, value]) => {
+    if (value !== undefined && value !== null && String(value) !== '') queryParams.append(key, String(value));
+  });
+};
+
 export const getDealsAPI = async (
   page?: number,
   pageSize?: number,
-  filters?: { search?: string; stage?: string },
+  filters?: DealQueryParams,
 ) => {
   const queryParams = new URLSearchParams();
   if (page) queryParams.append('page', String(page));
   if (pageSize) queryParams.append('page_size', String(pageSize));
-  if (filters?.search?.trim()) queryParams.append('search', filters.search.trim());
-  if (filters?.stage?.trim()) queryParams.append('stage', filters.stage.trim());
+  appendDealQuery(queryParams, filters);
   const endpoint = `/deals/${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
   return page
     ? apiRequest<{ count: number; next: string | null; previous: string | null; results: any[] }>(endpoint)
@@ -3095,6 +3153,108 @@ export const deleteDealAPI = async (dealId: number) => {
     method: 'DELETE',
   });
 };
+
+export const getDealAPI = async (id: number) => apiRequest<any>(`/deals/${id}/`);
+
+export const getDealSummaryAPI = async (filters?: DealQueryParams) => {
+  const queryParams = new URLSearchParams();
+  appendDealQuery(queryParams, filters);
+  const query = queryParams.toString();
+  return apiRequest<any>(query ? `/deals/summary/?${query}` : '/deals/summary/');
+};
+
+export const getDealTimelineAPI = async (id: number) => apiRequest<any>(`/deals/${id}/timeline/`);
+
+export const addDealNoteAPI = async (id: number, body: string) =>
+  apiRequest<any>(`/deals/${id}/notes/`, { method: 'POST', body: JSON.stringify({ text: body }) });
+
+export const moveDealAPI = async (id: number, payload: { pipelineStage: number; lostReason?: number; lostNote?: string }) =>
+  apiRequest<any>(`/deals/${id}/move/`, {
+    method: 'POST',
+    body: JSON.stringify({
+      pipeline_stage: payload.pipelineStage,
+      lost_reason: payload.lostReason,
+      lost_note: payload.lostNote || '',
+    }),
+  });
+
+export const markDealWonAPI = async (id: number) =>
+  apiRequest<any>(`/deals/${id}/won/`, { method: 'POST', body: JSON.stringify({}) });
+
+export const markDealLostAPI = async (id: number, payload: { lostReason: number; lostNote?: string }) =>
+  apiRequest<any>(`/deals/${id}/lost/`, {
+    method: 'POST',
+    body: JSON.stringify({ lost_reason: payload.lostReason, lost_note: payload.lostNote || '' }),
+  });
+
+export const reopenDealAPI = async (id: number) =>
+  apiRequest<any>(`/deals/${id}/reopen/`, { method: 'POST', body: JSON.stringify({}) });
+
+export const bulkDealsAPI = async (payload: {
+  ids: number[];
+  action: 'assign' | 'move' | 'delete';
+  employee?: number;
+  pipelineStage?: number;
+  lostReason?: number;
+  lostNote?: string;
+}) =>
+  apiRequest<any>('/deals/bulk/', {
+    method: 'POST',
+    body: JSON.stringify({
+      ids: payload.ids,
+      action: payload.action,
+      employee: payload.employee,
+      pipeline_stage: payload.pipelineStage,
+      lost_reason: payload.lostReason,
+      lost_note: payload.lostNote || '',
+    }),
+  });
+
+export const createDealLineItemAPI = async (dealId: number, payload: Record<string, unknown>) =>
+  apiRequest<any>(`/deals/${dealId}/line-items/`, { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateDealLineItemAPI = async (dealId: number, itemId: number, payload: Record<string, unknown>) =>
+  apiRequest<any>(`/deals/${dealId}/line-items/${itemId}/`, { method: 'PATCH', body: JSON.stringify(payload) });
+
+export const deleteDealLineItemAPI = async (dealId: number, itemId: number) =>
+  apiRequest<void>(`/deals/${dealId}/line-items/${itemId}/`, { method: 'DELETE' });
+
+export const getDealPipelinesAPI = async () => fetchAllPaginatedPages<any>('/settings/deal-pipelines/');
+
+export const createDealPipelineAPI = async (payload: { name: string }) =>
+  apiRequest<any>('/settings/deal-pipelines/', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateDealPipelineAPI = async (id: number, payload: Record<string, unknown>) =>
+  apiRequest<any>(`/settings/deal-pipelines/${id}/`, { method: 'PATCH', body: JSON.stringify(payload) });
+
+export const deleteDealPipelineAPI = async (id: number) =>
+  apiRequest<void>(`/settings/deal-pipelines/${id}/`, { method: 'DELETE' });
+
+export const createDealStageAPI = async (payload: Record<string, unknown>) =>
+  apiRequest<any>('/settings/deal-stages/', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateDealStageAPI = async (id: number, payload: Record<string, unknown>) =>
+  apiRequest<any>(`/settings/deal-stages/${id}/`, { method: 'PATCH', body: JSON.stringify(payload) });
+
+export const reorderDealStagesAPI = async (pipeline: number, order: number[]) =>
+  apiRequest<any>('/settings/deal-stages/reorder/', {
+    method: 'POST',
+    body: JSON.stringify({ pipeline, ordered_ids: order }),
+  });
+
+export const deleteDealStageAPI = async (id: number, moveTo?: number) =>
+  apiRequest<void>(`/settings/deal-stages/${id}/${moveTo ? `?move_to=${moveTo}` : ''}`, { method: 'DELETE' });
+
+export const getDealLostReasonsAPI = async () => fetchAllPaginatedPages<any>('/settings/deal-lost-reasons/');
+
+export const createDealLostReasonAPI = async (payload: { name: string }) =>
+  apiRequest<any>('/settings/deal-lost-reasons/', { method: 'POST', body: JSON.stringify(payload) });
+
+export const updateDealLostReasonAPI = async (id: number, payload: Record<string, unknown>) =>
+  apiRequest<any>(`/settings/deal-lost-reasons/${id}/`, { method: 'PATCH', body: JSON.stringify(payload) });
+
+export const deleteDealLostReasonAPI = async (id: number) =>
+  apiRequest<void>(`/settings/deal-lost-reasons/${id}/`, { method: 'DELETE' });
 
 // ==================== Real Estate APIs ====================
 
@@ -7047,6 +7207,12 @@ export type SyncSliceVersions = {
   inbox: number;
   /** Company subscription and activation state. */
   account: number;
+  /** Leads (clients) and their timeline events. */
+  leads: number;
+  /** Deals. */
+  deals: number;
+  /** Lead tasks (todos). */
+  todos: number;
 };
 
 export type SyncSliceName = keyof SyncSliceVersions;

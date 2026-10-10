@@ -8,6 +8,7 @@ import { NumberInput } from '../NumberInput';
 import { PhoneInput } from '../PhoneInput';
 import { Button } from '../Button';
 import { useCreateServiceProvider } from '../../hooks/useQueries';
+import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -29,27 +30,40 @@ export const AddServiceProviderModal = () => {
     
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+    const translate = (key: string) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+    };
+
+    const catalogValues = (): Record<string, unknown> => ({
+            name: formState.name,
+            email: formState.email,
+            phone: formState.phone,
+    });
+
+    const applyCatalog = (values: Record<string, unknown>) => {
+        const next = catalogFieldErrors('service_provider.upsert', values, translate);
+
+        return next;
+    };
+
     const validateForm = (): boolean => {
-        const newErrors: { [key: string]: string } = {};
-
-        if (!formState.name.trim()) {
-            newErrors.name = t('nameRequired') || 'Name is required';
-        }
-
-        if (formState.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
-            newErrors.email = t('invalidEmail') || 'Invalid email format';
-        }
-
-        if (formState.rating && (Number(formState.rating) < 0 || Number(formState.rating) > 5)) {
-            newErrors.rating = t('ratingRange') || 'Rating must be between 0 and 5';
-        }
-
+        const next = applyCatalog(catalogValues());
         if (!currentUser?.company?.id) {
-            newErrors._general = t('companyRequired') || 'Company is required';
+            next._general = t('companyRequired') || 'Company is required';
         }
+        setErrors(next);
+        return Object.keys(next).length === 0;
+    };
 
-        setErrors(newErrors);
-        return Object.keys(newErrors).length === 0;
+    const blurField = (field: string) => {
+        const next = applyCatalog(catalogValues());
+        setErrors((prev) => {
+            const updated = { ...prev };
+            if (next[field]) updated[field] = next[field];
+            else delete updated[field];
+            return updated;
+        });
     };
 
     const clearError = (field: string) => {
@@ -126,23 +140,10 @@ export const AddServiceProviderModal = () => {
             setIsSuccessModalOpen(true);
         } catch (error: any) {
             console.error('Error creating service provider:', error);
-            
-            // Parse API validation errors
-            const apiErrors = error?.response?.data || {};
-            const newErrors: { [key: string]: string } = {};
-            
-            Object.keys(apiErrors).forEach(key => {
-                const errorMessages = Array.isArray(apiErrors[key]) 
-                    ? apiErrors[key] 
-                    : [apiErrors[key]];
-                newErrors[key] = errorMessages[0];
-            });
-            
-            if (Object.keys(newErrors).length === 0) {
-                newErrors._general = error?.message || t('failedToCreateServiceProvider') || 'Failed to create service provider. Please try again.';
-            }
-            
-            setErrors(newErrors);
+            const serverErrors = serverFieldErrors(error, 'service_provider.upsert', translate);
+            if (serverErrors.company && !serverErrors._general) serverErrors._general = serverErrors.company;
+            if (Object.keys(serverErrors).length) setErrors((prev) => ({ ...prev, ...serverErrors }));
+            else setErrors({ _general: error?.message || t('failedToCreateServiceProvider') || 'Failed to create service provider. Please try again.' });
         }
     };
 
@@ -159,8 +160,7 @@ export const AddServiceProviderModal = () => {
                         placeholder={t('enterProviderName') || 'Enter provider name'} 
                         value={formState.name} 
                         onChange={handleChange}
-                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''}
-                    />
+                        className={errors.name ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('name')} />
                     {errors.name && (
                         <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.name}</p>
                     )}
@@ -173,11 +173,16 @@ export const AddServiceProviderModal = () => {
                             placeholder={t('enterPhoneNumber') || 'Enter phone number'} 
                             value={formState.phone} 
                             onChange={(value) => {
-                                setFormState(prev => ({ ...prev, phone: value }));
-                                clearError('phone');
-                            }}
+                            setFormState(prev => ({ ...prev, phone: value }));
+                            clearError('phone');
+                        }}
+                        onBlur={() => blurField('phone')}
                             defaultCountry="IQ"
+                            error={!!errors.phone}
                         />
+                        {errors.phone && (
+                            <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.phone}</p>
+                        )}
                     </div>
                 </div>
                 <div>
@@ -189,8 +194,7 @@ export const AddServiceProviderModal = () => {
                             placeholder={t('enterEmail') || 'Enter email'} 
                             value={formState.email} 
                             onChange={handleChange}
-                            className={errors.email ? 'border-red-500 dark:border-red-500' : ''}
-                        />
+                            className={errors.email ? 'border-red-500 dark:border-red-500' : ''} onBlur={() => blurField('email')} />
                         {errors.email && (
                             <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.email}</p>
                         )}

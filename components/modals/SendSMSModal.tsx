@@ -1,4 +1,5 @@
 import { Alert } from '../Alert';
+import { FieldError } from '../FieldError';
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../../context/AppContext';
@@ -10,6 +11,7 @@ import { sendLeadSMSAPI, getMessageTemplatesAPI } from '../../services/api';
 import { replaceSmsTemplatePlaceholders } from '../../utils/smsSendHelpers';
 import { SmsSendPreviewModal } from './SmsSendPreviewModal';
 import { clearFieldError } from '../../utils/formFieldErrors';
+import { catalogFieldErrors } from '../../forms';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -60,8 +62,9 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
 
     const handleOpenPreview = () => {
         const trimmed = body.trim();
-        if (!trimmed) {
-            setErrors({ body: t('smsMessageRequired') || 'Please enter your message' });
+        const fieldErrors = catalogFieldErrors('sms.send', { body: trimmed }, t);
+        if (fieldErrors.body) {
+            setErrors({ body: fieldErrors.body });
             return;
         }
         const bodyToSend = lead ? replaceSmsTemplatePlaceholders(trimmed, lead) : trimmed;
@@ -149,9 +152,7 @@ export const SendSMSModal = ({ isOpen, onClose, leadId, phoneNumber, lead, onSen
                         className={`w-full rounded border bg-white dark:bg-gray-800 text-gray-900 dark:text-white px-3 py-2 text-sm ${errors.body ? 'border-red-500 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`}
                         placeholder={t('smsMessagePlaceholder')}
                     />
-                    {errors.body && (
-                        <p className="mt-1 text-sm text-red-600 dark:text-red-400">{errors.body}</p>
-                    )}
+                    <FieldError>{errors.body}</FieldError>
                 </div>
                 {errors.general && (
                     <Alert variant="error">{errors.general}</Alert>

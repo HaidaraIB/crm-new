@@ -647,7 +647,7 @@ export function CampaignLeadPicker({
                             onChange={(e) => setSearchDraft(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && applySearch()}
                             placeholder={t('campaignSearchPlaceholder')}
-                            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-9 pe-3 py-2.5 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
+                            className="h-10 w-full rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 ps-9 pe-3 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500 focus:ring-2 focus:ring-primary/20 focus:border-primary"
                         />
                     </div>
                     <Button type="button" variant="secondary" onClick={applySearch}>

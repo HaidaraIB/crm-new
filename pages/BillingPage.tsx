@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Card, Button, Loader, Alert, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState, PaymentResultBanner } from '../components/index';
+import { PageWrapper, Card, Button, Loader, Alert, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState, PaymentResultBanner, Pagination } from '../components/index';
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI, cancelPendingPlanChangeAPI, getMyCompanyInvoicesAPI, downloadMyInvoicePdfAPI, type CompanyInvoiceListItem } from '../services/api';
 import { CreditCardIcon } from '../components/icons';
 import { formatDaysRemainingLabel, isFreeTrialPlan } from '../utils/planEntitlements';
@@ -9,19 +9,7 @@ import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import { isFibSessionPayload, routeToFibPaymentPage } from '../utils/paymentSession';
 import { hydratePaymentAccessToken } from '../utils/paymentAuth';
 import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
-import { PAGE_SIZE_OPTIONS, usePersistedPageSize } from '../hooks/usePersistedPageSize';
-
-const getPaginationItems = (current: number, total: number): Array<number | 'ellipsis'> => {
-    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
-    const items: Array<number | 'ellipsis'> = [1];
-    const start = Math.max(2, current - 1);
-    const end = Math.min(total - 1, current + 1);
-    if (start > 2) items.push('ellipsis');
-    for (let page = start; page <= end; page += 1) items.push(page);
-    if (end < total - 1) items.push('ellipsis');
-    items.push(total);
-    return items;
-};
+import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 
 type SubscriptionInfo = {
     id: number;
@@ -85,7 +73,6 @@ export const BillingPage = () => {
 
     const planLang = language === 'ar' ? 'ar' : 'en';
     const invoicesTotalPages = Math.max(1, Math.ceil(invoicesTotalCount / invoicesPageSize));
-    const invoicesPaginationItems = getPaginationItems(invoicesPageNumber, invoicesTotalPages);
 
     const loadSubscriptionInfo = useCallback(async (opts?: { showPageLoading?: boolean }) => {
         if (!currentUser) {
@@ -835,7 +822,7 @@ export const BillingPage = () => {
                         </p>
                     ) : (
                         <>
-                        <div className="overflow-x-auto">
+                        <div className="overflow-x-auto overflow-y-hidden">
                             <table className="min-w-full text-sm">
                                 <thead>
                                     <tr className="text-center text-gray-500 dark:text-gray-400 border-b dark:border-gray-700">
@@ -927,69 +914,19 @@ export const BillingPage = () => {
                             </table>
                         </div>
                         {invoicesTotalCount > 0 && (
-                            <div className="mt-4 flex flex-col sm:flex-row items-center justify-between gap-3">
-                                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                                    {t('page')} {invoicesPageNumber} {t('of')} {invoicesTotalPages}
-                                </p>
-                                <div className="flex flex-wrap items-center justify-center gap-2" dir="ltr">
-                                    <select
-                                        value={invoicesPageSize}
-                                        onChange={(e) => {
-                                            setInvoicesPageSize(Number(e.target.value));
-                                            setInvoicesPageNumber(1);
-                                        }}
-                                        className="px-2 py-2 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs sm:text-sm"
-                                    >
-                                        {PAGE_SIZE_OPTIONS.map((size) => (
-                                            <option key={size} value={size}>
-                                                {`${size} ${t('perPage')}`}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setInvoicesPageNumber(1)}
-                                        disabled={invoicesPageNumber === 1 || invoicesLoading}
-                                    >
-                                        &laquo;
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setInvoicesPageNumber((prev) => Math.max(1, prev - 1))}
-                                        disabled={!invoicesHasPrevious || invoicesLoading}
-                                    >
-                                        {t('previous')}
-                                    </Button>
-                                    {invoicesPaginationItems.map((item, idx) =>
-                                        item === 'ellipsis' ? (
-                                            <span key={`ellipsis-${idx}`} className="px-2 text-gray-500">...</span>
-                                        ) : (
-                                            <Button
-                                                key={item}
-                                                variant={item === invoicesPageNumber ? 'primary' : 'secondary'}
-                                                onClick={() => setInvoicesPageNumber(item)}
-                                                disabled={invoicesLoading}
-                                            >
-                                                {item}
-                                            </Button>
-                                        )
-                                    )}
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setInvoicesPageNumber((prev) => prev + 1)}
-                                        disabled={!invoicesHasNext || invoicesLoading}
-                                    >
-                                        {t('next')}
-                                    </Button>
-                                    <Button
-                                        variant="secondary"
-                                        onClick={() => setInvoicesPageNumber(invoicesTotalPages)}
-                                        disabled={invoicesPageNumber === invoicesTotalPages || invoicesLoading}
-                                    >
-                                        &raquo;
-                                    </Button>
-                                </div>
-                            </div>
+                            <Pagination
+                                page={invoicesPageNumber}
+                                totalPages={invoicesTotalPages}
+                                onPageChange={setInvoicesPageNumber}
+                                pageSize={invoicesPageSize}
+                                onPageSizeChange={(size) => {
+                                    setInvoicesPageSize(size);
+                                    setInvoicesPageNumber(1);
+                                }}
+                                hasPrevious={invoicesHasPrevious}
+                                hasNext={invoicesHasNext}
+                                disabled={invoicesLoading}
+                            />
                         )}
                         </>
                     )}

@@ -162,15 +162,12 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                                     {t('logoutConfirmMessage')}
                                 </p>
                                 <div className={`flex gap-3 ${language === 'ar' ? 'flex-row-reverse' : ''}`}>
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsLogoutConfirmOpen(false)}
-                                        className="flex-1 rounded-md bg-gray-200 px-4 py-2 font-medium text-gray-800 transition-colors hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
-                                    >
+                                    <Button variant="secondary" className="flex-1" onClick={() => setIsLogoutConfirmOpen(false)}>
                                         {t('cancel')}
-                                    </button>
-                                    <button
-                                        type="button"
+                                    </Button>
+                                    <Button
+                                        variant="danger"
+                                        className="flex-1"
                                         onClick={() => {
                                             localStorage.removeItem('accessToken');
                                             localStorage.removeItem('refreshToken');
@@ -178,10 +175,9 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                                             localStorage.removeItem('currentUser');
                                             setIsLoggedIn(false);
                                         }}
-                                        className="flex-1 rounded-md bg-red-600 px-4 py-2 font-medium text-white transition-colors hover:bg-red-700"
                                     >
                                         {t('logout')}
-                                    </button>
+                                    </Button>
                                 </div>
                             </div>
                         </div>

@@ -8,7 +8,7 @@ import {
   getWhatsAppContactTitle,
 } from '../../utils/whatsappContactDisplay';
 import { PhoneText, isPhoneLike } from '../PhoneText';
-import { validatePhoneField } from '../../utils/formValidation';
+import { catalogFieldErrors } from '../../forms';
 import { clearFieldError } from '../../utils/formFieldErrors';
 
 type Client = {
@@ -56,7 +56,14 @@ export const StartNewConversationModal = ({ isOpen, onClose, t, onSelectClient }
   const handleStartWithNumber = async () => {
     const compact = manualPhone.replace(/\s+/g, '');
     const withPlus = compact.startsWith('+') ? compact : `+${compact}`;
-    const phoneErr = validatePhoneField(withPlus, t);
+    const phoneErr = catalogFieldErrors(
+      'sms.send',
+      { to: withPlus, body: 'Hello' },
+      (key) => {
+        const value = t(key as never);
+        return value && value !== key ? value : undefined;
+      },
+    ).to;
     if (phoneErr) {
       setErrors({ phone: phoneErr });
       return;

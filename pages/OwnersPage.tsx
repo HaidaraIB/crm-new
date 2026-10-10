@@ -3,7 +3,7 @@
 
 import React, { useMemo } from 'react';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, PhoneText } from '../components/index';
+import { PageWrapper, Button, Card, PlusIcon, Loader, EditIcon, TrashIcon, FilterButton, RefreshButton, TableHorizontalScroll, hasActiveFilters, PhoneText, IconButton } from '../components/index';
 import { DEFAULT_OWNER_FILTERS } from '../components/drawers/OwnersFilterDrawer';
 import { Owner } from '../types';
 import { useOwners, useDeleteOwner } from '../hooks/useQueries';
@@ -37,14 +37,10 @@ const OwnersTable = ({ owners, onEdit, onDelete, isAdmin }: { owners: Owner[], o
                             <td className="px-6 py-4 text-center">
                                 <div className="flex items-center justify-center gap-2">
                                     {isAdmin && (
-                                        <Button variant="ghost" className="p-1 h-auto" onClick={() => onEdit(owner)}>
-                                            <EditIcon className="w-4 h-4" />
-                                        </Button>
+                                        <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onEdit(owner)} />
                                     )}
                                     {isAdmin && (
-                                        <Button variant="ghost" className="p-1 h-auto !text-red-600 dark:!text-red-400 hover:!bg-red-50 dark:hover:!bg-red-900/20" onClick={() => onDelete(owner.id)}>
-                                            <TrashIcon className="w-4 h-4" />
-                                        </Button>
+                                        <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => onDelete(owner.id)} />
                                     )}
                                 </div>
                             </td>

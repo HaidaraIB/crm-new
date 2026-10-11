@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDownIcon, CheckIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
 
@@ -103,7 +104,7 @@ export const LeadStatusDropdown = ({
 }: LeadStatusDropdownProps) => {
     const { theme, t } = useAppContext();
     const [isOpen, setIsOpen] = useState(false);
-    const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0, minWidth: 0 });
+    const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; minWidth: number } | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
     const triggerRef = useRef<HTMLButtonElement>(null);
     const menuRef = useRef<HTMLDivElement>(null);
@@ -117,29 +118,59 @@ export const LeadStatusDropdown = ({
           ? { backgroundColor: '#f8fafc', borderColor: '#e2e8f0', color: '#64748b' }
           : { backgroundColor: 'rgba(30,41,59,0.6)', borderColor: '#475569', color: '#94a3b8' };
 
-    useEffect(() => {
-        if (!isOpen || !triggerRef.current) return;
+    const placeMenu = useCallback(() => {
+        const trigger = triggerRef.current;
+        if (!trigger) return;
 
-        const buttonRect = triggerRef.current.getBoundingClientRect();
+        const buttonRect = trigger.getBoundingClientRect();
+        const gap = 6;
+        const margin = 8;
+        const menu = menuRef.current;
+        const menuHeight = menu?.offsetHeight || availableStatuses.length * (size === 'sm' ? 36 : 40) + 12;
+        const menuWidth = menu?.offsetWidth || Math.max(buttonRect.width, size === 'sm' ? 120 : 144);
         const spaceBelow = window.innerHeight - buttonRect.bottom;
         const spaceAbove = buttonRect.top;
-        const itemHeight = size === 'sm' ? 36 : 40;
-        const estimatedMenuHeight = availableStatuses.length * itemHeight + 12;
-        const gap = 6;
 
         let top: number;
-        if (spaceBelow < estimatedMenuHeight + gap && spaceAbove > estimatedMenuHeight + gap) {
-            top = buttonRect.top - estimatedMenuHeight - gap;
+        if (spaceBelow < menuHeight + gap && spaceAbove > spaceBelow) {
+            top = buttonRect.top - menuHeight - gap;
         } else {
             top = buttonRect.bottom + gap;
         }
+        top = Math.max(margin, Math.min(top, window.innerHeight - menuHeight - margin));
 
-        setMenuPosition({
-            top,
-            left: buttonRect.left,
-            minWidth: buttonRect.width,
+        let left = buttonRect.left;
+        if (left + menuWidth > window.innerWidth - margin) {
+            left = window.innerWidth - menuWidth - margin;
+        }
+        left = Math.max(margin, left);
+
+        setMenuPosition((prev) => {
+            if (prev && prev.top === top && prev.left === left && prev.minWidth === buttonRect.width) {
+                return prev;
+            }
+            return { top, left, minWidth: buttonRect.width };
         });
-    }, [isOpen, availableStatuses.length, size]);
+    }, [availableStatuses.length, size]);
+
+    useLayoutEffect(() => {
+        if (!isOpen) {
+            setMenuPosition(null);
+            return;
+        }
+        placeMenu();
+    }, [isOpen, placeMenu]);
+
+    useEffect(() => {
+        if (!isOpen) return;
+        const onUpdate = () => placeMenu();
+        window.addEventListener('scroll', onUpdate, true);
+        window.addEventListener('resize', onUpdate);
+        return () => {
+            window.removeEventListener('scroll', onUpdate, true);
+            window.removeEventListener('resize', onUpdate);
+        };
+    }, [isOpen, placeMenu]);
 
     useEffect(() => {
         if (!isOpen) return;
@@ -206,18 +237,19 @@ export const LeadStatusDropdown = ({
                 />
             </button>
 
-            {isOpen && (
+            {isOpen && typeof document !== 'undefined' && createPortal(
                 <div
                     ref={menuRef}
                     role="listbox"
                     aria-label={statusName}
                     className="fixed z-[9999] overflow-hidden rounded-xl border border-gray-200/90 bg-white py-1.5 shadow-xl ring-1 ring-black/5 dark:border-gray-600/80 dark:bg-gray-800 dark:ring-white/10"
                     style={{
-                        top: `${menuPosition.top}px`,
-                        left: `${menuPosition.left}px`,
-                        minWidth: `${Math.max(menuPosition.minWidth, size === 'sm' ? 120 : 144)}px`,
+                        top: menuPosition ? `${menuPosition.top}px` : 0,
+                        left: menuPosition ? `${menuPosition.left}px` : 0,
+                        visibility: menuPosition ? 'visible' : 'hidden',
+                        minWidth: `${Math.max(menuPosition?.minWidth ?? triggerRef.current?.offsetWidth ?? 0, size === 'sm' ? 120 : 144)}px`,
                         width: 'max-content',
-                        maxWidth: `min(100vw - ${menuPosition.left}px - 8px, 320px)`,
+                        maxWidth: 'min(100vw - 16px, 320px)',
                     }}
                 >
                     {availableStatuses.map((status) => {
@@ -264,7 +296,8 @@ export const LeadStatusDropdown = ({
                             </button>
                         );
                     })}
-                </div>
+                </div>,
+                document.body
             )}
         </div>
     );

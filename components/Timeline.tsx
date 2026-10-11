@@ -13,6 +13,25 @@ import { ChatMediaViewer } from './chat/ChatMediaViewer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { PhoneText } from './PhoneText';
 import { PlainTextWithLinks } from './PlainTextWithLinks';
+import { inputTextDir } from '../utils/inputAutoDir';
+
+/** User-written timeline text. Direction follows the first strong letter. */
+function TimelineUserText({
+    text,
+    className = '',
+}: {
+    text: string;
+    className?: string;
+}) {
+    return (
+        <span
+            dir={inputTextDir(text, false)}
+            className={`[unicode-bidi:isolate] text-start ${className}`}
+        >
+            {text}
+        </span>
+    );
+}
 
 const TimelineRecordingPlayer: React.FC<{ url: string; t: (key: string) => string }> = ({
     url,
@@ -154,11 +173,11 @@ function WhatsAppThreadBody({
                 </span>
             </p>
             {entry.details && !expanded && (
-                <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                    <span className="text-gray-400 dark:text-gray-500 me-1.5" aria-hidden="true">
+                <p className="flex min-w-0 items-baseline text-sm text-gray-600 dark:text-gray-300">
+                    <span className="shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
                         {previewCue}
                     </span>
-                    {entry.details}
+                    <TimelineUserText text={entry.details} className="ms-1.5 min-w-0 truncate" />
                 </p>
             )}
             {expanded && messages.length > 0 && (
@@ -174,9 +193,10 @@ function WhatsAppThreadBody({
                             >
                                 {msg.direction === 'inbound' ? '←' : '→'}
                             </span>
-                            <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">
-                                {msg.body}
-                            </span>
+                            <TimelineUserText
+                                text={msg.body}
+                                className="min-w-0 flex-1 break-words whitespace-pre-wrap"
+                            />
                             <time
                                 className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap self-start"
                                 dateTime={new Date(msg.timestamp).toISOString()}
@@ -250,11 +270,11 @@ function SocialThreadBody({
                 </span>
             </p>
             {entry.details && !expanded && (
-                <p className="text-sm text-gray-600 dark:text-gray-300 truncate">
-                    <span className="text-gray-400 dark:text-gray-500 me-1.5" aria-hidden="true">
+                <p className="flex min-w-0 items-baseline text-sm text-gray-600 dark:text-gray-300">
+                    <span className="shrink-0 text-gray-400 dark:text-gray-500" aria-hidden="true">
                         {previewCue}
                     </span>
-                    {entry.details}
+                    <TimelineUserText text={entry.details} className="ms-1.5 min-w-0 truncate" />
                 </p>
             )}
             {expanded && messages.length > 0 && (
@@ -270,9 +290,10 @@ function SocialThreadBody({
                             >
                                 {msg.direction === 'inbound' ? '←' : '→'}
                             </span>
-                            <span className="min-w-0 flex-1 break-words whitespace-pre-wrap">
-                                {msg.body}
-                            </span>
+                            <TimelineUserText
+                                text={msg.body}
+                                className="min-w-0 flex-1 break-words whitespace-pre-wrap"
+                            />
                             <time
                                 className="shrink-0 text-[11px] text-gray-400 dark:text-gray-500 whitespace-nowrap self-start"
                                 dateTime={new Date(msg.timestamp).toISOString()}

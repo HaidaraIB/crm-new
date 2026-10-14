@@ -8,7 +8,7 @@ import {
     type CheckPaymentStatusResponse,
 } from '../services/api';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
-import { hydratePaymentAccessToken, paymentLoginUrl } from '../utils/paymentAuth';
+import { hydratePaymentAccessToken, isPaymentStatusWrongAccount, paymentLoginUrl } from '../utils/paymentAuth';
 import {
     getFibPaymentSession,
     resolveSubscriptionIdFromContext,
@@ -69,13 +69,12 @@ export const PaymentPage = () => {
     const pollStartTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
-        hydratePaymentAccessToken();
-
         const urlParams = new URLSearchParams(window.location.search);
         const subIdFromUrl = urlParams.get('subscription_id');
         const status = urlParams.get('status');
         const gatewayId = urlParams.get('gateway_id');
         const subId = resolveSubscriptionIdFromContext(subIdFromUrl);
+        hydratePaymentAccessToken(subId);
 
         if (status && subId) {
             window.location.href = paymentSuccessUrl(subId, status);
@@ -135,7 +134,7 @@ export const PaymentPage = () => {
                     return;
                 }
 
-                const data: CheckPaymentStatusResponse = await checkPaymentStatusAPI(parseInt(subscriptionId));
+                const data: CheckPaymentStatusResponse = await checkPaymentStatusAPI(parseInt(subscriptionId, 10));
                 if (data.subscription_active || data.payment_status === 'completed') {
                     if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
                     pollIntervalRef.current = null;
@@ -150,7 +149,15 @@ export const PaymentPage = () => {
                     setFibPaymentData(null);
                     setError(t('paymentDeclinedOrCancelled'));
                 }
-            } catch (_) {}
+            } catch (err) {
+                if (!isPaymentStatusWrongAccount(err)) return;
+                if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+                pollIntervalRef.current = null;
+                if (pollStartTimeoutRef.current) clearTimeout(pollStartTimeoutRef.current);
+                pollStartTimeoutRef.current = null;
+                setFibPaymentData(null);
+                setError(t('paymentStatusWrongAccount'));
+            }
         };
 
         pollStartTimeoutRef.current = setTimeout(() => {
@@ -179,7 +186,7 @@ export const PaymentPage = () => {
             setIsLoading(true);
             setErrors({});
             setFibPaymentData(null);
-            if (!hydratePaymentAccessToken()) {
+            if (!hydratePaymentAccessToken(subscriptionId)) {
                 setError(t('paymentAuthRequired'));
                 setIsLoading(false);
                 paymentAttemptStarted.current = false;

@@ -3158,6 +3158,8 @@ export const translations = {
     paymentRedirectError: "Failed to get payment URL",
     paymentInitError: "Failed to initialize payment",
     paymentAuthRequired: "Please sign in to continue payment.",
+    paymentStatusWrongAccount:
+      "This payment belongs to a different company. Sign in as that company's owner to continue.",
     tryAgain: "Try again",
     noInvoicesYet: "No invoices yet",
     downloadInvoicePdf: "Download PDF",
@@ -6379,6 +6381,8 @@ export const translations = {
     paymentRedirectError: "فشل الحصول على رابط الدفع",
     paymentInitError: "فشل تهيئة الدفع",
     paymentAuthRequired: "يرجى تسجيل الدخول لمتابعة الدفع.",
+    paymentStatusWrongAccount:
+      "هذه الدفعة تخص شركة أخرى. سجّل الدخول بصفتك مالك تلك الشركة للمتابعة.",
     tryAgain: "حاول مرة أخرى",
     noInvoicesYet: "لا توجد فواتير بعد",
     downloadInvoicePdf: "تحميل PDF",

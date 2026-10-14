@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { Button, Loader } from '../components/index';
 import { checkPaymentStatusAPI, zaincashReturnAPI } from '../services/api';
-import { hydratePaymentAccessToken, paymentLoginUrl } from '../utils/paymentAuth';
+import { hydratePaymentAccessToken, isPaymentStatusWrongAccount, paymentLoginUrl } from '../utils/paymentAuth';
 import {
     consumePaymentCheckoutContext,
     hasLoggedInPaymentSession,
@@ -177,7 +177,7 @@ export const PaymentSuccessPage = () => {
                     return;
                 }
 
-                hydratePaymentAccessToken();
+                hydratePaymentAccessToken(subscriptionId);
 
                 if (zaincashToken) {
                     try {
@@ -221,6 +221,11 @@ export const PaymentSuccessPage = () => {
                     }
                 } catch (err: unknown) {
                     console.error('Error checking payment status:', err);
+                    if (isPaymentStatusWrongAccount(err)) {
+                        setError(t('paymentStatusWrongAccount'));
+                        processingRef.current = false;
+                        return;
+                    }
                     // Return handlers verify with the gateway before redirecting status=success.
                     if (urlStatus === 'success' && tranRef) {
                         finishAfterSuccessfulPayment(subscriptionId);

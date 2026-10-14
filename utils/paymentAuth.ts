@@ -28,29 +28,50 @@ export function clearPaymentAccessToken(): void {
   }
 }
 
-export function hydratePaymentAccessToken(): boolean {
-  if (typeof localStorage === 'undefined') return false;
-  if (localStorage.getItem('accessToken')) return true;
+function pendingRegistrationToken(subscriptionId?: string | number | null): {
+  access: string;
+  refresh?: string;
+} | null {
   try {
     const raw = localStorage.getItem('pendingUserData');
-    if (raw) {
-      const data = JSON.parse(raw) as {
-        accessToken?: string;
-        refreshToken?: string;
-        access?: string;
-        refresh?: string;
-      };
-      const access = data.accessToken || data.access;
-      const refresh = data.refreshToken || data.refresh;
-      if (access) {
-        localStorage.setItem('accessToken', access);
-        if (refresh) localStorage.setItem('refreshToken', refresh);
-        return true;
+    if (!raw) return null;
+    const data = JSON.parse(raw) as {
+      accessToken?: string;
+      refreshToken?: string;
+      access?: string;
+      refresh?: string;
+      subscriptionId?: string | number;
+      subscription_id?: string | number;
+    };
+    const access = data.accessToken || data.access;
+    if (!access) return null;
+    if (subscriptionId != null && String(subscriptionId) !== '') {
+      const pendingSub = data.subscriptionId ?? data.subscription_id;
+      if (pendingSub == null || String(pendingSub) !== String(subscriptionId)) {
+        return null;
       }
+    } else if (localStorage.getItem('accessToken')) {
+      // No subscription to match against: keep the signed-in session.
+      return null;
     }
+    const refresh = data.refreshToken || data.refresh;
+    return { access, refresh: refresh || undefined };
   } catch {
-    /* fall through to the billing-scoped token */
+    return null;
   }
+}
+
+export function hydratePaymentAccessToken(subscriptionId?: string | number | null): boolean {
+  if (typeof localStorage === 'undefined') return false;
+  // Registration stores its own JWT on pendingUserData. A leftover accessToken
+  // from another company would poll that company's payment-status and get 403.
+  const pending = pendingRegistrationToken(subscriptionId);
+  if (pending) {
+    localStorage.setItem('accessToken', pending.access);
+    if (pending.refresh) localStorage.setItem('refreshToken', pending.refresh);
+    return true;
+  }
+  if (localStorage.getItem('accessToken')) return true;
   try {
     // No refresh token to pair with this one: it is deliberately short-lived,
     // and a fresh one is minted on the next login attempt once it expires.
@@ -61,6 +82,12 @@ export function hydratePaymentAccessToken(): boolean {
   } catch {
     return false;
   }
+}
+
+/** 403 from payment-status when the signed-in company does not own the subscription. */
+export function isPaymentStatusWrongAccount(err: unknown): boolean {
+  const errObj = err as { status?: number; code?: string };
+  return errObj.status === 403 && errObj.code === 'forbidden';
 }
 
 export function paymentLoginUrl(subscriptionId: string | number | null): string {

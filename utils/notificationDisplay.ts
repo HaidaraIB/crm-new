@@ -73,7 +73,7 @@ const TEMPLATES: Record<string, Record<NotificationLang, Template>> = {
     en: { title: 'Customer Reception', body: '{lead_name} has arrived and is waiting at reception' },
   },
   customer_arrival_acknowledged: {
-    ar: { title: 'تم استلام إشعار الوصول', body: 'تم استلام إشعار وصول العميل {lead_name}' },
+    ar: { title: 'تم استلام إشعار الاستقبال', body: 'تم استلام إشعار استقبال العميل {lead_name}' },
     en: { title: 'Arrival Acknowledged', body: 'The arrival for {lead_name} has been acknowledged' },
   },
   customer_arrival_escalated: {

@@ -9,6 +9,7 @@ import { getUserDisplayName } from '../../types';
 import { buildLeadAssigneePickerOptions } from '../../utils/roles';
 import { formatLeadBudget } from '../../utils/budgetRange';
 import { ChevronDownIcon } from '../icons';
+import { seedLabel } from '../../utils/seedLabels';
 import { translations } from '../../constants';
 import ExcelJS from 'exceljs';
 
@@ -1105,7 +1106,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                       >
                         <option value="">{t('applyToAll') || 'Apply to all'}</option>
                         {statuses.map((s: { id: number; name: string; color?: string }) => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
+                          <option key={s.id} value={s.id}>{seedLabel(s.name, language)}</option>
                         ))}
                       </select>
                     </th>
@@ -1122,7 +1123,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                       >
                         <option value="">{t('applyToAll') || 'Apply to all'}</option>
                         {channels.map((c: { id: number; name: string }) => (
-                          <option key={c.id} value={c.id}>{c.name}</option>
+                          <option key={c.id} value={c.id}>{seedLabel(c.name, language)}</option>
                         ))}
                       </select>
                     </th>
@@ -1289,7 +1290,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                                       }}
                                       className={`w-full px-2 py-1 text-left rtl:text-right text-xs text-white hover:bg-slate-600/80 block ${row.status_id === s.id ? 'bg-blue-600' : ''}`}
                                     >
-                                      {s.name}
+                                      {seedLabel(s.name, language)}
                                     </button>
                                   ))}
                                 </div>,
@@ -1314,7 +1315,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                         >
                           <option value="">-</option>
                           {channels.map((c: { id: number; name: string }) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
+                            <option key={c.id} value={c.id}>{seedLabel(c.name, language)}</option>
                           ))}
                         </select>
                       </td>

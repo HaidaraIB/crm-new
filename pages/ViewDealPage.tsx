@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
+import { seedLabel } from '../utils/seedLabels';
 import { Button, Card, PageBackButton, PageLoadingState, PageWrapper } from '../components';
 import { DealActivitySection, DealLineItemsSection, DealTasksSection } from '../components/deals/DealDetailSections';
 import { DealWonLostModal } from '../components/deals/DealWonLostModal';
@@ -12,7 +13,7 @@ import { extractViewDealIdFromPath, getCompanyDealRoute, getCompanyViewLeadRoute
 import type { DealPipelineStage } from '../types';
 
 export const ViewDealPage = () => {
-  const { t, setCurrentPage, currentUser } = useAppContext();
+  const { t, language, setCurrentPage, currentUser } = useAppContext();
   const queryClient = useQueryClient();
   const dealId = extractViewDealIdFromPath(window.location.pathname) || undefined;
   const { data: deal, isLoading } = useDeal(dealId);
@@ -103,7 +104,7 @@ export const ViewDealPage = () => {
               style={active ? { backgroundColor: stage.color, borderColor: stage.color, color: textOnStageColor(stage.color) } : undefined}
             >
               <span className="h-2 w-2 rounded-full" style={{ backgroundColor: active ? 'currentColor' : stage.color }} />
-              {stage.name}
+              {seedLabel(stage.name, language)}
             </button>
           );
         })}
@@ -164,7 +165,7 @@ export const ViewDealPage = () => {
             {deal.lostReasonName && (
               <div>
                 <dt className="text-gray-600 dark:text-gray-300">{t('dealLostReasons')}</dt>
-                <dd className="mt-1 font-medium text-gray-900 dark:text-white">{deal.lostReasonName}</dd>
+                <dd className="mt-1 font-medium text-gray-900 dark:text-white">{seedLabel(deal.lostReasonName, language)}</dd>
               </div>
             )}
             {deal.description && <p className="whitespace-pre-wrap text-gray-800 dark:text-gray-100 md:col-span-2">{deal.description}</p>}

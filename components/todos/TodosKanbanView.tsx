@@ -8,6 +8,7 @@ import { patchTaskAPI, patchClientTaskAPI } from '../../services/api';
 import { queryKeys } from '../../hooks/useQueries';
 import type { Stage } from '../../types';
 import { getLocalizedApiErrorMessage } from '../../utils/apiErrorMessage';
+import { seedLabel } from '../../utils/seedLabels';
 
 type TodosKanbanViewProps = {
     items: TodoKanbanItem[];
@@ -28,7 +29,7 @@ export const TodosKanbanView = ({
     formatDealStage,
     enabled = true,
 }: TodosKanbanViewProps) => {
-    const { t, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
+    const { t, language, setAlertMessage, setAlertVariant, setIsAlertModalOpen } = useAppContext();
     const queryClient = useQueryClient();
     const [localItems, setLocalItems] = useState<TodoKanbanItem[]>(items);
     const [movingId, setMovingId] = useState<string | null>(null);
@@ -41,11 +42,11 @@ export const TodosKanbanView = ({
         () =>
             stages.map((stage) => ({
                 id: stage.id,
-                title: stage.name,
+                title: seedLabel(stage.name, language),
                 color: stage.color,
                 count: localItems.filter((item) => item.stageId === stage.id).length,
             })),
-        [stages, localItems],
+        [stages, localItems, language],
     );
 
     const itemsByColumn = useMemo(() => {

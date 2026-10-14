@@ -21,6 +21,7 @@ import { TagMultiSelect } from '../leads/TagMultiSelect';
 import type { LeadFilters, Tag } from '../../types';
 import { getUserDisplayName } from '../../types';
 import { usersForOperationalEmployeeLists } from '../../utils/roles';
+import { seedLabel } from '../../utils/seedLabels';
 
 export const DEFAULT_LEAD_FILTERS: LeadFilters = {
   status: 'All',
@@ -79,6 +80,7 @@ export const FilterDrawer = () => {
     isFilterDrawerOpen,
     setIsFilterDrawerOpen,
     t,
+    language,
     leadFilters,
     setLeadFilters,
     currentUser,
@@ -220,7 +222,11 @@ export const FilterDrawer = () => {
             >
               {leadStatuses.map((status) => (
                 <option key={status} value={status}>
-                  {status === 'All' ? t('all') : t(status.replace(' ', '').toLowerCase() as any) || status}
+                  {status === 'All'
+                    ? t('all')
+                    : (seedLabel(status, language) !== status
+                        ? seedLabel(status, language)
+                        : (t(status.replace(' ', '').toLowerCase() as any) || status))}
                 </option>
               ))}
             </FilterSelect>
@@ -314,7 +320,7 @@ export const FilterDrawer = () => {
             >
               {communicationWays.map((way) => (
                 <option key={way} value={way}>
-                  {way === 'All' ? t('all') : way}
+                  {way === 'All' ? t('all') : seedLabel(way, language)}
                 </option>
               ))}
             </FilterSelect>

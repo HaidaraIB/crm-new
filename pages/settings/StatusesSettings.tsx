@@ -5,6 +5,7 @@ import { Status } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useStatuses, useDeleteStatus, useUpdateStatus } from '../../hooks/useQueries';
 import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
+import { seedLabel } from '../../utils/seedLabels';
 
 export const StatusesSettings = () => {
     const { 
@@ -137,7 +138,7 @@ export const StatusesSettings = () => {
                                     </td>
                                     <td className="px-6 py-4 text-center">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {status.name}
+                                            {seedLabel(status.name, language)}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">

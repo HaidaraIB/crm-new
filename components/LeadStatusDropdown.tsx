@@ -2,6 +2,7 @@ import React, { useState, useEffect, useLayoutEffect, useRef, useCallback } from
 import { createPortal } from 'react-dom';
 import { ChevronDownIcon, CheckIcon } from './icons';
 import { useAppContext } from '../context/AppContext';
+import { seedLabel } from '../utils/seedLabels';
 
 export type LeadStatusOption = {
     id: number;
@@ -65,7 +66,8 @@ type LeadStatusBadgeProps = {
 
 /** Read-only status label matching the dropdown trigger style */
 export const LeadStatusBadge = ({ name, color, size = 'md', className = '' }: LeadStatusBadgeProps) => {
-    const { theme } = useAppContext();
+    const { theme, language } = useAppContext();
+    const label = seedLabel(name, language);
     const s = sizeClasses[size];
     const statusColor = color || DEFAULT_STATUS_COLOR;
     const surface = getStatusSurfaceStyles(statusColor, theme);
@@ -80,7 +82,7 @@ export const LeadStatusBadge = ({ name, color, size = 'md', className = '' }: Le
                 style={{ backgroundColor: statusColor }}
                 aria-hidden
             />
-            <span className="truncate">{name}</span>
+            <span className="truncate">{label}</span>
         </span>
     );
 };
@@ -102,7 +104,7 @@ export const LeadStatusDropdown = ({
     isUpdating = false,
     size = 'md',
 }: LeadStatusDropdownProps) => {
-    const { theme, t } = useAppContext();
+    const { theme, t, language } = useAppContext();
     const [isOpen, setIsOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; minWidth: number } | null>(null);
     const rootRef = useRef<HTMLDivElement>(null);
@@ -110,7 +112,9 @@ export const LeadStatusDropdown = ({
     const menuRef = useRef<HTMLDivElement>(null);
 
     const s = sizeClasses[size];
-    const statusName = currentStatus?.name || (t('selectStatus') as string) || 'Select status';
+    const statusName = currentStatus?.name
+        ? seedLabel(currentStatus.name, language)
+        : (t('selectStatus') as string) || 'Select status';
     const statusColor = currentStatus?.color || DEFAULT_STATUS_COLOR;
     const surface = currentStatus
         ? getStatusSurfaceStyles(statusColor, theme)
@@ -285,7 +289,7 @@ export const LeadStatusDropdown = ({
                                         style={{ backgroundColor: optionColor }}
                                         aria-hidden
                                     />
-                                    <span className="truncate">{status.name}</span>
+                                    <span className="truncate">{seedLabel(status.name, language)}</span>
                                 </span>
                                 {isSelected && (
                                     <CheckIcon

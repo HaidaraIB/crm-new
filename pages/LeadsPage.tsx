@@ -26,6 +26,7 @@ import { MarqueeText } from '../components/MarqueeText';
 import { resolveInputDir } from '../utils/inputAutoDir';
 import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 import { usePersistedTab } from '../hooks/usePersistedTab';
+import { seedLabel } from '../utils/seedLabels';
 
 const LEADS_SCROLL_STORAGE_KEY = 'crm:leadsScrollY';
 const LEADS_STATUS_LEGACY_PREFIX = 'crm:leadsStatusTab';
@@ -717,7 +718,11 @@ export const LeadsPage = () => {
                                    style={{ backgroundColor: statusConfig.color }}
                                />
                            )}
-                           {t(getStatusTranslationKey(status) as any) || status} <span className="hidden sm:inline">({count})</span>
+                           {status === 'All'
+                               ? t('all')
+                               : (seedLabel(status, language) !== status
+                                   ? seedLabel(status, language)
+                                   : (t(getStatusTranslationKey(status) as any) || status))} <span className="hidden sm:inline">({count})</span>
                         </button>
                     )
                 })}
@@ -785,9 +790,11 @@ export const LeadsPage = () => {
                         canDrag={!isDataEntryUser}
                         canOpenLead={!isDataEntryUser}
                         onOpenLead={(lead) => handleViewLead(lead as Lead)}
-                        getStatusLabel={(statusName) =>
-                            t(getStatusTranslationKey(statusName as Lead['status']) as any) || statusName
-                        }
+                        getStatusLabel={(statusName) => {
+                            const seeded = seedLabel(statusName, language);
+                            if (seeded !== statusName) return seeded;
+                            return t(getStatusTranslationKey(statusName as Lead['status']) as any) || statusName;
+                        }}
                         enabled={isBoardView}
                         showPhoneActions={!isDataEntryUser}
                         onSms={(lead, phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
@@ -1035,7 +1042,7 @@ export const LeadsPage = () => {
                                                     {assignedUserName || '-'}
                                                 </td>
                                                 <td className="px-3 sm:px-6 py-4 hidden xl:table-cell text-gray-900 dark:text-gray-100 whitespace-nowrap text-center">
-                                                    {(lead as any).communication_way_name || lead.communicationWay || '-'}
+                                                    {seedLabel((lead as any).communication_way_name || lead.communicationWay, language) || '-'}
                                                 </td>
                                                 <td className="px-4 sm:px-6 py-4 hidden md:table-cell text-center">
                                                     <div className="flex items-center justify-center gap-2">

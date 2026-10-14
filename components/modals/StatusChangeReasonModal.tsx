@@ -3,6 +3,7 @@ import { AutoDirTextarea } from '../Input';
 import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
+import { seedLabel } from '../../utils/seedLabels';
 
 type StatusChangeReasonModalProps = {
     isOpen: boolean;
@@ -44,7 +45,7 @@ export const StatusChangeReasonModal = ({
             <div className="space-y-3">
                 {statusName && (
                     <p className="text-sm text-gray-600 dark:text-gray-400">
-                        {t('statusChangeReasonIntro').replace('{status}', statusName)}
+                        {t('statusChangeReasonIntro').replace('{status}', seedLabel(statusName, language))}
                     </p>
                 )}
                 <div>

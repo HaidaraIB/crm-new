@@ -10,6 +10,7 @@ import { Status } from '../../types';
 import { useUpdateStatus } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -132,7 +133,7 @@ export const EditStatusModal = () => {
             
             const adh = (editingStatus as any).auto_delete_after_hours ?? (editingStatus as any).autoDeleteAfterHours;
             const initState = {
-                name: editingStatus.name,
+                name: seedLabel(editingStatus.name, language),
                 description: editingStatus.description || '',
                 category: categoryValue as 'active' | 'inactive' | 'follow_up' | 'closed',
                 color: editingStatus.color || '#808080',
@@ -149,7 +150,7 @@ export const EditStatusModal = () => {
         } else {
             initialPayloadRef.current = null;
         }
-    }, [editingStatus, currentUser?.company?.id]);
+    }, [editingStatus, currentUser?.company?.id, language]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { id, value } = e.target;

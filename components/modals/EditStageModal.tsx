@@ -9,6 +9,7 @@ import { Stage } from '../../types';
 import { useUpdateStage } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -85,7 +86,7 @@ export const EditStageModal = () => {
         if (editingStage) {
             const st = editingStage as Stage & { is_default?: boolean };
             const initState = {
-                name: editingStage.name,
+                name: seedLabel(editingStage.name, language),
                 description: editingStage.description || '',
                 color: editingStage.color || '#808080',
                 isDefault: st.isDefault ?? st.is_default ?? false,
@@ -96,7 +97,7 @@ export const EditStageModal = () => {
         } else {
             initialPayloadRef.current = null;
         }
-    }, [editingStage, currentUser?.company?.id]);
+    }, [editingStage, currentUser?.company?.id, language]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;

@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { seedLabel } from '../../utils/seedLabels';
 import { NumberInput } from '../NumberInput';
 import { useDealPipelines, useProjects, useUnits, useUsers } from '../../hooks/useQueries';
 import {
@@ -37,6 +38,7 @@ export const DealsFilterDrawer = () => {
     isDealsFilterDrawerOpen,
     setIsDealsFilterDrawerOpen,
     t,
+    language,
     currentUser,
     dealFilters,
     setDealFilters,
@@ -126,7 +128,7 @@ export const DealsFilterDrawer = () => {
             >
               <option value="All">{t('all')}</option>
               {stages.map((stage) => (
-                <option key={stage.id} value={String(stage.id)}>{stage.name}</option>
+                <option key={stage.id} value={String(stage.id)}>{seedLabel(stage.name, language)}</option>
               ))}
             </FilterSelect>
           </div>

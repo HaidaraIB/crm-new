@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { seedLabel } from '../../utils/seedLabels';
 import { Button, Card, IconButton, PlusIcon, Select, TrashIcon } from '../index';
 import { Input, AutoDirTextarea } from '../Input';
 import { NumberInput } from '../NumberInput';
@@ -61,7 +62,7 @@ function scrollToDealError(fieldErrors: Record<string, string>) {
 }
 
 export const DealForm = ({ initial, submitting, onSubmit, onCancel }: DealFormProps) => {
-  const { t, currentUser } = useAppContext();
+  const { t, language, currentUser } = useAppContext();
   const specialization = currentUser?.company?.specialization;
   const { data: pipelines = [] } = useDealPipelines();
   const { data: usersResponse } = useUsers();
@@ -256,13 +257,13 @@ export const DealForm = ({ initial, submitting, onSubmit, onCancel }: DealFormPr
           <div>
             <label className="block text-sm mb-1">{t('dealSelectPipeline')}</label>
             <Select value={pipelineId || String(activePipeline?.id || '')} onChange={(e) => { setPipelineId(e.target.value); setStageId(''); }}>
-              {pipelines.map((pipeline) => <option key={pipeline.id} value={pipeline.id}>{pipeline.name}</option>)}
+              {pipelines.map((pipeline) => <option key={pipeline.id} value={pipeline.id}>{seedLabel(pipeline.name, language)}</option>)}
             </Select>
           </div>
           <div>
             <label className="block text-sm mb-1">{t('stage')}</label>
             <Select value={stageId || String(stages[0]?.id || '')} onChange={(e) => setStageId(e.target.value)}>
-              {stages.map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
+              {stages.map((stage) => <option key={stage.id} value={stage.id}>{seedLabel(stage.name, language)}</option>)}
             </Select>
           </div>
           <div>

@@ -18,9 +18,10 @@ import {
   updateDealStageAPI,
 } from '../../services/api';
 import type { DealPipeline, DealPipelineStage, DealStageType } from '../../types';
+import { seedLabel, seedNameForSave } from '../../utils/seedLabels';
 
 export const DealPipelinesSettings = () => {
-  const { t, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
+  const { t, language, setConfirmDeleteConfig, setIsConfirmDeleteModalOpen } = useAppContext();
   const queryClient = useQueryClient();
   const { data: pipelines = [] } = useDealPipelines();
   const { data: reasons = [] } = useDealLostReasons();
@@ -138,7 +139,7 @@ export const DealPipelinesSettings = () => {
         <div className="p-4 space-y-3">
           <div className="flex flex-wrap items-start gap-2">
             <Select className="sm:w-56" aria-label={t('dealSelectPipeline')} value={pipeline?.id || ''} onChange={(e) => setPipelineId(Number(e.target.value))}>
-              {pipelines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+              {pipelines.map((item) => <option key={item.id} value={item.id}>{seedLabel(item.name, language)}</option>)}
             </Select>
             <div className="min-w-0 flex-1 sm:max-w-xs">
               <Input
@@ -154,7 +155,7 @@ export const DealPipelinesSettings = () => {
               <Button
                 type="button"
                 variant="danger"
-                onClick={() => confirmDelete(t('dealDeletePipeline'), t('dealConfirmDeletePipeline'), pipeline.name, () => deleteDealPipelineAPI(pipeline.id))}
+                onClick={() => confirmDelete(t('dealDeletePipeline'), t('dealConfirmDeletePipeline'), seedLabel(pipeline.name, language), () => deleteDealPipelineAPI(pipeline.id))}
               >
                 <TrashIcon className="h-4 w-4" />
                 {t('dealDeletePipeline')}
@@ -174,9 +175,13 @@ export const DealPipelinesSettings = () => {
                 <div>
                   <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">{t('dealTitle')}</label>
                   <Input
-                    defaultValue={stage.name}
+                    key={`${stage.id}-${language}`}
+                    defaultValue={seedLabel(stage.name, language)}
                     invalid={!!stageErrors[stage.id]?.name}
-                    onBlur={(e) => e.target.value !== stage.name && updateStageField(stage, { name: e.target.value })}
+                    onBlur={(e) => {
+                      const next = seedNameForSave(e.target.value, stage.name, language);
+                      if (next !== stage.name) updateStageField(stage, { name: next });
+                    }}
                   />
                   {stageErrors[stage.id]?.name && <p className="mt-1 text-sm text-red-600 dark:text-red-400">{stageErrors[stage.id].name}</p>}
                 </div>
@@ -213,7 +218,7 @@ export const DealPipelinesSettings = () => {
                   <label className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-300">{t('dealMoveDealsTo')}</label>
                   <Select value={moveTo[stage.id] || ''} onChange={(e) => setMoveTo((prev) => ({ ...prev, [stage.id]: e.target.value }))}>
                     <option value="">{t('dealMoveDealsTo')}</option>
-                    {(pipeline?.stages || []).filter((item) => item.id !== stage.id).map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                    {(pipeline?.stages || []).filter((item) => item.id !== stage.id).map((item) => <option key={item.id} value={item.id}>{seedLabel(item.name, language)}</option>)}
                   </Select>
                 </div>
                 <IconButton
@@ -221,7 +226,7 @@ export const DealPipelinesSettings = () => {
                   tone="danger"
                   icon={<TrashIcon className="h-4 w-4" />}
                   label={t('dealDeleteStage')}
-                  onClick={() => confirmDelete(t('dealDeleteStage'), t('dealConfirmDeleteStage'), stage.name, () => deleteDealStageAPI(stage.id, moveTo[stage.id] ? Number(moveTo[stage.id]) : undefined))}
+                  onClick={() => confirmDelete(t('dealDeleteStage'), t('dealConfirmDeleteStage'), seedLabel(stage.name, language), () => deleteDealStageAPI(stage.id, moveTo[stage.id] ? Number(moveTo[stage.id]) : undefined))}
                 />
               </div>
             ))}
@@ -246,12 +251,12 @@ export const DealPipelinesSettings = () => {
           <div className="divide-y divide-gray-200 dark:divide-gray-700">
             {reasons.map((reason) => (
               <div key={reason.id} className="flex items-center justify-between gap-3 py-2">
-                <span className="text-sm font-medium text-gray-900 dark:text-white">{reason.name}</span>
+                <span className="text-sm font-medium text-gray-900 dark:text-white">{seedLabel(reason.name, language)}</span>
                 <IconButton
                   tone="danger"
                   icon={<TrashIcon className="h-4 w-4" />}
                   label={t('dealDeleteLostReason')}
-                  onClick={() => confirmDelete(t('dealDeleteLostReason'), t('dealConfirmDeleteLostReason'), reason.name, () => deleteDealLostReasonAPI(reason.id))}
+                  onClick={() => confirmDelete(t('dealDeleteLostReason'), t('dealConfirmDeleteLostReason'), seedLabel(reason.name, language), () => deleteDealLostReasonAPI(reason.id))}
                 />
               </div>
             ))}

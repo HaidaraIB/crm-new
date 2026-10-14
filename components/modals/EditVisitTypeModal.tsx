@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { useUpdateVisitType } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -93,7 +94,7 @@ export const EditVisitTypeModal = () => {
         if (editingVisitType) {
             const vt = editingVisitType as { isDefault?: boolean; is_default?: boolean };
             const initState = {
-                name: editingVisitType.name,
+                name: seedLabel(editingVisitType.name, language),
                 description: editingVisitType.description || '',
                 color: editingVisitType.color || '#808080',
                 isDefault: vt.isDefault ?? vt.is_default ?? false,
@@ -104,7 +105,7 @@ export const EditVisitTypeModal = () => {
         } else {
             initialPayloadRef.current = null;
         }
-    }, [editingVisitType, currentUser?.company?.id]);
+    }, [editingVisitType, currentUser?.company?.id, language]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;

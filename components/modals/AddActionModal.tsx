@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { Stage } from '../../types';
 import { useCreateClientTask, useStages } from '../../hooks/useQueries';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -173,7 +174,7 @@ export const AddActionModal = () => {
                         {(stages || []).length > 0 ? (
                             (stages || []).map(s => (
                                 <option key={s.id} value={s.name}>
-                                    {s.name}
+                                    {seedLabel(s.name, language)}
                                 </option>
                             ))
                         ) : (

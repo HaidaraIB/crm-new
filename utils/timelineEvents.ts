@@ -1,4 +1,5 @@
 import { translations } from '../constants';
+import { seedLabel } from './seedLabels';
 import { localizeWhatsAppMessageBody } from './whatsappMessageBodyDisplay';
 
 type TFn = (key: keyof typeof translations.en) => string;
@@ -8,6 +9,7 @@ export type TimelineEventFormatContext = {
     users: Array<{ id: number; name?: string; username?: string }>;
     statuses: Array<{ id: number; name: string }>;
     channels: Array<{ id: number; name: string }>;
+    language?: string;
 };
 
 const EDIT_NOTE_FIELD_KEYS: Record<string, keyof typeof translations.en> = {
@@ -317,7 +319,7 @@ export function formatTimelineEventValue(
     ctx: TimelineEventFormatContext,
     hint: 'user' | 'status' | 'channel' | 'generic' = 'generic'
 ): string {
-    const { t, users, statuses, channels } = ctx;
+    const { t, users, statuses, channels, language = 'en' } = ctx;
     if (value == null || value === '' || value === 'None' || value === 'null') {
         return t('timelineValueEmpty');
     }
@@ -350,16 +352,16 @@ export function formatTimelineEventValue(
 
     if (hint === 'status' || hint === 'generic') {
         const statusById = statuses.find((s) => s.id.toString() === trimmed);
-        if (statusById) return statusById.name;
+        if (statusById) return seedLabel(statusById.name, language);
         const statusByName = statuses.find((s) => normalizeToken(s.name) === normalized);
-        if (statusByName) return statusByName.name;
+        if (statusByName) return seedLabel(statusByName.name, language);
     }
 
     if (hint === 'channel' || hint === 'generic') {
         const channelById = channels.find((c) => c.id.toString() === trimmed);
-        if (channelById) return channelById.name;
+        if (channelById) return seedLabel(channelById.name, language);
         const channelByName = channels.find((c) => normalizeToken(c.name) === normalized);
-        if (channelByName) return channelByName.name;
+        if (channelByName) return seedLabel(channelByName.name, language);
         if (normalized === 'whatsapp') return t('whatsappSource');
     }
 
@@ -367,7 +369,7 @@ export function formatTimelineEventValue(
         return t('timelineValueEmpty');
     }
 
-    return trimmed;
+    return seedLabel(trimmed, language);
 }
 
 export function inferValueHintFromEditNotes(

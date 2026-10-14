@@ -5,6 +5,7 @@ import { Stage } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useStages, useDeleteStage, useUpdateStage } from '../../hooks/useQueries';
 import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
+import { seedLabel } from '../../utils/seedLabels';
 
 export const StagesSettings = () => {
     const { 
@@ -121,7 +122,7 @@ export const StagesSettings = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {stage.name}
+                                            {seedLabel(stage.name, language)}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 text-center">

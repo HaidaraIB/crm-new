@@ -6,6 +6,7 @@ import { useAppContext } from '../context/AppContext';
 import { Card, PageWrapper, TargetIcon, UsersIcon, DealIcon, CheckIcon, SectionLoadingState, ClockIcon, TableHorizontalScroll, PaymentResultBanner, RefreshButton } from '../components/index';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip, XAxis, YAxis, CartesianGrid, Area, AreaChart } from 'recharts';
 import { getStageDisplayLabel } from '../utils/taskStageMapper';
+import { seedLabel } from '../utils/seedLabels';
 import { ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import {
     useStages,
@@ -205,13 +206,17 @@ export const DashboardPage = () => {
                 st.name.toLowerCase().replace(/\s+/g, '_') === row.name.toLowerCase().replace(/\s+/g, '_') ||
                 st.name === row.name
             );
+            const rawName = row.name;
+            const seeded = seedLabel(rawName, language);
             return {
-                name: getStageDisplayLabel(row.name.toLowerCase().replace(/\s+/g, '_') as any, t) || row.name,
+                name: seeded !== rawName
+                    ? seeded
+                    : (getStageDisplayLabel(rawName.toLowerCase().replace(/\s+/g, '_') as any, t) || rawName),
                 value: row.value,
                 fill: stageConfig?.color || fallbackColors[index % fallbackColors.length],
             };
         });
-    }, [stages, summary?.stages, t]);
+    }, [stages, summary?.stages, t, language]);
 
     const filteredWeekLeadsData = useMemo(() => {
         const locale = language === 'ar' ? ARABIC_DATE_LOCALE : 'en-US';
@@ -906,7 +911,7 @@ export const DashboardPage = () => {
                                             style={{ backgroundColor: entry.fill }}
                                         ></div>
                                         <span className="text-gray-700 dark:text-gray-300 font-medium truncate">
-                                            {entry.name}
+                                            {seedLabel(entry.name, language)}
                                         </span>
                                     </div>
                                     <span className="text-gray-600 dark:text-gray-400 font-semibold ml-2 flex-shrink-0">

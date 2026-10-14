@@ -7,6 +7,7 @@ import { Modal } from '../Modal';
 import { Button } from '../Button';
 import { useCreateClientVisit, useVisitTypes } from '../../hooks/useQueries';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -172,7 +173,7 @@ export const AddVisitModal = () => {
                     >
                         {visitTypes.length > 0 ? (
                             visitTypes.map((v: { id: number; name: string }) => (
-                                <option key={v.id} value={v.name}>{v.name}</option>
+                                <option key={v.id} value={v.name}>{seedLabel(v.name, language)}</option>
                             ))
                         ) : (
                             <option value="">{t('noVisitTypesAvailable') || 'No visit types'}</option>

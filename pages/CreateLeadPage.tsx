@@ -14,6 +14,7 @@ import { LeadLocationMapPicker } from '../components/LeadLocationMapPicker';
 import { buildLeadLocationApiBody } from '../utils/leadLocation';
 import { mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
 import { catalogFieldErrors, serverFieldErrors } from '../forms';
+import { seedLabel } from '../utils/seedLabels';
 import { scrollToFirstFieldError } from '../utils/formFieldErrors';
 import { Alert } from '../components/Alert';
 
@@ -36,7 +37,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const CreateLeadPage = () => {
-    const { t, setCurrentPage, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
+    const { t, language, setCurrentPage, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const isDataEntryUser = isDataEntryOnlyRole(currentUser?.role);
     const postCreateNavigateToAllLeads =
         isDataEntryUser || normalizeRole(currentUser?.role) === 'Reception';
@@ -674,7 +675,7 @@ export const CreateLeadPage = () => {
                                 {channels.length > 0 ? (
                                     channels.map(channel => (
                                         <option key={channel.id} value={channel.id.toString()}>
-                                            {channel.name}
+                                            {seedLabel(channel.name, language)}
                                         </option>
                                     ))
                                 ) : (
@@ -702,7 +703,7 @@ export const CreateLeadPage = () => {
                                         .filter(s => !s.isHidden)
                                         .map(status => (
                                             <option key={status.id} value={status.id.toString()}>
-                                                {status.name}
+                                                {seedLabel(status.name, language)}
                                             </option>
                                         ))
                                 ) : (

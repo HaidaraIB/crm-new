@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { seedLabel } from '../../utils/seedLabels';
 import { Button, Modal } from '../index';
 import { AutoDirTextarea } from '../Input';
 import { useDealLostReasons } from '../../hooks/useQueries';
@@ -14,7 +15,7 @@ type DealWonLostModalProps = {
 };
 
 export const DealWonLostModal = ({ stage, onClose, onConfirm, submitting }: DealWonLostModalProps) => {
-  const { t } = useAppContext();
+  const { t, language } = useAppContext();
   const { data: reasons = [] } = useDealLostReasons();
   const [lostReason, setLostReason] = useState('');
   const [lostNote, setLostNote] = useState('');
@@ -92,7 +93,7 @@ export const DealWonLostModal = ({ stage, onClose, onConfirm, submitting }: Deal
             >
               <option value="">{t('dealSelectLostReason')}</option>
               {reasons.map((reason) => (
-                <option key={reason.id} value={reason.id}>{reason.name}</option>
+                <option key={reason.id} value={reason.id}>{seedLabel(reason.name, language)}</option>
               ))}
             </select>
             {(errors.lostReason || errors.lost_reason) && (

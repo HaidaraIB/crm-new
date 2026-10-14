@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { useUpdateCallMethod } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -84,7 +85,7 @@ export const EditCallMethodModal = () => {
         if (editingCallMethod) {
             const cm = editingCallMethod as { isDefault?: boolean; is_default?: boolean };
             const initState = {
-                name: editingCallMethod.name,
+                name: seedLabel(editingCallMethod.name, language),
                 description: editingCallMethod.description || '',
                 color: editingCallMethod.color || '#808080',
                 isDefault: cm.isDefault ?? cm.is_default ?? false,
@@ -95,7 +96,7 @@ export const EditCallMethodModal = () => {
         } else {
             initialPayloadRef.current = null;
         }
-    }, [editingCallMethod, currentUser?.company?.id]);
+    }, [editingCallMethod, currentUser?.company?.id, language]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         const { id, value, type } = e.target;

@@ -11,6 +11,7 @@ import { leadHasPhone, resolveLeadPhoneRaw } from '../../utils/smsSendHelpers';
 import { Button, Loader, PhoneText } from '../index';
 import { getStatusSurfaceStyles } from '../LeadStatusDropdown';
 import { ChevronDownIcon, SearchIcon } from '../icons';
+import { seedLabel } from '../../utils/seedLabels';
 
 const LEAD_TYPES = ['fresh', 'hot', 'cold'] as const;
 const PRIORITIES = ['high', 'medium', 'low'] as const;
@@ -73,7 +74,9 @@ function formatLeadPriority(priority: string, t: (key: string) => string): strin
     return priority;
 }
 
-function formatLeadStatus(status: string, t: (key: string) => string): string {
+function formatLeadStatus(status: string, t: (key: string) => string, language: string): string {
+    const seeded = seedLabel(status, language);
+    if (seeded !== status) return seeded;
     return t(getStatusTranslationKey(status) as any) || status;
 }
 
@@ -408,14 +411,14 @@ export function CampaignLeadPicker({
         () =>
             statusOptions.map((s: { name: string; color?: string }) => ({
                 value: s.name,
-                label: formatLeadStatus(s.name, t),
+                label: formatLeadStatus(s.name, t, language),
                 colorDot: s.color,
             })),
-        [statusOptions, t],
+        [statusOptions, t, language],
     );
     const channelOptions = useMemo(
-        () => channels.map((c: { id: number; name: string }) => ({ value: String(c.id), label: c.name })),
-        [channels],
+        () => channels.map((c: { id: number; name: string }) => ({ value: String(c.id), label: seedLabel(c.name, language) })),
+        [channels, language],
     );
     const tagOptions = useMemo(
         () =>
@@ -531,7 +534,7 @@ export function CampaignLeadPicker({
                 label: t('status'),
                 chips: filters.statuses.map((status) => ({
                     key: `s-${status}`,
-                    label: formatLeadStatus(status, t),
+                    label: formatLeadStatus(status, t, language),
                     onRemove: () => setFilter('statuses', filters.statuses.filter((v) => v !== status)),
                 })),
             });
@@ -613,7 +616,7 @@ export function CampaignLeadPicker({
         }
 
         return groups;
-    }, [filters, t, channelOptions, tagOptions, assigneeLabel, dateActive, dateLabel]);
+    }, [filters, t, language, channelOptions, tagOptions, assigneeLabel, dateActive, dateLabel]);
 
     const filtersActive = hasActiveFilters(filters, searchApplied);
     const clearFiltersButton = filtersActive ? (
@@ -931,7 +934,7 @@ export function CampaignLeadPicker({
                                             <div className="flex flex-wrap gap-1.5 mt-1">
                                                 {statusName && (
                                                     <span className="inline-flex px-1.5 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-                                                        {formatLeadStatus(statusName, t)}
+                                                        {formatLeadStatus(statusName, t, language)}
                                                     </span>
                                                 )}
                                                 {typeVal && (

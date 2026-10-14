@@ -6,6 +6,7 @@ import { Channel } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 import { useChannels, useDeleteChannel, useUpdateChannel } from '../../hooks/useQueries';
 import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
+import { seedLabel } from '../../utils/seedLabels';
 
 
 export const ChannelsSettings = () => {
@@ -150,7 +151,7 @@ export const ChannelsSettings = () => {
                                 >
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {channel.name}
+                                            {seedLabel(channel.name, language)}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">

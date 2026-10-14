@@ -15,6 +15,7 @@ import { parseLeadCoordinate } from '../utils/leadLocation';
 import { mapApiLeadToDisplayLead, normalizeLead } from '../utils/normalizeLead';
 import { mapLeadApiErrorToFieldErrors } from '../utils/leadFormValidation';
 import { catalogFieldErrors, serverFieldErrors } from '../forms';
+import { seedLabel } from '../utils/seedLabels';
 import { scrollToFirstFieldError } from '../utils/formFieldErrors';
 import { Alert } from '../components/Alert';
 import { LeadUrgentToggle } from '../components/LeadUrgentToggle';
@@ -40,7 +41,7 @@ const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: str
 );
 
 export const EditLeadPage = () => {
-    const { t, setCurrentPage, editingLead, setEditingLead, setSelectedLead, currentUser } = useAppContext();
+    const { t, language, setCurrentPage, editingLead, setEditingLead, setSelectedLead, currentUser } = useAppContext();
     const goLeads = () => {
         window.history.pushState({}, '', '/leads');
         setCurrentPage('Leads');
@@ -770,7 +771,7 @@ export const EditLeadPage = () => {
                                 {channels.length > 0 ? (
                                     channels.map(channel => (
                                         <option key={channel.id} value={channel.id.toString()}>
-                                            {channel.name}
+                                            {seedLabel(channel.name, language)}
                                         </option>
                                     ))
                                 ) : (
@@ -808,7 +809,7 @@ export const EditLeadPage = () => {
                                         .filter(s => !s.isHidden)
                                         .map(status => (
                                             <option key={status.id} value={status.id.toString()}>
-                                                {status.name}
+                                                {seedLabel(status.name, language)}
                                             </option>
                                         ))
                                 ) : (

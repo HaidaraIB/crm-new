@@ -8,6 +8,7 @@ import { TaskStage, Stage } from '../types';
 
 type CallMethodItem = { id: number; name: string; color?: string };
 import { getStageDisplayLabel, getStageCategory } from '../utils/taskStageMapper';
+import { seedLabel } from '../utils/seedLabels';
 import { isSameDay, ARABIC_DATE_LOCALE, withLatinDigits } from '../utils/dateUtils';
 import {
     readMissionBarTodosPreset,
@@ -897,7 +898,7 @@ export const TodosPage = () => {
                                         }}
                                         className="focus:ring-0 focus-visible:ring-2 focus-visible:!ring-inset focus-visible:!ring-offset-0"
                                     >
-                                        <Icon className="w-4 h-4" /> {stage.name}
+                                        <Icon className="w-4 h-4" /> {seedLabel(stage.name, language)}
                                     </Button>
                                 );
                                 })
@@ -1088,7 +1089,9 @@ export const TodosPage = () => {
                                                                     color: textColor,
                                                                 } : undefined}
                                                             >
-                                                                {getStageDisplayLabel(displayName)}
+                                                                {seedLabel(displayName, language) !== displayName
+                                                                    ? seedLabel(displayName, language)
+                                                                    : getStageDisplayLabel(displayName, t)}
                                                             </span>
                                                         )}
                                                     </td>
@@ -1125,7 +1128,7 @@ export const TodosPage = () => {
                                                                             color: cmText,
                                                                         } : undefined}
                                                                     >
-                                                                        {callMethodName || '-'}
+                                                                        {seedLabel(callMethodName, language) || '-'}
                                                                     </span>
                                                                 );
                                                             })()

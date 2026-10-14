@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { seedLabel } from '../../utils/seedLabels';
 import { TableHorizontalScroll } from '../index';
 import { DealRowActions } from './DealRowActions';
 import { formatDealMoney, isDealOverdue } from '../../utils/deals/dealFormatters';
@@ -34,7 +35,7 @@ export const DealsTable = ({
   onEdit,
   onView,
 }: DealsTableProps) => {
-  const { t } = useAppContext();
+  const { t, language } = useAppContext();
   const pageIds = deals.map((deal) => deal.id);
   const allSelected = pageIds.length > 0 && pageIds.every((id) => selectedIds.includes(id));
 
@@ -87,7 +88,7 @@ export const DealsTable = ({
                 <td className="px-4 py-3">
                   <span className="inline-flex items-center gap-2">
                     <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: deal.pipelineStageColor || '#94a3b8' }} />
-                    {deal.pipelineStageName || deal.stage}
+                    {seedLabel(deal.pipelineStageName || deal.stage, language)}
                   </span>
                 </td>
                 <td className="px-4 py-3 tabular-nums">{formatDealMoney(deal.value, deal.currency)}</td>

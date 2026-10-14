@@ -12,6 +12,7 @@ import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useQuery } from '@tanstack/react-query';
 import { getConnectedAccountAPI } from '../services/api';
 import { getLocalizedApiErrorMessage } from '../utils/apiErrorMessage';
+import { seedLabel } from '../utils/seedLabels';
 import { useFieldVisitAllowed } from '../hooks/useFieldVisitAllowed';
 import { useStatusChangeReason } from '../hooks/useStatusChangeReason';
 import { StatusChangeReasonModal } from '../components/modals/StatusChangeReasonModal';
@@ -371,6 +372,8 @@ export const ViewLeadPage = () => {
 
     // Ø¯Ø§Ù„Ø© Ù„ØªØ­ÙˆÙŠÙ„ stage Ø¥Ù„Ù‰ Ù†Øµ Ø¬Ù…ÙŠÙ„
     const formatStage = (stage: string): string => {
+        const seeded = seedLabel(stage, language);
+        if (seeded !== stage) return seeded;
         // Try to translate using status translation keys first
         const translationKey = getStatusTranslationKey(stage);
         const translated = t(translationKey as any);
@@ -565,7 +568,7 @@ export const ViewLeadPage = () => {
         const calls = leadClientCalls.map(cc => {
             const user = users.find(u => u.id === (cc.created_by || cc.createdBy));
             const callMethod = callMethods.find(cm => cm.id === (cc.call_method || cc.callMethod));
-            const callMethodName = callMethod?.name || cc.call_method_name || t('call') || 'Call';
+            const callMethodName = seedLabel(callMethod?.name || cc.call_method_name, language) || t('call') || 'Call';
             
             // Use call_datetime if available, otherwise use created_at
             const callDate = cc.call_datetime || cc.created_at || cc.createdAt;
@@ -610,7 +613,7 @@ export const ViewLeadPage = () => {
         const visits = leadClientVisits.map((cv: Record<string, unknown>) => {
             const user = users.find(u => u.id === (cv.created_by || cv.createdBy));
             const vt = visitTypes.find((x: { id: number }) => x.id === (cv.visit_type as number));
-            const visitTypeName = vt?.name || (cv.visit_type_name as string) || (t('visit') as string) || 'Visit';
+            const visitTypeName = seedLabel(vt?.name || (cv.visit_type_name as string), language) || (t('visit') as string) || 'Visit';
 
             const visitDateRaw = (cv.visit_datetime as string) || (cv.created_at as string) || (cv.createdAt as string);
             const timestamp = new Date(visitDateRaw).getTime();
@@ -663,7 +666,7 @@ export const ViewLeadPage = () => {
             : [];
 
         // Format Events (ClientEvents)
-        const eventFormatCtx = { t, users, statuses, channels };
+        const eventFormatCtx = { t, users, statuses, channels, language };
 
         const events = clientEvents.map(ce => {
             const actor = resolveTimelineActor({
@@ -1133,7 +1136,7 @@ export const ViewLeadPage = () => {
                         <div>
                             <label className="text-xs font-medium text-gray-600 dark:text-gray-400 uppercase tracking-wide">{t('communicationWay')}</label>
                             <p className="text-base font-medium text-gray-900 dark:text-gray-100 mt-1">
-                                {(displayLead as any).communication_way_name || displayLead.communicationWay || '-'}
+                                {seedLabel((displayLead as any).communication_way_name || displayLead.communicationWay, language) || '-'}
                             </p>
                         </div>
                         {(() => {

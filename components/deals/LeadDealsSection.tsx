@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { seedLabel } from '../../utils/seedLabels';
 import { Button, Card } from '../index';
 import { useDeals } from '../../hooks/useQueries';
 import { formatDealMoney } from '../../utils/deals/dealFormatters';
@@ -7,7 +8,7 @@ import { getCompanyDealRoute } from '../../utils/routing';
 import type { Deal } from '../../types';
 
 export const LeadDealsSection = ({ leadId }: { leadId: number }) => {
-  const { t, currentUser, setCurrentPage, setSelectedLeadForDeal } = useAppContext();
+  const { t, language, currentUser, setCurrentPage, setSelectedLeadForDeal } = useAppContext();
   const { data } = useDeals(undefined, undefined, undefined, undefined, undefined, { client: leadId });
   const deals: Deal[] = Array.isArray(data) ? data : data?.results || [];
   const open = (segment: string, page: 'ViewDeal' | 'CreateDeal') => {
@@ -28,7 +29,7 @@ export const LeadDealsSection = ({ leadId }: { leadId: number }) => {
             <button key={deal.id} type="button" onClick={() => open(`view-deal/${deal.id}`, 'ViewDeal')} className="flex w-full items-center justify-between gap-3 rounded-lg border border-gray-200 px-3 py-2 text-start text-sm hover:bg-gray-50 dark:border-gray-700 dark:hover:bg-gray-800/40">
               <span className="flex min-w-0 items-center gap-2">
                 <span className="truncate font-medium text-gray-900 hover:text-primary-700 dark:text-white dark:hover:text-primary-200">{deal.title || deal.clientName}</span>
-                <span className="shrink-0 text-gray-500">{deal.pipelineStageName || deal.stage}</span>
+                <span className="shrink-0 text-gray-500">{seedLabel(deal.pipelineStageName || deal.stage, language)}</span>
               </span>
               <span className="shrink-0 tabular-nums">{formatDealMoney(deal.value, deal.currency)}</span>
             </button>

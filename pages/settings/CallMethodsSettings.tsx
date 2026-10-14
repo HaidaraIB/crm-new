@@ -5,6 +5,7 @@ import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll, Ico
 import { useAppContext } from '../../context/AppContext';
 import { useCallMethods, useDeleteCallMethod, useUpdateCallMethod } from '../../hooks/useQueries';
 import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
+import { seedLabel } from '../../utils/seedLabels';
 
 export interface CallMethod {
   id: number;
@@ -130,7 +131,7 @@ export const CallMethodsSettings = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">
                                         <div className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                                            {callMethod.name}
+                                            {seedLabel(callMethod.name, language)}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-center">

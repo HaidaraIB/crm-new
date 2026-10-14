@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { useCreateTask, useDeals, useStages } from '../../hooks/useQueries';
 import { userCanListDealsApi } from '../../utils/roles';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -230,7 +231,7 @@ export const AddTodoModal = () => {
                         {(stages || []).length > 0 ? (
                             (stages || []).map((stage: any) => (
                                 <option key={stage.id} value={stage.id.toString()}>
-                                    {stage.name}
+                                    {seedLabel(stage.name, language)}
                                 </option>
                             ))
                         ) : (

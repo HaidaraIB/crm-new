@@ -14,10 +14,12 @@ import { exportToExcel } from '../utils/exportToExcel';
 import { getCompanyDealRoute } from '../utils/routing';
 import { usePersistedPageSize } from '../hooks/usePersistedPageSize';
 import type { Deal } from '../types';
+import { seedLabel } from '../utils/seedLabels';
 
 export const DealsPage = () => {
   const {
     t,
+    language,
     currentUser,
     dealFilters,
     setDealFilters,
@@ -86,7 +88,7 @@ export const DealsPage = () => {
         id: deal.id,
         title: deal.title,
         clientName: deal.clientName,
-        stage: deal.pipelineStageName || deal.stage,
+        stage: seedLabel(deal.pipelineStageName || deal.stage, language),
         value: deal.value,
         owner: deal.employeeUsername || '',
       })),
@@ -131,7 +133,7 @@ export const DealsPage = () => {
             setDealFilters({ ...dealFilters, pipeline: e.target.value });
           }}
         >
-          {pipelines.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {pipelines.map((item) => <option key={item.id} value={item.id}>{seedLabel(item.name, language)}</option>)}
         </select>
         <ViewModeToggle value={viewMode} onChange={setViewMode} />
       </div>
@@ -196,7 +198,7 @@ export const DealsPage = () => {
           }}
         >
           <option value="">{t('dealBulkMove')}</option>
-          {(pipeline?.stages || []).filter((stage) => stage.stageType !== 'lost').map((stage) => <option key={stage.id} value={stage.id}>{stage.name}</option>)}
+          {(pipeline?.stages || []).filter((stage) => stage.stageType !== 'lost').map((stage) => <option key={stage.id} value={stage.id}>{seedLabel(stage.name, language)}</option>)}
         </select>
         <Button
           variant="danger"

@@ -6,6 +6,7 @@ import { getDealsAPI, moveDealAPI } from '../../services/api';
 import { mapApiDeal } from '../../utils/deals/dealMapper';
 import { formatDealMoney } from '../../utils/deals/dealFormatters';
 import { useAppContext } from '../../context/AppContext';
+import { seedLabel } from '../../utils/seedLabels';
 import type { Deal, DealPipeline, DealPipelineStage } from '../../types';
 import type { DealQueryParams } from '../../services/api';
 
@@ -21,7 +22,7 @@ type DealsKanbanViewProps = {
 };
 
 export const DealsKanbanView = ({ pipeline, filters, refreshKey = 0, onOpen, onEdit, onDelete }: DealsKanbanViewProps) => {
-  const { t } = useAppContext();
+  const { t, language } = useAppContext();
   const stages = pipeline?.stages || [];
   const [itemsByColumn, setItemsByColumn] = useState<Record<string, Deal[]>>({});
   const [pending, setPending] = useState<{ deal: Deal; stage: DealPipelineStage } | null>(null);
@@ -44,10 +45,10 @@ export const DealsKanbanView = ({ pipeline, filters, refreshKey = 0, onOpen, onE
 
   const columns = useMemo(() => stages.map((stage) => ({
     id: stage.id,
-    title: stage.name,
+    title: seedLabel(stage.name, language),
     color: stage.color,
     count: itemsByColumn[String(stage.id)]?.length || 0,
-  })), [stages, itemsByColumn]);
+  })), [stages, itemsByColumn, language]);
 
   const moveLocally = (deal: Deal, stage: DealPipelineStage) => {
     setItemsByColumn((prev) => {

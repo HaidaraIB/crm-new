@@ -9,6 +9,7 @@ import { Channel } from '../../types';
 import { useUpdateChannel } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -109,7 +110,7 @@ export const EditChannelModal = () => {
         if (editingChannel) {
             const ch = editingChannel as Channel & { is_default?: boolean };
             const initState = {
-                name: editingChannel.name,
+                name: seedLabel(editingChannel.name, language),
                 type: editingChannel.type,
                 priority: (editingChannel.priority?.toLowerCase() || 'medium') as 'high' | 'medium' | 'low',
                 isDefault: ch.isDefault ?? ch.is_default ?? false,
@@ -120,7 +121,7 @@ export const EditChannelModal = () => {
         } else {
             initialPayloadRef.current = null;
         }
-    }, [editingChannel, currentUser?.company?.id]);
+    }, [editingChannel, currentUser?.company?.id, language]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { id, value, type } = e.target;

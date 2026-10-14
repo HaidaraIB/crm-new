@@ -4,6 +4,7 @@ import { Card, Button, TrashIcon, PlusIcon, EditIcon, TableHorizontalScroll, Ico
 import { useAppContext } from '../../context/AppContext';
 import { useVisitTypes, useDeleteVisitType, useUpdateVisitType } from '../../hooks/useQueries';
 import { SetAsDefaultButton } from '../../components/settings/SetAsDefaultButton';
+import { seedLabel } from '../../utils/seedLabels';
 
 export interface VisitTypeRow {
   id: number;
@@ -121,7 +122,7 @@ export const VisitTypesSettings = () => {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{row.name}</div>
+                                            <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{seedLabel(row.name, language)}</div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-center">
                                             <div className="text-sm text-gray-700 dark:text-gray-300">

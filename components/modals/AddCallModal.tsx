@@ -8,6 +8,7 @@ import { Button } from '../Button';
 import { CallMethod } from '../../pages/settings/CallMethodsSettings';
 import { useCreateClientCall, useCallMethods } from '../../hooks/useQueries';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { seedLabel } from '../../utils/seedLabels';
 
 // FIX: Made children optional to fix missing children prop error.
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
@@ -178,7 +179,7 @@ export const AddCallModal = () => {
                         {(callMethods || []).length > 0 ? (
                             (callMethods || []).map(c => (
                                 <option key={c.id} value={c.name}>
-                                    {c.name}
+                                    {seedLabel(c.name, language)}
                                 </option>
                             ))
                         ) : (

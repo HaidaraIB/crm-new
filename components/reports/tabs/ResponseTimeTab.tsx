@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import type { ResponseBucketKey } from '../../../services/reportsTypes';
 import { formatCount, formatDuration, formatPercent } from '../../../utils/reportFormat';
+import { useReportPref } from '../../../utils/reportPrefs';
 import { BUCKET_LABEL_KEYS, channelLabel, responseKindLabel } from '../../../utils/reportLabels';
 import { BarList, ResponseHeatmap } from '../ReportCharts';
 import { EmptyState, KpiTile, ReportCard, ResponseTimeCell } from '../ReportKit';
@@ -19,7 +20,7 @@ const BUCKET_COLORS: Record<ResponseBucketKey, string> = {
 
 export const ResponseTimeTab = ({ query, onDrill }: TabProps) => {
   const { t, openLeadDetails } = useAppContext();
-  const [basis, setBasis] = useState<'business' | 'wall'>('business');
+  const [basis, setBasis] = useReportPref('basis', 'business');
   const drill = (title: string, extra: object) => () => onDrill({ title, query: { ...query, ...extra } });
 
   return (

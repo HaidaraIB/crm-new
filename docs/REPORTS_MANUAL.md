@@ -58,6 +58,8 @@ The page has four parts, top to bottom:
 
 The tab, period and compare setting are saved in the page address. Copy the link to send exactly this view to a colleague who has access.
 
+**Reports remembers how you left it.** Next time you open Reports (from the sidebar, after a refresh, or on another day) it returns to your last tab, period (including a custom range), compare setting and filters, plus the Work-hours / Elapsed toggle on the Response time tab and the sort column on the Employees tab. This is stored in your own browser, separately for each person, so it never affects anyone else. A link that spells out a tab or period always wins, so shared links open exactly as sent. To start fresh, choose a preset, press **Reset** in Filters, or clear your browser's site data.
+
 ## 3. Choosing the period
 
 ![Custom range](reports-manual/en/09-custom-range.png)

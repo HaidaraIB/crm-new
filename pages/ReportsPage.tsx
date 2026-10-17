@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import { PageWrapper, Button, FilterButton, RefreshButton, hasActiveFilters } from '../components/index';
 import { useAppContext } from '../context/AppContext';
@@ -19,7 +19,9 @@ import { CallsTab } from '../components/reports/tabs/CallsTab';
 import { DealsTab } from '../components/reports/tabs/DealsTab';
 import { DEFAULT_REPORT_FILTERS, filtersToQuery } from '../utils/reportFilters';
 import type { TKey } from '../utils/reportLabels';
+import { loadReportPrefs, saveReportPrefs } from '../utils/reportPrefs';
 import {
+  DEFAULT_REPORT_PERIOD,
   type ReportPeriod,
   periodFromSearch,
   periodToSearch,
@@ -62,23 +64,33 @@ const TAB_COMPONENTS: Record<ReportTab, React.ComponentType<{ query: ReportQuery
   deals: DealsTab,
 };
 
-/** Tab, period and compare live in the query string so a report can be shared as a link. */
-function readUrlState(defaultTab: ReportTab) {
+/**
+ * Where the page starts, in order of priority:
+ *   1. what the address says (a shared link or a refresh keeps its exact view);
+ *   2. the tab a legacy route asks for (the old Employees / Marketing / Calls report pages);
+ *   3. what this person used last time on this browser;
+ *   4. the defaults (Overview, last 30 days).
+ */
+function resolveInitialState(explicitTab: ReportTab | undefined, userId: number | string | undefined) {
   const search = new URLSearchParams(window.location.search);
-  const tab = search.get('tab');
+  const stored = loadReportPrefs(userId);
+  const hasUrlView = ['tab', 'preset', 'start', 'end'].some((k) => search.has(k));
+  const hasUrlPeriod = search.has('preset') || (search.has('start') && search.has('end'));
+  const urlTab = search.get('tab');
+  const tab: ReportTab = isTab(urlTab) ? urlTab : (explicitTab ?? (stored.tab && isTab(stored.tab) ? stored.tab : 'overview'));
   return {
-    tab: isTab(tab) ? tab : defaultTab,
-    period: periodFromSearch(search),
-    compare: search.get('compare') === '1',
+    tab,
+    period: hasUrlPeriod ? periodFromSearch(search) : (stored.period ?? DEFAULT_REPORT_PERIOD),
+    compare: hasUrlView ? search.get('compare') === '1' : (stored.compare ?? false),
   };
 }
 
-export const ReportsPage = ({ defaultTab = 'overview' }: { defaultTab?: ReportTab }) => {
-  const { t, language, currentUser, reportFilters, setIsReportFilterDrawerOpen } = useAppContext();
+export const ReportsPage = ({ defaultTab }: { defaultTab?: ReportTab }) => {
+  const { t, language, currentUser, reportFilters, setReportFilters, setIsReportFilterDrawerOpen } = useAppContext();
   const queryClient = useQueryClient();
   const timeZone = safeTimeZone(currentUser?.company?.timezone);
 
-  const initial = useMemo(() => readUrlState(defaultTab), []); // eslint-disable-line react-hooks/exhaustive-deps
+  const initial = useMemo(() => resolveInitialState(defaultTab, currentUser?.id), []); // eslint-disable-line react-hooks/exhaustive-deps
   const [tab, setTab] = useState<ReportTab>(initial.tab);
   const [period, setPeriod] = useState<ReportPeriod>(initial.period);
   const [compare, setCompare] = useState(initial.compare);
@@ -93,6 +105,21 @@ export const ReportsPage = ({ defaultTab = 'overview' }: { defaultTab?: ReportTa
     else search.delete('compare');
     window.history.replaceState(window.history.state, '', `${window.location.pathname}?${search.toString()}${window.location.hash}`);
   }, [tab, period, compare]);
+
+  // Remember how this person left the page. Filters live in AppContext, so they are restored once on
+  // mount; the first save is skipped so the not-yet-restored defaults can never overwrite the stored view.
+  const prefsReady = useRef(false);
+  useEffect(() => {
+    const stored = loadReportPrefs(currentUser?.id);
+    if (stored.filters) setReportFilters(stored.filters);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    if (!prefsReady.current) {
+      prefsReady.current = true;
+      return;
+    }
+    saveReportPrefs(currentUser?.id, { tab, period, compare, filters: reportFilters });
+  }, [tab, period, compare, reportFilters, currentUser?.id]);
 
   const range = useMemo(() => resolvePeriod(period, timeZone), [period, timeZone]);
   const query = useMemo<ReportQuery>(

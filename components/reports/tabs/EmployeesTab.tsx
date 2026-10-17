@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import type { EmployeesReport } from '../../../services/reportsTypes';
 import { formatCount, formatDuration, formatMoney, formatPercent } from '../../../utils/reportFormat';
+import { useReportPref } from '../../../utils/reportPrefs';
 import { EmptyState, KpiTile, ReportCard, ResponseTimeCell } from '../ReportKit';
 import { DataTable, DrillNumber, rowCls, SectionShell, tdCls, type TabProps } from './SectionShell';
 
@@ -24,7 +25,7 @@ const SORTS: Record<string, (r: Row) => number> = {
 
 export const EmployeesTab = ({ query, onDrill }: TabProps) => {
   const { t } = useAppContext();
-  const [sort, setSort] = useState<string>('deals_won');
+  const [sort, setSort] = useReportPref('employeeSort', 'deals_won');
   const drill = (title: string, extra: object) => () => onDrill({ title, query: { ...query, ...extra } });
 
   const sorted = (rows: Row[]) => {

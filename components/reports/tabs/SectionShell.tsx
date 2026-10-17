@@ -31,8 +31,8 @@ export const SectionShell = <S extends ReportSection>({
   );
 };
 
-export const thCls = 'px-3 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 text-start whitespace-nowrap';
-export const tdCls = 'px-3 py-3 text-sm text-gray-900 dark:text-gray-100 text-start align-middle';
+export const thCls = 'px-3 py-3 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 text-center whitespace-nowrap';
+export const tdCls = 'px-3 py-3 text-sm text-gray-900 dark:text-gray-100 text-center align-middle';
 export const rowCls = 'border-b border-gray-100 dark:border-gray-800/70 hover:bg-gray-50/70 dark:hover:bg-gray-800/40';
 
 /** Plain scrollable table used by every tab, so spacing and RTL behaviour stay identical. */

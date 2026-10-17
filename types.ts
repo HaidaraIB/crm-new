@@ -76,6 +76,10 @@ export interface Company {
   work_hours_tracking_enabled?: boolean;
   /** Minutes of no activity before tracking pauses and the user is alerted (1-120). */
   work_hours_idle_timeout_minutes?: number;
+  /** Weekday (0=Monday..6=Sunday) -> opening window in the company timezone; used for business-time response metrics. */
+  business_hours?: Record<string, { open: string; close: string } | null>;
+  /** Target first-response time in minutes (1-10080) for the reports 'within SLA' metric. */
+  response_sla_minutes?: number;
 }
 
 /** Response of `/work-sessions/ping/` and `/work-sessions/today/`. */
@@ -831,23 +835,14 @@ export interface CampaignFilters {
   search: string; // Search by name or code
 }
 
-export interface TeamsReportFilters {
-  selectedTeam: string; // 'all' or user ID
-  leadType: string; // 'all', 'fresh', 'cold'
-  startDate: string;
-  endDate: string;
-}
-
-export interface EmployeesReportFilters {
-  leadType: string; // 'all', 'fresh', 'cold'
-  startDate: string;
-  endDate: string;
-}
-
-export interface MarketingReportFilters {
-  selectedCampaign: string; // 'all' or campaign ID
-  startDate: string;
-  endDate: string;
+/** Committed filters of the Reports hub (the period lives in the URL, not here). Empty list = no filter. */
+export interface ReportFilters {
+  userIds: number[];
+  statusIds: number[];
+  sources: string[];
+  campaignIds: number[];
+  channelIds: number[];
+  leadTypes: string[];
 }
 
 export interface Developer {

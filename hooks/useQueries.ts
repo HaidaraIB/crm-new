@@ -3,7 +3,7 @@
  * This file contains all reusable query hooks for the application
  */
 
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useInfiniteQuery, useMutation, useQueryClient, UseQueryOptions, UseMutationOptions } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
 import type { LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
@@ -65,15 +65,20 @@ import {
   getAIInsightsDashboardAPI,
   getAIManagementReportAPI,
   generateAIManagementReportAPI,
-  getEmployeeReportAPI,
-  getTeamsReportAPI,
-  getMarketingReportAPI,
-  getCallReportAPI,
+  getReportSectionAPI,
+  getReportLeadListAPI,
+  getLeadJourneyAPI,
   approveAIInsightAPI,
   dismissAIInsightAPI,
   runAIAnalysisAPI,
 } from '../services/api';
-import type { MissionBarSummary, DashboardSummary, ReportQueryParams, CallReportResponse, LeadSocialMessageResponse, DealQueryParams } from '../services/api';
+import type {
+  ReportLeadListQuery,
+  ReportQuery,
+  ReportSection,
+  ReportSectionMap,
+} from '../services/reportsTypes';
+import type { MissionBarSummary, DashboardSummary, LeadSocialMessageResponse, DealQueryParams } from '../services/api';
 import { mapApiDeal, mapApiDealEvent, mapApiDealSummary, mapApiLostReason, mapApiPipeline } from '../utils/deals/dealMapper';
 
 // ==================== Query Keys ====================
@@ -87,10 +92,9 @@ export const queryKeys = {
   missionBarSummary: ['missionBarSummary'] as const,
   dashboardSummary: (days?: number, source?: string, dailyTarget?: number) =>
     ['dashboardSummary', days ?? 7, source ?? 'all', dailyTarget ?? 5] as const,
-  employeeReport: (params?: ReportQueryParams) => ['employeeReport', params] as const,
-  teamsReport: (params?: ReportQueryParams) => ['teamsReport', params] as const,
-  marketingReport: (params?: ReportQueryParams) => ['marketingReport', params] as const,
-  callReport: (params?: ReportQueryParams) => ['callReport', params] as const,
+  reportSection: (section: string, query?: unknown) => ['reportSection', section, query] as const,
+  reportLeadList: (query?: unknown) => ['reportLeadList', query] as const,
+  leadJourney: (id?: number) => ['leadJourney', id] as const,
   workSessionToday: ['workSessionToday'] as const,
   workSessionSummary: (days?: number) => ['workSessionSummary', days ?? 7] as const,
   deals: (page?: number, pageSize?: number, search?: string, stage?: string, extra?: string) =>
@@ -677,18 +681,6 @@ export const useTags = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' |
   });
 };
 
-export const useEmployeeReport = (
-  params?: ReportQueryParams,
-  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
-) => {
-  return useQuery({
-    queryKey: queryKeys.employeeReport(params),
-    queryFn: () => getEmployeeReportAPI(params),
-    staleTime: 60 * 1000,
-    ...options,
-  });
-};
-
 /**
  * The current user's own measured CRM usage for today.
  *
@@ -726,39 +718,38 @@ export const useWorkSessionSummary = (
   });
 };
 
-export const useTeamsReport = (
-  params?: ReportQueryParams,
-  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
+/** One section of the Reports hub. Keeps the previous range on screen while a new one loads. */
+export const useReportSection = <S extends ReportSection>(
+  section: S,
+  query: ReportQuery | null,
+  options?: Omit<UseQueryOptions<ReportSectionMap[S], Error>, 'queryKey' | 'queryFn'>,
 ) => {
   return useQuery({
-    queryKey: queryKeys.teamsReport(params),
-    queryFn: () => getTeamsReportAPI(params),
+    queryKey: queryKeys.reportSection(section, query),
+    queryFn: () => getReportSectionAPI(section, query as ReportQuery),
+    enabled: query != null,
     staleTime: 60 * 1000,
+    placeholderData: keepPreviousData,
     ...options,
   });
 };
 
-export const useMarketingReport = (
-  params?: ReportQueryParams,
-  options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>,
-) => {
+export const useReportLeadList = (query: ReportLeadListQuery | null) => {
   return useQuery({
-    queryKey: queryKeys.marketingReport(params),
-    queryFn: () => getMarketingReportAPI(params),
+    queryKey: queryKeys.reportLeadList(query),
+    queryFn: () => getReportLeadListAPI(query as ReportLeadListQuery),
+    enabled: query != null,
     staleTime: 60 * 1000,
-    ...options,
+    placeholderData: keepPreviousData,
   });
 };
 
-export const useCallReport = (
-  params?: ReportQueryParams,
-  options?: Omit<UseQueryOptions<CallReportResponse, Error>, 'queryKey' | 'queryFn'>,
-) => {
+export const useLeadJourney = (clientId?: number) => {
   return useQuery({
-    queryKey: queryKeys.callReport(params),
-    queryFn: () => getCallReportAPI(params),
+    queryKey: queryKeys.leadJourney(clientId),
+    queryFn: () => getLeadJourneyAPI(clientId as number),
+    enabled: clientId != null,
     staleTime: 60 * 1000,
-    ...options,
   });
 };
 

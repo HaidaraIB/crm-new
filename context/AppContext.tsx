@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useCallback, useRef, createContext, useContext, ReactNode } from 'react';
 import type { Toast } from '../components/ToastHost';
 import type { AlertVariant } from '../components/Alert';
-import { Theme, Language, Page, Lead, User, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ArrivalFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, TeamsReportFilters, EmployeesReportFilters, MarketingReportFilters } from '../types';
+import { Theme, Language, Page, Lead, User, Campaign, Developer, Project, Unit, Owner, Service, ServicePackage, ServiceProvider, Product, ProductCategory, Supplier, Activity, Todo, ClientTask, TimelineEntry, TaskStage, Channel, Stage, Status, Tag, LeadFilters, CallFilters, ArrivalFilters, ActivityFilters, DeveloperFilters, ProjectFilters, UnitFilters, OwnerFilters, ProductFilters, ProductCategoryFilters, SupplierFilters, ServiceFilters, ServicePackageFilters, ServiceProviderFilters, DealFilters, CampaignFilters, ReportFilters } from '../types';
+import { DEFAULT_REPORT_FILTERS } from '../utils/reportFilters';
 import { translations } from '../constants';
 import {
   isMedicalSpecialization,
@@ -181,12 +182,8 @@ export interface AppContextType {
   setIsServiceProviderFilterDrawerOpen: (isOpen: boolean) => void;
   isCampaignsFilterDrawerOpen: boolean;
   setIsCampaignsFilterDrawerOpen: (isOpen: boolean) => void;
-  isTeamsReportFilterDrawerOpen: boolean;
-  setIsTeamsReportFilterDrawerOpen: (isOpen: boolean) => void;
-  isEmployeesReportFilterDrawerOpen: boolean;
-  setIsEmployeesReportFilterDrawerOpen: (isOpen: boolean) => void;
-  isMarketingReportFilterDrawerOpen: boolean;
-  setIsMarketingReportFilterDrawerOpen: (isOpen: boolean) => void;
+  isReportFilterDrawerOpen: boolean;
+  setIsReportFilterDrawerOpen: (isOpen: boolean) => void;
   checkedLeadIds: Set<number>;
   setCheckedLeadIds: React.Dispatch<React.SetStateAction<Set<number>>>;
   primaryColor: string;
@@ -411,12 +408,8 @@ export interface AppContextType {
   supplierFilters: SupplierFilters;
   setSupplierFilters: React.Dispatch<React.SetStateAction<SupplierFilters>>;
   // Reports filters
-  teamsReportFilters: TeamsReportFilters;
-  setTeamsReportFilters: React.Dispatch<React.SetStateAction<TeamsReportFilters>>;
-  employeesReportFilters: EmployeesReportFilters;
-  setEmployeesReportFilters: React.Dispatch<React.SetStateAction<EmployeesReportFilters>>;
-  marketingReportFilters: MarketingReportFilters;
-  setMarketingReportFilters: React.Dispatch<React.SetStateAction<MarketingReportFilters>>;
+  reportFilters: ReportFilters;
+  setReportFilters: React.Dispatch<React.SetStateAction<ReportFilters>>;
   // Settings modals state
   isAddChannelModalOpen: boolean;
   setIsAddChannelModalOpen: (isOpen: boolean) => void;
@@ -632,22 +625,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     createdAtTo: '',
     search: '',
   });
-  const [teamsReportFilters, setTeamsReportFilters] = useState<TeamsReportFilters>({
-    selectedTeam: 'all',
-    leadType: 'all',
-    startDate: '',
-    endDate: '',
-  });
-  const [employeesReportFilters, setEmployeesReportFilters] = useState<EmployeesReportFilters>({
-    leadType: 'all',
-    startDate: '',
-    endDate: '',
-  });
-  const [marketingReportFilters, setMarketingReportFilters] = useState<MarketingReportFilters>({
-    selectedCampaign: 'all',
-    startDate: '',
-    endDate: '',
-  });
+  const [reportFilters, setReportFilters] = useState<ReportFilters>(DEFAULT_REPORT_FILTERS);
   const [selectedLeadForDeal, setSelectedLeadForDeal] = useState<number | null>(null);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [currentUser, setCurrentUserState] = useState<User | null>(() => {
@@ -716,9 +694,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
   const [isServicePackageFilterDrawerOpen, setIsServicePackageFilterDrawerOpen] = useState(false);
   const [isServiceProviderFilterDrawerOpen, setIsServiceProviderFilterDrawerOpen] = useState(false);
   const [isCampaignsFilterDrawerOpen, setIsCampaignsFilterDrawerOpen] = useState(false);
-  const [isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen] = useState(false);
-  const [isEmployeesReportFilterDrawerOpen, setIsEmployeesReportFilterDrawerOpen] = useState(false);
-  const [isMarketingReportFilterDrawerOpen, setIsMarketingReportFilterDrawerOpen] = useState(false);
+  const [isReportFilterDrawerOpen, setIsReportFilterDrawerOpen] = useState(false);
   const [checkedLeadIds, setCheckedLeadIds] = useState<Set<number>>(new Set());
 
   // Inventory state
@@ -1367,6 +1343,8 @@ export const AppProvider = ({ children }: AppProviderProps) => {
       // see IntegrationsPage.tsx's isRestrictedCampaignRole branch.
       // Inbox is allowed; the API scopes it to converted leads assigned to them.
       if (page === 'Library') return false;
+      // Reports are owner / supervisor(can_view_reports) only; the API 403s everyone else.
+      if (page === 'Reports' || page === 'Teams Report' || page === 'Employees Report' || page === 'Marketing Report' || page === 'Call Reports') return false;
       // WhatsApp access is a per-user toggle the owner controls; without it the
       // Chats page can only 403 (and poll the server doing so).
       if (page === 'Chats') return currentUser.whatsapp_chat_enabled !== false;
@@ -1762,9 +1740,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     isServicePackageFilterDrawerOpen, setIsServicePackageFilterDrawerOpen,
     isServiceProviderFilterDrawerOpen, setIsServiceProviderFilterDrawerOpen,
     isCampaignsFilterDrawerOpen, setIsCampaignsFilterDrawerOpen,
-    isTeamsReportFilterDrawerOpen, setIsTeamsReportFilterDrawerOpen,
-    isEmployeesReportFilterDrawerOpen, setIsEmployeesReportFilterDrawerOpen,
-    isMarketingReportFilterDrawerOpen, setIsMarketingReportFilterDrawerOpen,
+    isReportFilterDrawerOpen, setIsReportFilterDrawerOpen,
     checkedLeadIds, setCheckedLeadIds,
     primaryColor, setPrimaryColor: setAppColor,
     activeSubPageColor, setActiveSubPageColor: setAppSubPageColor,
@@ -1848,9 +1824,7 @@ export const AppProvider = ({ children }: AppProviderProps) => {
     productCategoryFilters, setProductCategoryFilters,
     supplierFilters, setSupplierFilters,
     // Reports filters
-    teamsReportFilters, setTeamsReportFilters,
-    employeesReportFilters, setEmployeesReportFilters,
-    marketingReportFilters, setMarketingReportFilters,
+    reportFilters, setReportFilters,
     // Settings modals state
     isAddChannelModalOpen, setIsAddChannelModalOpen,
     isEditChannelModalOpen, setIsEditChannelModalOpen,

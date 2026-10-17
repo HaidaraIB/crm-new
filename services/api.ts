@@ -8,6 +8,7 @@
 import { notifyMaintenanceMode } from '../utils/maintenanceMode';
 import { resolveIntegrationPolicyMessage } from '../utils/integrationPolicyMessage';
 import { isImpersonating, isTabSuperseded } from '../utils/impersonation';
+import type { BusinessHours, LeadJourney, ReportLeadList, ReportLeadListQuery, ReportQuery, ReportSection, ReportSectionMap } from './reportsTypes';
 import type { CampaignRequest, LeadApiFilters, LeadArrival, User, WorkSessionStatus, WorkSessionSummary } from '../types';
 
 function normalizeApiBaseUrl(raw: string): string {
@@ -2785,94 +2786,44 @@ export const getDashboardSummaryAPI = async (params?: {
   return apiRequest<DashboardSummary>(`/clients/dashboard-summary/${query ? `?${query}` : ''}`);
 };
 
-export type ReportQueryParams = {
-  from?: string;
-  to?: string;
-  lead_type?: string;
-  user_id?: number | string;
-  campaign_id?: number | string;
-};
+// ==================== Reports hub (v2) ====================
 
-export type EmployeeReportSummary = {
-  total_calls: number;
-  answered_calls: number;
-  not_answered_calls: number;
-  employee_count: number;
-};
-
-export type TeamReportSummary = EmployeeReportSummary & {
-  total_teams: number;
-  total_leads: number;
-  total_activities: number;
-  total_deals: number;
-};
-
-export type MarketingReportSummary = {
-  total_campaigns: number;
-  total_budget: number;
-  total_leads: number;
-  avg_conversion_rate: string;
-};
-
-function buildReportQuery(params?: ReportQueryParams): string {
+function buildReportV2Query(q: ReportLeadListQuery): string {
   const search = new URLSearchParams();
-  if (params?.from) search.set('from', params.from);
-  if (params?.to) search.set('to', params.to);
-  if (params?.lead_type && params.lead_type !== 'all') search.set('lead_type', params.lead_type);
-  if (params?.user_id && params.user_id !== 'all') search.set('user_id', String(params.user_id));
-  if (params?.campaign_id && params.campaign_id !== 'all') {
-    search.set('campaign_id', String(params.campaign_id));
+  search.set('start', q.start);
+  search.set('end', q.end);
+  if (q.compare) search.set('compare', 'previous');
+  if (q.granularity) search.set('granularity', q.granularity);
+  const lists: Array<[string, Array<string | number> | undefined]> = [
+    ['user_ids', q.user_ids],
+    ['status_ids', q.status_ids],
+    ['sources', q.sources],
+    ['campaign_ids', q.campaign_ids],
+    ['channel_ids', q.channel_ids],
+    ['lead_types', q.lead_types],
+  ];
+  for (const [key, values] of lists) {
+    if (values && values.length) search.set(key, values.join(','));
   }
-  const query = search.toString();
-  return query ? `?${query}` : '';
+  if (q.metric) search.set('metric', q.metric);
+  if (q.status_id != null) search.set('status_id', String(q.status_id));
+  if (q.bucket) search.set('bucket', q.bucket);
+  if (q.search) search.set('search', q.search);
+  if (q.page) search.set('page', String(q.page));
+  if (q.page_size) search.set('page_size', String(q.page_size));
+  return `?${search.toString()}`;
 }
 
-export const getEmployeeReportAPI = async (params?: ReportQueryParams) => {
-  return apiRequest<{ rows: any[]; summary: EmployeeReportSummary }>(
-    `/reports/employees/${buildReportQuery(params)}`,
-  );
+export const getReportSectionAPI = async <S extends ReportSection>(section: S, query: ReportQuery) => {
+  return apiRequest<ReportSectionMap[S]>(`/reports/v2/${section}/${buildReportV2Query(query)}`);
 };
 
-export const getTeamsReportAPI = async (params?: ReportQueryParams) => {
-  return apiRequest<{ rows: any[]; summary: TeamReportSummary }>(
-    `/reports/teams/${buildReportQuery(params)}`,
-  );
+export const getReportLeadListAPI = async (query: ReportLeadListQuery) => {
+  return apiRequest<ReportLeadList>(`/reports/v2/lead-list/${buildReportV2Query(query)}`);
 };
 
-export const getMarketingReportAPI = async (params?: ReportQueryParams) => {
-  return apiRequest<{ rows: any[]; summary: MarketingReportSummary }>(
-    `/reports/marketing/${buildReportQuery(params)}`,
-  );
-};
-
-export type CallReportResponse = {
-  crm: {
-    summary: {
-      total: number;
-      manual: number;
-      answered: number;
-      missed: number;
-      unknown: number;
-    };
-    by_user: Array<{
-      id: number | null;
-      name: string;
-      total: number;
-      answered: number;
-      missed: number;
-      manual: number;
-    }>;
-    by_method: Array<{
-      name: string;
-      total: number;
-      answered: number;
-      missed: number;
-    }>;
-  };
-};
-
-export const getCallReportAPI = async (params?: ReportQueryParams) => {
-  return apiRequest<CallReportResponse>(`/reports/calls/${buildReportQuery(params)}`);
+export const getLeadJourneyAPI = async (clientId: number) => {
+  return apiRequest<LeadJourney>(`/reports/v2/leads/${clientId}/journey/`);
 };
 
 /**
@@ -6561,6 +6512,8 @@ export const updateCompanyAssignmentSettingsAPI = async (
     timezone?: string;
     work_hours_tracking_enabled?: boolean;
     work_hours_idle_timeout_minutes?: number;
+    response_sla_minutes?: number;
+    business_hours?: BusinessHours;
   }
 ) => {
   return apiRequest<any>(`/companies/${companyId}/update_assignment_settings/`, {

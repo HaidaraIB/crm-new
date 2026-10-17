@@ -7,6 +7,7 @@ import { useCurrentUser, queryKeys } from '../../hooks/useQueries';
 import { useQueryClient } from '@tanstack/react-query';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
+import { BusinessHoursSettings } from './BusinessHoursSettings';
 
 const Label = ({ children, htmlFor }: { children?: React.ReactNode; htmlFor: string }) => (
     <label htmlFor={htmlFor} className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{children}</label>
@@ -210,6 +211,8 @@ export const WorkHoursSettings = () => {
                     </div>
                 </div>
             </Card>
+
+            <BusinessHoursSettings />
         </div>
     );
 };

@@ -1297,6 +1297,22 @@
       "expect": {}
     },
     {
+      "form": "company_business_hours.update",
+      "data": {},
+      "context": {},
+      "partial": false,
+      "expect": {}
+    },
+    {
+      "form": "company_business_hours.update",
+      "data": {
+        "response_sla_minutes": 15
+      },
+      "context": {},
+      "partial": false,
+      "expect": {}
+    },
+    {
       "form": "system_settings.update",
       "data": {},
       "context": {},

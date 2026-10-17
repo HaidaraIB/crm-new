@@ -11,8 +11,8 @@ import { RealtimeSessionSync } from './components/RealtimeSessionSync';
 import { useWebPush } from './hooks/useWebPush';
 import { useFieldVisitAllowed } from './hooks/useFieldVisitAllowed';
 import { Page } from './types';
-import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, TeamsReportFilterDrawer, EmployeesReportFilterDrawer, MarketingReportFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, AlertModal, ToastHost, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog, WebPushPrompt } from './components/index';
-import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, ViewDealPage, EmployeesReportPage, IntegrationsHubPage, MetaIntegrationPage, TikTokIntegrationPage, WhatsAppIntegrationPage, SmsIntegrationPage, AiIntegrationPage, LeadApiIntegrationPage, MujebIntegrationPage, MessagingCenterPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, MarketingReportPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TeamsReportPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallReportsPage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
+import { Sidebar, Header, PageWrapper, AddActionModal, AddCallModal, AddVisitModal, AddFieldVisitModal, AssignLeadModal, FilterDrawer, CallsFilterDrawer, ActivitiesFilterDrawer, ArrivalsFilterDrawer, DevelopersFilterDrawer, ProjectsFilterDrawer, OwnersFilterDrawer, ProductsFilterDrawer, ProductCategoriesFilterDrawer, SuppliersFilterDrawer, ServicesFilterDrawer, ServicePackagesFilterDrawer, ServiceProvidersFilterDrawer, CampaignsFilterDrawer, AddDeveloperModal, AddProjectModal, AddUnitModal, UnitsFilterDrawer, AddOwnerModal, EditOwnerModal, DealsFilterDrawer, AddUserModal, ViewUserModal, EditUserModal, DeleteUserModal, DeactivateEmployeeModal, AddCampaignModal, EditCampaignModal, ManageIntegrationAccountModal, ChangePasswordModal, EditDeveloperModal, DeleteDeveloperModal, ConfirmDeleteModal, EditProjectModal, EditUnitModal, AddTodoModal, AddServiceModal, EditServiceModal, AddServicePackageModal, EditServicePackageModal, AddServiceProviderModal, EditServiceProviderModal, AddProductModal, EditProductModal, AddProductCategoryModal, EditProductCategoryModal, AddSupplierModal, EditSupplierModal, AlertModal, ToastHost, AddChannelModal, EditChannelModal, AddStageModal, EditStageModal, AddStatusModal, EditStatusModal, AddTagModal, EditTagModal, AddCallMethodModal, EditCallMethodModal, AddVisitTypeModal, EditVisitTypeModal, NotificationsDialog, WebPushPrompt } from './components/index';
+import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, EditDealPage, CreateLeadPage, EditLeadPage, DashboardPage, DealsPage, ViewDealPage, ReportsPage, IntegrationsHubPage, MetaIntegrationPage, TikTokIntegrationPage, WhatsAppIntegrationPage, SmsIntegrationPage, AiIntegrationPage, LeadApiIntegrationPage, MujebIntegrationPage, MessagingCenterPage, LeadsPage, LoginPage, RegisterPage, PaymentPage, PaymentSuccessPage, VerifyEmailPage, VerifyPhonePage, ForgotPasswordPage, ResetPasswordPage, TwoFactorAuthPage, OwnersPage, ProfilePage, PropertiesPage, SettingsPage, LibraryPage, SupportCenterPage, UserGuidePage, NewsPage, TeamChatPage, TodosPage, UsersPage, ViewLeadPage, ServicesInventoryPage, ProductsInventoryPage, ServicesPage, ServicePackagesPage, ServiceProvidersPage, ProductsPage, ProductCategoriesPage, SuppliersPage, ChangePlanPage, BillingPage, TermsOfServicePage, PrivacyPolicyPage, DataDeletionPolicyPage, BookDemoPage, OAuthCallbackPage, ImpersonatePage, CallCenterPage, ArrivalsPage, InboxPage } from './pages';
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
@@ -98,13 +98,13 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             return <DashboardPage />;
         case 'Reports':
         case 'Teams Report':
-            return <TeamsReportPage />;
+            return <ReportsPage />;
         case 'Employees Report':
-            return <EmployeesReportPage />;
+            return <ReportsPage defaultTab="employees" />;
         case 'Marketing Report':
-            return <MarketingReportPage />;
+            return <ReportsPage defaultTab="sources" />;
         case 'Call Reports':
-            return <CallReportsPage />;
+            return <ReportsPage defaultTab="calls" />;
         case 'Integrations':
             return <IntegrationsHubPage />;
         case 'Meta':
@@ -1079,7 +1079,7 @@ const TheApp = () => {
     }
 
     return (
-        <div className={`flex h-full min-h-0 overflow-hidden ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
+        <div className={`app-print-flow flex h-full min-h-0 overflow-hidden ${language === 'ar' ? 'font-arabic' : 'font-sans'} bg-gray-50 dark:bg-gray-900 text-gray-700 dark:text-gray-300`}>
             <Sidebar />
             {isSidebarOpen && (
                 <div
@@ -1088,7 +1088,7 @@ const TheApp = () => {
                     onClick={() => setIsSidebarOpen(false)}
                 ></div>
             )}
-            <div className="flex-1 flex min-h-0 flex-col overflow-hidden">
+            <div className="app-print-flow flex-1 flex min-h-0 flex-col overflow-hidden">
                 <ImpersonationBanner />
                 <Header isInternetOnline={isInternetOnline} />
                 {/* Check if payment success message exists - if so, don't show email verification message */}
@@ -1153,9 +1153,6 @@ const TheApp = () => {
             <ServiceProvidersFilterDrawer />
             <CampaignsFilterDrawer />
             <DealsFilterDrawer />
-            <TeamsReportFilterDrawer />
-            <EmployeesReportFilterDrawer />
-            <MarketingReportFilterDrawer />
             <AddDeveloperModal />
             <AddProjectModal />
             <AddUnitModal />

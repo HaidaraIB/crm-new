@@ -1,5 +1,5 @@
 {
-  "version": "95c90c50730ddb96",
+  "version": "7d4761fbd314e4e9",
   "forms": {
     "task.upsert": {
       "public": false,
@@ -2892,6 +2892,31 @@
         "reAssignHours": "re_assign_hours",
         "noFollowUpHours": "no_follow_up_hours",
         "noFollowUpDigestHour": "no_follow_up_digest_hour"
+      }
+    },
+    "company_business_hours.update": {
+      "public": false,
+      "fields": {
+        "response_sla_minutes": {
+          "type": "integer",
+          "label_key": "responseSlaMinutes",
+          "rules": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number_range",
+              "params": {
+                "min": 1,
+                "max": 10080
+              }
+            }
+          ],
+          "ui_key": "responseSlaMinutes"
+        }
+      },
+      "aliases": {
+        "responseSlaMinutes": "response_sla_minutes"
       }
     },
     "system_settings.update": {

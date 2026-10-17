@@ -263,6 +263,21 @@
             box-shadow: 0 0 0 1000px #1f2937 inset;
             transition: background-color 99999s ease-out 0s;
         }
+        /* Printing: the app scrolls inside fixed-height panes, which prints as one clipped screen with a
+           scrollbar. Let the shell flow at full height and drop the navigation chrome. */
+        @media print {
+          html, body, #root, .app-print-flow, .app-main-scroll {
+            display: block !important;
+            height: auto !important;
+            min-height: 0 !important;
+            max-height: none !important;
+            overflow: visible !important;
+          }
+          aside, header, nav { display: none !important; }
+          section { break-inside: avoid; }
+          * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+
         /* Scrollbar styling — scoped to main content + custom-scrollbar (avoids nested * scrollbars) */
         .app-main-scroll::-webkit-scrollbar,
         .custom-scrollbar::-webkit-scrollbar,

@@ -64,12 +64,17 @@ export const FilterDrawerShell = ({
           {children}
         </div>
         <div className="p-4 border-t dark:border-gray-800 flex gap-2">
-          <Button variant="secondary" className="w-full" onClick={onReset}>
-            {t('reset')}
-          </Button>
-          <Button className="w-full" onClick={onApply}>
-            {t('applyFilters')}
-          </Button>
+          {/* Button is shrink-0, so two w-full buttons cannot share a row: give each its own half. */}
+          <div className="min-w-0 flex-1">
+            <Button variant="secondary" className="w-full" onClick={onReset}>
+              {t('reset')}
+            </Button>
+          </div>
+          <div className="min-w-0 flex-1">
+            <Button className="w-full" onClick={onApply}>
+              {t('applyFilters')}
+            </Button>
+          </div>
         </div>
       </aside>
       {isOpen && (

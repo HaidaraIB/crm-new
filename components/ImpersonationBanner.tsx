@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { impersonateEndAPI } from '../services/api';
 import {
+  announceImpersonationEnded,
   clearImpersonation,
   readImpersonation,
   type ImpersonationMeta,
@@ -42,23 +43,10 @@ const ImpersonationBanner: React.FC = () => {
     localStorage.removeItem('isLoggedIn');
     localStorage.removeItem('isCompanySubscriptionInactive');
 
-    // Prefer closing the tab (admin panel remains open). Fallback: ended page.
+    // Prefer closing the tab (admin panel remains open). If the browser blocks
+    // window.close() (tab not script-opened), the session guard shows the ended screen.
+    announceImpersonationEnded();
     window.close();
-    setTimeout(() => {
-      // If the browser blocked window.close (tab not script-opened), show a clear end state.
-      document.body.innerHTML = '';
-      const root = document.createElement('div');
-      root.style.cssText =
-        'min-height:100vh;display:flex;align-items:center;justify-content:center;font-family:system-ui,sans-serif;padding:24px;text-align:center;background:#f9fafb;color:#111827;';
-      root.innerHTML = `<div><h1 style="font-size:1.25rem;font-weight:600;margin-bottom:8px;">${t(
-        'impersonationEndedTitle'
-      )}</h1><p style="color:#6b7280;margin-bottom:16px;">${t(
-        'impersonationEndedMessage'
-      )}</p><a href="/login" style="color:#7c3aed;text-decoration:underline;">${t(
-        'impersonationBackToLogin'
-      )}</a></div>`;
-      document.body.appendChild(root);
-    }, 150);
   };
 
   return (

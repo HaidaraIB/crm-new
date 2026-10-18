@@ -236,6 +236,25 @@ export function subscribeImpersonationSupersession(
   };
 }
 
+/** Fired after this tab ends its own impersonation session. */
+export const IMPERSONATION_ENDED_EVENT = 'crm-impersonation-ended';
+
+/**
+ * Tell the app shell the impersonation session was ended on purpose, so it can
+ * show the themed "impersonation ended" screen when the browser blocks
+ * `window.close()` (the usual case for a tab not opened by script).
+ */
+export function announceImpersonationEnded(): void {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(IMPERSONATION_ENDED_EVENT));
+}
+
+export function subscribeImpersonationEnded(onEnded: () => void): () => void {
+  if (typeof window === 'undefined') return () => {};
+  window.addEventListener(IMPERSONATION_ENDED_EVENT, onEnded);
+  return () => window.removeEventListener(IMPERSONATION_ENDED_EVENT, onEnded);
+}
+
 /** Module-level single-flight for code exchange (survives React Strict Mode remounts). */
 const exchangeInflight = new Map<string, Promise<unknown>>();
 const exchangeDone = new Map<string, unknown>();

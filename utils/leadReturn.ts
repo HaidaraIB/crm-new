@@ -5,7 +5,7 @@ const CALLS_TAB_KEY = 'crm:pendingCallsTab';
 
 const LEAD_DETAIL_PAGES: ReadonlySet<Page> = new Set(['ViewLead', 'EditLead', 'CreateLead']);
 
-const CALLS_TABS = new Set(['history', 'live', 'team', 'hours', 'error-logs']);
+const CALLS_TABS = new Set(['history', 'live', 'team', 'hours', 'error-logs', 'pbx']);
 
 export type LeadOpenExtras = {
   /** Number the Chats page should reopen for this lead. */

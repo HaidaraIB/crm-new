@@ -33,6 +33,8 @@ import { queryKeys, useLead, useSyncDigest, useWhatsAppLiveCalls } from '../hook
 import { useRealtimeConnected } from '../hooks/useRealtimeChannel';
 import { useInvalidateOnSliceChange } from '../hooks/useSliceVersion';
 import { useWhatsAppCallingOptional } from '../components/whatsapp/WhatsAppCallListener';
+import { PbxPhoneSystemTab } from '../components/telephony/PbxWallboard';
+import { useSoftphoneOptional } from '../components/telephony/SoftphoneProvider';
 import { WhatsAppLiveCallsPanel } from '../components/whatsapp/WhatsAppLiveCallsPanel';
 import { WhatsAppAgentStatusControl } from '../components/whatsapp/WhatsAppAgentStatusControl';
 import { WhatsAppCallHoursPanel } from '../components/whatsapp/WhatsAppCallHoursPanel';
@@ -52,8 +54,8 @@ import {
   replaceCallsUrlQuery,
 } from '../utils/callFilters';
 
-type CallsPageTab = 'history' | 'live' | 'team' | 'hours' | 'error-logs';
-const CALLS_TABS = ['history', 'live', 'team', 'hours', 'error-logs'] as const;
+type CallsPageTab = 'history' | 'live' | 'team' | 'hours' | 'error-logs' | 'pbx';
+const CALLS_TABS = ['history', 'live', 'team', 'hours', 'error-logs', 'pbx'] as const;
 
 const STATUS_FILTERS = [
   { key: 'all' },
@@ -296,6 +298,8 @@ export const CallsPage: React.FC = () => {
     setIsCallFilterDrawerOpen,
   } = useAppContext();
   const whatsappCalling = useWhatsAppCallingOptional();
+  // Loop Cloud PBX history tab: only when the company has telephony (GET /telephony/me/ succeeded).
+  const hasPbx = Boolean(useSoftphoneOptional()?.me);
   const [selected, setSelected] = useState<WhatsAppCallRecord | null>(null);
   const [numberScope, setNumberScope] = useState<CallsNumberScope>(() => readCallsNumberScope());
   const [searchDraft, setSearchDraft] = useState(callFilters.search);
@@ -306,7 +310,8 @@ export const CallsPage: React.FC = () => {
       pending === 'live' ||
       pending === 'team' ||
       pending === 'hours' ||
-      pending === 'error-logs'
+      pending === 'error-logs' ||
+      pending === 'pbx'
     ) {
       return pending;
     }
@@ -451,6 +456,10 @@ export const CallsPage: React.FC = () => {
       setActiveTab('history');
       return;
     }
+    if (activeTab === 'pbx') {
+      if (!hasPbx) setActiveTab('history');
+      return;
+    }
     if (
       activeTab !== 'history' &&
       activeTab !== 'error-logs' &&
@@ -458,7 +467,7 @@ export const CallsPage: React.FC = () => {
     ) {
       setActiveTab('history');
     }
-  }, [activeTab, canSeeSupervisorTabs, canSeeCallErrorLogs]);
+  }, [activeTab, canSeeSupervisorTabs, canSeeCallErrorLogs, hasPbx]);
 
   // Deep-link: /calls?client=123&status=missed&…
   useEffect(() => {
@@ -604,6 +613,17 @@ export const CallsPage: React.FC = () => {
           >
             {t('callsTabHistory')}
           </button>
+          {hasPbx ? (
+            <button
+              type="button"
+              onClick={() => setActiveTab('pbx')}
+              className={`whitespace-nowrap py-3 px-1 text-sm transition-colors ${
+                activeTab === 'pbx' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE
+              }`}
+            >
+              {t('callsTabPbx')}
+            </button>
+          ) : null}
           {canSeeSupervisorTabs ? (
             <>
               <button
@@ -685,6 +705,8 @@ export const CallsPage: React.FC = () => {
           emptyHint={hoursEmptyHint}
         />
       ) : null}
+
+      {activeTab === 'pbx' && hasPbx ? <PbxPhoneSystemTab /> : null}
 
       {activeTab === 'error-logs' && canSeeCallErrorLogs ? (
         <CallErrorLogsPanel callSource={numberScope} />

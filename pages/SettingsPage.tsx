@@ -13,6 +13,7 @@ import { FieldVisitSettings } from './settings/FieldVisitSettings';
 import { SupervisorsSettings } from './settings/SupervisorsSettings';
 import { NewLeadSmsSettings } from './settings/NewLeadSmsSettings';
 import { WorkHoursSettings } from './settings/WorkHoursSettings';
+import { PhoneSystemSettings, useTelephonyStatus } from './settings/telephony/PhoneSystemSettings';
 import { useAppContext } from '../context/AppContext';
 import { normalizeRole } from '../utils/roles';
 import { PAGE_TAB_ACTIVE, PAGE_TAB_INACTIVE } from '../utils/pageTabNavClasses';
@@ -30,7 +31,8 @@ type SettingsTab =
     | 'FieldVisits'
     | 'NewLeadSms'
     | 'WorkHours'
-    | 'Supervisors';
+    | 'Supervisors'
+    | 'PhoneSystem';
 
 const ALL_SETTINGS_TAB_IDS: SettingsTab[] = [
     'Channels',
@@ -45,10 +47,15 @@ const ALL_SETTINGS_TAB_IDS: SettingsTab[] = [
     'NewLeadSms',
     'WorkHours',
     'Supervisors',
+    'PhoneSystem',
 ];
 
 export const SettingsPage = () => {
     const { t, currentUser } = useAppContext();
+    // Phone System (Loop Cloud PBX): only when the API lets this user manage it
+    // (plan feature, kill switch and admin rights are all checked server-side).
+    const telephony = useTelephonyStatus(Boolean(currentUser));
+    const showPhoneSystem = telephony.isSuccess;
     const showVisitTypes =
         currentUser?.company?.specialization === 'real_estate' ||
         currentUser?.company?.specialization === 'services' ||
@@ -68,8 +75,9 @@ export const SettingsPage = () => {
             'NewLeadSms',
             ...(normalizeRole(currentUser?.role) === 'Owner' ? (['WorkHours'] as const) : []),
             ...(normalizeRole(currentUser?.role) === 'Owner' ? (['Supervisors'] as const) : []),
+            ...(showPhoneSystem ? (['PhoneSystem'] as const) : []),
         ],
-        [currentUser?.role, showVisitTypes]
+        [currentUser?.role, showVisitTypes, showPhoneSystem]
     );
 
     const [activeTab, setActiveTab] = usePersistedTab<SettingsTab>(
@@ -95,6 +103,12 @@ export const SettingsPage = () => {
             setActiveTab('Channels');
         }
     }, [activeTab, showVisitTypes]);
+
+    useEffect(() => {
+        if (activeTab === 'PhoneSystem' && telephony.isError) {
+            setActiveTab('Channels');
+        }
+    }, [activeTab, telephony.isError]);
 
     const renderContent = () => {
         switch (activeTab) {
@@ -122,6 +136,8 @@ export const SettingsPage = () => {
                 return <WorkHoursSettings />;
             case 'Supervisors':
                 return <SupervisorsSettings />;
+            case 'PhoneSystem':
+                return showPhoneSystem ? <PhoneSystemSettings /> : null;
             default:
                 return null;
         }
@@ -209,6 +225,14 @@ export const SettingsPage = () => {
                             className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'Supervisors' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
                         >
                             {t('supervisorsTitle')}
+                        </button>
+                    )}
+                    {showPhoneSystem && (
+                        <button
+                            onClick={() => setActiveTab('PhoneSystem')}
+                            className={`whitespace-nowrap py-4 px-1 text-sm transition-colors ${activeTab === 'PhoneSystem' ? PAGE_TAB_ACTIVE : PAGE_TAB_INACTIVE}`}
+                        >
+                            {t('phoneSystem')}
                         </button>
                     )}
                 </nav>

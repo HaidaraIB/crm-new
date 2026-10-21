@@ -2,9 +2,10 @@
  * Loop Cloud PBX softphone (browser, JsSIP) and click-to-call.
  *
  * Mounted once next to the WhatsApp call listener. It:
- *  - asks GET /telephony/me/ what this user can do (403 = no telephony on the
- *    plan, or the platform kill switch: everything here then stays inert and
- *    LeadContactPhone keeps its tel: link);
+ *  - first checks the shared integration policy, then asks GET /telephony/me/
+ *    what an eligible user can do (everything stays inert for companies whose
+ *    plan or pilot policy explicitly denies telephony, and LeadContactPhone
+ *    keeps its tel: link);
  *  - for a WebRTC extension, registers with the short-lived credentials from
  *    GET /telephony/me/webrtc-credentials/ and re-registers before they expire;
  *  - places click-to-call through POST /telephony/calls/. The PBX rings the
@@ -38,6 +39,7 @@ import type { IncomingRTCSessionEvent, UA } from 'jssip/lib/UA';
 import { useAppContext } from '../../context/AppContext';
 import {
   getPbxCallAPI,
+  getIntegrationPolicyAPI,
   getTelephonyMeAPI,
   getWebRtcCredentialsAPI,
   hangupPbxCallAPI,
@@ -49,6 +51,7 @@ import {
   type TelephonyMe,
   type WebRtcCredentials,
 } from '../../services/api';
+import { shouldQueryTelephonyMe } from '../../utils/telephonyEligibility';
 import {
   preloadWhatsAppIncomingCallRingtone,
   startWhatsAppIncomingCallRingtone,
@@ -139,11 +142,24 @@ export const SoftphoneProvider: React.FC<{ children?: React.ReactNode }> = ({ ch
   const tr = useCallback((key: string) => (t as (k: string) => string)(key), [t]);
 
   const queryClient = useQueryClient();
+  const policyQuery = useQuery({
+    queryKey: ['integrationPolicy'],
+    queryFn: getIntegrationPolicyAPI,
+    enabled: Boolean(currentUser?.id),
+    retry: false,
+    staleTime: 5 * 60_000,
+    refetchOnWindowFocus: false,
+  });
+  const queryTelephonyMe = shouldQueryTelephonyMe(
+    currentUser?.id,
+    policyQuery.status,
+    policyQuery.data?.telephony?.enabled,
+  );
   const meKey = useMemo(() => ['telephony', 'me', currentUser?.id ?? null], [currentUser?.id]);
   const meQuery = useQuery({
     queryKey: meKey,
     queryFn: getTelephonyMeAPI,
-    enabled: Boolean(currentUser?.id),
+    enabled: queryTelephonyMe,
     retry: false,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,

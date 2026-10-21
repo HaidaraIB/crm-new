@@ -916,6 +916,7 @@ export const LeadsPage = () => {
                                                         <LeadContactPhoneList
                                                             variant="table"
                                                             phoneNumbers={lead.phoneNumbers}
+                                                            leadId={lead.id}
                                                             fallbackPhone={lead.phone}
                                                             onSms={(phone) => setSendSMSModal({ leadId: lead.id, phone, lead })}
                                                             onWhatsApp={(phone) => openWhatsApp(lead, phone)}

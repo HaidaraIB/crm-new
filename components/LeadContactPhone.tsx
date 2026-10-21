@@ -3,6 +3,7 @@ import { useAppContext } from '../context/AppContext';
 import { PhoneIcon, SmsIcon, WhatsappIcon } from './icons';
 import { MarqueeText } from './MarqueeText';
 import { PHONE_BIDI_CLASS } from './PhoneText';
+import { useSoftphoneOptional } from './telephony/SoftphoneProvider';
 import type { PhoneNumber } from '../types';
 
 export type LeadContactPhoneVariant = 'table' | 'details';
@@ -33,6 +34,7 @@ function sanitizeTel(phone: string): string {
 function PhoneActions({
   phone,
   phoneType,
+  leadId,
   onSms,
   onWhatsApp,
   compact,
@@ -40,11 +42,16 @@ function PhoneActions({
 }: {
   phone: string;
   phoneType?: string;
+  leadId?: number;
   onSms?: () => void;
   onWhatsApp?: () => void;
   compact?: boolean;
   t: (key: string) => string;
 }) {
+  // Loop Cloud PBX click-to-call when the company has telephony and the user an
+  // extension; otherwise the plain tel: link (device dialer) as before.
+  const softphone = useSoftphoneOptional();
+  const pbxCall = softphone?.canClickToCall ? softphone : null;
   const iconClass = compact ? ICON_COMPACT : ICON;
   const btnClass = `${ICON_BTN} ${compact ? ICON_BTN_SIZE_COMPACT : ICON_BTN_SIZE}`;
   const cellClass = `${ACTION_CELL} ${compact ? ACTION_CELL_SIZE_COMPACT : ACTION_CELL_SIZE}`;
@@ -86,14 +93,27 @@ function PhoneActions({
         )}
       </span>
       <span className={cellClass}>
-        <a
-          href={`tel:${sanitizeTel(phone)}`}
-          className={`${btnClass} text-primary dark:text-primary-300`}
-          title={callTitle}
-        >
-          <PhoneIcon className={iconClass} />
-          <span className="sr-only">{callTitle}</span>
-        </a>
+        {pbxCall ? (
+          <button
+            type="button"
+            onClick={() => void pbxCall.placeCall(sanitizeTel(phone), leadId ?? null)}
+            disabled={pbxCall.busy}
+            className={`${btnClass} text-primary disabled:opacity-40 dark:text-primary-300`}
+            title={`${callTitle} — ${t('softphoneCallViaPbx') || 'Call with the phone system'}`}
+          >
+            <PhoneIcon className={iconClass} />
+            <span className="sr-only">{callTitle}</span>
+          </button>
+        ) : (
+          <a
+            href={`tel:${sanitizeTel(phone)}`}
+            className={`${btnClass} text-primary dark:text-primary-300`}
+            title={callTitle}
+          >
+            <PhoneIcon className={iconClass} />
+            <span className="sr-only">{callTitle}</span>
+          </a>
+        )}
       </span>
     </div>
   );
@@ -104,6 +124,8 @@ export type LeadContactPhoneProps = {
   phoneType?: PhoneNumber['phone_type'] | string;
   isPrimary?: boolean;
   variant: LeadContactPhoneVariant;
+  /** Lead the number belongs to: click-to-call links the PBX call to it. */
+  leadId?: number;
   onSms?: () => void;
   onWhatsApp?: () => void;
   t: (key: string) => string;
@@ -125,6 +147,7 @@ export function LeadContactPhone({
   phoneType,
   isPrimary,
   variant,
+  leadId,
   onSms,
   onWhatsApp,
   t,
@@ -170,6 +193,7 @@ export function LeadContactPhone({
         <PhoneActions
           phone={phone}
           phoneType={phoneType}
+          leadId={leadId}
           onSms={onSms}
           onWhatsApp={onWhatsApp}
           compact={compact}
@@ -184,6 +208,7 @@ export type LeadContactPhoneListProps = {
   phoneNumbers?: PhoneNumber[];
   fallbackPhone?: string;
   variant: LeadContactPhoneVariant;
+  leadId?: number;
   onSms: (phone: string) => void;
   onWhatsApp: (phone: string) => void;
   t: (key: string) => string;
@@ -195,6 +220,7 @@ export function LeadContactPhoneList({
   phoneNumbers,
   fallbackPhone,
   variant,
+  leadId,
   onSms,
   onWhatsApp,
   t,
@@ -221,6 +247,7 @@ export function LeadContactPhoneList({
             phoneType={pn.phone_type}
             isPrimary={pn.is_primary}
             variant={variant}
+            leadId={leadId}
             onSms={() => onSms(pn.phone_number)}
             onWhatsApp={() => onWhatsApp(pn.phone_number)}
             t={t}

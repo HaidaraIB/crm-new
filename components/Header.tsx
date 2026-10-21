@@ -9,6 +9,7 @@ import { Dropdown, DropdownItem } from './Dropdown';
 import { navigateToCompanyRoute } from '../utils/routing';
 import { useCurrentUser, useSyncDigest } from '../hooks/useQueries';
 import { WorkHoursPill } from './work/WorkHoursPill';
+import { AgentStatusToggle } from './telephony/AgentStatusToggle';
 
 type HeaderProps = {
     isInternetOnline: boolean;
@@ -54,6 +55,7 @@ export const Header = ({ isInternetOnline }: HeaderProps) => {
                 <WorkHoursPill />
             </div>
             <div className={`flex items-center ${language === 'ar' ? 'gap-4' : 'space-x-4'} flex-shrink-0`}>
+                <AgentStatusToggle />
                 <button
                     onClick={() => setLanguage(language === 'en' ? 'ar' : 'en')}
                     className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 transition-colors"

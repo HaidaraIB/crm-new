@@ -331,6 +331,8 @@ export interface TimelineEntry {
   locationPhotoUrl?: string; // Optional: client location photo for field visits
   recordingUrl?: string; // Optional: WhatsApp call recording playback URL
   recordingStatus?: 'pending' | 'processing' | 'ready' | 'failed' | 'skipped' | string;
+  /** Loop Cloud PBX call recording: played through the audited access endpoint, not a stored URL. */
+  pbxRecordingId?: string;
   /** Direction for individual WhatsApp / social timeline rows (before thread collapse). */
   direction?: 'inbound' | 'outbound';
   /** Messages inside a collapsed WhatsApp or social conversation block. */

@@ -49,6 +49,14 @@ type StartOutboundArgs = {
   templateName?: string;
 };
 
+/**
+ * Another calling line in this browser (the Loop Cloud PBX softphone). One call
+ * at a time: while it is busy, WhatsApp neither starts a call nor rings over it;
+ * an inbound WhatsApp call shows the call-waiting banner, whose "end and answer"
+ * ends the other line's call first.
+ */
+export type OtherCallLine = { busy: boolean; end: () => void | Promise<void> };
+
 type WhatsAppCallingContextValue = {
   startOutboundCall: (args: StartOutboundArgs) => Promise<void>;
   acceptIncoming: (call: WhatsAppCallRecord) => Promise<void>;
@@ -58,6 +66,7 @@ type WhatsAppCallingContextValue = {
   elapsedSec: number;
   isStartingOutbound: boolean;
   answeringBusy: boolean;
+  registerOtherLine: (line: OtherCallLine | null) => void;
 };
 
 const WhatsAppCallingContext = createContext<WhatsAppCallingContextValue | null>(null);
@@ -102,6 +111,12 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
 
   const onCallsPage = currentPage === 'Calls';
   const sessionBusy = isBusyPhase(session.phase);
+  const [otherLine, setOtherLine] = useState<OtherCallLine | null>(null);
+  const otherLineRef = useRef<OtherCallLine | null>(null);
+  otherLineRef.current = otherLine;
+  const otherLineBusy = Boolean(otherLine?.busy);
+  /** This WhatsApp session or the other line (PBX softphone) is on a call. */
+  const lineBusy = sessionBusy || otherLineBusy;
 
   const invalidateLists = useCallback(() => {
     void queryClient.invalidateQueries({ queryKey: ['whatsappCalls'] });
@@ -157,14 +172,14 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
     const candidates = liveInbound.filter((c) => activeId == null || c.id !== activeId);
 
     setWaitingCall((prev) => {
-      if (!sessionBusy) return null;
+      if (!lineBusy) return null;
       if (prev && candidates.some((c) => c.id === prev.id)) {
         return candidates.find((c) => c.id === prev.id) ?? null;
       }
       return candidates[0] ?? null;
     });
 
-    if (onCallsPage || sessionBusy || isStartingOutbound) {
+    if (onCallsPage || lineBusy || isStartingOutbound) {
       setToastCall(null);
       return;
     }
@@ -176,13 +191,13 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
       }
       return undismissed[0] ?? null;
     });
-  }, [liveInbound, onCallsPage, sessionBusy, isStartingOutbound, dismissTick]);
+  }, [liveInbound, onCallsPage, lineBusy, isStartingOutbound, dismissTick]);
 
-  const showToast = Boolean(toastCall) && !onCallsPage && !sessionBusy && !isStartingOutbound;
-  const showCallWaiting = Boolean(waitingCall) && sessionBusy && !isStartingOutbound;
+  const showToast = Boolean(toastCall) && !onCallsPage && !lineBusy && !isStartingOutbound;
+  const showCallWaiting = Boolean(waitingCall) && lineBusy && !isStartingOutbound;
   const hasAnswerableRing =
     liveInbound.some((c) => activeCallIdRef.current == null || c.id !== activeCallIdRef.current) &&
-    !sessionBusy &&
+    !lineBusy &&
     !isStartingOutbound;
 
   useEffect(() => {
@@ -257,6 +272,8 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
       setToastCall((prev) => (prev?.id === call.id ? null : prev));
       setWaitingCall((prev) => (prev?.id === call.id ? null : prev));
       try {
+        // "End and answer" over a phone system call: hang that up first.
+        if (otherLineRef.current?.busy) await otherLineRef.current.end();
         await session.acceptInbound(call);
       } catch (e: any) {
         const micCode = detectMicPermissionErrorCode(e) || e?.code;
@@ -313,6 +330,10 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
       const to = args.to.replace(/\s+/g, '');
       if (!to) {
         showAlert(t('sms_error_invalid_to_number'), 'warning');
+        return;
+      }
+      if (otherLineRef.current?.busy) {
+        showAlert(t('whatsappCallBusyPhoneSystem'), 'warning');
         return;
       }
       if (
@@ -430,6 +451,7 @@ export const WhatsAppCallListener: React.FC<{ children?: React.ReactNode }> = ({
       elapsedSec: session.elapsedSec,
       isStartingOutbound,
       answeringBusy: answeringBusy || waitingActionBusy || acceptingRef.current,
+      registerOtherLine: setOtherLine,
     }),
     [
       startOutboundCall,

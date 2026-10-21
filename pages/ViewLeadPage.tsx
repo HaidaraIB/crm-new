@@ -442,7 +442,20 @@ export const ViewLeadPage = () => {
         if (duration) {
             parts.push(t('callDurationSeconds').replace('{n}', String(duration)));
         }
-        return parts.join(' Â· ');
+        return parts.join(' · ');
+    };
+
+    /** Loop Cloud PBX call: "Outgoing · Answered · 61s" (the stage chip says "Phone system"). */
+    const formatPbxCallSummary = (cc: Record<string, unknown>): string => {
+        type Key = Parameters<typeof t>[0];
+        const parts: string[] = [];
+        const direction = cc.pbx_direction as string | null | undefined;
+        if (direction) parts.push(t(`pbxDirection_${direction}` as Key));
+        const status = cc.pbx_call_status as string | null | undefined;
+        if (status) parts.push(t(`pbxStatus_${status}` as Key));
+        const duration = cc.pbx_duration_sec as number | null | undefined;
+        if (duration) parts.push(t('callDurationSeconds').replace('{n}', String(duration)));
+        return parts.length ? parts.join(' · ') : t('call');
     };
 
 
@@ -577,12 +590,17 @@ export const ViewLeadPage = () => {
             const callDateTimeFormatted = formatDetailDateTime(callDate);
             const followUpDateFormatted = formatDetailDateTime(cc.follow_up_date);
             const isWhatsAppCall = cc.source === 'whatsapp';
+            // Loop Cloud PBX call: typed fields from the API, localized here
+            // (crm_mobile lib/utils/timeline_builder.dart mirrors this).
+            const isPbxCall = cc.source === 'pbx';
             const recordingUrl = isWhatsAppCall
                 ? ((cc.whatsapp_recording_url ?? cc.whatsappRecordingUrl) as string | undefined)
                 : undefined;
             const recordingStatus = isWhatsAppCall
                 ? ((cc.whatsapp_recording_status ?? cc.whatsappRecordingStatus) as string | undefined)
-                : undefined;
+                : isPbxCall
+                  ? ((cc.pbx_recording_status as string | null) || undefined)
+                  : undefined;
 
             return {
                 id: `call-${cc.id}`,
@@ -591,22 +609,29 @@ export const ViewLeadPage = () => {
                 avatar: user?.avatar || '',
                 action: isWhatsAppCall
                     ? formatWhatsAppCallSummary(cc)
-                    : t('callMade'),
+                    : isPbxCall
+                      ? formatPbxCallSummary(cc)
+                      : t('callMade'),
                 details: isWhatsAppCall
                     ? ((cc.notes as string) || '').includes('\n')
                         ? ((cc.notes as string).split('\n').slice(1).join('\n') || '')
                         : ''
-                    : (cc.notes || ''),
+                    : isPbxCall
+                      ? ''
+                      : (cc.notes || ''),
                 date: formatTimelineDate(callDate, lang),
                 timestamp: timestamp,
                 stage: isWhatsAppCall
                     ? t('whatsappCallSource')
-                    : callMethodName,
-                color: isWhatsAppCall ? '#16a34a' : callMethod?.color,
+                    : isPbxCall
+                      ? t('pbxCallSource')
+                      : callMethodName,
+                color: isWhatsAppCall ? '#16a34a' : isPbxCall ? '#2563eb' : callMethod?.color,
                 callDatetime: callDateTimeFormatted,
                 followUpDate: followUpDateFormatted,
                 recordingUrl: recordingUrl || undefined,
                 recordingStatus: recordingStatus || undefined,
+                pbxRecordingId: isPbxCall ? ((cc.pbx_recording_id as string | null) || undefined) : undefined,
             };
         });
 
@@ -1066,6 +1091,7 @@ export const ViewLeadPage = () => {
                                 <LeadContactPhoneList
                                     variant="details"
                                     phoneNumbers={displayLead.phoneNumbers}
+                                    leadId={displayLead.id}
                                     fallbackPhone={displayLead.phone}
                                     onSms={(phone) => setSendSMSModal({ phone })}
                                     onWhatsApp={(phone) => openWhatsApp(displayLead, phone)}
@@ -1386,7 +1412,7 @@ export const ViewLeadPage = () => {
                                     {metaQualificationSentAt && !metaQualificationError && (
                                         <p className="text-xs text-green-600 dark:text-green-400 mt-1">
                                             {t('metaQualificationSent')}
-                                            {metaQualificationSentAt ? ` Â· ${formatDateTimeToLocal(metaQualificationSentAt)}` : ''}
+                                            {metaQualificationSentAt ? ` · ${formatDateTimeToLocal(metaQualificationSentAt)}` : ''}
                                         </p>
                                     )}
                                     {metaQualificationErrorText && (

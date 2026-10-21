@@ -16,6 +16,7 @@ import { ActivitiesPage, CampaignsPage, ChatsPage, CallsPage, CreateDealPage, Ed
 import { ArrivalAlertHost } from './components/arrivals/ArrivalAlertHost';
 import { WorkSessionTrackerHost } from './components/work/WorkSessionTrackerHost';
 import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener';
+import { SoftphoneProvider } from './components/telephony/SoftphoneProvider';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import ImpersonationBanner from './components/ImpersonationBanner';
 import ImpersonationSessionGuard from './components/ImpersonationSessionGuard';
@@ -97,8 +98,8 @@ function CurrentPageContent({ currentPage }: { currentPage: Page }) {
             // Legacy `currentPage` only; team chat UI is the overlay dialog.
             return <DashboardPage />;
         case 'Reports':
-        case 'Teams Report':
             return <ReportsPage />;
+        case 'Teams Report':
         case 'Employees Report':
             return <ReportsPage defaultTab="employees" />;
         case 'Marketing Report':
@@ -1256,7 +1257,10 @@ function App() {
     <AppProvider>
       <ImpersonationSessionGuard>
         <WhatsAppCallGate>
-          <TheApp />
+          {/* Inside the WhatsApp gate so PBX and WhatsApp calling see each other's busy state. */}
+          <SoftphoneProvider>
+            <TheApp />
+          </SoftphoneProvider>
         </WhatsAppCallGate>
       </ImpersonationSessionGuard>
     </AppProvider>

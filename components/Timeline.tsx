@@ -12,6 +12,7 @@ import { ChatVoicePlayer } from './chat/ChatVoicePlayer';
 import { ChatMediaViewer } from './chat/ChatMediaViewer';
 import { useAuthBlobUrl } from '../hooks/useAuthBlobUrl';
 import { PhoneText } from './PhoneText';
+import { PbxRecordingPlayer } from './telephony/PbxRecordingPlayer';
 import { PlainTextWithLinks } from './PlainTextWithLinks';
 import { inputTextDir } from '../utils/inputAutoDir';
 
@@ -762,7 +763,9 @@ export const Timeline = ({ history, chatLead }: TimelineProps) => {
                                         </p>
                                     )}
 
-                                    {entry.recordingStatus === 'ready' && entry.recordingUrl ? (
+                                    {entry.recordingStatus === 'ready' && entry.pbxRecordingId ? (
+                                        <PbxRecordingPlayer recordingId={entry.pbxRecordingId} />
+                                    ) : entry.recordingStatus === 'ready' && entry.recordingUrl ? (
                                         <TimelineRecordingPlayer url={entry.recordingUrl} t={t} />
                                     ) : entry.recordingStatus === 'pending' || entry.recordingStatus === 'processing' ? (
                                         <p className="mt-2 text-sm text-amber-700 dark:text-amber-300">

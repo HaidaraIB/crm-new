@@ -7166,6 +7166,8 @@ export type SyncSliceVersions = {
   deals: number;
   /** Lead tasks (todos). */
   todos: number;
+  /** Phone system calls, queue waits and agent presence (Loop Cloud PBX). */
+  telephony: number;
 };
 
 export type SyncSliceName = keyof SyncSliceVersions;
@@ -7419,3 +7421,417 @@ export async function downloadCompanyLibraryAsFileAPI(id: number, filename: stri
   return new File([blob], filename || 'file', { type: mime });
 }
 
+
+// ---------------------------------------------------------------------------
+// Loop Cloud PBX (telephony): softphone, click-to-call, PBX call history
+// ---------------------------------------------------------------------------
+
+/** Spec section 6: a paused agent's extension answers busy instead of ringing. */
+export type AgentStatus = 'available' | 'paused';
+
+export type AgentPresence = {
+  extension_id: string;
+  number: string;
+  display_name: string;
+  user: number | null;
+  user_name: string;
+  registered: boolean;
+  agent_status: AgentStatus;
+  on_call: boolean;
+};
+
+export type TelephonyMe = {
+  provisioned: boolean;
+  outbound_suspended: boolean;
+  extension: {
+    id: string;
+    number: string;
+    device_type: 'webrtc' | 'desk_phone' | 'softphone';
+    registered: boolean;
+    agent_status: AgentStatus;
+  } | null;
+  can_click_to_call: boolean;
+  webrtc: boolean;
+  recording_mode: 'off' | 'external' | 'all';
+};
+
+export type WebRtcCredentials = {
+  extension: string;
+  sip: { ws_uri: string; uri: string; username: string; password: string; realm: string };
+  turn: { urls: string[]; username: string; credential: string };
+  expires_at: string;
+  refresh_after: string;
+  /** Dev stack only (no Kamailio): a static digest secret. */
+  mode?: 'static';
+};
+
+export type PbxCallStatus =
+  | 'queued' | 'ringing' | 'in_progress'
+  | 'answered' | 'busy' | 'no_answer' | 'failed' | 'abandoned' | 'missed' | 'cancelled';
+
+export type PbxCallRecord = {
+  id: string;
+  direction: 'inbound' | 'outbound' | 'internal' | '';
+  origin: 'crm' | 'pbx' | '';
+  status: PbxCallStatus;
+  from_party: string;
+  to_party: string;
+  did: string;
+  extension: string | null;
+  extension_number: string | null;
+  answered_by: string | null;
+  answered_by_number: string | null;
+  crm_contact: number | null;
+  crm_contact_name: string | null;
+  on_hold: boolean;
+  hangup_cause: number | null;
+  duration_s: number | null;
+  billsec_s: number | null;
+  recorded: boolean;
+  has_recording: boolean;
+  started_at: string | null;
+  answered_at: string | null;
+  ended_at: string | null;
+  recordings?: { id: string; duration_s: number; format: string; size_bytes: number; started_at: string }[];
+};
+
+export const PBX_LIVE_STATUSES: PbxCallStatus[] = ['queued', 'ringing', 'in_progress'];
+
+export const getTelephonyMeAPI = async (): Promise<TelephonyMe> => apiRequest('/telephony/me/');
+
+export const getWebRtcCredentialsAPI = async (): Promise<WebRtcCredentials> =>
+  apiRequest('/telephony/me/webrtc-credentials/');
+
+/** Click-to-call. The agent's own phone rings first; 202 with the queued call. */
+export const placePbxCallAPI = async (
+  destination: string,
+  crmContactId?: number | null,
+  idempotencyKey?: string,
+): Promise<PbxCallRecord> =>
+  apiRequest('/telephony/calls/', {
+    method: 'POST',
+    body: JSON.stringify({ destination, ...(crmContactId ? { crm_contact_id: crmContactId } : {}) }),
+    headers: idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : undefined,
+  });
+
+export const getPbxCallAPI = async (id: string): Promise<PbxCallRecord> => apiRequest(`/telephony/calls/${id}/`);
+
+export const hangupPbxCallAPI = async (id: string): Promise<{ id: string; status: string }> =>
+  apiRequest(`/telephony/calls/${id}/hangup/`, { method: 'POST' });
+
+export const getPbxCallsAPI = async (params?: {
+  direction?: string;
+  status?: string;
+  client?: number;
+  cursor?: string | null;
+  limit?: number;
+}): Promise<{ next: string | null; previous: string | null; results: PbxCallRecord[] }> => {
+  const q = new URLSearchParams();
+  if (params?.direction) q.set('direction', params.direction);
+  if (params?.status) q.set('status', params.status);
+  if (params?.client != null) q.set('client', String(params.client));
+  if (params?.cursor) q.set('cursor', params.cursor);
+  if (params?.limit != null) q.set('limit', String(params.limit));
+  const qs = q.toString();
+  return apiRequest(`/telephony/calls/${qs ? `?${qs}` : ''}`);
+};
+
+/** Pushed to the PBX first; saved only once the node took it. */
+export const setMyAgentStatusAPI = async (status: AgentStatus): Promise<{ status: AgentStatus; changed_at: string | null }> =>
+  apiRequest('/telephony/agents/me/status/', { method: 'PUT', body: JSON.stringify({ status }) });
+
+export const getAgentPresenceAPI = async (): Promise<{ agents: AgentPresence[] }> => apiRequest('/telephony/agents/status/');
+
+export type PbxWallboardQueue = {
+  id: string;
+  name: string;
+  waiting: number;
+  longest_wait_s: number;
+  agents: { members: number; available: number; on_call: number; paused: number; offline: number };
+  today: {
+    offered: number;
+    answered: number;
+    abandoned: number;
+    overflow: number;
+    avg_wait_s: number | null;
+    max_wait_s: number | null;
+    service_level_pct: number | null;
+  };
+};
+
+export type PbxLiveCall = {
+  id: string;
+  direction: 'inbound' | 'outbound' | 'internal' | '';
+  status: PbxCallStatus;
+  from_party: string;
+  to_party: string;
+  did: string;
+  extension_number: string | null;
+  answered_by_number: string | null;
+  crm_contact: number | null;
+  crm_contact_name: string | null;
+  queue: string | null;
+  queue_name: string | null;
+  waiting: boolean;
+  on_hold: boolean;
+  started_at: string | null;
+  answered_at: string | null;
+  queued_at: string | null;
+};
+
+export type PbxWallboard = {
+  generated_at: string;
+  since: string;
+  service_level_s: number;
+  queues: PbxWallboardQueue[];
+  live_calls: PbxLiveCall[];
+  agents: AgentPresence[];
+  today: { calls: number; answered: number; missed: number };
+};
+
+/** Live calls, queue waits and today's queue stats; re-read when the telephony slice moves. */
+export const getPbxWallboardAPI = async (): Promise<PbxWallboard> => apiRequest('/telephony/wallboard/');
+
+// ---- Phone System settings (tenant admins) ------------------------------------
+
+export type PbxDestinationType = 'extension' | 'ivr' | 'queue' | 'hangup';
+
+export type PbxExtensionRow = {
+  id: string;
+  number: string;
+  display_name: string;
+  device_type: 'webrtc' | 'desk_phone' | 'softphone';
+  user: number | null;
+  status: 'active' | 'disabled';
+  /** Verified number this extension presents on outbound calls. Null: the company route. */
+  outbound_number: string | null;
+  sip_username: string | null;
+  /** Only in the create / rotate response, once. */
+  sip_secret: string | null;
+};
+
+export type PbxTrunkRow = {
+  id: string;
+  name: string;
+  kind: 'sip' | 'gsm_gateway';
+  status: 'pending' | 'ready' | 'degraded' | 'down' | 'disabled';
+  host: string;
+  port: number;
+  transport: 'udp' | 'tcp' | 'tls';
+  auth_username: string;
+  has_auth_secret: boolean;
+  allowed_sources: string[];
+  /** Set when this trunk is a GSM gateway's (its address is pinned to the tunnel). */
+  gateway: string | null;
+  health: '' | 'ready' | 'degraded' | 'down';
+};
+
+export type PbxGatewayRow = {
+  id: string;
+  name: string;
+  trunk: string;
+  tunnel_ip: string;
+  status: 'awaiting_enrollment' | 'enrolled' | 'verified';
+  public_key: string;
+  token_expires_at: string | null;
+  enrolled_at: string | null;
+  verified_at: string | null;
+  trunk_status: PbxTrunkRow['status'];
+  health: PbxTrunkRow['health'];
+  health_changed_at: string | null;
+  /** Only in the create / reset response, once. */
+  enrollment_token?: string;
+  enrollment_url?: string;
+};
+
+export type PbxNumberRow = { id: string; e164: string; label: string; trunk: string; verified: boolean; verified_at: string | null };
+
+export type PbxInboundRouteRow = {
+  id: string;
+  number: string;
+  destination_type: PbxDestinationType;
+  extension: string | null;
+  ivr: string | null;
+  queue: string | null;
+  business_hours: string | null;
+  closed_type: PbxDestinationType;
+  closed_extension: string | null;
+  closed_ivr: string | null;
+  closed_queue: string | null;
+};
+
+export type PbxOutboundRouteRow = {
+  id: string;
+  name: string;
+  priority: number;
+  patterns: { prefix: string; digits: number }[];
+  trunk: string;
+  caller_id: string;
+  enabled: boolean;
+};
+
+export type PbxHoursRule = { days: number[]; start: string; end: string };
+export type PbxBusinessHoursRow = { id: string; name: string; timezone: string; rules: PbxHoursRule[]; closed_dates: string[] };
+
+export type PbxIvrOption = {
+  digit: string;
+  destination_type: PbxDestinationType;
+  extension: string | null;
+  ivr: string | null;
+  queue: string | null;
+};
+export type PbxIvrMenuRow = {
+  id: string;
+  name: string;
+  prompt: string;
+  /** The tenant's own greeting (a PbxSoundRow id), played instead of `prompt` when set. */
+  greeting: string | null;
+  timeout_s: number;
+  max_retries: number;
+  timeout_type: PbxDestinationType;
+  timeout_extension: string | null;
+  timeout_ivr: string | null;
+  timeout_queue: string | null;
+  options: PbxIvrOption[];
+};
+
+export type PbxQueueRow = {
+  id: string;
+  name: string;
+  strategy: 'ringall' | 'rrmemory' | 'leastrecent' | 'fewestcalls' | 'random';
+  member_timeout_s: number;
+  max_wait_s: number;
+  wrapup_s: number;
+  overflow_type: PbxDestinationType;
+  overflow_extension: string | null;
+  overflow_ivr: string | null;
+  members: { extension: string; number?: string; penalty: number }[];
+};
+
+export type TelephonySettings = {
+  recording_mode: 'off' | 'external' | 'all';
+  recording_notice: 'none' | 'ar' | 'en' | 'ar_en';
+  recording_accepted_at: string | null;
+  recording_accepted_by: number | null;
+  /** Recordings older than this are deleted by the daily retention job. */
+  recording_retention_days: number;
+  /** Set by the platform operator: nothing is deleted, by retention or by hand. */
+  recording_legal_hold: boolean;
+  /** Stored recordings fill the plan's storage: new calls are not recorded. */
+  recording_paused_quota: boolean;
+  recording_bytes_used: number;
+  recording_bytes_limit: number | null;
+};
+
+export type TelephonyStatus = {
+  provisioned: boolean;
+  tenant: {
+    status: 'pending' | 'active' | 'failed' | 'suspended' | 'deprovisioned';
+    outbound_suspended: boolean;
+    config_version: number;
+    applied_version: number | null;
+    last_apply_error: string;
+  } | null;
+};
+
+export type PbxSoundRow = { id: string; name: string; duration_ms: number; size_bytes: number; created_at: string };
+
+export type PbxResource =
+  | 'extensions' | 'trunks' | 'numbers' | 'inbound-routes' | 'outbound-routes' | 'business-hours' | 'ivr-menus' | 'queues'
+  | 'gateways' | 'sounds';
+
+/** Every row of a Phone System resource (the lists are small; one page of up to 200). */
+export const listPbxResourceAPI = async <T,>(resource: PbxResource): Promise<T[]> => {
+  const body = await apiRequest<T[] | { results: T[] }>(`/telephony/${resource}/?page_size=200`);
+  return Array.isArray(body) ? body : body?.results || [];
+};
+
+export const createPbxResourceAPI = async <T,>(resource: PbxResource, data: Record<string, unknown>): Promise<T> =>
+  apiRequest<T>(`/telephony/${resource}/`, { method: 'POST', body: JSON.stringify(data) });
+
+export const updatePbxResourceAPI = async <T,>(resource: PbxResource, id: string, data: Record<string, unknown>): Promise<T> =>
+  apiRequest<T>(`/telephony/${resource}/${id}/`, { method: 'PATCH', body: JSON.stringify(data) });
+
+export const deletePbxResourceAPI = async (resource: PbxResource, id: string): Promise<void> => {
+  await apiRequest(`/telephony/${resource}/${id}/`, { method: 'DELETE' });
+};
+
+/** Upload a greeting: `file` is a WAV (16-bit PCM, mono, 8 kHz), see utils/phoneAudio.ts. */
+export const uploadPbxSoundAPI = async (name: string, file: Blob): Promise<PbxSoundRow> => {
+  const form = new FormData();
+  form.append('name', name);
+  form.append('file', file, 'greeting.wav');
+  return apiRequest<PbxSoundRow>('/telephony/sounds/', { method: 'POST', body: form });
+};
+
+/** A stored greeting as a playable WAV (admins only). */
+export const getPbxSoundAudioAPI = async (id: string): Promise<Blob> => {
+  const response = await fetch(`${BASE_URL}/telephony/sounds/${id}/audio/`, { headers: getAuthenticatedBinaryRequestHeaders() });
+  if (!response.ok) throw new Error(`pbx_sound_audio_${response.status}`);
+  return response.blob();
+};
+
+export type PbxTrunkCheck = {
+  id: 'config' | 'options' | 'register' | 'identify' | 'numbers' | 'inbound' | 'outbound';
+  status: 'ok' | 'warning' | 'failed' | 'skipped';
+  data?: Record<string, unknown>;
+};
+export type PbxTrunkTestReport = { trunk: string; tested_at: string; ok: boolean; checks: PbxTrunkCheck[] };
+
+/** POST /telephony/trunks/{id}/test/: one SIP OPTIONS from the node plus the trunk's routing checks. */
+export const testPbxTrunkAPI = async (id: string): Promise<PbxTrunkTestReport> =>
+  apiRequest(`/telephony/trunks/${id}/test/`, { method: 'POST' });
+
+export const rotatePbxExtensionCredentialsAPI = async (id: string): Promise<PbxExtensionRow> =>
+  apiRequest(`/telephony/extensions/${id}/credentials/rotate/`, { method: 'POST' });
+
+export const verifyPbxGatewayAPI = async (id: string): Promise<PbxGatewayRow> =>
+  apiRequest(`/telephony/gateways/${id}/verify/`, { method: 'POST' });
+
+/** New one-time enrollment code (drops an enrolled key: for a replaced gateway). */
+export const resetPbxGatewayEnrollmentAPI = async (id: string): Promise<PbxGatewayRow> =>
+  apiRequest(`/telephony/gateways/${id}/enrollment/reset/`, { method: 'POST' });
+
+export const getTelephonyStatusAPI = async (): Promise<TelephonyStatus> => apiRequest('/telephony/status/');
+
+export type PbxUsageDay = {
+  day: string;
+  calls_inbound: number;
+  calls_outbound: number;
+  calls_internal: number;
+  calls_answered: number;
+  calls_missed: number;
+  talk_seconds: number;
+  outbound_minutes: number;
+  recordings: number;
+  recording_bytes: number;
+};
+type Quota = { used: number; limit: number | null };
+export type PbxUsage = {
+  period_start: string;
+  minutes: Quota;
+  extensions: Quota;
+  trunks: Quota;
+  recording_bytes: Quota;
+  /** hits_7d: 5-minute periods in the last 7 days when the node refused calls on this live limit (quota.warning). */
+  concurrent_calls: { limit: number | null; hits_7d: number; last_hit_at: string | null };
+  cps: { limit: number | null; hits_7d: number; last_hit_at: string | null };
+  days: PbxUsageDay[];
+};
+
+/** GET /telephony/usage/: this month's metering, quotas in use, the last 30 days. */
+export const getTelephonyUsageAPI = async (): Promise<PbxUsage> => apiRequest('/telephony/usage/');
+
+export const getTelephonySettingsAPI = async (): Promise<TelephonySettings> => apiRequest('/telephony/settings/');
+
+export const updateTelephonySettingsAPI = async (
+  data: Partial<TelephonySettings> & { accept_recording_terms?: boolean },
+): Promise<TelephonySettings> => apiRequest('/telephony/settings/', { method: 'PATCH', body: JSON.stringify(data) });
+
+/** Short-lived (5 min), audit-logged playback URL for a PBX recording. */
+export const getPbxRecordingAccessAPI = async (recordingId: string): Promise<{ url: string; expires_at: string }> =>
+  apiRequest(`/telephony/recordings/${recordingId}/access/`, { method: 'POST' });
+
+/** Delete one PBX recording (company admins; audited; 409 legal_hold while the operator holds recordings). */
+export const deletePbxRecordingAPI = async (recordingId: string): Promise<void> =>
+  apiRequest(`/telephony/recordings/${recordingId}/`, { method: 'DELETE' });

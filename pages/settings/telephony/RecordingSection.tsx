@@ -73,6 +73,8 @@ export const RecordingSection = () => {
   }, [settings.data]);
 
   const current = settings.data;
+  // The platform's legal gate: until it opens, recording can only stay (or be turned) off.
+  const unavailable = current?.recording_available === false;
   const turningOn = Boolean(current) && current?.recording_mode === 'off' && mode !== 'off';
   const dirty = Boolean(current) && (mode !== current?.recording_mode || notice !== current?.recording_notice
     || Number(retention) !== current?.recording_retention_days);
@@ -108,13 +110,14 @@ export const RecordingSection = () => {
       {form.errors._general ? <Alert variant="error">{form.errors._general}</Alert> : null}
       {current?.recording_paused_quota ? <Alert variant="warning">{tr('pbxRecordingPausedQuota')}</Alert> : null}
       {current?.recording_legal_hold ? <Alert variant="info">{tr('pbxRecordingLegalHold')}</Alert> : null}
+      {unavailable ? <Alert variant="info">{tr('pbxRecordingGated')}</Alert> : null}
       <div>
         <FieldLabel htmlFor="pbx-rec-mode">{tr('pbxRecordingMode')}</FieldLabel>
         <Select id="pbx-rec-mode" value={mode} disabled={!current}
           onChange={(e) => { setMode(e.target.value as TelephonySettings['recording_mode']); form.setErrors({}); }}>
           <option value="off">{tr('pbxRecordingMode_off')}</option>
-          <option value="external">{tr('pbxRecordingMode_external')}</option>
-          <option value="all">{tr('pbxRecordingMode_all')}</option>
+          <option value="external" disabled={unavailable}>{tr('pbxRecordingMode_external')}</option>
+          <option value="all" disabled={unavailable}>{tr('pbxRecordingMode_all')}</option>
         </Select>
         <FieldError message={form.errors.recording_mode} />
       </div>

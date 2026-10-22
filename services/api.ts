@@ -7721,6 +7721,8 @@ export type TelephonySettings = {
   recording_paused_quota: boolean;
   recording_bytes_used: number;
   recording_bytes_limit: number | null;
+  /** False until the platform enables call recording (its legal gate). */
+  recording_available: boolean;
 };
 
 export type TelephonyStatus = {

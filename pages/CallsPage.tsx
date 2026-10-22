@@ -245,7 +245,7 @@ function CallHoursPanel({
       {canManage ? (
         <div className="flex flex-wrap items-center gap-2">
           <Button
-            className="!h-8 !px-3 !text-xs"
+            size="sm"
             loading={enabling}
             disabled={!selectedReady}
             title={selectedReady ? selectedLabel : emptyHint || undefined}

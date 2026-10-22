@@ -64,7 +64,7 @@ export const ChatTemplatePicker: React.FC<Props> = ({
             </select>
             <Button
               variant="secondary"
-              className="!shrink-0 !px-2 !py-1 !text-xs"
+              size="sm"
               disabled={whatsappSendBlocked || !chatTemplateSendId || chatTemplateSending}
               onClick={onSendTemplate}
             >

@@ -140,24 +140,6 @@ export const SectionHeader = ({ title, hint, action }: { title: string; hint?: s
   </div>
 );
 
-export const TH = ({ children, className = '' }: { children?: React.ReactNode; className?: string }) => (
-  <th className={`px-4 py-3 text-start text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 ${className}`}>
-    {children}
-  </th>
-);
-
-export const TD = ({ children, className = '' }: { children?: React.ReactNode; className?: string }) => (
-  <td className={`px-4 py-3 text-sm text-gray-800 dark:text-gray-200 ${className}`}>{children}</td>
-);
-
-export const EmptyRow = ({ colSpan, text }: { colSpan: number; text: string }) => (
-  <tr>
-    <td colSpan={colSpan} className="px-4 py-10 text-center text-sm text-gray-500 dark:text-gray-400">
-      {text}
-    </td>
-  </tr>
-);
-
 export const Badge = ({ tone, children }: { tone: 'green' | 'amber' | 'gray' | 'red'; children: React.ReactNode }) => {
   const tones = {
     green: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300',

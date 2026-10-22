@@ -2,9 +2,8 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { SectionLoadingState } from '../SectionLoadingState';
 import { Modal } from '../Modal';
 import { Button } from '../Button';
-import { FileTextIcon, MicrophoneIcon } from '../icons';
+import { ArrowLeftIcon, FileTextIcon, MicrophoneIcon } from '../icons';
 import { ChatMediaThumb } from '../chat/ChatMediaThumb';
-import { useAppContext } from '../../context/AppContext';
 import type { translations } from '../../constants';
 import {
   CompanyLibraryFile,
@@ -53,8 +52,6 @@ export const AttachmentSourceModal: React.FC<Props> = ({
   onPickLibraryFile,
   t,
 }) => {
-  const { language } = useAppContext();
-  const isRtl = language === 'ar';
   const [step, setStep] = useState<Step>('source');
   const [files, setFiles] = useState<CompanyLibraryFile[]>([]);
   const [loading, setLoading] = useState(false);
@@ -176,11 +173,8 @@ export const AttachmentSourceModal: React.FC<Props> = ({
       ) : (
         <div className="space-y-3">
           <Button variant="ghost" onClick={() => setStep('source')}>
-            {isRtl ? (
-              <>→ {t('back') || 'Back'}</>
-            ) : (
-              <>← {t('back') || 'Back'}</>
-            )}
+            <ArrowLeftIcon className="h-4 w-4" />
+            {t('back')}
           </Button>
           {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
           {loading ? (

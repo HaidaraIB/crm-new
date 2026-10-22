@@ -71,7 +71,8 @@ export const BulkActionBar: React.FC<BulkActionBarProps> = ({
             variant="primary"
             onClick={onStatusAction}
             title={statusActionTitle || statusActionLabel}
-            className="!h-8 shrink-0 whitespace-nowrap !rounded-full px-3"
+            size="sm"
+            className="!rounded-full"
           >
             {statusActionLabel}
           </Button>

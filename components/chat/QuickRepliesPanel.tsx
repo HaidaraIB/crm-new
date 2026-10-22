@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button, Card, TableHorizontalScroll, IconButton, TrashIcon } from '../index';
 import { EditIcon, PlusIcon, SearchIcon } from '../icons';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../DataTable';
 import { Input, AutoDirTextarea } from '../Input';
 import { Modal } from '../Modal';
 import { useAppContext } from '../../context/AppContext';
@@ -163,55 +164,41 @@ export function QuickRepliesManager() {
 
       <Card className="overflow-hidden">
         <TableHorizontalScroll>
-          <table className="w-full min-w-[560px]">
-            <thead>
-              <tr className="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50">
-                <th className="py-3 px-4 text-start text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  {t('quickReplyTitle')}
-                </th>
-                <th className="py-3 px-4 text-start text-sm font-semibold text-gray-700 dark:text-gray-300">
-                  {t('quickReplyBodyColumn')}
-                </th>
-                <th className="py-3 px-4 text-center text-sm font-semibold text-gray-700 dark:text-gray-300 w-[120px]">
-                  {t('actions')}
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+          <DataTable className="min-w-[560px]">
+            <TableHead>
+              <Th>{t('quickReplyTitle')}</Th>
+              <Th>{t('quickReplyBodyColumn')}</Th>
+              <Th className="w-[120px]">{t('actions')}</Th>
+            </TableHead>
+            <TableBody>
               {isLoading ? (
-                <tr>
-                  <td colSpan={3} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                    {t('loading')}
-                  </td>
-                </tr>
+                <TableMessageRow colSpan={3}>{t('loading')}</TableMessageRow>
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={3} className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                    {rows.length === 0
-                      ? t('noQuickReplies')
-                      : `${t('search')} — ${t('noResultsFound')}`}
-                  </td>
-                </tr>
+                <TableMessageRow colSpan={3}>
+                  {rows.length === 0
+                    ? t('noQuickReplies')
+                    : `${t('search')} — ${t('noResultsFound')}`}
+                </TableMessageRow>
               ) : (
                 filtered.map((row) => (
-                  <tr key={row.id} className="bg-white dark:bg-gray-900/40">
-                    <td className="py-3 px-4 text-sm font-medium text-gray-900 dark:text-gray-50 align-top">
+                  <TableRow key={row.id}>
+                    <Td className="font-medium text-gray-900 dark:text-gray-50">
                       {displayText(row.title)}
-                    </td>
-                    <td className="py-3 px-4 text-sm text-gray-600 dark:text-gray-300 align-top">
+                    </Td>
+                    <Td className="text-gray-600 dark:text-gray-300">
                       <p className="line-clamp-2 whitespace-pre-wrap">{displayText(row.body)}</p>
-                    </td>
-                    <td className="py-3 px-4 align-top">
-                      <div className="flex items-center justify-center gap-0.5">
+                    </Td>
+                    <Td>
+                      <TableActions>
                         <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => openEdit(row)} />
                         <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('deleteQuickReply')} tone="danger" onClick={() => requestDelete(row)} />
-                      </div>
-                    </td>
-                  </tr>
+                      </TableActions>
+                    </Td>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </DataTable>
         </TableHorizontalScroll>
       </Card>
 

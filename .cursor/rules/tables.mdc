@@ -1,0 +1,45 @@
+---
+description: Data tables reuse components/DataTable and center every header and cell (LTR and RTL)
+globs: "**/*.tsx"
+alwaysApply: true
+---
+
+# Data tables
+
+Every value sits centered under its column header, in English and Arabic. Build new tables from the shared primitives in `components/DataTable.tsx` (also exported from `components/index`). Do not write local `TH`/`TD`/`thClass` helpers.
+
+```tsx
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../components/DataTable';
+
+<TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
+  <DataTable>
+    <TableHead>
+      <Th>{t('name')}</Th>
+      <Th className="w-24">{t('actions')}</Th>
+    </TableHead>
+    <TableBody>
+      {rows.length === 0 ? (
+        <TableMessageRow colSpan={2}>{isLoading ? t('loading') : t('noResultsFound')}</TableMessageRow>
+      ) : rows.map((row) => (
+        <TableRow key={row.id}>
+          <Td className="font-medium">{row.name}</Td>
+          <Td>
+            <TableActions>
+              <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => edit(row)} />
+              <IconButton icon={<TrashIcon className="h-4 w-4" />} label={t('delete')} tone="danger" onClick={() => remove(row)} />
+            </TableActions>
+          </Td>
+        </TableRow>
+      ))}
+    </TableBody>
+  </DataTable>
+</TableHorizontalScroll>
+```
+
+## Rules
+
+- `Th` and `Td` are `text-center`. Never add `text-start`, `text-left`, `text-end` or `rtl:text-right` to a table, header or cell.
+- Content that is a flex or block layout inside a cell must center itself as well: `TableActions` for row actions, `justify-center` for badge groups, `mx-auto` for images and color swatches.
+- Use `TableMessageRow` for loading, empty and no-results rows.
+- Older pages with hand-written `<table>` markup already center every cell. Keep them that way when you edit them, and move them onto `DataTable` when you rework them.
+- Report tabs keep their own `DataTable` in `components/reports/tabs/SectionShell.tsx`. It centers the same way.

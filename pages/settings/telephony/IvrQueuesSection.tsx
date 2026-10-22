@@ -7,17 +7,15 @@ import { Input } from '../../../components/Input';
 import { Modal } from '../../../components/Modal';
 import { Select } from '../../../components/Select';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { EditIcon, PlusIcon, TrashIcon } from '../../../components/icons';
 import type { PbxDestinationType, PbxIvrMenuRow, PbxIvrOption, PbxQueueRow, PbxSoundRow } from '../../../services/api';
 import {
   type Destination,
   DestinationPicker,
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   readDestination,
   useCatalogForm,
   useConfirmDelete,
@@ -196,22 +194,20 @@ export const IvrMenusSection = () => {
         action={<Button onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" />{tr('pbxAddIvr')}</Button>}
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxIvrName')}</TH>
-              <TH>{tr('pbxIvrOptions')}</TH>
-              <TH>{tr('pbxIvrTimeoutDestination')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxIvrName')}</Th>
+            <Th>{tr('pbxIvrOptions')}</Th>
+            <Th>{tr('pbxIvrTimeoutDestination')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={4} text={isLoading ? tr('loading') : tr('pbxNoIvrs')} />
+              <TableMessageRow colSpan={4}>{isLoading ? tr('loading') : tr('pbxNoIvrs')}</TableMessageRow>
             ) : rows.map((row) => (
-              <tr key={row.id}>
-                <TD className="font-medium">{row.name}</TD>
-                <TD>
+              <TableRow key={row.id}>
+                <Td className="font-medium">{row.name}</Td>
+                <Td>
                   <ul className="space-y-0.5">
                     {row.options.map((o) => (
                       <li key={o.digit}>
@@ -220,19 +216,19 @@ export const IvrMenusSection = () => {
                       </li>
                     ))}
                   </ul>
-                </TD>
-                <TD>{label(readDestination(row as unknown as Record<string, unknown>, 'timeout', 'hangup'))}</TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+                </Td>
+                <Td>{label(readDestination(row as unknown as Record<string, unknown>, 'timeout', 'hangup'))}</Td>
+                <Td>
+                  <TableActions>
                     <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                     <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                       onClick={() => confirmDelete(row.name, () => remove.mutateAsync(row.id))} />
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? <IvrModal row={editing === 'new' ? null : editing} onClose={() => setEditing(null)} /> : null}
     </div>
@@ -347,7 +343,7 @@ const QueueModal = ({ row, onClose }: { row: PbxQueueRow | null; onClose: () => 
                     </label>
                     {member ? (
                       <Select
-                        className="!h-8 !w-20 text-xs"
+                        className="w-20"
                         aria-label={tr('pbxQueuePenalty')}
                         title={tr('pbxQueuePenalty')}
                         value={String(member.penalty)}
@@ -393,36 +389,34 @@ export const QueuesSection = () => {
         action={<Button onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" />{tr('pbxAddQueue')}</Button>}
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxQueueName')}</TH>
-              <TH>{tr('pbxQueueStrategy')}</TH>
-              <TH>{tr('pbxQueueMembers')}</TH>
-              <TH>{tr('pbxQueueOverflow')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxQueueName')}</Th>
+            <Th>{tr('pbxQueueStrategy')}</Th>
+            <Th>{tr('pbxQueueMembers')}</Th>
+            <Th>{tr('pbxQueueOverflow')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={5} text={isLoading ? tr('loading') : tr('pbxNoQueues')} />
+              <TableMessageRow colSpan={5}>{isLoading ? tr('loading') : tr('pbxNoQueues')}</TableMessageRow>
             ) : rows.map((row) => (
-              <tr key={row.id}>
-                <TD className="font-medium">{row.name}</TD>
-                <TD>{tr(`pbxStrategy_${row.strategy}`)}</TD>
-                <TD><span dir="ltr">{row.members.map((m) => m.number).join(', ') || '—'}</span></TD>
-                <TD>{label(readDestination(row as unknown as Record<string, unknown>, 'overflow', 'hangup'))}</TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+              <TableRow key={row.id}>
+                <Td className="font-medium">{row.name}</Td>
+                <Td>{tr(`pbxStrategy_${row.strategy}`)}</Td>
+                <Td><span dir="ltr">{row.members.map((m) => m.number).join(', ') || '—'}</span></Td>
+                <Td>{label(readDestination(row as unknown as Record<string, unknown>, 'overflow', 'hangup'))}</Td>
+                <Td>
+                  <TableActions>
                     <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                     <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                       onClick={() => confirmDelete(row.name, () => remove.mutateAsync(row.id))} />
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? <QueueModal row={editing === 'new' ? null : editing} onClose={() => setEditing(null)} /> : null}
     </div>

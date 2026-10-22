@@ -111,7 +111,7 @@ export const ManagementReportCard = ({
                 <table className="min-w-full text-sm">
                   <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-600 dark:text-gray-400">
                     <tr>
-                      <th className="px-3 py-2 text-start font-semibold">{activityLabel}</th>
+                      <th className="px-3 py-2 text-center font-semibold">{activityLabel}</th>
                       <th className="px-3 py-2 text-center font-semibold">{tasksLabel}</th>
                       <th className="px-3 py-2 text-center font-semibold">{callsLabel}</th>
                       <th className="px-3 py-2 text-center font-semibold">{visitsLabel}</th>
@@ -124,7 +124,7 @@ export const ManagementReportCard = ({
                         key={row.user_id}
                         className="border-t border-gray-100 dark:border-gray-800/80"
                       >
-                        <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-gray-100">
+                        <td className="px-3 py-2.5 text-center font-medium text-gray-900 dark:text-gray-100">
                           {row.name}
                           <span className="block text-[11px] font-normal text-gray-500 dark:text-gray-500">
                             {row.activity_total} {activityLabel.toLowerCase()}

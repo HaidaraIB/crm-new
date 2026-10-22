@@ -44,10 +44,10 @@ export const DealLineItemsSection = ({
       <table className="w-full min-w-[520px] text-sm">
         <thead>
           <tr className="border-b border-gray-200 text-xs uppercase tracking-wide text-gray-500 dark:border-gray-700 dark:text-gray-400">
-            <th className="px-1 py-2 text-start font-medium">{t('dealTitle')}</th>
-            <th className="px-1 py-2 text-end font-medium">{t('dealQuantity')}</th>
-            <th className="px-1 py-2 text-end font-medium">{t('dealUnitPrice')}</th>
-            <th className="px-1 py-2 text-end font-medium">{t('value')}</th>
+            <th className="px-1 py-2 text-center font-medium">{t('dealTitle')}</th>
+            <th className="px-1 py-2 text-center font-medium">{t('dealQuantity')}</th>
+            <th className="px-1 py-2 text-center font-medium">{t('dealUnitPrice')}</th>
+            <th className="px-1 py-2 text-center font-medium">{t('value')}</th>
           </tr>
         </thead>
         <tbody>
@@ -58,7 +58,7 @@ export const DealLineItemsSection = ({
         <tfoot>
           <tr className="border-t border-gray-200 dark:border-gray-700">
             <td colSpan={3} className="px-1 py-3 text-end text-sm font-medium text-gray-600 dark:text-gray-300">{t('value')}</td>
-            <td className="px-1 py-3 text-end text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{formatDealMoney(deal.value, deal.currency)}</td>
+            <td className="px-1 py-3 text-center text-sm font-semibold tabular-nums text-gray-900 dark:text-white">{formatDealMoney(deal.value, deal.currency)}</td>
           </tr>
         </tfoot>
       </table>
@@ -68,10 +68,10 @@ export const DealLineItemsSection = ({
 
 const LineItemRow = ({ item, currency }: { item: DealLineItem; currency?: string }) => (
   <tr className="border-b border-gray-100 last:border-0 dark:border-gray-800">
-    <td className="px-1 py-3 font-medium text-gray-900 dark:text-white">{item.name}</td>
-    <td className="px-1 py-3 text-end tabular-nums text-gray-700 dark:text-gray-200">{item.quantity}</td>
-    <td className="px-1 py-3 text-end tabular-nums text-gray-700 dark:text-gray-200">{formatDealMoney(item.unitPrice, currency)}</td>
-    <td className="px-1 py-3 text-end font-medium tabular-nums text-gray-900 dark:text-white">{formatDealMoney(item.lineTotal, currency)}</td>
+    <td className="px-1 py-3 text-center font-medium text-gray-900 dark:text-white">{item.name}</td>
+    <td className="px-1 py-3 text-center tabular-nums text-gray-700 dark:text-gray-200">{item.quantity}</td>
+    <td className="px-1 py-3 text-center tabular-nums text-gray-700 dark:text-gray-200">{formatDealMoney(item.unitPrice, currency)}</td>
+    <td className="px-1 py-3 text-center font-medium tabular-nums text-gray-900 dark:text-white">{formatDealMoney(item.lineTotal, currency)}</td>
   </tr>
 );
 

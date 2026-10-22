@@ -15,6 +15,7 @@ import { Button } from '../Button';
 import { IconButton } from '../IconButton';
 import { TrashIcon } from '../icons';
 import { PhoneText, isPhoneLike } from '../PhoneText';
+import { DataTable, TableBody, TableHead, TableRow, Td, Th } from '../DataTable';
 import { PbxRecordingPlayer } from './PbxRecordingPlayer';
 import { useSoftphoneOptional } from './SoftphoneProvider';
 
@@ -113,32 +114,30 @@ export const PbxCallsPanel: React.FC = () => {
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-      <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700">
-        <thead className="bg-gray-50 text-start text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900/40 dark:text-gray-400">
-          <tr>
-            <th className="px-3 py-2 text-start">{tr('pbxColStarted')}</th>
-            <th className="px-3 py-2 text-start">{tr('direction')}</th>
-            <th className="px-3 py-2 text-start">{tr('from')}</th>
-            <th className="px-3 py-2 text-start">{tr('to')}</th>
-            <th className="px-3 py-2 text-start">{tr('lead')}</th>
-            <th className="px-3 py-2 text-start">{tr('pbxColExtension')}</th>
-            <th className="px-3 py-2 text-start">{tr('status')}</th>
-            <th className="px-3 py-2 text-start">{tr('pbxColTalkTime')}</th>
-            <th className="px-3 py-2 text-start">{tr('recording')}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
+      <DataTable className="min-w-full">
+        <TableHead>
+          <Th>{tr('pbxColStarted')}</Th>
+          <Th>{tr('direction')}</Th>
+          <Th>{tr('from')}</Th>
+          <Th>{tr('to')}</Th>
+          <Th>{tr('lead')}</Th>
+          <Th>{tr('pbxColExtension')}</Th>
+          <Th>{tr('status')}</Th>
+          <Th>{tr('pbxColTalkTime')}</Th>
+          <Th>{tr('recording')}</Th>
+        </TableHead>
+        <TableBody>
           {rows.map((c) => {
             const remote = c.direction === 'inbound' ? c.from_party : c.to_party;
             return (
-              <tr key={c.id} className="text-gray-800 dark:text-gray-100">
-                <td className="whitespace-nowrap px-3 py-2 text-xs text-gray-600 dark:text-gray-300">
+              <TableRow key={c.id}>
+                <Td className="whitespace-nowrap text-xs text-gray-600 dark:text-gray-300">
                   {c.started_at ? new Date(c.started_at).toLocaleString() : '—'}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">{c.direction ? tr(`pbxDirection_${c.direction}`) : '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2"><Party value={c.from_party} /></td>
-                <td className="whitespace-nowrap px-3 py-2"><Party value={c.to_party} /></td>
-                <td className="whitespace-nowrap px-3 py-2">
+                </Td>
+                <Td className="whitespace-nowrap">{c.direction ? tr(`pbxDirection_${c.direction}`) : '—'}</Td>
+                <Td className="whitespace-nowrap"><Party value={c.from_party} /></Td>
+                <Td className="whitespace-nowrap"><Party value={c.to_party} /></Td>
+                <Td className="whitespace-nowrap">
                   {c.crm_contact ? (
                     <button
                       type="button"
@@ -159,22 +158,22 @@ export const PbxCallsPanel: React.FC = () => {
                   ) : (
                     '—'
                   )}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">
+                </Td>
+                <Td className="whitespace-nowrap">
                   <PhoneText>{c.answered_by_number || c.extension_number || ''}</PhoneText>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2">
+                </Td>
+                <Td className="whitespace-nowrap">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_TONE[c.status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
                     {tr(`pbxStatus_${c.status}`)}
                   </span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 tabular-nums">{talkTime(c.billsec_s)}</td>
-                <td className="px-3 py-2"><RecordingCell call={c} /></td>
-              </tr>
+                </Td>
+                <Td className="whitespace-nowrap tabular-nums">{talkTime(c.billsec_s)}</Td>
+                <Td><RecordingCell call={c} /></Td>
+              </TableRow>
             );
           })}
-        </tbody>
-      </table>
+        </TableBody>
+      </DataTable>
       {query.hasNextPage ? (
         <div className="border-t border-gray-100 p-3 text-center dark:border-gray-700">
           <Button size="sm" variant="ghost" loading={query.isFetchingNextPage} onClick={() => void query.fetchNextPage()}>

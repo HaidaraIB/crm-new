@@ -12,6 +12,7 @@ import { usePersistedTab } from '../../hooks/usePersistedTab';
 import { useInvalidateOnSliceChange } from '../../hooks/useSliceVersion';
 import { getPbxWallboardAPI, type AgentPresence, type PbxLiveCall, type PbxWallboardQueue } from '../../services/api';
 import { PhoneText, isPhoneLike } from '../PhoneText';
+import { DataTable, TableBody, TableHead, TableRow, Td, Th } from '../DataTable';
 import { PbxCallsPanel } from './PbxCallsPanel';
 
 const WALLBOARD_KEY = ['telephony', 'wallboard'] as const;
@@ -120,53 +121,51 @@ const LiveCalls = ({ calls, now }: { calls: PbxLiveCall[]; now: number }) => {
   }
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
-      <table className="min-w-full divide-y divide-gray-200 text-sm dark:divide-gray-700" aria-label={tr('pbxWallLiveCalls')}>
-        <thead className="bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-500 dark:bg-gray-900/40 dark:text-gray-400">
-          <tr>
-            <th className="px-3 py-2 text-start">{tr('direction')}</th>
-            <th className="px-3 py-2 text-start">{tr('from')}</th>
-            <th className="px-3 py-2 text-start">{tr('to')}</th>
-            <th className="px-3 py-2 text-start">{tr('lead')}</th>
-            <th className="px-3 py-2 text-start">{tr('pbxColExtension')}</th>
-            <th className="px-3 py-2 text-start">{tr('pbxQueues')}</th>
-            <th className="px-3 py-2 text-start">{tr('status')}</th>
-            <th className="px-3 py-2 text-start">{tr('pbxWallDuration')}</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-gray-100 dark:divide-gray-700/60">
+      <DataTable className="min-w-full" aria-label={tr('pbxWallLiveCalls')}>
+        <TableHead>
+          <Th>{tr('direction')}</Th>
+          <Th>{tr('from')}</Th>
+          <Th>{tr('to')}</Th>
+          <Th>{tr('lead')}</Th>
+          <Th>{tr('pbxColExtension')}</Th>
+          <Th>{tr('pbxQueues')}</Th>
+          <Th>{tr('status')}</Th>
+          <Th>{tr('pbxWallDuration')}</Th>
+        </TableHead>
+        <TableBody>
           {calls.map((c) => {
             const state = callState(c);
             // Waiting callers show how long they have waited; others the time since answer (or start).
             const elapsed = c.waiting ? since(c.queued_at, now) : since(c.answered_at || c.started_at, now);
             return (
-              <tr key={c.id} className="text-gray-800 dark:text-gray-100" data-call={c.id} data-state={state}>
-                <td className="whitespace-nowrap px-3 py-2">{c.direction ? tr(`pbxDirection_${c.direction}`) : '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2"><Party value={c.from_party} /></td>
-                <td className="whitespace-nowrap px-3 py-2"><Party value={c.to_party} /></td>
-                <td className="whitespace-nowrap px-3 py-2">
+              <TableRow key={c.id} data-call={c.id} data-state={state}>
+                <Td className="whitespace-nowrap">{c.direction ? tr(`pbxDirection_${c.direction}`) : '—'}</Td>
+                <Td className="whitespace-nowrap"><Party value={c.from_party} /></Td>
+                <Td className="whitespace-nowrap"><Party value={c.to_party} /></Td>
+                <Td className="whitespace-nowrap">
                   {c.crm_contact ? (
                     <button type="button" className="font-medium text-primary hover:underline dark:text-primary-300"
                       onClick={() => openLeadDetails({ id: c.crm_contact as number }, { callsTab: 'pbx' })}>
                       {c.crm_contact_name || `#${c.crm_contact}`}
                     </button>
                   ) : '—'}
-                </td>
-                <td className="whitespace-nowrap px-3 py-2"><PhoneText>{c.answered_by_number || c.extension_number || ''}</PhoneText></td>
-                <td className="whitespace-nowrap px-3 py-2">{c.queue_name || '—'}</td>
-                <td className="whitespace-nowrap px-3 py-2">
+                </Td>
+                <Td className="whitespace-nowrap"><PhoneText>{c.answered_by_number || c.extension_number || ''}</PhoneText></Td>
+                <Td className="whitespace-nowrap">{c.queue_name || '—'}</Td>
+                <Td className="whitespace-nowrap">
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
                     state === 'waiting' ? 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
                       : state === 'in_progress' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300'
                         : 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
                     {tr(`pbxWallState_${state}`)}
                   </span>
-                </td>
-                <td className="whitespace-nowrap px-3 py-2 tabular-nums" dir="ltr">{clock(elapsed)}</td>
-              </tr>
+                </Td>
+                <Td className="whitespace-nowrap tabular-nums" dir="ltr">{clock(elapsed)}</Td>
+              </TableRow>
             );
           })}
-        </tbody>
-      </table>
+        </TableBody>
+      </DataTable>
     </div>
   );
 };

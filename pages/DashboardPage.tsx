@@ -960,7 +960,7 @@ export const DashboardPage = () => {
                     <TableHorizontalScroll scrollClassName="-mx-2 px-2">
                         <div className="min-w-full block">
                             <div className="overflow-hidden rounded-lg">
-                                <table className="w-full text-sm text-left rtl:text-right min-w-[600px]">
+                                <table className="w-full text-sm text-center min-w-[600px]">
                                     <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/50 dark:to-red-900/50 border-b-2 border-orange-200 dark:border-orange-700">
                                         <tr>
                                             <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('lead')}</th>
@@ -1229,7 +1229,7 @@ export const DashboardPage = () => {
                         <div className="min-w-full block">
                             <div className="overflow-hidden rounded-lg">
                                 {latestFeedbacks.length > 0 ? (
-                                    <table className="w-full text-sm text-left rtl:text-right min-w-[600px]">
+                                    <table className="w-full text-sm text-center min-w-[600px]">
                                         <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-b-2 border-gray-200 dark:border-gray-700">
                                             <tr>
                                                 <th scope="col" className="px-4 py-3.5 font-bold text-center whitespace-nowrap">{t('date')}</th>

@@ -806,7 +806,7 @@ export const LeadsPage = () => {
                 <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
                     <div className="min-w-full block">
                         <div className="overflow-hidden">
-                            <table className="w-full text-sm text-left rtl:text-right min-w-[1200px]">
+                            <table className="w-full text-sm text-center min-w-[1200px]">
                                 <thead className="text-xs text-gray-700 dark:text-gray-300 uppercase bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
                                     <tr>
                                         {!isDataEntryUser && (
@@ -1203,7 +1203,8 @@ export const LeadsPage = () => {
                                 variant="danger"
                                 onClick={handleBulkDelete}
                                 loading={bulkDeleteLeadsMutation.isPending}
-                                className="!h-8 shrink-0 whitespace-nowrap !rounded-full px-3"
+                                size="sm"
+                                className="!rounded-full"
                                 title={t('bulkDelete')}
                             >
                                 <TrashIcon className="h-4 w-4 shrink-0" />

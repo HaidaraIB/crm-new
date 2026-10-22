@@ -35,7 +35,7 @@ const DevelopersTable = ({ developers, onUpdate, onDelete, isAdmin }: { develope
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full block">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[500px]">
+                    <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400 min-w-[500px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
                                 <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
@@ -78,7 +78,7 @@ const ProjectsTable = ({ projects, onUpdate, onDelete, isAdmin }: { projects: Di
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full block">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[800px]">
+                    <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400 min-w-[800px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
                                 <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
@@ -129,7 +129,7 @@ const UnitsTable = ({ units, onUpdate, onDelete, isAdmin }: { units: DisplayUnit
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full block">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[1200px]">
+                    <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400 min-w-[1200px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
                                 <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>

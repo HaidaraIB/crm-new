@@ -8,16 +8,14 @@ import { Modal } from '../../../components/Modal';
 import { PhoneText } from '../../../components/PhoneText';
 import { Select } from '../../../components/Select';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { EditIcon, PlusIcon, TrashIcon } from '../../../components/icons';
 import type { PbxNumberRow, PbxTrunkRow } from '../../../services/api';
 import {
   Badge,
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   useCatalogForm,
   useConfirmDelete,
   usePbxMutations,
@@ -107,38 +105,36 @@ export const NumbersSection = () => {
         }
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxNumberE164')}</TH>
-              <TH>{tr('pbxNumberLabel')}</TH>
-              <TH>{tr('pbxNumberTrunk')}</TH>
-              <TH>{tr('pbxNumberVerification')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxNumberE164')}</Th>
+            <Th>{tr('pbxNumberLabel')}</Th>
+            <Th>{tr('pbxNumberTrunk')}</Th>
+            <Th>{tr('pbxNumberVerification')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={5} text={isLoading ? tr('loading') : tr('pbxNoNumbers')} />
+              <TableMessageRow colSpan={5}>{isLoading ? tr('loading') : tr('pbxNoNumbers')}</TableMessageRow>
             ) : rows.map((row) => (
-              <tr key={row.id}>
-                <TD><PhoneText className="font-medium">{row.e164}</PhoneText></TD>
-                <TD>{row.label || '—'}</TD>
-                <TD>{trunks.find((t) => t.id === row.trunk)?.name ?? '—'}</TD>
-                <TD>
+              <TableRow key={row.id}>
+                <Td><PhoneText className="font-medium">{row.e164}</PhoneText></Td>
+                <Td>{row.label || '—'}</Td>
+                <Td>{trunks.find((t) => t.id === row.trunk)?.name ?? '—'}</Td>
+                <Td>
                   {row.verified ? <Badge tone="green">{tr('pbxVerified')}</Badge> : <Badge tone="amber">{tr('pbxPendingVerification')}</Badge>}
-                </TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+                </Td>
+                <Td>
+                  <TableActions>
                     <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                     <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                       onClick={() => confirmDelete(row.e164, () => remove.mutateAsync(row.id))} />
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? <NumberModal row={editing === 'new' ? null : editing} trunks={trunks} onClose={() => setEditing(null)} /> : null}
     </div>

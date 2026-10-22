@@ -11,6 +11,7 @@ import { IconButton } from '../../../components/IconButton';
 import { Input } from '../../../components/Input';
 import { Modal } from '../../../components/Modal';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { PlusIcon, RefreshIcon, TrashIcon } from '../../../components/icons';
 import { useAppContext } from '../../../context/AppContext';
 import { getLocalizedApiErrorMessage } from '../../../utils/apiErrorMessage';
@@ -21,12 +22,9 @@ import {
 } from '../../../services/api';
 import {
   Badge,
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   useCatalogForm,
   useConfirmDelete,
   usePbxMutations,
@@ -143,32 +141,30 @@ export const GatewaysSection = () => {
       />
       {message ? <div className="mb-3"><Alert variant={message.tone}>{message.text}</Alert></div> : null}
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxGatewayName')}</TH>
-              <TH>{tr('pbxGatewayTunnel')}</TH>
-              <TH>{tr('pbxGatewayStatus')}</TH>
-              <TH>{tr('pbxGatewayReachability')}</TH>
-              <TH className="w-48">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxGatewayName')}</Th>
+            <Th>{tr('pbxGatewayTunnel')}</Th>
+            <Th>{tr('pbxGatewayStatus')}</Th>
+            <Th>{tr('pbxGatewayReachability')}</Th>
+            <Th className="w-48">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={5} text={isLoading ? tr('loading') : tr('pbxNoGateways')} />
+              <TableMessageRow colSpan={5}>{isLoading ? tr('loading') : tr('pbxNoGateways')}</TableMessageRow>
             ) : rows.map((gw) => (
-              <tr key={gw.id}>
-                <TD className="font-medium">{gw.name}</TD>
-                <TD><span dir="ltr" className="font-mono text-xs">{gw.tunnel_ip}</span></TD>
-                <TD><Badge tone={STATUS_TONE[gw.status]}>{tr(`pbxGatewayStatus_${gw.status}`)}</Badge></TD>
-                <TD>
+              <TableRow key={gw.id}>
+                <Td className="font-medium">{gw.name}</Td>
+                <Td><span dir="ltr" className="font-mono text-xs">{gw.tunnel_ip}</span></Td>
+                <Td><Badge tone={STATUS_TONE[gw.status]}>{tr(`pbxGatewayStatus_${gw.status}`)}</Badge></Td>
+                <Td>
                   {gw.health === 'ready' ? <Badge tone="green">{tr('pbxReachable')}</Badge>
                     : gw.health === 'down' ? <Badge tone="red">{tr('pbxUnreachable')}</Badge>
                     : gw.health === 'degraded' ? <Badge tone="amber">{tr('pbxTrunkStatus_degraded')}</Badge>
                     : <span className="text-gray-400">—</span>}
-                </TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+                </Td>
+                <Td>
+                  <TableActions>
                     {gw.status !== 'awaiting_enrollment' ? (
                       <Button size="sm" variant="secondary" loading={busy === gw.id} disabled={busy !== null}
                         onClick={() => void run(gw.id, () => verifyPbxGatewayAPI(gw.id),
@@ -180,12 +176,12 @@ export const GatewaysSection = () => {
                       onClick={() => void run(gw.id, () => resetPbxGatewayEnrollmentAPI(gw.id), setEnrollment)} />
                     <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                       onClick={() => confirmDelete(gw.name, () => remove.mutateAsync(gw.id))} />
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {adding ? (
         <AddGatewayModal onClose={() => setAdding(false)} onCreated={(gw) => { setAdding(false); setEnrollment(gw); }} />

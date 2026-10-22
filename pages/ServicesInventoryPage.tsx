@@ -32,33 +32,33 @@ const ServicesTable = ({ services, onUpdate, onDelete, isAdmin }: { services: Se
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full block">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[700px]">
+                    <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400 min-w-[700px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('code')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('name')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('category')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('price')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('duration')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('status')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('actions')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('name')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden md:table-cell">{t('category')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('price')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden md:table-cell">{t('duration')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('status')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {services.map(service => (
                                 <tr key={service.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{service.code}</td>
-                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{service.name}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{service.category}</td>
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{service.price.toLocaleString(undefined, withLatinDigits())}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{service.duration}</td>
-                                    <td className="px-3 sm:px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-4 text-center text-xs sm:text-sm">{service.code}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{service.name}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden md:table-cell text-xs sm:text-sm">{service.category}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center text-xs sm:text-sm">{service.price.toLocaleString(undefined, withLatinDigits())}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden md:table-cell text-xs sm:text-sm">{service.duration}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center">
                                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${service.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}`}>
                                             {service.isActive ? t('active') : t('inactive')}
                                         </span>
                                     </td>
-                                    <td className="px-3 sm:px-6 py-4">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-3 sm:px-6 py-4 text-center">
+                                        <div className="flex items-center justify-center gap-2">
                                             {isAdmin && (
                                                 <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(service)} />
                                             )}
@@ -83,33 +83,33 @@ const PackagesTable = ({ packages, onUpdate, onDelete, isAdmin }: { packages: Se
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full block">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[700px]">
+                    <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400 min-w-[700px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('code')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('name')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('description')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('price')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('duration')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('status')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('actions')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('name')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden md:table-cell">{t('description')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('price')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden md:table-cell">{t('duration')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('status')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {packages.map(pkg => (
                                 <tr key={pkg.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{pkg.code}</td>
-                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{pkg.name}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm max-w-xs truncate">{pkg.description}</td>
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{pkg.price.toLocaleString(undefined, withLatinDigits())}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{pkg.duration}</td>
-                                    <td className="px-3 sm:px-6 py-4">
+                                    <td className="px-3 sm:px-6 py-4 text-center text-xs sm:text-sm">{pkg.code}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{pkg.name}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden md:table-cell text-xs sm:text-sm max-w-xs truncate">{pkg.description}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center text-xs sm:text-sm">{pkg.price.toLocaleString(undefined, withLatinDigits())}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden md:table-cell text-xs sm:text-sm">{pkg.duration}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center">
                                         <span className={`px-2 py-1 text-xs font-medium rounded-full ${pkg.isActive ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'}`}>
                                             {pkg.isActive ? t('active') : t('inactive')}
                                         </span>
                                     </td>
-                                    <td className="px-3 sm:px-6 py-4">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-3 sm:px-6 py-4 text-center">
+                                        <div className="flex items-center justify-center gap-2">
                                             {isAdmin && (
                                                 <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(pkg)} />
                                             )}
@@ -134,32 +134,32 @@ const ProvidersTable = ({ providers, onUpdate, onDelete, isAdmin }: { providers:
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full block">
                 <div className="overflow-hidden">
-                    <table className="w-full text-sm text-left rtl:text-right text-gray-500 dark:text-gray-400 min-w-[800px]">
+                    <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400 min-w-[800px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-700 dark:text-gray-400">
                             <tr>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('code')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('logo')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('name')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('specialization')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell">{t('phone')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden lg:table-cell">{t('email')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3 hidden md:table-cell">{t('rating')}</th>
-                                <th scope="col" className="px-3 sm:px-6 py-3">{t('actions')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('code')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('logo')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('name')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden md:table-cell">{t('specialization')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden lg:table-cell">{t('phone')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden lg:table-cell">{t('email')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center hidden md:table-cell">{t('rating')}</th>
+                                <th scope="col" className="px-3 sm:px-6 py-3 text-center">{t('actions')}</th>
                             </tr>
                         </thead>
                         <tbody>
                             {providers.map(provider => (
                                 <tr key={provider.id} className="bg-white dark:bg-dark-card border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600">
-                                    <td className="px-3 sm:px-6 py-4 text-xs sm:text-sm">{provider.code}</td>
-                                    <td className="px-3 sm:px-6 py-4 font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{provider.name}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.specialization}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">
+                                    <td className="px-3 sm:px-6 py-4 text-center text-xs sm:text-sm">{provider.code}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center font-medium text-gray-900 dark:text-white text-xs sm:text-sm">{provider.name}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden md:table-cell text-xs sm:text-sm">{provider.specialization}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden lg:table-cell text-xs sm:text-sm">
                                         <PhoneText>{provider.phone}</PhoneText>
                                     </td>
-                                    <td className="px-3 sm:px-6 py-4 hidden lg:table-cell text-xs sm:text-sm">{provider.email}</td>
-                                    <td className="px-3 sm:px-6 py-4 hidden md:table-cell text-xs sm:text-sm">{provider.rating ? `â­ ${provider.rating}` : '-'}</td>
-                                    <td className="px-3 sm:px-6 py-4">
-                                        <div className="flex items-center gap-2">
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden lg:table-cell text-xs sm:text-sm">{provider.email}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center hidden md:table-cell text-xs sm:text-sm">{provider.rating ? `â­ ${provider.rating}` : '-'}</td>
+                                    <td className="px-3 sm:px-6 py-4 text-center">
+                                        <div className="flex items-center justify-center gap-2">
                                             {isAdmin && (
                                                 <IconButton icon={<EditIcon className="h-4 w-4" />} label={t('edit')} onClick={() => onUpdate(provider)} />
                                             )}

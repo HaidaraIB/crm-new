@@ -898,7 +898,7 @@ export const BillingPage = () => {
                                                     <div className="flex justify-center">
                                                         <Button
                                                             variant="secondary"
-                                                            className="!h-8 !px-3 text-xs"
+                                                            size="sm"
                                                             loading={downloadingInvoiceId === inv.id}
                                                             disabled={downloadingInvoiceId != null}
                                                             onClick={() => handleDownloadInvoice(inv.id)}

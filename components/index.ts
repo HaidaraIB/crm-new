@@ -6,6 +6,7 @@ export * from './FilterButton';
 export * from './RefreshButton';
 export * from './Card';
 export * from './TableHorizontalScroll';
+export * from './DataTable';
 export * from './Input';
 export * from './NumberInput';
 export * from './Select';

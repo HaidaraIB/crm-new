@@ -73,22 +73,22 @@ function FieldsTable({
 }) {
   return (
     <div className="mb-4 overflow-x-auto overflow-y-hidden rounded-lg border border-gray-200 dark:border-gray-600">
-      <table className="min-w-full text-sm text-start">
+      <table className="min-w-full text-sm text-center">
         <thead className="bg-gray-50 dark:bg-gray-800/80">
           <tr>
-            <th className="px-3 py-2 font-semibold text-gray-700 dark:text-gray-200">{headers[0]}</th>
-            <th className="px-3 py-2 font-semibold text-gray-700 dark:text-gray-200">{headers[1]}</th>
-            <th className="px-3 py-2 font-semibold text-gray-700 dark:text-gray-200">{headers[2]}</th>
+            <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-200">{headers[0]}</th>
+            <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-200">{headers[1]}</th>
+            <th className="px-3 py-2 text-center font-semibold text-gray-700 dark:text-gray-200">{headers[2]}</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
           {rows.map((row) => (
             <tr key={row.field} className="bg-white dark:bg-gray-900/40">
-              <td className="px-3 py-2 font-mono text-xs text-primary-700 dark:text-primary-300 whitespace-nowrap" dir="ltr">
+              <td className="px-3 py-2 text-center font-mono text-xs text-primary-700 dark:text-primary-300 whitespace-nowrap" dir="ltr">
                 {row.field}
               </td>
-              <td className="px-3 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{row.required}</td>
-              <td className="px-3 py-2 text-gray-700 dark:text-gray-300">{row.description}</td>
+              <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{row.required}</td>
+              <td className="px-3 py-2 text-center text-gray-700 dark:text-gray-300">{row.description}</td>
             </tr>
           ))}
         </tbody>

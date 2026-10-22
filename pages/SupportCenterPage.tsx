@@ -2,7 +2,7 @@ import React, { useState, useRef } from 'react';
 import { SectionLoadingState } from '../components/SectionLoadingState';
 import { useQuery } from '@tanstack/react-query';
 import { useAppContext } from '../context/AppContext';
-import { PageWrapper, Input, Button, Modal, TableHorizontalScroll, RefreshButton } from '../components/index';
+import { PageWrapper, Input, Button, Modal, TableHorizontalScroll, RefreshButton, IconButton, TableActions } from '../components/index';
 import { EyeIcon } from '../components/icons';
 import { SupportChatThread } from '../components/supportChat';
 import { usePersistedTab } from '../hooks/usePersistedTab';
@@ -335,7 +335,7 @@ export const SupportCenterPage = () => {
                         <button
                           type="button"
                           onClick={() => setSelectedTicket(ticket)}
-                          className="cursor-pointer hover:underline focus:outline-none focus:underline text-left"
+                          className="cursor-pointer hover:underline focus:outline-none focus:underline"
                         >
                           {ticket.title}
                         </button>
@@ -359,15 +359,13 @@ export const SupportCenterPage = () => {
                           : '—'}
                       </td>
                       <td className="px-4 py-3">
-                        <button
-                          type="button"
-                          onClick={() => setSelectedTicket(ticket)}
-                          className="inline-flex items-center justify-center p-1.5 rounded text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100 focus:outline-none"
-                          title={t('viewDetails') || 'View details'}
-                          aria-label={t('viewDetails') || 'View details'}
-                        >
-                          <EyeIcon className="w-5 h-5" />
-                        </button>
+                        <TableActions>
+                          <IconButton
+                            icon={<EyeIcon className="h-4 w-4" />}
+                            label={t('viewDetails')}
+                            onClick={() => setSelectedTicket(ticket)}
+                          />
+                        </TableActions>
                       </td>
                     </tr>
                   ))}

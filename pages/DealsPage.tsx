@@ -204,7 +204,8 @@ export const DealsPage = () => {
           variant="danger"
           onClick={() => confirmDelete(selected)}
           disabled={bulk.isPending}
-          className="!h-8 shrink-0 whitespace-nowrap !rounded-full px-3"
+          size="sm"
+          className="!rounded-full"
           title={t('delete')}
         >
           <TrashIcon className="h-4 w-4 shrink-0" />

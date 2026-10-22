@@ -8,6 +8,7 @@ import { Modal } from '../../../components/Modal';
 import { PhoneText } from '../../../components/PhoneText';
 import { Select } from '../../../components/Select';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { ToggleSwitch } from '../../../components/ToggleSwitch';
 import { EditIcon, PlusIcon, TrashIcon } from '../../../components/icons';
 import type {
@@ -20,12 +21,9 @@ import type {
 import {
   Badge,
   DestinationPicker,
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   readDestination,
   useCatalogForm,
   useConfirmDelete,
@@ -142,42 +140,40 @@ export const InboundRoutesSection = () => {
         }
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxRouteNumber')}</TH>
-              <TH>{tr('pbxDestination')}</TH>
-              <TH>{tr('pbxBusinessHours')}</TH>
-              <TH>{tr('pbxClosedDestination')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxRouteNumber')}</Th>
+            <Th>{tr('pbxDestination')}</Th>
+            <Th>{tr('pbxBusinessHours')}</Th>
+            <Th>{tr('pbxClosedDestination')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={5} text={isLoading ? tr('loading') : tr('pbxNoInboundRoutes')} />
+              <TableMessageRow colSpan={5}>{isLoading ? tr('loading') : tr('pbxNoInboundRoutes')}</TableMessageRow>
             ) : rows.map((row) => {
               const number = numbers.find((n) => n.id === row.number);
               return (
-                <tr key={row.id}>
-                  <TD>
+                <TableRow key={row.id}>
+                  <Td>
                     {number ? <PhoneText className="font-medium">{number.e164}</PhoneText> : '—'}
                     {number && !number.verified ? <span className="ms-2"><Badge tone="amber">{tr('pbxPendingVerification')}</Badge></span> : null}
-                  </TD>
-                  <TD>{label(readDestination(row, '', 'extension'))}</TD>
-                  <TD>{hours.find((h) => h.id === row.business_hours)?.name ?? tr('pbxAlwaysOpen')}</TD>
-                  <TD>{row.business_hours ? label(readDestination(row, 'closed', 'hangup')) : '—'}</TD>
-                  <TD>
-                    <div className="flex items-center gap-1">
+                  </Td>
+                  <Td>{label(readDestination(row, '', 'extension'))}</Td>
+                  <Td>{hours.find((h) => h.id === row.business_hours)?.name ?? tr('pbxAlwaysOpen')}</Td>
+                  <Td>{row.business_hours ? label(readDestination(row, 'closed', 'hangup')) : '—'}</Td>
+                  <Td>
+                    <TableActions>
                       <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                       <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                         onClick={() => confirmDelete(number?.e164 ?? '', () => remove.mutateAsync(row.id))} />
-                    </div>
-                  </TD>
-                </tr>
+                    </TableActions>
+                  </Td>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? (
         <InboundModal
@@ -343,42 +339,40 @@ export const OutboundRoutesSection = () => {
         }
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxRouteName')}</TH>
-              <TH>{tr('pbxRoutePatterns')}</TH>
-              <TH>{tr('pbxNumberTrunk')}</TH>
-              <TH>{tr('pbxRouteCallerId')}</TH>
-              <TH>{tr('pbxRouteEnabled')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxRouteName')}</Th>
+            <Th>{tr('pbxRoutePatterns')}</Th>
+            <Th>{tr('pbxNumberTrunk')}</Th>
+            <Th>{tr('pbxRouteCallerId')}</Th>
+            <Th>{tr('pbxRouteEnabled')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={6} text={isLoading ? tr('loading') : tr('pbxNoOutboundRoutes')} />
+              <TableMessageRow colSpan={6}>{isLoading ? tr('loading') : tr('pbxNoOutboundRoutes')}</TableMessageRow>
             ) : rows.map((row) => (
-              <tr key={row.id}>
-                <TD className="font-medium">{row.name}</TD>
-                <TD>
+              <TableRow key={row.id}>
+                <Td className="font-medium">{row.name}</Td>
+                <Td>
                   <span dir="ltr" className="font-mono text-xs">
                     {row.patterns.map((p) => `${p.prefix}${'X'.repeat(p.digits)}`).join(', ')}
                   </span>
-                </TD>
-                <TD>{trunks.find((t) => t.id === row.trunk)?.name ?? '—'}</TD>
-                <TD>{(() => { const n = numbers.find((x) => x.id === row.caller_id); return n ? <PhoneText>{n.e164}</PhoneText> : '—'; })()}</TD>
-                <TD>{row.enabled ? <Badge tone="green">{tr('pbxStatusActive')}</Badge> : <Badge tone="gray">{tr('pbxStatusDisabled')}</Badge>}</TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+                </Td>
+                <Td>{trunks.find((t) => t.id === row.trunk)?.name ?? '—'}</Td>
+                <Td>{(() => { const n = numbers.find((x) => x.id === row.caller_id); return n ? <PhoneText>{n.e164}</PhoneText> : '—'; })()}</Td>
+                <Td>{row.enabled ? <Badge tone="green">{tr('pbxStatusActive')}</Badge> : <Badge tone="gray">{tr('pbxStatusDisabled')}</Badge>}</Td>
+                <Td>
+                  <TableActions>
                     <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                     <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                       onClick={() => confirmDelete(row.name, () => remove.mutateAsync(row.id))} />
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? (
         <OutboundModal row={editing === 'new' ? null : editing} trunks={trunks} numbers={numbers} onClose={() => setEditing(null)} />

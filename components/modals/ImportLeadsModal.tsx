@@ -1067,19 +1067,19 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
               {t('importLeadsPreview') || 'Found'} <strong>{previewRows.length}</strong> {t('importLeadsRows') || 'row(s)'}. {t('importLeadsPreviewConfirm') || 'Review and assign below, then click Import.'}
             </p>
             <TableHorizontalScroll scrollClassName="max-h-[60vh] overflow-y-auto custom-scrollbar rounded-lg border border-gray-200 dark:border-gray-700">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm text-center">
                 <thead className="bg-gray-50 dark:bg-gray-800/50 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-10">
                   <tr>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 w-8">#</th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('name') || 'Name'}</th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('phone') || 'Phone'}</th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[70px]">{t('budget') || 'Budget'}</th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[60px]">{t('type') || 'Type'}</th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[70px]">{t('priority') || 'Priority'}</th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[140px]">
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 w-8">#</th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('name') || 'Name'}</th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[100px]">{t('phone') || 'Phone'}</th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[70px]">{t('budget') || 'Budget'}</th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[60px]">{t('type') || 'Type'}</th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[70px]">{t('priority') || 'Priority'}</th>
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[140px]">
                       {t('assignedTo') || 'Assigned to'}
                       <select
-                        className="ml-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        className="ms-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                         value=""
                         onChange={(e) => {
                           const v = e.target.value;
@@ -1093,10 +1093,10 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                         ))}
                       </select>
                     </th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[120px]">
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[120px]">
                       {t('status') || 'Status'}
                       <select
-                        className="ml-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        className="ms-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                         value=""
                         onChange={(e) => {
                           const v = e.target.value;
@@ -1110,10 +1110,10 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                         ))}
                       </select>
                     </th>
-                    <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[120px]">
+                    <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[120px]">
                       {t('channel') || 'Channel'}
                       <select
-                        className="ml-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                        className="ms-1 mt-1 text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                         value=""
                         onChange={(e) => {
                           const v = e.target.value;
@@ -1129,7 +1129,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                     </th>
                     {isRealEstateCompany && (
                       <>
-                        <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[130px]">
+                        <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[130px]">
                           {t('interestedDeveloper') || 'Developer'}
                           <select
                             className="ml-1 mt-1 block w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
@@ -1148,7 +1148,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                             ))}
                           </select>
                         </th>
-                        <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[130px]">
+                        <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[130px]">
                           {t('interestedProject') || 'Project'}
                           <select
                             className="ml-1 mt-1 block w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
@@ -1167,7 +1167,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                             ))}
                           </select>
                         </th>
-                        <th className="px-2 py-2 text-left rtl:text-right font-semibold text-gray-700 dark:text-gray-300 min-w-[140px]">
+                        <th className="px-2 py-2 text-center font-semibold text-gray-700 dark:text-gray-300 min-w-[140px]">
                           {t('interestedUnit') || 'Unit'}
                           <select
                             className="ml-1 mt-1 block w-full max-w-[12rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
@@ -1193,13 +1193,13 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
                   {previewRows.map((row, idx) => (
                     <tr key={idx} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                      <td className="px-2 py-1.5 text-gray-500">{idx + 1}</td>
-                      <td className="px-2 py-1.5">{row.name}</td>
-                      <td className="px-2 py-1.5"><PhoneText>{row.phone}</PhoneText></td>
-                      <td className="px-2 py-1.5">{formatLeadBudget(row as any) || '-'}</td>
-                      <td className="px-2 py-1.5">{row.type}</td>
-                      <td className="px-2 py-1.5">{row.priority}</td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-2 py-1.5 text-center text-gray-500">{idx + 1}</td>
+                      <td className="px-2 py-1.5 text-center">{row.name}</td>
+                      <td className="px-2 py-1.5 text-center"><PhoneText>{row.phone}</PhoneText></td>
+                      <td className="px-2 py-1.5 text-center">{formatLeadBudget(row as any) || '-'}</td>
+                      <td className="px-2 py-1.5 text-center">{row.type}</td>
+                      <td className="px-2 py-1.5 text-center">{row.priority}</td>
+                      <td className="px-2 py-1.5 text-center">
                         <select
                           className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           value={row.assigned_to ?? ''}
@@ -1218,7 +1218,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                           ))}
                         </select>
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-2 py-1.5 text-center">
                         {(() => {
                           const st = statuses.find((s: { id: number; name: string; color?: string }) => s.id === row.status_id) as { id: number; name: string; color?: string } | undefined;
                           const hex = st?.color && /^#[0-9a-fA-F]{6}$/.test(st.color) ? st.color : '#808080';
@@ -1229,7 +1229,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                             <div className="relative min-w-[100px]">
                               <button
                                 type="button"
-                                className="status-dropdown-trigger w-full rounded-full border text-left rtl:text-right py-1 pl-2.5 pr-6 text-xs font-medium text-white cursor-pointer flex items-center justify-between gap-1 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-white/30"
+                                className="status-dropdown-trigger w-full rounded-full border text-center py-1 pl-2.5 pr-6 text-xs font-medium text-white cursor-pointer flex items-center justify-between gap-1 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-white/30"
                                 onClick={(e) => {
                                   if (isOpen) {
                                     setOpenStatusDropdownRow(null);
@@ -1271,7 +1271,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                                       setOpenStatusDropdownRow(null);
                                       setDropdownTriggerRect(null);
                                     }}
-                                    className={`w-full px-2 py-1 text-left rtl:text-right text-xs text-white hover:bg-slate-600/80 block ${row.status_id == null ? 'bg-blue-600' : ''}`}
+                                    className={`w-full px-2 py-1 text-center text-xs text-white hover:bg-slate-600/80 block ${row.status_id == null ? 'bg-blue-600' : ''}`}
                                   >
                                     -
                                   </button>
@@ -1288,7 +1288,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                                         setOpenStatusDropdownRow(null);
                                         setDropdownTriggerRect(null);
                                       }}
-                                      className={`w-full px-2 py-1 text-left rtl:text-right text-xs text-white hover:bg-slate-600/80 block ${row.status_id === s.id ? 'bg-blue-600' : ''}`}
+                                      className={`w-full px-2 py-1 text-center text-xs text-white hover:bg-slate-600/80 block ${row.status_id === s.id ? 'bg-blue-600' : ''}`}
                                     >
                                       {seedLabel(s.name, language)}
                                     </button>
@@ -1300,7 +1300,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                           );
                         })()}
                       </td>
-                      <td className="px-2 py-1.5">
+                      <td className="px-2 py-1.5 text-center">
                         <select
                           className="w-full text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           value={row.channel_id ?? ''}
@@ -1321,7 +1321,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                       </td>
                       {isRealEstateCompany && (
                         <>
-                          <td className="px-2 py-1.5 min-w-[120px]" title={row.interested_dev_input || ''}>
+                          <td className="px-2 py-1.5 text-center min-w-[120px]" title={row.interested_dev_input || ''}>
                             <select
                               className="w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                               value={row.interested_developer ?? ''}
@@ -1340,7 +1340,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                               </span>
                             )}
                           </td>
-                          <td className="px-2 py-1.5 min-w-[120px]" title={row.interested_proj_input || ''}>
+                          <td className="px-2 py-1.5 text-center min-w-[120px]" title={row.interested_proj_input || ''}>
                             <select
                               className="w-full max-w-[11rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                               value={row.interested_project ?? ''}
@@ -1373,7 +1373,7 @@ export const ImportLeadsModal = ({ isOpen, onClose, onSuccess }: ImportLeadsModa
                               </span>
                             )}
                           </td>
-                          <td className="px-2 py-1.5 min-w-[130px]" title={row.interested_unit_input || ''}>
+                          <td className="px-2 py-1.5 text-center min-w-[130px]" title={row.interested_unit_input || ''}>
                             <select
                               className="w-full max-w-[12rem] text-xs border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 disabled:opacity-50"
                               value={row.interested_unit ?? ''}

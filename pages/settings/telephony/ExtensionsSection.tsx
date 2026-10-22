@@ -9,6 +9,7 @@ import { Modal } from '../../../components/Modal';
 import { PhoneText } from '../../../components/PhoneText';
 import { Select } from '../../../components/Select';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { EditIcon, PlusIcon, RefreshIcon, TrashIcon } from '../../../components/icons';
 import { useUsers } from '../../../hooks/useQueries';
 import {
@@ -19,12 +20,9 @@ import {
 } from '../../../services/api';
 import {
   Badge,
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   useCatalogForm,
   useConfirmDelete,
   usePbxMutations,
@@ -225,30 +223,28 @@ export const ExtensionsSection = () => {
       />
       {rotateError ? <Alert variant="error">{rotateError}</Alert> : null}
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxExtensionNumber')}</TH>
-              <TH>{tr('pbxDisplayName')}</TH>
-              <TH>{tr('pbxExtensionUser')}</TH>
-              <TH>{tr('pbxDeviceType')}</TH>
-              <TH>{tr('pbxPresence')}</TH>
-              <TH className="w-32">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxExtensionNumber')}</Th>
+            <Th>{tr('pbxDisplayName')}</Th>
+            <Th>{tr('pbxExtensionUser')}</Th>
+            <Th>{tr('pbxDeviceType')}</Th>
+            <Th>{tr('pbxPresence')}</Th>
+            <Th className="w-32">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={6} text={isLoading ? tr('loading') : tr('pbxNoExtensions')} />
+              <TableMessageRow colSpan={6}>{isLoading ? tr('loading') : tr('pbxNoExtensions')}</TableMessageRow>
             ) : rows.map((row) => {
               const agent = byExtension.get(row.id);
               return (
-                <tr key={row.id}>
-                  <TD><PhoneText className="font-semibold">{row.number}</PhoneText></TD>
-                  <TD>{row.display_name || '—'}</TD>
-                  <TD>{userName(users.find((u) => u.id === row.user)) || '—'}</TD>
-                  <TD>{tr(`pbxDevice_${row.device_type}`)}</TD>
-                  <TD>
-                    <div className="flex flex-wrap gap-1">
+                <TableRow key={row.id}>
+                  <Td><PhoneText className="font-semibold">{row.number}</PhoneText></Td>
+                  <Td>{row.display_name || '—'}</Td>
+                  <Td>{userName(users.find((u) => u.id === row.user)) || '—'}</Td>
+                  <Td>{tr(`pbxDevice_${row.device_type}`)}</Td>
+                  <Td>
+                    <div className="flex flex-wrap justify-center gap-1">
                       {row.status === 'disabled' ? <Badge tone="gray">{tr('pbxStatusDisabled')}</Badge> : null}
                       {agent ? (
                         <>
@@ -260,9 +256,9 @@ export const ExtensionsSection = () => {
                         </>
                       ) : null}
                     </div>
-                  </TD>
-                  <TD>
-                    <div className="flex items-center gap-1">
+                  </Td>
+                  <Td>
+                    <TableActions>
                       <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                       <IconButton icon={<RefreshIcon className="h-4 w-4" />} label={tr('pbxRotateCredentials')} onClick={() => void rotate(row)} />
                       <IconButton
@@ -271,13 +267,13 @@ export const ExtensionsSection = () => {
                         tone="danger"
                         onClick={() => confirmDelete(row.number, () => remove.mutateAsync(row.id))}
                       />
-                    </div>
-                  </TD>
-                </tr>
+                    </TableActions>
+                  </Td>
+                </TableRow>
               );
             })}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? (
         <ExtensionModal

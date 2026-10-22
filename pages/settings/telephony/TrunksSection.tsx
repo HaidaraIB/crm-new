@@ -7,18 +7,16 @@ import { AutoDirTextarea, Input } from '../../../components/Input';
 import { Modal } from '../../../components/Modal';
 import { Select } from '../../../components/Select';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { CheckSquareIcon, EditIcon, PlusIcon, TrashIcon } from '../../../components/icons';
 import type { PbxTrunkRow } from '../../../services/api';
 import { GatewaysSection } from './GatewaysSection';
 import { TrunkTestModal } from './TrunkTestModal';
 import {
   Badge,
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   useCatalogForm,
   useConfirmDelete,
   usePbxMutations,
@@ -176,27 +174,25 @@ export const TrunksSection = () => {
         action={<Button onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" />{tr('pbxAddTrunk')}</Button>}
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxTrunkName')}</TH>
-              <TH>{tr('pbxTrunkKind')}</TH>
-              <TH>{tr('pbxTrunkHost')}</TH>
-              <TH>{tr('pbxTrunkStatus')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxTrunkName')}</Th>
+            <Th>{tr('pbxTrunkKind')}</Th>
+            <Th>{tr('pbxTrunkHost')}</Th>
+            <Th>{tr('pbxTrunkStatus')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={5} text={isLoading ? tr('loading') : tr('pbxNoTrunks')} />
+              <TableMessageRow colSpan={5}>{isLoading ? tr('loading') : tr('pbxNoTrunks')}</TableMessageRow>
             ) : rows.map((row) => (
-              <tr key={row.id}>
-                <TD className="font-medium">{row.name}</TD>
-                <TD>{tr(`pbxTrunkKind_${row.kind}`)}</TD>
-                <TD><span dir="ltr" className="font-mono text-xs">{row.host}:{row.port}/{row.transport}</span></TD>
-                <TD><Badge tone={STATUS_TONE[row.status]}>{tr(`pbxTrunkStatus_${row.status}`)}</Badge></TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+              <TableRow key={row.id}>
+                <Td className="font-medium">{row.name}</Td>
+                <Td>{tr(`pbxTrunkKind_${row.kind}`)}</Td>
+                <Td><span dir="ltr" className="font-mono text-xs">{row.host}:{row.port}/{row.transport}</span></Td>
+                <Td><Badge tone={STATUS_TONE[row.status]}>{tr(`pbxTrunkStatus_${row.status}`)}</Badge></Td>
+                <Td>
+                  <TableActions>
                     <IconButton icon={<CheckSquareIcon className="h-4 w-4" />} label={tr('pbxTrunkTest')} onClick={() => setTesting(row)} />
                     {row.gateway ? (
                       // A GSM gateway's trunk: managed (and deleted) from the gateways list below.
@@ -208,12 +204,12 @@ export const TrunksSection = () => {
                           onClick={() => confirmDelete(row.name, () => remove.mutateAsync(row.id))} />
                       </>
                     )}
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? <TrunkModal row={editing === 'new' ? null : editing} onClose={() => setEditing(null)} /> : null}
       {testing ? <TrunkTestModal trunk={testing} onClose={() => setTesting(null)} /> : null}

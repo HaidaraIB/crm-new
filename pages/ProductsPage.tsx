@@ -26,7 +26,7 @@ const ProductsTable = ({ products, onUpdate, onDelete, isAdmin }: { products: Pr
         <TableHorizontalScroll scrollClassName="-mx-4 sm:mx-0">
             <div className="min-w-full block">
                 <div className="overflow-hidden border border-gray-200 dark:border-gray-700 rounded-lg">
-                    <table className="w-full text-sm text-center rtl:text-right text-gray-500 dark:text-gray-400 min-w-[900px]">
+                    <table className="w-full text-sm text-center text-gray-500 dark:text-gray-400 min-w-[900px]">
                         <thead className="text-xs text-gray-700 uppercase bg-gray-50 dark:bg-gray-800 dark:text-gray-300 border-b border-gray-200 dark:border-gray-700">
                             <tr>
                                 <th scope="col" className="px-4 py-3.5 font-semibold whitespace-nowrap text-center">{t('code')}</th>

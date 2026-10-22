@@ -6,16 +6,14 @@ import { IconButton } from '../../../components/IconButton';
 import { Input } from '../../../components/Input';
 import { Modal } from '../../../components/Modal';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { EditIcon, PlusIcon, TrashIcon, XIcon } from '../../../components/icons';
 import { useAppContext } from '../../../context/AppContext';
 import type { PbxBusinessHoursRow, PbxHoursRule } from '../../../services/api';
 import {
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   useCatalogForm,
   useConfirmDelete,
   usePbxMutations,
@@ -189,36 +187,34 @@ export const BusinessHoursSection = () => {
         action={<Button onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" />{tr('pbxAddHours')}</Button>}
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxHoursName')}</TH>
-              <TH>{tr('pbxHoursRules')}</TH>
-              <TH>{tr('pbxTimezone')}</TH>
-              <TH>{tr('pbxClosedDates')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxHoursName')}</Th>
+            <Th>{tr('pbxHoursRules')}</Th>
+            <Th>{tr('pbxTimezone')}</Th>
+            <Th>{tr('pbxClosedDates')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={5} text={isLoading ? tr('loading') : tr('pbxNoHours')} />
+              <TableMessageRow colSpan={5}>{isLoading ? tr('loading') : tr('pbxNoHours')}</TableMessageRow>
             ) : rows.map((row) => (
-              <tr key={row.id}>
-                <TD className="font-medium">{row.name}</TD>
-                <TD>{describeRules(row.rules, names)}</TD>
-                <TD><span dir="ltr">{row.timezone}</span></TD>
-                <TD>{row.closed_dates.length || '—'}</TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+              <TableRow key={row.id}>
+                <Td className="font-medium">{row.name}</Td>
+                <Td>{describeRules(row.rules, names)}</Td>
+                <Td><span dir="ltr">{row.timezone}</span></Td>
+                <Td>{row.closed_dates.length || '—'}</Td>
+                <Td>
+                  <TableActions>
                     <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                     <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                       onClick={() => confirmDelete(row.name, () => remove.mutateAsync(row.id))} />
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing ? <HoursModal row={editing === 'new' ? null : editing} onClose={() => setEditing(null)} /> : null}
     </div>

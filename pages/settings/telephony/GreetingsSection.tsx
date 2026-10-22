@@ -13,16 +13,14 @@ import { IconButton } from '../../../components/IconButton';
 import { Input } from '../../../components/Input';
 import { Modal } from '../../../components/Modal';
 import { TableHorizontalScroll } from '../../../components/TableHorizontalScroll';
+import { DataTable, TableActions, TableBody, TableHead, TableMessageRow, TableRow, Td, Th } from '../../../components/DataTable';
 import { EditIcon, PlayIcon, PlusIcon, TrashIcon } from '../../../components/icons';
 import { getPbxSoundAudioAPI, uploadPbxSoundAPI, type PbxSoundRow } from '../../../services/api';
 import { PhoneAudioError, toPhoneWav } from '../../../utils/phoneAudio';
 import {
-  EmptyRow,
   FieldError,
   FieldLabel,
   SectionHeader,
-  TD,
-  TH,
   useCatalogForm,
   useConfirmDelete,
   usePbxMutations,
@@ -206,34 +204,32 @@ export const GreetingsSection = () => {
         action={<Button onClick={() => setEditing('new')}><PlusIcon className="h-4 w-4" />{tr('pbxAddGreeting')}</Button>}
       />
       <TableHorizontalScroll scrollClassName="rounded-lg border border-gray-200 dark:border-gray-700">
-        <table className="w-full">
-          <thead className="border-b border-gray-200 bg-gray-50 dark:border-gray-700 dark:bg-gray-800/50">
-            <tr>
-              <TH>{tr('pbxSoundName')}</TH>
-              <TH>{tr('pbxSoundDuration')}</TH>
-              <TH>{tr('pbxSoundPlay')}</TH>
-              <TH className="w-24">{tr('actions')}</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-200 bg-white dark:divide-gray-700 dark:bg-gray-900">
+        <DataTable>
+          <TableHead>
+            <Th>{tr('pbxSoundName')}</Th>
+            <Th>{tr('pbxSoundDuration')}</Th>
+            <Th>{tr('pbxSoundPlay')}</Th>
+            <Th className="w-24">{tr('actions')}</Th>
+          </TableHead>
+          <TableBody>
             {rows.length === 0 ? (
-              <EmptyRow colSpan={4} text={isLoading ? tr('loading') : tr('pbxNoGreetings')} />
+              <TableMessageRow colSpan={4}>{isLoading ? tr('loading') : tr('pbxNoGreetings')}</TableMessageRow>
             ) : rows.map((row) => (
-              <tr key={row.id}>
-                <TD className="font-medium">{row.name}</TD>
-                <TD><span dir="ltr">{formatSeconds(row.duration_ms)}</span></TD>
-                <TD><GreetingPlayer row={row} /></TD>
-                <TD>
-                  <div className="flex items-center gap-1">
+              <TableRow key={row.id}>
+                <Td className="font-medium">{row.name}</Td>
+                <Td><span dir="ltr">{formatSeconds(row.duration_ms)}</span></Td>
+                <Td><GreetingPlayer row={row} /></Td>
+                <Td>
+                  <TableActions>
                     <IconButton icon={<EditIcon className="h-4 w-4" />} label={tr('edit')} onClick={() => setEditing(row)} />
                     <IconButton icon={<TrashIcon className="h-4 w-4" />} label={tr('delete')} tone="danger"
                       onClick={() => confirmDelete(row.name, () => remove.mutateAsync(row.id))} />
-                  </div>
-                </TD>
-              </tr>
+                  </TableActions>
+                </Td>
+              </TableRow>
             ))}
-          </tbody>
-        </table>
+          </TableBody>
+        </DataTable>
       </TableHorizontalScroll>
       {editing === 'new' ? <UploadModal onClose={() => setEditing(null)} /> : null}
       {editing && editing !== 'new' ? <RenameModal row={editing} onClose={() => setEditing(null)} /> : null}

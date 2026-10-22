@@ -498,7 +498,7 @@ export const ConversationList: React.FC<Props> = ({
               <Button
                 type="button"
                 variant="secondary"
-                className="!h-8 !px-3 !text-xs"
+                size="sm"
                 onClick={() => onLoadMore?.()}
                 disabled={isFetchingMore}
               >

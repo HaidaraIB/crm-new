@@ -817,7 +817,8 @@ export const InboxPage: React.FC = () => {
                   {threadConversation?.client ? (
                     <Button
                       variant="ghost"
-                      className="!h-8 !text-white hover:!bg-white/20"
+                      size="sm"
+                      className="!text-white hover:!bg-white/20"
                       onClick={() =>
                         openLead(threadConversation.client!.id, threadConversation.client!.name)
                       }
@@ -827,7 +828,8 @@ export const InboxPage: React.FC = () => {
                   ) : canConvert ? (
                     <Button
                       variant="ghost"
-                      className="!h-8 !text-white hover:!bg-white/20"
+                      size="sm"
+                      className="!text-white hover:!bg-white/20"
                       onClick={() => {
                         setConvertError(null);
                         setConvertOpen(true);
@@ -854,7 +856,8 @@ export const InboxPage: React.FC = () => {
                   {(currentUser?.is_company_owner || currentUser?.isCompanyOwner) ? (
                     <Button
                       variant="ghost"
-                      className="!h-8 !text-white hover:!bg-white/20"
+                      size="sm"
+                      className="!text-white hover:!bg-white/20"
                       onClick={handleDeleteConversation}
                     >
                       {t('delete')}

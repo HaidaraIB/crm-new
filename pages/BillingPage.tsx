@@ -1,5 +1,10 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { normalizePublicPlans } from '../components/pricing/normalizePublicPlan';
+import PlanPrice from '../components/pricing/PlanPrice';
+import PlanCornerBadges from '../components/pricing/PlanCornerBadges';
+import PlanOfferNote from '../components/pricing/PlanOfferNote';
+import SaleCountdownChip from '../components/pricing/SaleCountdownChip';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Button, Loader, Alert, PaymentGatewaySelector, Modal, PlanEntitlementsSummary, PageLoadingState, SectionLoadingState, PaymentResultBanner, Pagination } from '../components/index';
 import { getPublicPlansAPI, createPaymentSessionAPI, checkPaymentStatusAPI, getCurrentUserAPI, switchSubscriptionPlanFreeAPI, cancelPendingPlanChangeAPI, getMyCompanyInvoicesAPI, downloadMyInvoicePdfAPI, type CompanyInvoiceListItem } from '../services/api';
@@ -249,7 +254,7 @@ export const BillingPage = () => {
                 setPlansLoading(true);
                 try {
                     const data = await getPublicPlansAPI();
-                    setAvailablePlans(Array.isArray(data) ? data : []);
+                    setAvailablePlans(normalizePublicPlans(data));
                 } catch (error) {
                     console.error('Error loading plans:', error);
                 } finally {
@@ -1043,11 +1048,8 @@ export const BillingPage = () => {
                     {plansLoading ? (
                         <SectionLoadingState label={t('loadingPlans') || 'Loading plans'} />
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto custom-scrollbar">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto custom-scrollbar pt-3">
                             {availablePlans.map((plan) => {
-                                const price = billingCycle === 'monthly' 
-                                    ? Number(plan.price_monthly || 0) 
-                                    : Number(plan.price_yearly || 0);
                                 const isFreeOrTrial = Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0;
                                 const isCurrentPlan = currentPlanId != null && plan.id === currentPlanId;
                                 const isPendingPlan =
@@ -1085,7 +1087,7 @@ export const BillingPage = () => {
                                                 });
                                             }
                                         }}
-                                        className={`p-4 border-2 rounded-lg transition-all ${
+                                        className={`relative p-4 border-2 rounded-lg transition-all ${
                                             isLocked
                                                 ? 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-800/60 cursor-not-allowed'
                                                 : `cursor-pointer ${
@@ -1095,6 +1097,7 @@ export const BillingPage = () => {
                                                   }`
                                         }`}
                                     >
+                                        <PlanCornerBadges plan={plan} cycle={billingCycle === 'yearly' ? 'yearly' : 'monthly'} language={language} t={t} />
                                         <div className="flex items-center justify-between mb-2 gap-2">
                                             <h3 className="font-semibold text-gray-900 dark:text-white">
                                                 {language === 'ar' && plan.name_ar && plan.name_ar.trim()
@@ -1131,14 +1134,20 @@ export const BillingPage = () => {
                                                 ? plan.description_ar
                                                 : plan.description}
                                         </p>
-                                        <p className="text-lg font-bold text-primary-700 dark:text-primary-300" dir={isRTL ? 'rtl' : 'ltr'}>
-                                            {isFreeOrTrial
-                                                ? (t('free') || 'Free')
-                                                : renderPricePeriodLine(
-                                                      price,
-                                                      billingCycle === 'yearly' ? 'yearly' : 'monthly',
-                                                  )}
-                                        </p>
+                                        <div className="mb-1">
+                                            <PlanPrice plan={plan} cycle={billingCycle === 'yearly' ? 'yearly' : 'monthly'} language={language} t={t} size="md" />
+                                            {!isFreeOrTrial && plan.pricing?.[billingCycle === 'yearly' ? 'yearly' : 'monthly']?.onSale && (
+                                                <SaleCountdownChip
+                                                    endsAt={plan.saleEndsAt}
+                                                    language={language}
+                                                    t={t}
+                                                    onExpire={() => {
+                                                        void getPublicPlansAPI().then((d) => setAvailablePlans(normalizePublicPlans(d))).catch(() => undefined);
+                                                    }}
+                                                />
+                                            )}
+                                            <PlanOfferNote plan={plan} language={language} />
+                                        </div>
                                         <PlanEntitlementsSummary
                                             users={plan.users}
                                             clients={plan.clients}

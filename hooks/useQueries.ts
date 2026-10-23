@@ -8,6 +8,8 @@ import { useAppContext } from '../context/AppContext';
 import { companyHasServiceInventory } from '../utils/serviceInventorySpecialization';
 import type { LeadApiFilters, LeadArrival, WorkSessionStatus, WorkSessionSummary } from '../types';
 import { normalizeLead } from '../utils/normalizeLead';
+import { getActivePromotionAPI } from '../services/api';
+import type { PromotionAudience, PublicPromotion } from '../components/pricing/types';
 import { normalizeUser } from '../utils/userUtils';
 import { canAccessSocialInbox } from '../utils/socialInboxAccess';
 import {
@@ -84,6 +86,7 @@ import { mapApiDeal, mapApiDealEvent, mapApiDealSummary, mapApiLostReason, mapAp
 // ==================== Query Keys ====================
 export const queryKeys = {
   currentUser: ['currentUser'] as const,
+  activePromotion: (audience: string) => ['activePromotion', audience] as const,
   users: (page?: number, pageSize?: number, filters?: { roles?: string[]; excludeRoles?: string[] }) =>
     ['users', page ?? 'all', pageSize ?? 'default', filters?.roles?.join('|') ?? '', filters?.excludeRoles?.join('|') ?? ''] as const,
   leads: (filters?: LeadApiFilters, page?: number, pageSize?: number) => ['leads', filters, page ?? 'all', pageSize ?? 'default'] as const,
@@ -161,6 +164,33 @@ export const dashboardHeavyListQueryOptions = {
 } as const satisfies Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>;
 
 // ==================== Query Hooks ====================
+
+/**
+ * The live promotion for a surface (public pages / dashboard). Public endpoint,
+ * cached 60s server-side; we refetch on focus and every 5 min as a polling floor
+ * so a paused or edited promotion propagates without a reload.
+ * `serverOffsetMs` = server clock − device clock, for skew-free countdowns.
+ */
+export const useActivePromotion = (audience: PromotionAudience, options?: { enabled?: boolean }) => {
+  const query = useQuery({
+    queryKey: queryKeys.activePromotion(audience),
+    queryFn: async () => {
+      const fetchedAt = Date.now();
+      const data = await getActivePromotionAPI(audience);
+      const serverMs = data?.server_time ? new Date(data.server_time).getTime() : NaN;
+      return {
+        promotion: (data?.promotion ?? null) as PublicPromotion | null,
+        serverOffsetMs: Number.isFinite(serverMs) ? serverMs - fetchedAt : 0,
+      };
+    },
+    staleTime: 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    retry: 1,
+    enabled: options?.enabled ?? true,
+  });
+  return query;
+};
 
 export const useCurrentUser = (options?: Omit<UseQueryOptions<any, Error>, 'queryKey' | 'queryFn'>) => {
   return useQuery({

@@ -1395,9 +1395,62 @@
         "name_ar": "Sample",
         "description": "Plan details",
         "description_ar": "تفاصيل",
-        "monthly_price": 10,
-        "yearly_price": 100,
-        "trial_days": 14
+        "price_monthly": 10,
+        "price_yearly": 100,
+        "trial_days": 14,
+        "sale_price_monthly": 5,
+        "sale_price_yearly": 50,
+        "sale_starts_at": "2026-10-09",
+        "sale_ends_at": "2026-10-09",
+        "badge": "most_popular",
+        "badge_text": "Hot",
+        "badge_text_ar": "رائج",
+        "offer_note": "2x credits",
+        "offer_note_ar": "Sample",
+        "sort_order": 0
+      },
+      "context": {},
+      "partial": false,
+      "expect": {}
+    },
+    {
+      "form": "promotion.upsert",
+      "data": {},
+      "context": {},
+      "partial": false,
+      "expect": {
+        "name": [
+          "validation.required"
+        ],
+        "theme": [
+          "validation.required"
+        ],
+        "starts_at": [
+          "validation.required"
+        ]
+      }
+    },
+    {
+      "form": "promotion.upsert",
+      "data": {
+        "name": "Sample",
+        "messages": [
+          {
+            "en": "Biggest deals of the year",
+            "ar": "Sample"
+          }
+        ],
+        "cta_label": "See plans",
+        "cta_label_ar": "Sample",
+        "cta_url": "/register",
+        "theme": "sale",
+        "starts_at": "2026-10-09",
+        "ends_at": "2026-10-09",
+        "show_countdown": true,
+        "audiences": [
+          "public"
+        ],
+        "priority": 0
       },
       "context": {},
       "partial": false,

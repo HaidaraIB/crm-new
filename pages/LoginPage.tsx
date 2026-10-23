@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../context/AppContext';
+import PromoBar from '../components/pricing/PromoBar';
 // FIX: Corrected component import path to avoid conflict with `components.tsx`.
 import { Button, Input, EyeIcon, EyeOffIcon, MoonIcon, SunIcon, LegalLinks, PaymentResultBanner } from '../components/index';
 import { loginAPI, getCurrentUserAPI, redeemTrialCodeAPI } from '../services/api';
@@ -397,7 +398,9 @@ export const LoginPage = () => {
     };
     
     return (
-        <div className={`min-h-screen flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
+        <div className="flex min-h-screen flex-col">
+        <PromoBar audience="public" defaultHref="/register" />
+        <div className={`flex-1 flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
             {/* Theme and Language Toggle Buttons */}
             <div className={`absolute top-4 end-4 z-10 flex ${language === 'ar' ? 'gap-4' : 'gap-2'}`}>
                 <button
@@ -614,6 +617,7 @@ export const LoginPage = () => {
                     </div>
                 </div>
             </div>
+        </div>
         </div>
     );
 };

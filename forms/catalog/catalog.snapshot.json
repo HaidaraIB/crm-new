@@ -1,5 +1,5 @@
 {
-  "version": "d9fa50eea502d74e",
+  "version": "1ff42470267c9023",
   "forms": {
     "task.upsert": {
       "public": false,
@@ -3099,7 +3099,7 @@
             }
           ]
         },
-        "monthly_price": {
+        "price_monthly": {
           "type": "number",
           "label_key": "monthlyPrice",
           "rules": [
@@ -3110,9 +3110,10 @@
               },
               "client_only": true
             }
-          ]
+          ],
+          "ui_key": "monthlyPrice"
         },
-        "yearly_price": {
+        "price_yearly": {
           "type": "number",
           "label_key": "yearlyPrice",
           "rules": [
@@ -3123,7 +3124,8 @@
               },
               "client_only": true
             }
-          ]
+          ],
+          "ui_key": "yearlyPrice"
         },
         "trial_days": {
           "type": "integer",
@@ -3141,14 +3143,393 @@
               "client_only": true
             }
           ]
+        },
+        "sale_price_monthly": {
+          "type": "number",
+          "label_key": "salePriceMonthly",
+          "rules": [
+            {
+              "type": "number_range",
+              "params": {
+                "min": 0.01
+              }
+            },
+            {
+              "type": "decimal_places",
+              "params": {
+                "max": 2
+              }
+            }
+          ],
+          "ui_key": "salePriceMonthly"
+        },
+        "sale_price_yearly": {
+          "type": "number",
+          "label_key": "salePriceYearly",
+          "rules": [
+            {
+              "type": "number_range",
+              "params": {
+                "min": 0.01
+              }
+            },
+            {
+              "type": "decimal_places",
+              "params": {
+                "max": 2
+              }
+            }
+          ],
+          "ui_key": "salePriceYearly"
+        },
+        "sale_starts_at": {
+          "type": "date",
+          "label_key": "saleStartsAt",
+          "rules": [],
+          "ui_key": "saleStartsAt"
+        },
+        "sale_ends_at": {
+          "type": "date",
+          "label_key": "saleEndsAt",
+          "rules": [
+            {
+              "type": "date_range",
+              "params": {
+                "gte_field": "sale_starts_at"
+              }
+            }
+          ],
+          "ui_key": "saleEndsAt"
+        },
+        "badge": {
+          "type": "string",
+          "label_key": "badge",
+          "rules": [
+            {
+              "type": "one_of",
+              "params": {
+                "values": [
+                  "",
+                  "most_popular",
+                  "best_value",
+                  "recommended",
+                  "new",
+                  "limited_offer",
+                  "custom"
+                ]
+              }
+            }
+          ]
+        },
+        "badge_text": {
+          "type": "string",
+          "label_key": "badgeText",
+          "rules": [
+            {
+              "type": "required_if",
+              "params": {
+                "field": "badge",
+                "equals": "custom"
+              }
+            },
+            {
+              "type": "max_length",
+              "params": {
+                "max": 40
+              }
+            }
+          ],
+          "ui_key": "badgeText"
+        },
+        "badge_text_ar": {
+          "type": "string",
+          "label_key": "badgeTextAr",
+          "rules": [
+            {
+              "type": "required_if",
+              "params": {
+                "field": "badge",
+                "equals": "custom"
+              }
+            },
+            {
+              "type": "max_length",
+              "params": {
+                "max": 40
+              }
+            }
+          ],
+          "ui_key": "badgeTextAr"
+        },
+        "offer_note": {
+          "type": "string",
+          "label_key": "offerNote",
+          "rules": [
+            {
+              "type": "max_length",
+              "params": {
+                "max": 160
+              }
+            }
+          ],
+          "ui_key": "offerNote"
+        },
+        "offer_note_ar": {
+          "type": "string",
+          "label_key": "offerNoteAr",
+          "rules": [
+            {
+              "type": "max_length",
+              "params": {
+                "max": 160
+              }
+            }
+          ],
+          "ui_key": "offerNoteAr"
+        },
+        "sort_order": {
+          "type": "integer",
+          "label_key": "sortOrder",
+          "rules": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number_range",
+              "params": {
+                "min": 0,
+                "max": 999
+              }
+            }
+          ],
+          "ui_key": "sortOrder"
         }
       },
       "aliases": {
         "nameAr": "name_ar",
         "descriptionAr": "description_ar",
-        "monthlyPrice": "monthly_price",
-        "yearlyPrice": "yearly_price",
-        "trialDays": "trial_days"
+        "monthlyPrice": "price_monthly",
+        "yearlyPrice": "price_yearly",
+        "trialDays": "trial_days",
+        "salePriceMonthly": "sale_price_monthly",
+        "salePriceYearly": "sale_price_yearly",
+        "saleStartsAt": "sale_starts_at",
+        "saleEndsAt": "sale_ends_at",
+        "badgeText": "badge_text",
+        "badgeTextAr": "badge_text_ar",
+        "offerNote": "offer_note",
+        "offerNoteAr": "offer_note_ar",
+        "sortOrder": "sort_order"
+      }
+    },
+    "promotion.upsert": {
+      "public": false,
+      "fields": {
+        "name": {
+          "type": "string",
+          "label_key": "name",
+          "rules": [
+            {
+              "type": "required"
+            },
+            {
+              "type": "max_length",
+              "params": {
+                "max": 120
+              }
+            }
+          ]
+        },
+        "messages": {
+          "type": "array",
+          "label_key": "promotionMessages",
+          "rules": [
+            {
+              "type": "array",
+              "params": {
+                "min": 1,
+                "max": 6
+              }
+            }
+          ],
+          "item": {
+            "type": "object",
+            "label_key": "promotionMessage",
+            "rules": [],
+            "fields": {
+              "en": {
+                "type": "string",
+                "label_key": "messageEn",
+                "rules": [
+                  {
+                    "type": "required"
+                  },
+                  {
+                    "type": "max_length",
+                    "params": {
+                      "max": 120
+                    }
+                  }
+                ]
+              },
+              "ar": {
+                "type": "string",
+                "label_key": "messageAr",
+                "rules": [
+                  {
+                    "type": "required"
+                  },
+                  {
+                    "type": "max_length",
+                    "params": {
+                      "max": 120
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "cta_label": {
+          "type": "string",
+          "label_key": "ctaLabel",
+          "rules": [
+            {
+              "type": "max_length",
+              "params": {
+                "max": 40
+              }
+            }
+          ],
+          "ui_key": "ctaLabel"
+        },
+        "cta_label_ar": {
+          "type": "string",
+          "label_key": "ctaLabelAr",
+          "rules": [
+            {
+              "type": "max_length",
+              "params": {
+                "max": 40
+              }
+            }
+          ],
+          "ui_key": "ctaLabelAr"
+        },
+        "cta_url": {
+          "type": "string",
+          "label_key": "ctaUrl",
+          "rules": [
+            {
+              "type": "max_length",
+              "params": {
+                "max": 500
+              }
+            }
+          ],
+          "ui_key": "ctaUrl"
+        },
+        "theme": {
+          "type": "string",
+          "label_key": "theme",
+          "rules": [
+            {
+              "type": "required"
+            },
+            {
+              "type": "one_of",
+              "params": {
+                "values": [
+                  "sale",
+                  "brand",
+                  "dark",
+                  "amber"
+                ]
+              }
+            }
+          ]
+        },
+        "starts_at": {
+          "type": "date",
+          "label_key": "startsAt",
+          "rules": [
+            {
+              "type": "required"
+            }
+          ],
+          "ui_key": "startsAt"
+        },
+        "ends_at": {
+          "type": "date",
+          "label_key": "endsAt",
+          "rules": [
+            {
+              "type": "date_range",
+              "params": {
+                "gte_field": "starts_at"
+              }
+            }
+          ],
+          "ui_key": "endsAt"
+        },
+        "show_countdown": {
+          "type": "boolean",
+          "label_key": "showCountdown",
+          "rules": [],
+          "ui_key": "showCountdown"
+        },
+        "audiences": {
+          "type": "array",
+          "label_key": "audiences",
+          "rules": [
+            {
+              "type": "array",
+              "params": {
+                "min": 1
+              }
+            }
+          ],
+          "item": {
+            "type": "string",
+            "label_key": "audience",
+            "rules": [
+              {
+                "type": "one_of",
+                "params": {
+                  "values": [
+                    "public",
+                    "dashboard",
+                    "mobile"
+                  ]
+                }
+              }
+            ]
+          }
+        },
+        "priority": {
+          "type": "integer",
+          "label_key": "priority",
+          "rules": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number_range",
+              "params": {
+                "min": -999,
+                "max": 999
+              }
+            }
+          ]
+        }
+      },
+      "aliases": {
+        "ctaLabel": "cta_label",
+        "ctaLabelAr": "cta_label_ar",
+        "ctaUrl": "cta_url",
+        "startsAt": "starts_at",
+        "endsAt": "ends_at",
+        "showCountdown": "show_countdown"
       }
     },
     "payment_gateway.create": {

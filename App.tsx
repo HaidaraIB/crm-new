@@ -19,6 +19,7 @@ import { WhatsAppCallListener } from './components/whatsapp/WhatsAppCallListener
 import { SoftphoneProvider } from './components/telephony/SoftphoneProvider';
 import { MaintenanceScreen } from './components/MaintenanceScreen';
 import ImpersonationBanner from './components/ImpersonationBanner';
+import DashboardPromoBar from './components/pricing/DashboardPromoBar';
 import ImpersonationSessionGuard from './components/ImpersonationSessionGuard';
 import { fetchMaintenanceStatusAPI } from './services/api';
 import { subscribeMaintenanceMode } from './utils/maintenanceMode';
@@ -1090,6 +1091,7 @@ const TheApp = () => {
                 ></div>
             )}
             <div className="app-print-flow flex-1 flex min-h-0 flex-col overflow-hidden">
+                <DashboardPromoBar />
                 <ImpersonationBanner />
                 <Header isInternetOnline={isInternetOnline} />
                 {/* Check if payment success message exists - if so, don't show email verification message */}

@@ -1547,6 +1547,24 @@ export const checkPaymentStatusAPI = async (
  * GET /api/public/plans/
  * Public — do not send JWT (stale tokens can trigger refresh/redirect and break registration).
  */
+/**
+ * GET /api/public/promotions/active/?audience=public|dashboard|mobile
+ * Public — no JWT, same as public plans. Returns the one live promotion (or null) + server clock.
+ */
+export const getActivePromotionAPI = async (audience: 'public' | 'dashboard' | 'mobile') => {
+  const response = await fetch(`${BASE_URL}/public/promotions/active/?audience=${encodeURIComponent(audience)}`, {
+    method: 'GET',
+    headers: getHeadersWithApiKey({
+      'Content-Type': 'application/json',
+    }),
+  });
+  if (!response.ok) {
+    const errorData = await readJsonResponse(response);
+    throwApiError(errorData, 'Failed to load promotion');
+  }
+  return parseSuccessJsonResponse<{ promotion: any | null; server_time: string }>(response);
+};
+
 export const getPublicPlansAPI = async () => {
   const response = await fetch(`${BASE_URL}/public/plans/`, {
     method: 'GET',

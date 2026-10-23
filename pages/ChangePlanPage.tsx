@@ -17,27 +17,26 @@ import { isFibSessionPayload, routeToFibPaymentPage, getPendingSubscriptionId } 
 import { hydratePaymentAccessToken } from '../utils/paymentAuth';
 import { setPaymentCheckoutContext } from '../utils/paymentFeedback';
 import { clearFieldError } from '../utils/formFieldErrors';
+import type { PublicPlan } from '../components/pricing/types';
+import { normalizePublicPlans } from '../components/pricing/normalizePublicPlan';
+import { formatPlanPrice } from '../components/pricing/formatPlanPrice';
+import PlanPrice from '../components/pricing/PlanPrice';
+import PlanCornerBadges from '../components/pricing/PlanCornerBadges';
+import PlanOfferNote from '../components/pricing/PlanOfferNote';
+import SaleCountdownChip from '../components/pricing/SaleCountdownChip';
+import PromoBar from '../components/pricing/PromoBar';
 
-type PublicPlan = {
-    id: number;
-    name: string;
-    name_ar?: string;
-    description: string;
-    description_ar?: string;
-    price_monthly: number;
-    price_yearly: number;
-    trial_days: number;
-    users: string;
-    clients: string;
-    features?: Record<string, boolean>;
-    limits?: Record<string, number | 'unlimited' | null>;
-    usage_limits_monthly?: Record<string, number | 'unlimited' | null>;
-    tier?: number;
-};
 
 export const ChangePlanPage = () => {
     const { t, language, theme, currentUser, setIsSuccessModalOpen, setSuccessMessage } = useAppContext();
     const [plans, setPlans] = useState<PublicPlan[]>([]);
+    const reloadPlans = async () => {
+        try {
+            setPlans(normalizePublicPlans(await getPublicPlansAPI()));
+        } catch {
+            /* keep the current list */
+        }
+    };
     const [errors, setErrors] = useState<Record<string, string>>({});
     const [plansLoading, setPlansLoading] = useState<boolean>(true);
     const [plansError, setPlansError] = useState<string | null>(null);
@@ -52,6 +51,8 @@ export const ChangePlanPage = () => {
     const [preview, setPreview] = useState<{
         intent?: string;
         amount_usd?: string;
+        regular_amount_usd?: string;
+        discount_usd?: string;
         days_remaining_in_period?: number;
         error?: string;
     } | null>(null);
@@ -119,22 +120,7 @@ export const ChangePlanPage = () => {
             setPlansError(null);
             try {
                 const data = await getPublicPlansAPI();
-                const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
-                    id: plan.id,
-                    name: plan.name || '',
-                    name_ar: plan.name_ar || '',
-                    description: plan.description || '',
-                    description_ar: plan.description_ar || '',
-                    price_monthly: Number(plan.price_monthly || 0),
-                    price_yearly: Number(plan.price_yearly || 0),
-                    trial_days: Number(plan.trial_days || 0),
-                    users: plan.users,
-                    clients: plan.clients,
-                    features: plan.features || {},
-                    limits: plan.limits || {},
-                    usage_limits_monthly: plan.usage_limits_monthly || {},
-                    tier: typeof plan.tier === 'number' ? plan.tier : undefined,
-                }));
+                const normalizedPlans = normalizePublicPlans(data);
                 setPlans(normalizedPlans);
             } catch (error: any) {
                 setPlansError(error.message || t('failedToLoadPlans') || 'Failed to load plans');
@@ -201,17 +187,6 @@ export const ChangePlanPage = () => {
         };
     }, [selectedPlan, billingCycle, subscriptionId]);
 
-    const getPlanPriceLabel = (plan: PublicPlan) => {
-        const price = billingCycle === 'monthly' ? Number(plan.price_monthly || 0) : Number(plan.price_yearly || 0);
-        if (price === 0) {
-            return t('free') || 'Free';
-        }
-        const formattedPrice = new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', withLatinDigits({
-            style: 'currency',
-            currency: 'USD',
-        })).format(price);
-        return `${formattedPrice}/${billingCycle === 'monthly' ? t('month') || 'month' : t('year') || 'year'}`;
-    };
 
     const handleChangePlan = async () => {
         const newErrors: Record<string, string> = {};
@@ -328,6 +303,8 @@ export const ChangePlanPage = () => {
     const isRTL = language === 'ar';
 
     return (
+        <>
+        <PromoBar audience="public" defaultHref="/change-plan" hideDefaultCta />
         <PageWrapper title={t('changePlan') || 'Change Plan'}>
             <PaymentResultBanner autoHideMs={20000} />
             <div className="max-w-6xl mx-auto space-y-6">
@@ -412,6 +389,17 @@ export const ChangePlanPage = () => {
                                         })).format(Number(preview.amount_usd))}{' '}
                                         ({preview.intent})
                                     </p>
+                                    {Number(preview.discount_usd) > 0 && (
+                                        <p className="text-gray-600 dark:text-gray-400">
+                                            {t('planRegularLine')}:{' '}
+                                            <del dir="ltr" className="[unicode-bidi:isolate]">{formatPlanPrice(Number(preview.regular_amount_usd), language)}</del>
+                                            {' · '}
+                                            {t('planDiscountLine')}:{' '}
+                                            <span dir="ltr" className="font-semibold text-rose-600 dark:text-rose-400 [unicode-bidi:isolate]">
+                                                −{formatPlanPrice(Number(preview.discount_usd), language)}
+                                            </span>
+                                        </p>
+                                    )}
                                     {typeof preview.days_remaining_in_period === 'number' && (
                                         <p className="text-gray-600 dark:text-gray-400">
                                             {t('daysLeftInPeriod') || 'Days left in current period'}:{' '}
@@ -480,7 +468,7 @@ export const ChangePlanPage = () => {
                                             clearFieldError(setErrors, 'plan');
                                         }
                                     }}
-                                    className={`p-6 border-2 rounded-lg transition-all ${
+                                    className={`relative p-6 border-2 rounded-lg transition-all ${
                                         isLocked
                                             ? 'border-gray-300 dark:border-gray-500 bg-gray-50 dark:bg-gray-800/60 cursor-not-allowed'
                                             : `cursor-pointer ${
@@ -490,6 +478,7 @@ export const ChangePlanPage = () => {
                                               }`
                                     }`}
                                 >
+                                    <PlanCornerBadges plan={plan} cycle={billingCycle} language={language} t={t} />
                                     <div className="flex items-center justify-between mb-4">
                                         <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                                             {displayName}
@@ -517,8 +506,12 @@ export const ChangePlanPage = () => {
                                             {resolvedDesc}
                                         </p>
                                     )}
-                                    <div className="text-2xl font-bold text-primary-700 dark:text-primary-300 mb-4">
-                                        {getPlanPriceLabel(plan)}
+                                    <div className="mb-4">
+                                        <PlanPrice plan={plan} cycle={billingCycle} language={language} t={t} size="md" />
+                                        {plan.pricing[billingCycle].onSale && (
+                                            <SaleCountdownChip endsAt={plan.saleEndsAt} language={language} t={t} onExpire={reloadPlans} />
+                                        )}
+                                        <PlanOfferNote plan={plan} language={language} />
                                     </div>
                                     <PlanEntitlementsSummary
                                         users={plan.users}
@@ -582,6 +575,7 @@ export const ChangePlanPage = () => {
                 </Card>
             </div>
         </PageWrapper>
+        </>
     );
 };
 

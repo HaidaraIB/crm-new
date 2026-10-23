@@ -37,35 +37,18 @@ import {
     clearRegistrationDraft,
     clampRestoredRegistrationStep,
 } from '../utils/registrationDraft';
+import type { PublicPlan } from '../components/pricing/types';
+import { normalizePublicPlans, isFreeOrTrialPlan } from '../components/pricing/normalizePublicPlan';
+import PlanPrice from '../components/pricing/PlanPrice';
+import PlanCornerBadges from '../components/pricing/PlanCornerBadges';
+import PlanOfferNote from '../components/pricing/PlanOfferNote';
+import SaleCountdownChip from '../components/pricing/SaleCountdownChip';
+import PromoBar from '../components/pricing/PromoBar';
 
-type PublicPlan = {
-    id: number;
-    name: string;
-    name_ar?: string;
-    description: string;
-    description_ar?: string;
-    price_monthly: number;
-    price_yearly: number;
-    trial_days: number;
-    users: string;
-    clients: string;
-    features?: Record<string, boolean>;
-    limits?: Record<string, number | 'unlimited' | null>;
-    usage_limits_monthly?: Record<string, number | 'unlimited' | null>;
-    tier?: number;
-};
 
 const slugifyDomain = (text: string) =>
     text.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
 
-const resolveRecommendedPlanId = (planList: PublicPlan[]): number | null => {
-    if (planList.length < 2) return null;
-    const paid = planList.filter(
-        (p) => Number(p.price_monthly || 0) > 0 || Number(p.price_yearly || 0) > 0,
-    );
-    if (paid.length === 0) return planList[1]?.id ?? null;
-    return paid.reduce((best, plan) => ((plan.tier ?? 0) > (best.tier ?? 0) ? plan : best)).id;
-};
 
 export const RegisterPage = () => {
     const { setIsLoggedIn, setCurrentUser, t, language, setLanguage, setCurrentPage, theme, setTheme } = useAppContext();
@@ -99,6 +82,13 @@ export const RegisterPage = () => {
     const [trialCodeLoading, setTrialCodeLoading] = useState(false);
     const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>(registrationBootstrap.billingCycle);
     const [plans, setPlans] = useState<PublicPlan[]>([]);
+    const reloadPlans = async () => {
+        try {
+            setPlans(normalizePublicPlans(await getPublicPlansAPI()));
+        } catch {
+            /* keep the current list; the next load retries */
+        }
+    };
     const [plansLoading, setPlansLoading] = useState<boolean>(true);
     const [plansError, setPlansError] = useState<string | null>(null);
     const [stepCheckLoading, setStepCheckLoading] = useState(false);
@@ -228,18 +218,6 @@ export const RegisterPage = () => {
     const mapBackendErrorsToFields = (apiFields: any) =>
         mapRegisterBackendErrorsToFields(apiFields, t);
 
-    const getPlanPriceLabel = (plan: PublicPlan) => {
-        // Free/trial plans do not have billing cycles (avoid "per month/year" confusion).
-        const isFreeOrTrial = Number(plan.price_monthly || 0) <= 0 && Number(plan.price_yearly || 0) <= 0;
-        const price = billingCycle === 'monthly' ? Number(plan.price_monthly || 0) : Number(plan.price_yearly || 0);
-        if (isFreeOrTrial || !price) {
-            return t('free') || 'Free';
-        }
-        return new Intl.NumberFormat(language === 'ar' ? 'ar' : 'en', withLatinDigits({
-            style: 'currency',
-            currency: 'USD',
-        })).format(price);
-    };
 
     const selectedPlanDetails = selectedPlan ? plans.find((p) => p.id === selectedPlan) : undefined;
     const clearFieldError = (field: string) => {
@@ -538,22 +516,7 @@ export const RegisterPage = () => {
             try {
                 const data = await getPublicPlansAPI();
                 if (isMounted) {
-                    const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
-                        id: plan.id,
-                        name: plan.name || '',
-                        name_ar: plan.name_ar || '',
-                        description: plan.description || '',
-                        description_ar: plan.description_ar || '',
-                        price_monthly: Number(plan.price_monthly || 0),
-                        price_yearly: Number(plan.price_yearly || 0),
-                        trial_days: Number(plan.trial_days || 0),
-                        users: plan.users,
-                        clients: plan.clients,
-                        features: plan.features || {},
-                        limits: plan.limits || {},
-                        usage_limits_monthly: plan.usage_limits_monthly || {},
-                        tier: typeof plan.tier === 'number' ? plan.tier : undefined,
-                    }));
+                    const normalizedPlans = normalizePublicPlans(data);
                     setPlans(normalizedPlans);
                 }
             } catch (error: any) {
@@ -583,22 +546,7 @@ export const RegisterPage = () => {
             try {
                 const data = await getPublicPlansAPI();
                 if (cancelled) return;
-                const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
-                    id: plan.id,
-                    name: plan.name || '',
-                    name_ar: plan.name_ar || '',
-                    description: plan.description || '',
-                    description_ar: plan.description_ar || '',
-                    price_monthly: Number(plan.price_monthly || 0),
-                    price_yearly: Number(plan.price_yearly || 0),
-                    trial_days: Number(plan.trial_days || 0),
-                    users: plan.users,
-                    clients: plan.clients,
-                    features: plan.features || {},
-                    limits: plan.limits || {},
-                    usage_limits_monthly: plan.usage_limits_monthly || {},
-                    tier: typeof plan.tier === 'number' ? plan.tier : undefined,
-                }));
+                const normalizedPlans = normalizePublicPlans(data);
                 setPlans(normalizedPlans);
             } catch (error: any) {
                 if (!cancelled) {
@@ -1192,7 +1140,9 @@ export const RegisterPage = () => {
 
     return (
         <>
-            <div className={`min-h-screen flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
+            <div className="flex min-h-screen flex-col">
+            <PromoBar audience="public" defaultHref="/register" hideDefaultCta />
+            <div className={`flex-1 flex ${language === 'ar' ? 'font-arabic' : 'font-sans'} relative`}>
                 {/* Theme and Language Toggle Buttons */}
                 <div className={`absolute top-4 end-4 z-10 flex ${language === 'ar' ? 'gap-4' : 'gap-2'}`}>
                     <button
@@ -1805,22 +1755,7 @@ export const RegisterPage = () => {
                                                             setPlansError(null);
                                                             try {
                                                                 const data = await getPublicPlansAPI();
-                                                                const normalizedPlans = (Array.isArray(data) ? data : []).map((plan: any): PublicPlan => ({
-                                                                    id: plan.id,
-                                                                    name: plan.name || '',
-                                                                    name_ar: plan.name_ar || '',
-                                                                    description: plan.description || '',
-                                                                    description_ar: plan.description_ar || '',
-                                                                    price_monthly: Number(plan.price_monthly || 0),
-                                                                    price_yearly: Number(plan.price_yearly || 0),
-                                                                    trial_days: Number(plan.trial_days || 0),
-                                                                    users: plan.users,
-                                                                    clients: plan.clients,
-                                                                    features: plan.features || {},
-                                                                    limits: plan.limits || {},
-                                                                    usage_limits_monthly: plan.usage_limits_monthly || {},
-                                                                    tier: typeof plan.tier === 'number' ? plan.tier : undefined,
-                                                                }));
+                                                                const normalizedPlans = normalizePublicPlans(data);
                                                                 setPlans(normalizedPlans);
                                                             } catch (error: any) {
                                                                 setPlansError(error.message || t('failedToLoadPlans') || 'Failed to load plans');
@@ -1841,7 +1776,6 @@ export const RegisterPage = () => {
                                             )}
 
                                             {!plansLoading && !plansError && plans.length > 0 && (() => {
-                                                const recommendedPlanId = resolveRecommendedPlanId(plans);
                                                 return (
                                                     <div
                                                         className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
@@ -1861,10 +1795,7 @@ export const RegisterPage = () => {
                                                                 explicitDesc || (t('planDefaultDescription') || 'All CRM essentials included.');
                                                             const showPlanDescription = !isRedundantPlanDescription(displayName, resolvedDesc);
                                                             const isPlanSelected = selectedPlan === plan.id;
-                                                            const isRecommended = recommendedPlanId === plan.id;
-                                                            const isFreeOrTrial =
-                                                                Number(plan.price_monthly || 0) <= 0
-                                                                && Number(plan.price_yearly || 0) <= 0;
+                                                            const featured = plan.isFeatured;
                                                             return (
                                                                 <button
                                                                     type="button"
@@ -1872,32 +1803,36 @@ export const RegisterPage = () => {
                                                                     role="radio"
                                                                     aria-checked={isPlanSelected}
                                                                     onClick={() => handlePlanSelect(plan.id)}
-                                                                    className={`relative flex h-full flex-col rounded-2xl border-2 bg-white p-5 text-start shadow-sm transition-all group dark:bg-gray-800/90 ${
-                                                                        isPlanSelected
-                                                                            ? 'border-primary-500 shadow-md ring-2 ring-primary-500/20 dark:ring-primary-400/30'
-                                                                            : 'border-gray-200 hover:border-primary-300 hover:shadow-md dark:border-gray-600 dark:hover:border-gray-500'
+                                                                    className={`relative flex h-full flex-col rounded-2xl border-2 p-5 text-start shadow-sm transition-all group ${
+                                                                        featured
+                                                                            ? `dark bg-gradient-to-b from-primary-900 via-primary-950 to-gray-950 ${
+                                                                                  isPlanSelected
+                                                                                      ? 'border-primary-300 shadow-xl ring-2 ring-primary-400/40'
+                                                                                      : 'border-primary-700/60 shadow-lg hover:border-primary-400'
+                                                                              }`
+                                                                            : `bg-white dark:bg-gray-800/90 ${
+                                                                                  isPlanSelected
+                                                                                      ? 'border-primary-500 shadow-md ring-2 ring-primary-500/20 dark:ring-primary-400/30'
+                                                                                      : 'border-gray-200 hover:border-primary-300 hover:shadow-md dark:border-gray-600 dark:hover:border-gray-500'
+                                                                              }`
                                                                     }`}
                                                                 >
-                                                                    {isRecommended && (
-                                                                        <span className="absolute -top-3 end-4 rounded-full bg-amber-400 px-3 py-0.5 text-[11px] font-bold uppercase tracking-wide text-gray-900 shadow-sm">
-                                                                            {t('planMostPopular')}
-                                                                        </span>
-                                                                    )}
+                                                                    <PlanCornerBadges plan={plan} cycle={billingCycle} language={language} t={t} onDarkCard={featured} />
                                                                     <h4 className="text-xl font-bold text-heading">
                                                                         {displayName}
                                                                     </h4>
                                                                     <div className="mt-4">
-                                                                        <span className="text-3xl font-extrabold tracking-tight text-heading">
-                                                                            {getPlanPriceLabel(plan)}
-                                                                        </span>
-                                                                        {!isFreeOrTrial && (
-                                                                            <p className="mt-1 text-sm text-secondary capitalize">
-                                                                                {billingCycle === 'monthly'
-                                                                                    ? (t('perMonth') || 'per month')
-                                                                                    : (t('perYear') || 'per year')}
-                                                                            </p>
+                                                                        <PlanPrice plan={plan} cycle={billingCycle} language={language} t={t} periodStyle={isFreeOrTrialPlan(plan) ? 'inline' : 'below'} />
+                                                                        {plan.pricing[billingCycle].onSale && (
+                                                                            <SaleCountdownChip
+                                                                                endsAt={plan.saleEndsAt}
+                                                                                language={language}
+                                                                                t={t}
+                                                                                onExpire={reloadPlans}
+                                                                            />
                                                                         )}
                                                                     </div>
+                                                                    <PlanOfferNote plan={plan} language={language} />
                                                                     {showPlanDescription && (
                                                                         <p className="mt-4 text-sm font-semibold leading-snug text-secondary">
                                                                             {resolvedDesc}
@@ -1921,7 +1856,9 @@ export const RegisterPage = () => {
                                                                         className={`mt-5 block w-full rounded-lg py-2.5 text-center text-sm font-semibold transition ${
                                                                             isPlanSelected
                                                                                 ? 'bg-primary-500 text-white shadow-sm'
-                                                                                : 'border border-gray-300 bg-gray-100 text-gray-900 group-hover:bg-gray-200 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-50 dark:group-hover:bg-gray-500'
+                                                                                : featured
+                                                                                  ? 'bg-primary-500/90 text-white group-hover:bg-primary-400'
+                                                                                  : 'border border-gray-300 bg-gray-100 text-gray-900 group-hover:bg-gray-200 dark:border-gray-500 dark:bg-gray-600 dark:text-gray-50 dark:group-hover:bg-gray-500'
                                                                         }`}
                                                                     >
                                                                         {isPlanSelected ? t('planSelected') : t('selectThisPlan')}
@@ -2077,6 +2014,7 @@ export const RegisterPage = () => {
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
             {showVerificationModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center px-4">

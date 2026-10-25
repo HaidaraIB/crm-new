@@ -367,6 +367,9 @@ export interface PhoneNumber {
   updated_at?: string;
 }
 
+/** A phone row in a lead form: saved rows keep their id, rows added in the form have none yet. */
+export type PhoneNumberDraft = Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> & { id?: number };
+
 export type MetaQualificationError = { key: string; message: string } | null;
 
 export interface Lead {

@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, PageBackButton, PageLoadingState, FieldError, IconButton, Select } from '../components/index';
-import { Channel, Lead, PhoneNumber, Status, Tag } from '../types';
+import { Channel, Lead, PhoneNumber, PhoneNumberDraft, Status, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useTags, usePatchLead } from '../hooks/useQueries';
 import { TagMultiSelect } from '../components/leads/TagMultiSelect';
@@ -119,7 +119,7 @@ export const EditLeadPage = () => {
         interestedProject: '',
         interestedUnit: '',
     });
-    const [phoneNumbers, setPhoneNumbers] = useState<Array<Omit<PhoneNumber, 'id' | 'created_at' | 'updated_at'> | PhoneNumber>>([]);
+    const [phoneNumbers, setPhoneNumbers] = useState<PhoneNumberDraft[]>([]);
     const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
     useEffect(() => {
@@ -134,7 +134,7 @@ export const EditLeadPage = () => {
 
     const leadCatalogValues = (
         state = formState,
-        phones: PhoneNumber[] = phoneNumbers,
+        phones: PhoneNumberDraft[] = phoneNumbers,
     ) => {
         const filled = phones.filter((pn) => (pn.phone_number || '').trim() !== '');
         const phone = filled[0]?.phone_number || state.phone;
@@ -172,7 +172,7 @@ export const EditLeadPage = () => {
     const showLeadField = (
         field: string,
         state = formState,
-        phones: PhoneNumber[] = phoneNumbers,
+        phones: PhoneNumberDraft[] = phoneNumbers,
     ) => {
         const next = mirrorLeadErrors(catalogFieldErrors('lead.upsert', leadCatalogValues(state, phones), translate));
         const keys = new Set<string>([field]);

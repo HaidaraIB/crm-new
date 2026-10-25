@@ -35,10 +35,18 @@ export const SoftphoneDock: React.FC = () => {
   const [keypadOpen, setKeypadOpen] = useState(false);
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferTo, setTransferTo] = useState('');
+  const [dialerOpen, setDialerOpen] = useState(false);
+  const [dialTo, setDialTo] = useState('');
   const call = phone?.call ?? null;
   const elapsed = useElapsed(call?.phase === 'active' ? call.startedAt : null);
 
   useEffect(() => {
+    // A call is under way (the CRM accepted ours, or one came in): the dialer has done
+    // its job. A refused call keeps the typed number, so it can be corrected.
+    if (call && call.phase !== 'ended' && (call.callId || call.direction === 'inbound')) {
+      setDialerOpen(false);
+      setDialTo('');
+    }
     if (!call || call.phase === 'ended') {
       setKeypadOpen(false);
       setTransferOpen(false);
@@ -49,22 +57,99 @@ export const SoftphoneDock: React.FC = () => {
   if (!phone) return null;
   const { me, registration } = phone;
 
-  // Idle: a small registration pill for browser extensions only.
+  // Idle: a small registration pill for browser extensions only. Once registered it
+  // opens a dialer: numbers that are on no lead, and emergency numbers (which a
+  // lead's phone field cannot hold), are reachable only from here.
   if (!call) {
     if (!me?.webrtc) return null;
     const label =
       registration === 'registered' ? tr('softphoneReady') : registration === 'connecting' ? tr('softphoneConnecting') : tr('softphoneOffline');
     const dot = registration === 'registered' ? 'bg-emerald-500' : registration === 'connecting' ? 'bg-amber-400' : 'bg-gray-400';
-    return (
-      <div
-        className="fixed bottom-4 end-4 z-40 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-800/95 dark:text-gray-200"
-        role="status"
-        aria-live="polite"
-      >
+    const canDial = registration === 'registered' && Boolean(me.can_click_to_call);
+    const pillClass =
+      'inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white/95 px-3 py-1.5 text-xs font-medium text-gray-700 shadow-sm dark:border-gray-700 dark:bg-gray-800/95 dark:text-gray-200';
+    const pillContent = (
+      <>
         <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden />
         <PhoneIcon className="h-3.5 w-3.5" />
         <span>{label}</span>
         {me.extension ? <PhoneText className="text-gray-500 dark:text-gray-400">{me.extension.number}</PhoneText> : null}
+      </>
+    );
+    const number = dialTo.replace(/[^0-9+*#]/g, '');
+    const dial = () => {
+      if (!number) return;
+      void phone.placeCall(number, null);
+    };
+    return (
+      <div className="fixed bottom-4 end-4 z-40 flex flex-col items-end gap-2" role="status" aria-live="polite">
+        {canDial && dialerOpen ? (
+          <form
+            className="w-[19rem] max-w-[calc(100vw-2rem)] rounded-xl border border-gray-200 bg-white p-4 shadow-xl dark:border-gray-700 dark:bg-gray-800"
+            aria-label={tr('softphoneDialer')}
+            onSubmit={(e) => {
+              e.preventDefault();
+              dial();
+            }}
+          >
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{tr('softphoneDialer')}</p>
+              <IconButton icon={<XIcon className="h-4 w-4" />} label={tr('close')} onClick={() => setDialerOpen(false)} />
+            </div>
+            <div className="mt-2 flex gap-1.5">
+              <input
+                dir="ltr"
+                type="tel"
+                inputMode="tel"
+                autoComplete="off"
+                value={dialTo}
+                onChange={(e) => setDialTo(e.target.value.replace(/[^0-9+*#\s()-]/g, '').slice(0, 20))}
+                placeholder={tr('softphoneDialerPlaceholder')}
+                aria-label={tr('softphoneDialer')}
+                aria-describedby="softphone-dialer-hint"
+                className="h-10 min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 text-base dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
+              />
+              <IconButton
+                size="md"
+                icon={<span aria-hidden>⌫</span>}
+                label={tr('softphoneBackspace')}
+                title={tr('softphoneBackspace')}
+                disabled={!dialTo}
+                onClick={() => setDialTo((v) => v.slice(0, -1))}
+              />
+            </div>
+            <p id="softphone-dialer-hint" className="mt-1 text-[11px] text-gray-500 dark:text-gray-400">{tr('softphoneDialerHint')}</p>
+            <div className="mt-2 grid grid-cols-3 gap-1.5" dir="ltr">
+              {[...KEYS.slice(0, 9), '+', '0', '#'].map((k) => (
+                <button
+                  key={k}
+                  type="button"
+                  className="h-10 rounded-md bg-gray-100 text-base font-semibold text-gray-800 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
+                  onClick={() => setDialTo((v) => (v + k).slice(0, 20))}
+                >
+                  {k}
+                </button>
+              ))}
+            </div>
+            <Button type="submit" className="mt-3 w-full !bg-emerald-600 hover:!bg-emerald-700" disabled={!number}>
+              <PhoneIcon className="h-4 w-4" />
+              {tr('softphoneCall')}
+            </Button>
+          </form>
+        ) : null}
+        {canDial ? (
+          <button
+            type="button"
+            className={`${pillClass} hover:bg-gray-50 dark:hover:bg-gray-700`}
+            aria-expanded={dialerOpen}
+            title={tr('softphoneDialer')}
+            onClick={() => setDialerOpen((v) => !v)}
+          >
+            {pillContent}
+          </button>
+        ) : (
+          <div className={pillClass}>{pillContent}</div>
+        )}
       </div>
     );
   }

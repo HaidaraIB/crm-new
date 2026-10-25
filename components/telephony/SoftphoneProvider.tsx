@@ -33,7 +33,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 // JsSIP is loaded on demand: only users with a browser extension ever need it.
 type JsSIPModule = typeof import('jssip');
-import type { RTCSession } from 'jssip/lib/RTCSession';
+import type { IceCandidateEvent, RTCSession } from 'jssip/lib/RTCSession';
 import type { IncomingRTCSessionEvent, UA } from 'jssip/lib/UA';
 
 import { useAppContext } from '../../context/AppContext';
@@ -120,6 +120,10 @@ export function useSoftphoneOptional(): SoftphoneContextValue | null {
 
 const POLL_MS = 2500;
 const ENDED_LINGER_MS = 4000;
+// JsSIP sends the answer only when ICE gathering ends. A TURN server the agent's
+// network cannot reach (UDP 3478 blocked) holds that for many seconds while the
+// caller keeps ringing, so answer this long after the first candidate.
+const ICE_GATHERING_GRACE_MS = 1500;
 const EXT_RE = /^[1-9][0-9]{1,5}$/;
 
 function isWhatsAppBusy(phase: string | undefined, active: unknown): boolean {
@@ -249,6 +253,16 @@ export const SoftphoneProvider: React.FC<{ children?: React.ReactNode }> = ({ ch
   const wireSession = useCallback(
     (session: RTCSession) => {
       sessionRef.current = session;
+      let iceTimer: ReturnType<typeof setTimeout> | undefined;
+      session.on('icecandidate', (e: IceCandidateEvent) => {
+        // A relay candidate is the last one that matters; otherwise stop waiting soon.
+        if (/ typ relay /.test(e.candidate.candidate)) {
+          clearTimeout(iceTimer);
+          e.ready();
+        } else if (!iceTimer) {
+          iceTimer = setTimeout(e.ready, ICE_GATHERING_GRACE_MS);
+        }
+      });
       session.on('confirmed', () => {
         stopWhatsAppIncomingCallRingtone();
         attachAudio(session);
@@ -375,6 +389,15 @@ export const SoftphoneProvider: React.FC<{ children?: React.ReactNode }> = ({ ch
 
   // ---- registration (WebRTC extensions only) --------------------------------------
 
+  // The UA reads the handler through a ref: onIncoming changes whenever the app
+  // context hands out a new t/showToast, and restarting the UA for that unregistered
+  // the phone each time, so click-to-call in that gap was refused as "not connected"
+  // (seen through the production edge: REGISTER, expires=0, REGISTER after navigating).
+  const onIncomingRef = useRef(onIncoming);
+  useEffect(() => {
+    onIncomingRef.current = onIncoming;
+  }, [onIncoming]);
+
   useEffect(() => {
     if (!me?.webrtc) return undefined;
     let stopped = false;
@@ -409,7 +432,7 @@ export const SoftphoneProvider: React.FC<{ children?: React.ReactNode }> = ({ ch
       ua.on('unregistered', () => !stopped && setRegistration('connecting'));
       ua.on('registrationFailed', () => !stopped && setRegistration('failed'));
       ua.on('disconnected', () => !stopped && setRegistration('connecting'));
-      ua.on('newRTCSession', onIncoming as never);
+      ua.on('newRTCSession', ((e: IncomingRTCSessionEvent) => onIncomingRef.current(e)) as never);
       uaRef.current = ua;
       ua.start();
 
@@ -435,7 +458,7 @@ export const SoftphoneProvider: React.FC<{ children?: React.ReactNode }> = ({ ch
       uaRef.current = null;
       setRegistration('off');
     };
-  }, [me?.webrtc, onIncoming]);
+  }, [me?.webrtc]);
 
   // ---- live call polling (REST; the socket carries no call data) ---------------------
 
@@ -526,6 +549,9 @@ export const SoftphoneProvider: React.FC<{ children?: React.ReactNode }> = ({ ch
   const answer = useCallback(() => {
     const session = sessionRef.current;
     if (!session || callRef.current?.phase !== 'ringing-in') return;
+    // The phase stays "ringing-in" until the call is confirmed; a second click in
+    // between made JsSIP throw INVALID_STATE_ERROR (status 5, already answering).
+    if (session.status !== session.C.STATUS_WAITING_FOR_ANSWER) return;
     stopWhatsAppIncomingCallRingtone();
     session.answer({ mediaConstraints: { audio: true, video: false }, pcConfig: pcConfig() });
   }, [pcConfig]);

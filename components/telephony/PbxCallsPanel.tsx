@@ -22,6 +22,7 @@ import { Button } from '../Button';
 import { IconButton } from '../IconButton';
 import { ClockIcon, MicrophoneIcon, PhoneIcon, TrashIcon } from '../icons';
 import { PhoneText, isPhoneLike } from '../PhoneText';
+import { Select } from '../Select';
 import { DataTable, TableActions, TableBody, TableHead, TableRow, Td, Th } from '../DataTable';
 import { PbxRecordingPlayer } from './PbxRecordingPlayer';
 import { useSoftphoneOptional } from './SoftphoneProvider';
@@ -181,27 +182,19 @@ export const PbxCallsPanel: React.FC = () => {
   return (
     <div className="overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-gray-700 dark:bg-gray-800">
       <div className="flex flex-wrap items-end gap-3 border-b border-gray-200 bg-gray-50/70 p-3 dark:border-gray-700 dark:bg-gray-800">
-        <label className="min-w-40 flex-1 sm:flex-none">
+        <label className="min-w-40 flex-1 sm:w-48 sm:flex-none">
           <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{tr('direction')}</span>
-          <select
-            value={direction}
-            onChange={(event) => setDirection(event.target.value)}
-            className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          >
+          <Select value={direction} onChange={(event) => setDirection(event.target.value)}>
             <option value="">{tr('all')}</option>
             {['inbound', 'outbound', 'internal'].map((value) => <option key={value} value={value}>{tr(`pbxDirection_${value}`)}</option>)}
-          </select>
+          </Select>
         </label>
-        <label className="min-w-40 flex-1 sm:flex-none">
+        <label className="min-w-40 flex-1 sm:w-48 sm:flex-none">
           <span className="mb-1 block text-xs font-medium text-gray-600 dark:text-gray-400">{tr('status')}</span>
-          <select
-            value={status}
-            onChange={(event) => setStatus(event.target.value)}
-            className="h-9 w-full rounded-md border border-gray-300 bg-white px-3 text-sm text-gray-900 outline-none focus:border-primary focus:ring-2 focus:ring-primary/30 dark:border-gray-600 dark:bg-gray-900 dark:text-gray-100"
-          >
+          <Select value={status} onChange={(event) => setStatus(event.target.value)}>
             <option value="">{tr('all')}</option>
             {FILTER_STATUSES.map((value) => <option key={value} value={value}>{tr(`pbxStatus_${value}`)}</option>)}
-          </select>
+          </Select>
         </label>
         {hasFilters ? (
           <Button size="sm" variant="ghost" onClick={() => { setDirection(''); setStatus(''); }}>
@@ -222,14 +215,15 @@ export const PbxCallsPanel: React.FC = () => {
           {hasFilters ? <Button size="sm" variant="ghost" onClick={() => { setDirection(''); setStatus(''); }}>{tr('clearFilters')}</Button> : null}
         </div>
       ) : (
+      // Fits a laptop screen beside the sidebar (about 66rem); narrower screens scroll. Not
+      // TableHorizontalScroll: its w-max wrapper collapses a table-fixed table's flexible column.
       <div className="overflow-x-auto">
-      <DataTable className="min-w-[64rem] table-fixed">
+      <DataTable className="min-w-[62rem] table-fixed">
         <TableHead>
           <Th className="w-36">{tr('pbxColStarted')}</Th>
-          <Th className="w-64">{tr('call')}</Th>
-          <Th className="w-40">{tr('lead')}</Th>
-          <Th className="w-32">{tr('status')}</Th>
-          <Th className="w-24">{tr('pbxColTalkTime')}</Th>
+          <Th>{tr('call')}</Th>
+          <Th className="w-36">{tr('lead')}</Th>
+          <Th className="w-40">{tr('status')}</Th>
           <Th className="w-60">{tr('recording')}</Th>
           <Th className="w-28">{tr('actions')}</Th>
         </TableHead>
@@ -285,9 +279,17 @@ export const PbxCallsPanel: React.FC = () => {
                   <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${STATUS_TONE[c.status] || 'bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200'}`}>
                     {tr(`pbxStatus_${c.status}`)}
                   </span>
-                </Td>
-                <Td className="whitespace-nowrap">
-                  <span className="inline-block w-12 text-center tabular-nums">{talkTime(c.billsec_s)}</span>
+                  {c.billsec_s != null ? (
+                    <span
+                      // relative: keeps the sr-only label inside the scroll container (else it widens the page in RTL)
+                      className="relative mt-1 flex items-center justify-center gap-1 text-xs tabular-nums text-gray-500 dark:text-gray-400"
+                      title={tr('pbxColTalkTime')}
+                    >
+                      <ClockIcon className="h-3 w-3" aria-hidden />
+                      <span className="sr-only">{tr('pbxColTalkTime')}</span>
+                      {talkTime(c.billsec_s)}
+                    </span>
+                  ) : null}
                 </Td>
                 <Td><RecordingCell call={c} /></Td>
                 <Td>

@@ -206,6 +206,8 @@ export const DestinationPicker = ({
   types,
   error,
   excludeIvr,
+  className = 'grid gap-2 sm:grid-cols-2',
+  showEmptyTarget = false,
 }: {
   id: string;
   value: Destination;
@@ -214,6 +216,9 @@ export const DestinationPicker = ({
   error?: string;
   /** A menu never offers itself as a target. */
   excludeIvr?: string;
+  className?: string;
+  /** In a table-like row, fill the target column for "Hang up" so the row doesn't look unfinished. */
+  showEmptyTarget?: boolean;
 }) => {
   const tr = useTr();
   const { extensions, ivrs, queues } = useDestinationTargets();
@@ -224,7 +229,7 @@ export const DestinationPicker = ({
     hangup: tr('pbxDestHangup'),
   };
   return (
-    <div className="grid gap-2 sm:grid-cols-2">
+    <div className={className}>
       <Select
         id={id}
         value={value.type}
@@ -286,10 +291,47 @@ export const DestinationPicker = ({
           ))}
         </Select>
       ) : null}
-      <div className="sm:col-span-2">
-        <FieldError message={error} />
-      </div>
+      {showEmptyTarget && value.type === 'hangup' ? (
+        <span aria-hidden="true" className="hidden h-10 items-center px-3 text-gray-400 sm:flex dark:text-gray-500">—</span>
+      ) : null}
+      {error ? (
+        <div className="sm:col-span-2">
+          <FieldError message={error} />
+        </div>
+      ) : null}
     </div>
+  );
+};
+
+/** A titled group inside a Phone System modal; `titleFor` makes the title the field's label. */
+export const FormSection = ({
+  title,
+  titleFor,
+  titleId,
+  hint,
+  first,
+  children,
+}: {
+  title: string;
+  titleFor?: string;
+  titleId?: string;
+  hint?: string;
+  first?: boolean;
+  children: React.ReactNode;
+}) => {
+  const titleClass = 'block text-base font-semibold text-gray-900 dark:text-gray-100';
+  return (
+    <section className={first ? '' : 'border-t border-gray-200 pt-5 dark:border-gray-700'}>
+      <div className="mb-3">
+        {titleFor ? (
+          <label htmlFor={titleFor} id={titleId} className={titleClass}>{title}</label>
+        ) : (
+          <h4 id={titleId} className={titleClass}>{title}</h4>
+        )}
+        {hint ? <p className="mt-0.5 text-xs text-gray-500 dark:text-gray-400">{hint}</p> : null}
+      </div>
+      {children}
+    </section>
   );
 };
 

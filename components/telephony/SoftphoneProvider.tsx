@@ -52,6 +52,7 @@ import {
   type WebRtcCredentials,
 } from '../../services/api';
 import { shouldQueryTelephonyMe } from '../../utils/telephonyEligibility';
+import { SOFTPHONE_DECLINED } from '../../utils/pbxCallOutcome';
 import {
   preloadWhatsAppIncomingCallRingtone,
   startWhatsAppIncomingCallRingtone,
@@ -532,7 +533,7 @@ export const SoftphoneProvider: React.FC<{ children?: React.ReactNode }> = ({ ch
   const decline = useCallback(() => {
     stopWhatsAppIncomingCallRingtone();
     sessionRef.current?.terminate({ status_code: 486, reason_phrase: 'Busy Here' });
-    finish('missed');
+    finish(SOFTPHONE_DECLINED);
   }, [finish]);
 
   const declineWaiting = useCallback(() => {

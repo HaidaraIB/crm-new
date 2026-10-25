@@ -12,6 +12,7 @@ import { IconButton } from '../IconButton';
 import { MicOffIcon, MicrophoneIcon, PauseIcon, PhoneHangupIcon, PhoneIcon, PlayIcon, XIcon } from '../icons';
 import { PhoneText, isPhoneLike } from '../PhoneText';
 import { useSoftphoneOptional } from './SoftphoneProvider';
+import { softphoneEndLabelKey } from '../../utils/pbxCallOutcome';
 
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '*', '0', '#'];
 
@@ -77,7 +78,10 @@ export const SoftphoneDock: React.FC = () => {
   if (call.phase === 'ringing-in') subtitle = tr('softphoneIncoming');
   else if (call.phase === 'dialing') subtitle = call.viaBrowser ? tr('softphoneRingingYourPhone') : tr('softphonePickUpDeskPhone');
   else if (call.phase === 'active') subtitle = call.held ? tr('softphoneOnHold') : `${tr('softphoneInCall')} · ${elapsed}`;
-  else subtitle = call.endStatus ? `${tr('softphoneCallEnded')} · ${tr(`pbxStatus_${call.endStatus}`)}` : tr('softphoneCallEnded');
+  else {
+    const outcome = softphoneEndLabelKey(call.endStatus);
+    subtitle = outcome ? `${tr('softphoneCallEnded')} · ${tr(outcome)}` : tr('softphoneCallEnded');
+  }
 
   return (
     <div

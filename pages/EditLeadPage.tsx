@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from '../context/AppContext';
 import { PageWrapper, Card, Input, Button, NumberInput, PhoneInput, Checkbox, PageBackButton, PageLoadingState, FieldError, IconButton, Select } from '../components/index';
+import { phoneForForm } from '../utils/countries';
 import { Channel, Lead, PhoneNumber, PhoneNumberDraft, Status, Tag } from '../types';
 import { PlusIcon, TrashIcon } from '../components/icons';
 import { useUsers, useStatuses, useChannels, useTags, usePatchLead } from '../hooks/useQueries';
@@ -247,7 +248,7 @@ export const EditLeadPage = () => {
 
             const nextForm = {
                 name: editingLead.name || '',
-                phone: editingLead.phone || '',
+                phone: phoneForForm(editingLead.phone),
                 budget: editingLead.budget != null ? String(editingLead.budget) : '',
                 budgetMax:
                     editingLead.budgetMax != null
@@ -308,11 +309,11 @@ export const EditLeadPage = () => {
             if (editingLead.phoneNumbers && editingLead.phoneNumbers.length > 0) {
                 nextPhones = editingLead.phoneNumbers.map(pn => ({
                     ...pn,
-                    phone_number: pn.phone_number,
+                    phone_number: phoneForForm(pn.phone_number),
                 }));
             } else if (editingLead.phone) {
                 nextPhones = [{
-                    phone_number: editingLead.phone,
+                    phone_number: phoneForForm(editingLead.phone),
                     phone_type: 'mobile',
                     is_primary: true,
                     notes: '',

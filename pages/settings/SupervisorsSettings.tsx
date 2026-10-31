@@ -82,7 +82,7 @@ export const SupervisorsSettings = () => {
           updateUserAPI(editingSupervisor.user.id, {
             first_name: data.first_name,
             last_name: data.last_name,
-            phone: (data.phone || '').trim(),
+            phone: (data.phone || '').replace(/\D/g, ''),
           }),
           updateSupervisorAPI(editingSupervisor.id, {
             user_id: editingSupervisor.user.id,

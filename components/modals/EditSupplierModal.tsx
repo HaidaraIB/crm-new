@@ -5,6 +5,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import {Input, AutoDirTextarea } from '../Input';
 import { PhoneInput } from '../PhoneInput';
+import { phoneForForm } from '../../utils/countries';
 import { Button } from '../Button';
 import { Supplier } from '../../types';
 import { useUpdateSupplier } from '../../hooks/useQueries';
@@ -101,7 +102,7 @@ export const EditSupplierModal = () => {
         if (editingSupplier) {
             const initState = {
                 name: editingSupplier.name || '',
-                phone: editingSupplier.phone || '',
+                phone: phoneForForm(editingSupplier.phone),
                 email: editingSupplier.email || '',
                 address: editingSupplier.address || '',
                 contactPerson: editingSupplier.contactPerson || '',

@@ -5,6 +5,7 @@ import { useAppContext } from '../../context/AppContext';
 import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { PhoneInput } from '../PhoneInput';
+import { phoneForForm } from '../../utils/countries';
 import { Button } from '../Button';
 import { useUpdateOwner } from '../../hooks/useQueries';
 import { buildUpdateDiff } from '../../utils/buildUpdateDiff';
@@ -96,7 +97,7 @@ export const EditOwnerModal = () => {
         if (editingOwner) {
             const initState = {
                 name: editingOwner.name,
-                phone: editingOwner.phone,
+                phone: phoneForForm(editingOwner.phone),
                 city: editingOwner.city,
                 district: editingOwner.district,
             };

@@ -7,6 +7,7 @@ import { Button } from '../../components/Button';
 import { PhoneInput } from '../../components/PhoneInput';
 import { catalogFieldErrors, serverFieldErrors } from '../../forms';
 import { scrollToFirstFieldError } from '../../utils/formFieldErrors';
+import { phoneForForm } from '../../utils/countries';
 
 interface SupervisorModalProps {
   isOpen: boolean;
@@ -136,7 +137,7 @@ export const SupervisorModal: React.FC<SupervisorModalProps> = ({
         password: '',
         first_name: editingSupervisor.user.first_name,
         last_name: editingSupervisor.user.last_name,
-        phone: editingSupervisor.user.phone || '',
+        phone: phoneForForm(editingSupervisor.user.phone),
         is_active: editingSupervisor.is_active,
         can_manage_leads: editingSupervisor.can_manage_leads,
         can_manage_deals: editingSupervisor.can_manage_deals,

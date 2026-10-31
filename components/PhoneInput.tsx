@@ -4,6 +4,7 @@ import {
   Country,
   getCountryByCode,
   matchCountryByPhone,
+  phoneForForm,
   filterCountries,
   countryFlagSrc,
 } from '../utils/countries';
@@ -58,7 +59,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
 
   useEffect(() => {
     if (value) {
-      const matched = matchCountryByPhone(value);
+      const matched = matchCountryByPhone(phoneForForm(value));
       if (matched) {
         setSelectedCountry(matched.country);
         setPhoneNumber(matched.national);

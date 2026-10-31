@@ -110,6 +110,17 @@ export function matchCountryByPhone(value: string): { country: Country; national
   return { country, national };
 }
 
+/**
+ * Stored phones can be digits-only (User.phone, WhatsApp leads) or local (07...).
+ * Forms and PhoneInput work in +E.164. Mirrors the API's normalize_phone_to_e164.
+ */
+export function phoneForForm(stored?: string | null): string {
+  const value = (stored || '').trim().replace(/[\s-]/g, '');
+  if (!value) return '';
+  if (value.startsWith('07') && value.length >= 10) return `+964${value.slice(1)}`;
+  return value.startsWith('+') ? value : `+${value}`;
+}
+
 /** PNG flag URL (Windows does not render emoji flags as images). */
 export function countryFlagSrc(code: string, width: 20 | 40 = 40): string {
   return `https://flagcdn.com/w${width}/${code.toLowerCase()}.png`;

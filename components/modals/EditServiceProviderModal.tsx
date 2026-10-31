@@ -6,6 +6,7 @@ import { Modal } from '../Modal';
 import { Input } from '../Input';
 import { NumberInput } from '../NumberInput';
 import { PhoneInput } from '../PhoneInput';
+import { phoneForForm } from '../../utils/countries';
 import { Button } from '../Button';
 import { ServiceProvider } from '../../types';
 import { useUpdateServiceProvider } from '../../hooks/useQueries';
@@ -89,7 +90,7 @@ export const EditServiceProviderModal = () => {
         if (editingServiceProvider) {
             const initState = {
                 name: editingServiceProvider.name || '',
-                phone: editingServiceProvider.phone || '',
+                phone: phoneForForm(editingServiceProvider.phone),
                 email: editingServiceProvider.email || '',
                 specialization: editingServiceProvider.specialization || '',
                 rating: editingServiceProvider.rating !== undefined && editingServiceProvider.rating !== null ? editingServiceProvider.rating.toString() : '',

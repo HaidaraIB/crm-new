@@ -233,6 +233,8 @@ export const ProfilePage = () => {
 
     const mirrorProfileErrors = (raw: Record<string, string>) => {
         const next = { ...raw };
+        // The phone field is read-only here; it must not block saving the rest of the profile.
+        delete next.phone;
         if (next._general && !next.general) next.general = next._general;
         if (next.first_name && !next.firstName) next.firstName = next.first_name;
         if (next.firstName && !next.first_name) next.first_name = next.firstName;
